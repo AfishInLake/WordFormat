@@ -4,21 +4,41 @@
 # @Author  : afish
 # @File    : style.py
 from dataclasses import dataclass
-from enum import Enum, IntEnum
-from typing import Union
+from typing import Union, Any, Optional, Tuple, List
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor, Cm
-from docx.oxml import OxmlElement
-from .utils import _is_chinese_font_name
+from docx.text.run import Run
 
 
-class FontName(Enum):
+class LabelEnum:
+    _LABEL_MAP = {}
+
+    @classmethod
+    def from_label(cls, label: Any) -> Union[int, float, str, tuple]:
+        # 检查配置是否有映射
+        if label in cls._LABEL_MAP:
+            return cls._LABEL_MAP[label]
+        # 检查配置是否是类成员
+        if isinstance(label, str):
+            if label.isupper() and not label.startswith('_'):  # 只允许如 "BLACK"
+                if hasattr(cls, label):
+                    value = getattr(cls, label)
+                    if not callable(value):  # 排除方法
+                        return value
+        # 检查是否是int, float, tuple三类数据结构
+        if isinstance(label, int) or isinstance(label, float) or isinstance(label, tuple):
+            return label
+        raise ValueError(f"未知段落样式: '{label}'，支持的有: {list(cls._LABEL_MAP.keys())}")
+
+
+class FontName(LabelEnum):
     """
     常用中英文字体枚举。
     使用示例：
-        font = FontName.SIM_SUN.value  # '宋体'
+        font = FontName.SIM_SUN  # '宋体'
         style = ParagraphStyle(font_name=font)
     """
     # 中文字体
@@ -28,7 +48,6 @@ class FontName(Enum):
     FANG_SONG = "仿宋"
     MICROSOFT_YAHEI = "微软雅黑"
     HAN_YI_XIAO_BIAO_SONG = "汉仪小标宋"
-
     # 英文字体
     TIMES_NEW_ROMAN = "Times New Roman"
     ARIAL = "Arial"
@@ -36,12 +55,30 @@ class FontName(Enum):
     COURIER_NEW = "Courier New"
     HELVETICA = "Helvetica"
 
-    # 通用别名（可选）
-    DEFAULT_CHINESE = "宋体"
-    DEFAULT_ENGLISH = "Times New Roman"
+    _LABEL_MAP = {
+        "宋体": SIM_SUN,
+        "黑体": SIM_HEI,
+        "楷体": KAI_TI,
+        "仿宋": FANG_SONG,
+        "微软雅黑": MICROSOFT_YAHEI,
+        "汉仪小标宋": HAN_YI_XIAO_BIAO_SONG,
+        "Times New Roman": TIMES_NEW_ROMAN,
+        "Arial": ARIAL,
+        "Calibri": CALIBRI,
+        "Courier New": COURIER_NEW,
+        "Helvetica": HELVETICA,
+    }
+
+    def is_chinese(self, value: str):
+        if value not in self._LABEL_MAP:
+            raise ValueError(f"未知字体: '{value}'，支持的有: {list(self._LABEL_MAP.keys())}")
+        if value in ["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]:
+            return True
+        else:
+            return False
 
 
-class FontSize(IntEnum):
+class FontSize(LabelEnum):
     """
     常用中文字档字号（单位：磅 / pt）。
     继承 IntEnum 以便直接用于数值比较或传递给 Pt()。
@@ -50,7 +87,6 @@ class FontSize(IntEnum):
         size = FontSize.XIAO_SI  # 12
         run.font.size = Pt(size)
     """
-    BAO_BIAO = 22  # 报表/大标题
     YI_HAO = 26  # 一号
     XIAO_YI = 24  # 小一
     ER_HAO = 22  # 二号
@@ -64,19 +100,28 @@ class FontSize(IntEnum):
     LIU_HAO = 7.5  # 六号
     QI_HAO = 5.5  # 七号（极少用）
 
-    # 别名（英文/通用）
-    TITLE = 18  # 标题常用
-    SUBTITLE = 16  # 副标题
-    BODY = 12  # 正文（等同 XIAO_SI）
-    FOOTNOTE = 9  # 脚注（等同 XIAO_WU）
+    _LABEL_MAP = {
+        '一号': YI_HAO,
+        '小一': XIAO_YI,
+        '二号': ER_HAO,
+        '小二': XIAO_ER,
+        '三号': SAN_HAO,
+        '小三': XIAO_SAN,
+        '四号': SI_HAO,
+        '小四': XIAO_SI,
+        '五号': WU_HAO,
+        '小五': XIAO_WU,
+        '六号': LIU_HAO,
+        '七号': QI_HAO,
+    }
 
 
-class FontColor(Enum):
+class FontColor(LabelEnum):
     """
     常用字体颜色（RGB 元组）。
 
     示例：
-        color = FontColor.BLACK.value  # (0, 0, 0)
+        color = FontColor.BLACK  # (0, 0, 0)
         run.font.color.rgb = RGBColor(*color)
     """
     BLACK = (0, 0, 0)
@@ -96,7 +141,7 @@ class FontColor(Enum):
     LINK_BLUE = (0, 102, 204)  # 超链接蓝色
 
 
-class Alignment(Enum):
+class Alignment(LabelEnum):
     """
     段落对齐方式枚举，兼容 python-docx。
 
@@ -111,8 +156,16 @@ class Alignment(Enum):
     JUSTIFY = WD_ALIGN_PARAGRAPH.JUSTIFY  # 两端对齐
     DISTRIBUTE = WD_ALIGN_PARAGRAPH.DISTRIBUTE  # 分散对齐（较少用）
 
+    _LABEL_MAP = {
+        '左对齐': LEFT,
+        '居中对齐': CENTER,
+        '右对齐': RIGHT,
+        '两端对齐': JUSTIFY,
+        '分散对齐': DISTRIBUTE,
+    }
 
-class Spacing(Enum):
+
+class Spacing(LabelEnum):
     """
        常用段落间距枚举（单位：磅 / pt）。
 
@@ -133,8 +186,19 @@ class Spacing(Enum):
     LARGE = 24  # 大间距（标题前后）
     EXTRA_LARGE = 36  # 超大间距（封面、分章）
 
+    _LABEL_MAP = {
+        'NONE': NONE,
+        'TINY': TINY,
+        'SMALL': SMALL,
+        'HALF_LINE': HALF_LINE,
+        'NORMAL': NORMAL,
+        'MEDIUM': MEDIUM,
+        'LARGE': LARGE,
+        'EXTRA_LARGE': EXTRA_LARGE,
+    }
 
-class LineSpacing(Enum):
+
+class LineSpacing(LabelEnum):
     """
     常用行距枚举（倍数制），兼容 python-docx。
 
@@ -143,14 +207,20 @@ class LineSpacing(Enum):
 
     使用示例：
         style = ParagraphStyle(line_spacing=LineSpacing.ONE_POINT_FIVE)
-        paragraph.paragraph_format.line_spacing = style.line_spacing.value
+        paragraph.paragraph_format.line_spacing = style.line_spacing
     """
-    SINGLE = 1.0  # 单倍行距 (1.0)
+    SINGLE = 1.0  # 单倍行距
     ONE_POINT_FIVE = 1.5  # 1.5 倍
-    DOUBLE = 2.0  # 双倍 (2.0)
+    DOUBLE = 2.0  # 双倍
+
+    _LABEL_MAP = {
+        'SINGLE': SINGLE,
+        'ONE_POINT_FIVE': ONE_POINT_FIVE,
+        'DOUBLE': DOUBLE,
+    }
 
 
-class FirstLineIndent(Enum):
+class FirstLineIndent(LabelEnum):
     """
     首行缩进枚举（单位：厘米 / cm），适用于中文排版。
 
@@ -163,8 +233,15 @@ class FirstLineIndent(Enum):
     TWO_CHARS = 2  # 2 字符（标准中文正文）
     THREE_CHARS = 3  # 3 字符（较少用）
 
+    _LABEL_MAP = {
+        'NONE': NONE,
+        'ONE_CHAR': ONE_CHAR,
+        'TWO_CHARS': TWO_CHARS,
+        'THREE_CHARS': THREE_CHARS,
+    }
 
-class BuiltInStyle(Enum):
+
+class BuiltInStyle(LabelEnum):
     """
     Word 内置段落样式名称（使用英文标准名称，跨语言兼容）。
 
@@ -180,6 +257,17 @@ class BuiltInStyle(Enum):
     SUBTITLE = "Subtitle"
     LIST_PARAGRAPH = "List Paragraph"
 
+    _LABEL_MAP = {
+        'Heading 1': HEADING_1,
+        "Heading 2": HEADING_2,
+        "Heading 3": HEADING_3,
+        "Heading 4": HEADING_4,
+        '正文': NORMAL,
+        '标题': TITLE,
+        '副标题': SUBTITLE,
+        '列表项': LIST_PARAGRAPH,
+    }
+
 
 @dataclass
 class CharacterStyle:
@@ -189,53 +277,146 @@ class CharacterStyle:
     通常用于格式校验、自动修复或样式比对。所有字段均有默认值，符合中文文档常见排版规范。
 
     Attributes:
-        font_name (FontName): 字体名称（如黑体、宋体）。注意：中文字体需通过 `w:eastAsia` 属性设置。
+        font_name_cn (FontName): 字体名称（如黑体、宋体）。注意：中文字体需通过 `w:eastAsia` 属性设置。
+        font_name_en (FontName): 字体名称（如Times New Roman）
         font_size (FontSize): 字号（如小四、四号等），内部以磅（pt）为单位存储。
         font_color (FontColor): 字体颜色，默认为黑色（RGB(0, 0, 0)）。
         bold (bool): 是否加粗。True 表示加粗，False 表示不加粗。
         italic (bool): 是否斜体。True 表示斜体，False 表示非斜体。
         underline (bool): 是否带下划线。True 表示有下划线，False 表示无下划线。
     """
-    font_name: Union[FontName, str] = FontName.SIM_SUN
-    font_size: FontSize = FontSize.XIAO_SI
-    font_color: FontColor = FontColor.BLACK
-    bold: bool = False
-    italic: bool = False
-    underline: bool = False
 
-    def apply_to(self, run):
+    def __init__(
+            self,
+            font_name_cn: str = '宋体',
+            font_name_en: str = 'Times New Roman',
+            font_size: Union[str, float] = '小四',
+            font_color: Union[str, tuple] = 'BLACK',
+            bold: bool = False,
+            italic: bool = False,
+            underline: bool = False
+    ):
+        self.font_name_cn: str = FontName.from_label(font_name_cn)
+        self.font_name_en: str = FontName.from_label(font_name_en)
+        self.font_size: float = FontSize.from_label(font_size)
+        self.font_color: tuple = FontColor.from_label(font_color)
+        self.bold: bool = bold
+        self.italic: bool = italic
+        self.underline: bool = underline
+
+    def _get_run_font_name_cn(self, run) -> Optional[str]:
+        """从 run 中提取中文字体 (w:eastAsia)"""
+        rPr = run._element.rPr
+        if rPr is not None and rPr.rFonts is not None:
+            return rPr.rFonts.get(qn('w:eastAsia'))
+        return None
+
+    def _get_run_font_name_en(self, run) -> Optional[str]:
+        """从 run 中提取英文字体 (w:ascii 或 w:hAnsi)"""
+        rPr = run._element.rPr
+        if rPr is not None and rPr.rFonts is not None:
+            ascii_font = rPr.rFonts.get(qn('w:ascii'))
+            hansi_font = rPr.rFonts.get(qn('w:hAnsi'))
+            return ascii_font or hansi_font
+        return None
+
+    def _get_run_font_color(self, run) -> Optional[tuple]:
+        """从 run 中提取字体颜色 RGB 元组"""
+        color = run.font.color
+        if color and color.rgb:
+            rgb = color.rgb
+            return (rgb[0], rgb[1], rgb[2])  # RGBColor 是 bytes-like，转为 tuple
+        return None
+
+    def _get_run_font_size_pt(self, run) -> Optional[float]:
+        """从 run 中提取字号（单位：磅）"""
+        size = run.font.size
+        if size is not None:
+            return size.pt  # Pt 对象有 .pt 属性
+        return None
+
+    def diff_from_run(self, run) -> List[Tuple[str, Any, Any]]:
+        """
+        比较当前 CharacterStyle 与给定 run 的实际格式。
+
+        返回一个列表，每个元素为 (属性名, run当前值, 期望值)，
+        仅包含不一致的属性。
+
+        属性名使用内部字段名（如 'font_name_cn', 'bold' 等）。
+        """
+        diffs = []
+
+        # 1. 加粗
+        if run.bold != self.bold:
+            diffs.append(('bold', run.bold, self.bold))
+
+        # 2. 斜体
+        if run.italic != self.italic:
+            diffs.append(('italic', run.italic, self.italic))
+
+        # 3. 下划线
+        if run.underline != self.underline:
+            diffs.append(('underline', run.underline, self.underline))
+
+        # 4. 字号
+        current_size = self._get_run_font_size_pt(run)
+        if current_size != self.font_size:
+            diffs.append(('font_size', current_size, self.font_size))
+
+        # 5. 字体颜色
+        current_color = self._get_run_font_color(run)
+        if current_color != self.font_color:
+            diffs.append(('font_color', current_color, self.font_color))
+
+        # 6. 中文字体
+        current_cn = self._get_run_font_name_cn(run)
+        if current_cn != self.font_name_cn:
+            diffs.append(('font_name_cn', current_cn, self.font_name_cn))
+
+        # 7. 英文字体
+        current_en = self._get_run_font_name_en(run)
+        if current_en != self.font_name_en:
+            diffs.append(('font_name_en', current_en, self.font_name_en))
+
+        return diffs
+
+    def apply_to(self, run: Run):
         """将字符样式应用到 docx.Run 对象"""
-        run.bold = self.bold
-        run.italic = self.italic
-        run.underline = self.underline
-        run.font.size = Pt(self.font_size.value)
-        run.font.color.rgb = RGBColor(*self.font_color.value)
+        diffs = self.diff_from_run(run)
+        setters = {
+            'bold': lambda v: setattr(run, 'bold', v),
+            'italic': lambda v: setattr(run, 'italic', v),
+            'underline': lambda v: setattr(run, 'underline', v),
+            'font_size': lambda v: setattr(run.font, 'size', Pt(v)),
+            'font_color': lambda v: setattr(run.font.color, 'rgb', RGBColor(*v)),
+            'font_name_en': lambda v: self._set_run_font_en(run, v),
+            'font_name_cn': lambda v: self._set_run_font_cn(run, v),
+        }
 
-        # 获取实际字体名称字符串
-        if isinstance(self.font_name, FontName):
-            font_str = self.font_name.value
-        else:
-            font_str = str(self.font_name)
-        # 判断是否为中文字体（根据是否包含中文字符）
-        is_chinese = _is_chinese_font_name(font_str)
-        # 设置中文字体（关键！）
-        r = run._element
-        rPr = r.rPr
+        for attr, current, expected in diffs:
+            if attr in setters:
+                setters[attr](expected)
+
+    def _set_run_font_en(self, run, font_name: str):
+        """
+        设置 英文 字体
+        """
+        rPr = run._element.rPr
         if rPr.rFonts is None:
             rFonts = OxmlElement('w:rFonts')
             rPr.append(rFonts)
-        if is_chinese:
-            # 中文字体：重点设置 eastAsia
-            rPr.rFonts.set(qn('w:eastAsia'), font_str)
-            # 西文部分建议使用标准英文字体（避免中文字体渲染英文难看）
-            rPr.rFonts.set(qn('w:ascii'), 'Times New Roman')
-            rPr.rFonts.set(qn('w:hAnsi'), 'Times New Roman')
-        else:
-            # 纯英文字体
-            rPr.rFonts.set(qn('w:ascii'), font_str)
-            rPr.rFonts.set(qn('w:hAnsi'), font_str)
-            # eastAsia 设为默认中文字体，用于混排时的中文显示
-            rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+        rPr.rFonts.set(qn('w:ascii'), font_name)
+        rPr.rFonts.set(qn('w:hAnsi'), font_name)
+
+    def _set_run_font_cn(self, run, font_name: str):
+        """
+        设置 中文 字体
+        """
+        rPr = run._element.rPr
+        if rPr.rFonts is None:
+            rFonts = OxmlElement('w:rFonts')
+            rPr.append(rFonts)
+        rPr.rFonts.set(qn('w:eastAsia'), font_name)
 
 
 @dataclass
@@ -254,20 +435,29 @@ class ParagraphStyle:
         first_line_indent (FirstLineIndent): 首行缩进量，通常用于正文段落（如缩进两个汉字）。标题类段落一般设为 NONE。
         builtin_style_name ():预设样式
     """
-    alignment: Alignment = Alignment.LEFT
-    space_before: Spacing = Spacing.NONE
-    space_after: Spacing = Spacing.NONE
-    line_spacing: LineSpacing = LineSpacing.ONE_POINT_FIVE
-    first_line_indent: FirstLineIndent = FirstLineIndent.NONE
-    builtin_style_name: BuiltInStyle = BuiltInStyle.NORMAL
+
+    def __init__(self,
+                 alignment: str = '左对齐',
+                 space_before: float = .0,
+                 space_after: float = .0,
+                 line_spacing: float = 1.5,
+                 first_line_indent: float = .0,
+                 builtin_style_name: str = '正文'
+                 ):
+        self.alignment: tuple = Alignment.from_label(alignment)
+        self.space_before: float = float(Spacing.from_label(space_before))
+        self.space_after: float = float(Spacing.from_label(space_after))
+        self.line_spacing: Union[LineSpacing, float] = LineSpacing.from_label(line_spacing)
+        self.first_line_indent: Union[FirstLineIndent, float] = FirstLineIndent.from_label(first_line_indent)
+        self.builtin_style_name: str = BuiltInStyle.from_label(builtin_style_name)
 
     def apply_to(self, paragraph):
         """将段落样式应用到 docx.Paragraph 对象"""
-        paragraph.style = self.builtin_style_name.value
+        paragraph.style = self.builtin_style_name
         pf = paragraph.paragraph_format
-        pf.alignment = self.alignment.value
-        pf.space_before = Pt(self.space_before.value)
-        pf.space_after = Pt(self.space_after.value)
-        pf.line_spacing = self.line_spacing.value
+        pf.alignment = self.alignment
+        pf.space_before = Pt(self.space_before)
+        pf.space_after = Pt(self.space_after)
+        pf.line_spacing = self.line_spacing
         # TODO:首行缩进量不准确，待修复
-        pf.first_line_indent = Cm(self.first_line_indent.value)
+        pf.first_line_indent = Cm(self.first_line_indent)
