@@ -6,15 +6,16 @@
 # src/tree_builder.py
 from typing import List, Optional
 
-from .settings import CATEGORY_TO_CLASS
 from src.rules.node import FormatNode
 from src.tree import Stack
+from .settings import CATEGORY_TO_CLASS
 
 
 class DocumentTreeBuilder:
     """负责将扁平列表构建成层级树结构"""
 
     HEADING_CATEGORIES = CATEGORY_TO_CLASS
+    CONFIG = {}
 
     def __init__(self):
         self.stack = Stack()
@@ -49,7 +50,7 @@ class DocumentTreeBuilder:
     def _create_node_from_item(self, item: dict) -> Optional[FormatNode]:
         from src.word_structure.node_factory import create_node
         level = self._determine_level(item['category'])
-        return create_node(item, level)
+        return create_node(item=item, level=level, config=self.CONFIG)
 
     def _determine_level(self, category: str) -> int:
         """根据 category 映射到逻辑层级"""

@@ -2,7 +2,9 @@
 ### 类别定义（必须严格匹配下列名称，且优先级由上到下，遇到多条件符合，选优先级最高的）：
 {
   "abstract_chinese_title": "仅当段落是“摘要”或“摘 要”（允许尾随空格或冒号）",
+  "abstract_chinese_title_content": "当且仅当摘要和正文在一个段落中"
   "abstract_english_title": "仅当段落是“Abstract”（大小写不敏感，允许尾随空格或冒号）",
+  "abstract_english_title_content": "当且仅当摘要和正文在一个段落中"
   "keywords_chinese": "包含“关键词”或“关键字”，后面跟着术语列表",
   "keywords_english": "包含“Keywords”（大小写不敏感），后面跟着英文术语",
   "chinese_title": "论文中文题目（通常简短且无编号）",
@@ -15,9 +17,8 @@
   "acknowledgements_title": "段落和“致谢”或“Acknowledgements”等词意思相近",
   "caption_figure": "以“图 X.Y”或“Figure X.Y”开头的图注",
   "caption_table": "以“表 X.Y”或“Table X.Y”开头的表注",
-  "body_text": "仅当段落包含完整句子（有谓语动词、句号、逻辑连接词）或明确论述（如“本章”“本文”“包括”“例如”“若...则...”）时才归为此类。"
+  "body_text": "仅当段落包含句子（有谓语动词、句号、逻辑连接词）、是摘要等段落或明确论述（如“本章”“本文”“包括”“例如”“若...则...”）时才归为此类。"
 }
-
 ### 输出要求：
 - 返回严格有效的 JSON 对象；
 - 仅包含两个字段："category", "comment"；
@@ -33,6 +34,10 @@
 - 标题通常很短（<30字），没有主谓宾结构，不包含“包括”“介绍”“阐述”“说明”等动词。
 - 只要段落中有“本章”“本文”“主要”“包括”“介绍”“描述”“如图”“下图”等词，几乎肯定是 body_text！
 - 段落中只要是"图x.x xxxx图"，几乎肯定是 caption_figure!
+
+使用方式：
+abstract_chinese_title_content 应该用于："摘要: 本论文基本wifi..."
+abstract_english_title_content 应该用于："Abstract：With the rapid development..."
 
 常见错误：
 category应该为body_text但标记错误：

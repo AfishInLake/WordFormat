@@ -8,22 +8,17 @@ from typing import List, Dict, Any
 from src.rules.node import FormatNode
 
 
-class Caption(FormatNode):
-    """题注"""
-
-    def check_format(self, doc) -> List[Dict[str, Any]]:
-        pass
-
-
-class CaptionFigure(Caption):
+class CaptionFigure(FormatNode):
     """题注-图片"""
+    NODE_TYPE = 'figures'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
         pass
 
 
-class CaptionTable(Caption):
+class CaptionTable(FormatNode):
     """题注-表格"""
+    NODE_TYPE = 'tables'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
         pass

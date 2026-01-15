@@ -1,65 +1,83 @@
 # === 通用论文格式规则 Schema (Generic Thesis Format Schema v1.0) ===
 # 说明：所有字段均为可选（标有 ?），未提及即表示“无特殊要求”。
 #       所有字体名称应使用操作系统支持的完整字体名（如 "SimSun", "FangSong_GB2312"）。
-#       尺寸单位：pt（磅）用于字号，mm/cm 用于页面，行数用于段落间距。
 
-school_info:
+base_info:
   name: str?                 # 学校全称，如 "清华大学"
   document_type: enum?       # 文档类型，允许值：["毕业论文", "毕业设计说明书", "学位论文"]
-  level: enum                # 学位层次（必填），允许值：["本科", "硕士", "博士"]
   year: int?                 # 适用届别年份，如 2025（表示 2025 届）
 
 # 全局页面格式
-global_format:
-  line_spacing: float?       # 正文行距倍数，如 1.5 表示 1.5 倍行距；典型值：1.0, 1.25, 1.5, 2.0
+global_format: &global_format
+  alignment: 'justify'
+  space_before: 'none'
+  space_after: 'none'
+  line_spacing: 'ONE_POINT_FIVE'
+  first_line_indent: 'two_chars'
+  builtin_style_name: 'normal'
+  chinese_font_name: 'SIM_SUN'
+  english_font_name: 'TIMES_NEW_ROMAN'
+  font_size: 'XIAO_SI'
+  font_color: 'BLACK'
+  bold: false
+  italic: false
+  underline: false
 
 # 摘要部分（中英文）
 abstract:
   chinese:
-    section_title: str?      # 中文摘要章节标题，通常为 "摘要" 或 "摘 要"
-    title_font: str?         # 标题字体，如 "黑体"
-    font_size: enum?         # 标题字号，如 "三号"；允许值：["初号","小初","一号","小一","二号","小二","三号","小三","四号","小四","五号","小五","六号","小六"]
-    content_font: str?       # 摘要正文内容字体，如 "宋体"
-    content_size_pt: float?  # 摘要正文字号（单位：磅），如 12.0（≈小四）
-    max_chars: int?          # 中文摘要最大字符数（含汉字、标点、空格），典型值：300–500
+    chinese_title:
+      <<: *global_format
+      alignment: 'center'
+      first_line_indent: 'none'
+      chinese_font_name: 'SIM_HEI'
+      bold: true
+    chinese_content:
+      <<: *global_format
   english:
-    section_title: str?      # 英文摘要章节标题，通常为 "Abstract"
-    title_font: str?         # 英文标题字体，如 "Arial" 或 "Times New Roman"
-    font_size: enum?         # 标题字号，如 "三号"；允许值：["初号","小初","一号","小一","二号","小二","三号","小三","四号","小四","五号","小五","六号","小六"]
-    content_font: str?       # 英文摘要内容字体，推荐 "Times New Roman"
-    content_font_size: enum? # 英文摘要正文字号，如 "三号"；允许值：["初号","小初","一号","小一","二号","小二","三号","小三","四号","小四","五号","小五","六号","小六"]
-    max_words: int?          # 英文摘要最大单词数（按空格分词），典型值：200–300
+    english_title:
+      <<: *global_format
+      alignment: 'center'
+      first_line_indent: 'none'
+      bold: true
+    english_content:
+      <<: *global_format
   keywords:
-    count_min: int?          # 关键词最少数量，如 3
-    count_max: int?          # 关键词最多数量，如 8
-    separator: str?          # 关键词之间的分隔符，如 "；"（中文）或 "; "（英文）
-    allow_custom: bool?      # 是否允许使用非标准/自造关键词（false 表示仅限规范术语）
-    trailing_punct_forbidden: bool?  # 若为 true，则最后一个关键词后不得添加标点（如句号、分号）
+    english:
+      <<: *global_format
+      separator: ';'
+      count_min: 4
+      count_max: 4
+      trailing_punct_forbidden: true
+    chinese:
+      <<: *global_format
+      separator: '；'
+      count_min: 4
+      count_max: 4
+      trailing_punct_forbidden: false
 
 # 各级标题格式（章、节、小节）
 headings:
-  level_1:                   # 一级标题（如“第一章”）
-    prefix_pattern: str?     # 编号模板，如 "第X章"（X 自动替换为数字）或 "1"
-    font: str?               # 字体，如 "黑体"
-    font_size: enum?         # 如 "小二"
-    page_break_before: bool? # 是否在标题前强制分页（通常章标题设为 true）
-    spacing_before_lines: float?  # 段前间距（以“行”为单位），如 1.5 表示 1.5 行空白
-    spacing_after_lines: float?   # 段后间距（以“行”为单位），如 1.0
-  level_2:                   # 二级标题（如“1.1”）
-    prefix_pattern: str?     # 编号模板，如 "X.X"（自动展开为 1.1, 2.3 等）
-    font: str?               # 字体，如 "楷体_GB2312"
-    font_size: enum?         # 如 "三号"
-  level_3:                   # 三级标题（如“1.1.1”）
-    prefix_pattern: str?     # 编号模板，如 "X.X.X"
-    font: str?               # 字体，如 "仿宋_GB2312"
-    font_size: enum?         # 如 "小四"
+  level_1: # 一级标题（如“第一章”）
+    <<: *global_format
+    alignment: 'center'
+    first_line_indent: 'none'
+    bold: true
+    page_break_before: true
+  level_2: # 二级标题（如“1.1”）
+    <<: *global_format
+    alignment: 'center'
+    first_line_indent: 'none'
+    bold: true
+  level_3:
+    <<: *global_format
+    alignment: 'center'
+    first_line_indent: 'none'
+    bold: true
 
 # 正文段落格式
 body_text:
-  font: str?                 # 正文字体，中文通常为 "宋体"，英文为 "Times New Roman"
-  font_size: enum?           # 通常为 "小四"
-  paragraph_spacing_before: float?  # 每个自然段前的间距（单位：行），如 0 表示无额外间距
-  paragraph_spacing_after: float?   # 每个自然段后的间距（单位：行），如 0 表示紧凑排版
+  <<: *global_format
 
 # 插图（Figure）格式
 figures:
@@ -81,19 +99,19 @@ tables:
 
 # 参考文献（References）
 references:
-  section_title: str?        # 参考文献章节标题，如 "参考文献"
-  min_count: int?            # 最少引用文献总数，如 15
-  min_foreign_count: int?    # 最少外文文献数量，如 2
-  citation_style: str?       # 引用格式标准，如 "GB/T 7714", "APA", "IEEE"
-  numbering_format: str?     # 文献编号显示格式，如 "[{num}]" → [1], "(1)", "1."
-  entry_ending_punct: str?   # 每条参考文献末尾的标点，通常为 "."（句号）
-  author_truncation: str?    # 多作者时的省略词，中文用 "等"，英文用 "et al."
-  entry_indent: float?       # 条目首行缩进量（单位：字符或厘米），0 表示顶格（无缩进）
-  hanging_indent: float?     # 悬挂缩进量（第二行及以后的缩进），如 2.0（字符）
+  title:
+    <<: *global_format
+    section_title: str?        # 参考文献章节标题，如 "参考文献"
+  content:
+    <<: *global_format
+    numbering_format: str?
+    entry_indent: float?       # 条目首行缩进量（单位：字符或厘米），0 表示顶格（无缩进）
+    entry_ending_punct: str?
 
 # 致谢（Acknowledgements）
 acknowledgements:
-  section_title: str?        # 致谢章节标题，如 "致谢" 或 "致 谢"
-  required: bool?            # 是否为必需章节（true 表示不可省略）
-  font: str?                 # 致谢正文所用字体，通常与正文一致（如 "宋体"）
-  font_size: enum?           # 通常为 "小四"
+  title:
+    <<: *global_format
+    section_title: str?        # 致谢章节标题，如 "致谢" 或 "致 谢"
+  content: # 致谢正文所用字体，通常与正文一致（如 "宋体"）
+    <<: *global_format        # 通常为 "小四"

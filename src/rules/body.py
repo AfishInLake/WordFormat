@@ -11,7 +11,7 @@ from src.rules.style import *
 
 class BodyText(FormatNode):
     """正文节点"""
-
+    NODE_TYPE = 'body_text'
     def check_format(self, doc) -> List[Dict[str, Any]]:
         """
         设置 正文 样式

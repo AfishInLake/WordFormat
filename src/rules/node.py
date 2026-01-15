@@ -3,7 +3,7 @@
 # @Time    : 2026/1/10 14:07
 # @Author  : afish
 # @File    : node.py
-from typing import Any, List, Dict, Sequence
+from typing import Any, List, Dict, Sequence, Union
 
 from docx.document import Document
 from docx.text.paragraph import Paragraph
@@ -13,9 +13,54 @@ from docx.text.run import Run
 class TreeNode:
     """树的节点类"""
 
+    NODE_TYPE = 'node'
+
     def __init__(self, value: Any):
         self.value = value
+        self.__config = {}
         self.children: List['TreeNode'] = []
+        self.__set_fingerprint()
+
+    @property
+    def config(self):
+        return self.__config
+
+    def load_config(self, full_config: Union[Dict, Any]) -> None:
+        """
+        根据 self.NODE_TYPE（点分路径）从 full_config 中提取子配置。
+
+        例如：
+          NODE_TYPE = 'abstract.keywords.chinese'
+          则从 full_config['abstract']['keywords']['chinese'] 提取
+        """
+        if not isinstance(full_config, dict):
+            self.__config = {}
+            return
+
+        # 解析路径：支持 'a.b.c' 或直接 'top_level_key'
+        path_parts = self.NODE_TYPE.split('.')
+
+        current = full_config
+        try:
+            for part in path_parts:
+                if not isinstance(current, dict):
+                    raise KeyError(f"Expected dict at path {'.'.join(path_parts[:path_parts.index(part) + 1])}")
+                current = current[part]
+            # 如果最终值不是 dict，也允许（但通常应是 dict）
+            self.__config = current if isinstance(current, dict) else {}
+        except (KeyError, TypeError):
+            # 路径不存在或结构不匹配，返回空配置
+            self.__config = {}
+
+
+    def __set_fingerprint(self):
+        if self.value and isinstance(self.value, dict):
+            if self.value.get('category') == 'top':
+                return
+            try:
+                self.fingerprint = self.value['fingerprint']
+            except KeyError:
+                raise ValueError(f"{self.value} must have a 'fingerprint' key")
 
     def add_child(self, child_value: Any) -> 'TreeNode':
         """添加一个子节点，并返回该子节点（便于链式调用）"""

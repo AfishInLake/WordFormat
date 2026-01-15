@@ -9,15 +9,9 @@ from src.rules.node import FormatNode
 from src.rules.style import *
 
 
-class Heading(FormatNode):
-    """标题节点"""
-
-    def check_format(self, doc) -> List[Dict[str, Any]]:
-        return []
-
-
-class HeadingLevel1Node(Heading):
+class HeadingLevel1Node(FormatNode):
     """一级标题节点"""
+    NODE_TYPE = 'headings.level_1'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
         ps = ParagraphStyle(
@@ -41,9 +35,9 @@ class HeadingLevel1Node(Heading):
         return []
 
 
-class HeadingLevel2Node(Heading):
+class HeadingLevel2Node(FormatNode):
     """二级标题节点"""
-
+    NODE_TYPE = 'headings.level_2'
     def check_format(self, doc) -> List[Dict[str, Any]]:
         ps = ParagraphStyle(
             alignment=Alignment.LEFT,
@@ -66,9 +60,9 @@ class HeadingLevel2Node(Heading):
         return []
 
 
-class HeadingLevel3Node(Heading):
+class HeadingLevel3Node(FormatNode):
     """三级标题节点"""
-
+    NODE_TYPE = 'headings.level_3'
     def check_format(self, doc) -> List[Dict[str, Any]]:
         ps = ParagraphStyle(
             alignment=Alignment.LEFT,

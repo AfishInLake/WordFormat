@@ -4,38 +4,12 @@
 # @Author  : afish
 # @File    : DocxBase.py
 import json
-from pathlib import Path
-from typing import Dict, Any
 
-import yaml
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from src.agent.api import OpenAIAgent
 from src.agent.message import MessageManager
-
-
-class Style:
-    """样式"""
-
-    def __init__(self, path: str | Path):
-        """
-        Args:
-            path: yaml配置加载路径
-        """
-        self.style = self.load_yaml_config(path)
-
-    def load_yaml_config(self, file_path: str | Path) -> Dict[str, Any]:
-        path = Path(file_path)
-        if not path.exists():
-            raise FileNotFoundError(f"{file_path} not found")
-        with open(path, 'r', encoding='utf-8') as f:
-            try:
-                config = yaml.safe_load(f)
-                if config is None:
-                    config = {}
-                return config
-            except yaml.YAMLError as e:
-                raise ValueError(f"格式错误: {file_path}") from e
+from src.utils import get_paragraph_xml_fingerprint
 
 
 class DocxBase:
@@ -51,7 +25,7 @@ class DocxBase:
             baseurl="http://localhost:11434/v1",
         )
 
-    async def parse(self, rules: Style) -> list[dict]:
+    async def parse(self) -> list[dict]:
         result = []
         for paragraph in self.document.paragraphs:
             # 跳过空段落
@@ -65,14 +39,18 @@ class DocxBase:
                 response = {
                     'category': 'body_text',
                     'comment': str(e),
-                    'paragraph': paragraph.text
+                    'paragraph': paragraph.text,
+
                 }
+
+            response['fingerprint'] = get_paragraph_xml_fingerprint(paragraph)
+            print(response)
             result.append(response)
         return result
 
     @retry(
         retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(5),
         wait=wait_fixed(5)
     )
     async def parse_paragraph(self, paragraph: str):
@@ -83,12 +61,13 @@ class DocxBase:
             response_format='json'
         )
         jsondata = json.loads(response)
+        result_dict = {}
         for key in ['category', 'comment']:
             if key not in jsondata:
-                raise ValueError(f"{key} not found in response")
+                raise Exception(f"{key} not found in response")
+            result_dict[key] = jsondata.get(key)
         jsondata['paragraph'] = paragraph
         self.base_agent.message_manager.clear()  # 清空消息
-        print(jsondata)
         return jsondata
 
 

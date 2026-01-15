@@ -10,6 +10,7 @@ from src.rules.node import FormatNode
 
 class References(FormatNode):
     """参考文献节点"""
+    NODE_TYPE = 'references'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
         pass

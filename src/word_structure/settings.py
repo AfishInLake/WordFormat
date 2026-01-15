@@ -5,9 +5,12 @@
 # @File    : settings.py
 from src.rules import *
 
+# 标签节点映射
 CATEGORY_TO_CLASS = {
     'abstract_chinese_title': AbstractTitleCN,
     'abstract_english_title': AbstractTitleEN,
+    'abstract_chinese_title_content': AbstractTitleContentCN,
+    'abstract_english_title_content': AbstractTitleContentEN,
     'abstract_chinese_content': AbstractContentCN,
     'abstract_english_content': AbstractContentEN,
     'keywords_chinese': KeywordsCN,
@@ -21,4 +24,3 @@ CATEGORY_TO_CLASS = {
     'caption_table': CaptionTable,
     'body_text': BodyText
 }
-BODY_CATEGORIES = {'body_text', 'caption_figure', 'caption_table', 'other'}

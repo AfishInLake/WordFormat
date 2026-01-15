@@ -8,6 +8,7 @@ from loguru import logger
 
 from src.rules import *
 from src.tree import print_tree
+from src.utils import get_paragraph_xml_fingerprint
 from src.word_structure.document_builder import DocumentBuilder
 from src.word_structure.utils import find_and_modify_first, promote_bodytext_in_subtrees_of_type
 
@@ -27,9 +28,7 @@ def apply_format_check_to_all_nodes(root_node, document):
             try:
                 # TODO: 应该使用not in list
                 if node.value.get('category') != 'top':
-                    # TODO:节点的paragraph属性为空
-                    if node.paragraph:
-                        node.check_format(document)
+                    node.check_format(document)
             except Exception as e:
                 logger.warning(f"Node {node} not format, beacuse: {str(e)}")
                 raise e
@@ -50,7 +49,9 @@ def xg(root_node, paragraph):
     """
 
     def condition(node):
-        return node.value.get('paragraph') == paragraph.text
+        if getattr(node, 'fingerprint', False):
+            return node.fingerprint == get_paragraph_xml_fingerprint(paragraph)
+        return False
 
     return find_and_modify_first(
         root=root_node,
@@ -59,12 +60,12 @@ def xg(root_node, paragraph):
 
 
 def main():
-    root_node = DocumentBuilder.build_from_json('论文修改测试.json')
+    root_node = DocumentBuilder.build_from_json('毕业设计说明书.json')
     root_node.children = [
         node for node in root_node.children
         if node.value.get('category') != 'body_text'
     ]
-    document = Document('论文修改测试.docx')
+    document = Document('毕业设计说明书.docx')
     for paragraph in document.paragraphs:
         if not paragraph.text:
             continue
@@ -86,7 +87,7 @@ def main():
         )
     print_tree(root_node)
     apply_format_check_to_all_nodes(root_node, document)
-    document.save('论文修改测试-修改版.docx')
+    document.save('毕业设计说明书-修改版.docx')
 
 
 if __name__ == '__main__':

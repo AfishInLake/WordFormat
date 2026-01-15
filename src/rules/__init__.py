@@ -4,25 +4,36 @@
 # @Author  : afish
 # @File    : __init__.py.py
 
-from .abstract import AbstractTitleCN, AbstractTitleEN, AbstractContentCN, AbstractContentEN, KeywordsEN, KeywordsCN
-from .acknowledgement import Acknowledgements
+from .abstract import (
+    AbstractTitleCN,
+    AbstractTitleContentCN,
+    AbstractTitleEN,
+    AbstractTitleContentEN,
+    AbstractContentCN,
+    AbstractContentEN,
+    KeywordsEN,
+    KeywordsCN
+)
+from .acknowledgement import Acknowledgements, AcknowledgementsCN
 from .body import BodyText
-from .caption import Caption, CaptionFigure, CaptionTable
-from .heading import Heading, HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node
+from .caption import CaptionFigure, CaptionTable
+from .heading import HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node
 from .references import References, ReferenceEntry
+
 __all__ = [
     "AbstractTitleCN",
+    "AbstractTitleContentCN",
     "AbstractTitleEN",
+    "AbstractTitleContentEN",
     "AbstractContentCN",
     "AbstractContentEN",
     "KeywordsEN",
     "KeywordsCN",
     "Acknowledgements",
+    "AcknowledgementsCN",
     "BodyText",
-    "Caption",
     "CaptionFigure",
     "CaptionTable",
-    "Heading",
     "HeadingLevel1Node",
     "HeadingLevel2Node",
     "HeadingLevel3Node",
