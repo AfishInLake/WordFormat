@@ -214,9 +214,9 @@ class LineSpacing(LabelEnum):
     DOUBLE = 2.0  # 双倍
 
     _LABEL_MAP = {
-        'SINGLE': SINGLE,
-        'ONE_POINT_FIVE': ONE_POINT_FIVE,
-        'DOUBLE': DOUBLE,
+        '单倍行距': SINGLE,
+        '1.5倍': ONE_POINT_FIVE,
+        '双倍': DOUBLE,
     }
 
 
@@ -234,10 +234,10 @@ class FirstLineIndent(LabelEnum):
     THREE_CHARS = 3  # 3 字符（较少用）
 
     _LABEL_MAP = {
-        'NONE': NONE,
-        'ONE_CHAR': ONE_CHAR,
-        'TWO_CHARS': TWO_CHARS,
-        'THREE_CHARS': THREE_CHARS,
+        '无缩进': NONE,
+        '1字符': ONE_CHAR,
+        '2字符': TWO_CHARS,
+        '3字符': THREE_CHARS,
     }
 
 

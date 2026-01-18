@@ -18,7 +18,8 @@ class BodyText(FormatNode):
         """
         for index, run in enumerate(self.paragraph.runs):
             CharacterStyle(
-                font_name=FontName.SIM_SUN,
+                font_name_en=FontName.SIM_SUN,
+                font_name_cn=self.config.get(''),
                 font_size=FontSize.XIAO_SI,
                 font_color=FontColor.BLACK,
                 bold=False,

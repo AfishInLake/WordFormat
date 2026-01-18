@@ -8,7 +8,7 @@ from src.tree import print_tree
 from src.word_structure.document_builder import DocumentBuilder
 
 def main():
-    root_node = DocumentBuilder.build_from_json('毕业设计说明书.json')
+    root_node = DocumentBuilder.build_from_json('tmp/毕业设计说明书.json')
     print_tree(root_node)
 
 

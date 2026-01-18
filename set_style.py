@@ -3,6 +3,8 @@
 # @Time    : 2026/1/11 19:51
 # @Author  : afish
 # @File    : set_style.py
+from typing import Dict
+
 from docx import Document
 from loguru import logger
 
@@ -13,7 +15,7 @@ from src.word_structure.document_builder import DocumentBuilder
 from src.word_structure.utils import find_and_modify_first, promote_bodytext_in_subtrees_of_type
 
 
-def apply_format_check_to_all_nodes(root_node, document):
+def apply_format_check_to_all_nodes(root_node, document, config: Dict):
     """
     递归遍历文档树中的所有节点，
     对每个具有 check_format 方法的节点执行该方法。
@@ -28,6 +30,7 @@ def apply_format_check_to_all_nodes(root_node, document):
             try:
                 # TODO: 应该使用not in list
                 if node.value.get('category') != 'top':
+                    node.load_config(config)
                     node.check_format(document)
             except Exception as e:
                 logger.warning(f"Node {node} not format, beacuse: {str(e)}")
@@ -60,7 +63,8 @@ def xg(root_node, paragraph):
 
 
 def main():
-    root_node = DocumentBuilder.build_from_json('毕业设计说明书.json')
+    from src.utils import load_yaml_with_merge
+    root_node = DocumentBuilder.build_from_json('tmp/毕业设计说明书.json')
     root_node.children = [
         node for node in root_node.children
         if node.value.get('category') != 'body_text'
@@ -86,7 +90,7 @@ def main():
             target_type=value
         )
     print_tree(root_node)
-    apply_format_check_to_all_nodes(root_node, document)
+    apply_format_check_to_all_nodes(root_node, document, load_yaml_with_merge(r'G:\desktop\WordFormat\test\undergrad_thesis.yaml'))
     document.save('毕业设计说明书-修改版.docx')
 
 

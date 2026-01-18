@@ -10,5 +10,38 @@ dependencies = [
     "python-docx>=1.2.0",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
+    "ruff>=0.14.13",
     "tenacity>=9.1.2",
 ]
+[tool.ruff]
+# 目标 Python 版本
+target-version = "py311"
+line-length = 108
+# 启用的规则集（默认已启用很多）
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]  # 忽略行长度限制（由 formatter 处理）
+# 自动 fix 的安全级别
+fixable = ["ALL"]
+unfixable = []
+# 排除
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+    ".idea"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"test/**/*" = ["E501"]
+"tmp/**/*" = ["E501"]
+
+[tool.ruff.format]
+# 格式化选项
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

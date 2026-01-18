@@ -19,7 +19,7 @@ class AbstractTitleCN(FormatNode):
         设置 摘要 样式
         """
         ps = ParagraphStyle(
-            alignment=Alignment.CENTER,
+            alignment=self.config.get('alignment', ),
             space_before=Spacing.NONE,
             space_after=Spacing.NONE,
             line_spacing=LineSpacing.ONE_POINT_FIVE,
