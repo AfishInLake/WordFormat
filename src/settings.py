@@ -1,0 +1,12 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Time    : 2026/1/18 11:48
+# @Author  : afish
+# @File    : settings.py
+
+# 模型api_key
+API_KEY = ''
+# 模型名称
+MODEL = "qwen3-4b-no-think"
+# 模型链接
+MODEL_URL = "http://localhost:11434/v1"

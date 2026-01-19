@@ -9,7 +9,8 @@ from typing import Union, Any, Optional, Tuple, List
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor, Cm
+from docx.shared import Pt, RGBColor
+from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
 
@@ -31,7 +32,7 @@ class LabelEnum:
         # 检查是否是int, float, tuple三类数据结构
         if isinstance(label, int) or isinstance(label, float) or isinstance(label, tuple):
             return label
-        raise ValueError(f"未知段落样式: '{label}'，支持的有: {list(cls._LABEL_MAP.keys())}")
+        raise ValueError(f"未知段落样式: '{cls.__name__}:{label}'，支持的有: {list(cls._LABEL_MAP.keys())}")
 
 
 class FontName(LabelEnum):
@@ -420,6 +421,23 @@ class CharacterStyle:
 
 
 @dataclass
+class DIFFResult:
+    """
+    用来保存段落差异
+
+    Attributes:
+        diff_type: 不同类别
+        expected_value: 期待值
+        current_value: 当前值
+        comment: 评论
+    """
+    diff_type: str = None
+    expected_value: Any = None
+    current_value: Any = None
+    comment: str = None
+
+
+@dataclass
 class ParagraphStyle:
     """段落样式类，用于定义 Word 文档中 Paragraph 级别的排版格式。
 
@@ -451,7 +469,7 @@ class ParagraphStyle:
         self.first_line_indent: Union[FirstLineIndent, float] = FirstLineIndent.from_label(first_line_indent)
         self.builtin_style_name: str = BuiltInStyle.from_label(builtin_style_name)
 
-    def apply_to(self, paragraph):
+    def apply_to(self, paragraph: Paragraph):
         """将段落样式应用到 docx.Paragraph 对象"""
         paragraph.style = self.builtin_style_name
         pf = paragraph.paragraph_format
@@ -459,5 +477,26 @@ class ParagraphStyle:
         pf.space_before = Pt(self.space_before)
         pf.space_after = Pt(self.space_after)
         pf.line_spacing = self.line_spacing
-        # TODO:首行缩进量不准确，待修复
-        pf.first_line_indent = Cm(self.first_line_indent)
+        # TODO:首行缩进量不准确，待确认
+        pf.first_line_indent = self.first_line_indent * paragraph.style.font.size
+
+    def diff_from_paragraph(self, paragraph: Paragraph) -> List[Tuple[str, Any, Any]]:
+        """比较当前段落样式与给定段落样式的差异"""
+        diffs = []
+        pf = paragraph.paragraph_format
+        # 对齐方式
+        if self.alignment != pf.alignment:
+            # TODO: 需要实现格式与术语之间的转化
+            diffs.append(DIFFResult('alignment', self.alignment, pf.alignment, "对齐方式错误;"))
+        if self.space_before != pf.space_before:
+            diffs.append(DIFFResult('space_before', self.space_before, pf.space_before, f"段前间距错误:期待{self.space_before}实际{pf.space_before};"))
+        if self.space_after != pf.space_after:
+            diffs.append(DIFFResult('space_after', self.space_after, pf.space_after, f"段后间距错误:期待{self.space_before}实际{pf.space_before};"))
+        if self.line_spacing != pf.line_spacing:
+            diffs.append(DIFFResult('line_spacing', self.line_spacing, pf.line_spacing, f"行距错误:期待{self.line_spacing}实际{pf.line_spacing};"))
+        first_line_indent = pf.first_line_indent if pf.first_line_indent else 0
+        if self.first_line_indent != first_line_indent:
+            diffs.append(DIFFResult('first_line_indent', self.first_line_indent, pf.first_line_indent, f"首行缩进错误:期待{self.first_line_indent}实际{pf.first_line_indent};"))
+        if self.builtin_style_name != paragraph.style.name:
+            diffs.append(DIFFResult('builtin_style_name', self.builtin_style_name, paragraph.style.name, f"样式错误:期待{self.builtin_style_name}实际{paragraph.style.name};"))
+        return diffs

@@ -9,6 +9,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_t
 
 from src.agent.api import OpenAIAgent
 from src.agent.message import MessageManager
+from src.settings import API_KEY, MODEL, MODEL_URL
 from src.utils import get_paragraph_xml_fingerprint
 
 
@@ -21,8 +22,9 @@ class DocxBase:
         self.base_agent = OpenAIAgent(
             system_prompt=system_prompt,
             messageManager=MessageManager(),
-            model="qwen3-4b-no-think",
-            baseurl="http://localhost:11434/v1",
+            model=MODEL,
+            baseurl=MODEL_URL,
+            api_key=API_KEY
         )
 
     async def parse(self) -> list[dict]:

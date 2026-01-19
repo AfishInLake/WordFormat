@@ -6,6 +6,7 @@
 
 import re
 from typing import Optional, Tuple
+
 from docx.text.run import Run
 
 

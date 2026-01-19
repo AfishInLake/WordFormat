@@ -4,10 +4,10 @@
 # @Author  : afish
 # @File    : abstract.py
 import re
-from typing import Dict, Any, List
+from typing import Dict, List, Any
 
 from src.rules.node import FormatNode
-from src.rules.style import *
+from src.rules.style import ParagraphStyle
 
 
 class AbstractTitleCN(FormatNode):
@@ -16,29 +16,19 @@ class AbstractTitleCN(FormatNode):
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
         """
-        设置 摘要 样式
+        检查 摘要 样式
         """
+        cfg = self.config
         ps = ParagraphStyle(
-            alignment=self.config.get('alignment', ),
-            space_before=Spacing.NONE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.NONE,
-            builtin_style_name=BuiltInStyle.NORMAL
+            alignment=cfg.get('alignment', '左对齐'),
+            space_before=cfg.get('space_before', 'NONE'),
+            space_after=cfg.get('space_after', 'NONE'),
+            line_spacing=cfg.get('line_spacing', '1.5倍'),
+            first_line_indent=cfg.get('first_line_indent', '2字符'),
+            builtin_style_name=cfg.get('builtin_style_name', '正文')
         )
-        ps.apply_to(self.paragraph)
-
-        for index, run in enumerate(self.paragraph.runs):
-            # 对run对象设置样式
-            CharacterStyle(
-                font_name=FontName.SIM_HEI,
-                font_size=FontSize.XIAO_SI,
-                font_color=FontColor.BLACK,
-                bold=True,
-                italic=False,
-                underline=False
-            ).apply_to(run)
-
+        issues = ps.diff_from_paragraph(self.paragraph)
+        print(issues)
         return []
 
 
@@ -58,39 +48,42 @@ class AbstractTitleContentCN(FormatNode):
         """
         设置 摘要 样式
         """
-        ps = ParagraphStyle(
-            alignment=Alignment.JUSTIFY,
-            space_before=Spacing.NONE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.TWO_CHARS,
-            builtin_style_name=BuiltInStyle.NORMAL
-        )
-        ps.apply_to(self.paragraph)
-
-        for index, run in enumerate(self.paragraph.runs):
-            # 检查标题是否包含在正文中
-            if self.check_title(run):
-                # 对run对象设置样式
-                CharacterStyle(
-                    font_name=FontName.SIM_HEI,
-                    font_size=FontSize.XIAO_SI,
-                    font_color=FontColor.BLACK,
-                    bold=True,
-                    italic=False,
-                    underline=False
-                ).apply_to(run)
-                self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
-            else:
-                # 对剩余部分的run设置样式
-                CharacterStyle(
-                    font_name=FontName.SIM_SUN,
-                    font_size=FontSize.XIAO_SI,
-                    font_color=FontColor.BLACK,
-                    bold=False,
-                    italic=False,
-                    underline=False
-                ).apply_to(run)
+        # cfg = self.config
+        # ps = ParagraphStyle(
+        #     alignment=cfg.get('alignment', '左对齐'),
+        #     space_before=cfg.get('space_before', 'NONE'),
+        #     space_after=cfg.get('space_after', 'NONE'),
+        #     line_spacing=cfg.get('line_spacing', '1.5倍'),
+        #     first_line_indent=cfg.get('first_line_indent', '2字符'),
+        #     builtin_style_name=cfg.get('builtin_style_name', '正文')
+        # )
+        # ps.apply_to(self.paragraph)
+        #
+        # for index, run in enumerate(self.paragraph.runs):
+        #     # 检查标题是否包含在正文中
+        #     if self.check_title(run):
+        #         # 对run对象设置样式
+        #         CharacterStyle(
+        #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #             font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #             font_size=cfg.get('font_size', '小四'),
+        #             font_color=cfg.get('font_color', 'BLACK'),
+        #             bold=cfg.get('bold', True),
+        #             italic=cfg.get('italic', False),
+        #             underline=cfg.get('underline', False),
+        #         ).apply_to(run)
+        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        #     else:
+        #         # 对剩余部分的run设置样式
+        #         CharacterStyle(
+        #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #             font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #             font_size=cfg.get('font_size', '小四'),
+        #             font_color=cfg.get('font_color', 'BLACK'),
+        #             bold=cfg.get('bold', True),
+        #             italic=cfg.get('italic', False),
+        #             underline=cfg.get('underline', False),
+        #         ).apply_to(run)
         return []
 
 
@@ -99,24 +92,26 @@ class AbstractContentCN(FormatNode):
     NODE_TYPE = 'abstract.chinese.chinese_content'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
-        ps = ParagraphStyle(
-            alignment=Alignment.JUSTIFY,
-            space_before=Spacing.NONE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.TWO_CHARS,
-            builtin_style_name=BuiltInStyle.NORMAL
-        )
-        ps.apply_to(self.paragraph)
-        for index, run in enumerate(self.paragraph.runs):
-            CharacterStyle(
-                font_name=FontName.SIM_SUN,
-                font_size=FontSize.XIAO_SI,
-                font_color=FontColor.BLACK,
-                bold=False,
-                italic=False,
-                underline=False
-            ).apply_to(run)
+        # cfg = self.config
+        # ps = ParagraphStyle(
+        #     alignment=cfg.get('alignment', '左对齐'),
+        #     space_before=cfg.get('space_before', 'NONE'),
+        #     space_after=cfg.get('space_after', 'NONE'),
+        #     line_spacing=cfg.get('line_spacing', '1.5倍'),
+        #     first_line_indent=cfg.get('first_line_indent', '2字符'),
+        #     builtin_style_name=cfg.get('builtin_style_name', '正文')
+        # )
+        # ps.apply_to(self.paragraph)
+        # for index, run in enumerate(self.paragraph.runs):
+        #     CharacterStyle(
+        #         font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #         font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #         font_size=cfg.get('font_size', '小四'),
+        #         font_color=cfg.get('font_color', 'BLACK'),
+        #         bold=cfg.get('bold', True),
+        #         italic=cfg.get('italic', False),
+        #         underline=cfg.get('underline', False),
+        #     ).apply_to(run)
         return []
 
 
@@ -146,38 +141,42 @@ class AbstractTitleContentEN(FormatNode):
         """
         设置 摘要 样式
         """
-        ps = ParagraphStyle(
-            alignment=Alignment.JUSTIFY,
-            space_before=Spacing.NONE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.TWO
-        )
-        ps.apply_to(self.paragraph)
-        for index, run in enumerate(self.paragraph.runs):
-            # 检查标题是否包含在正文中
-            if self.check_title(run):
-                # 对run对象设置样式
-                CharacterStyle(
-                    font_name=FontName.SIM_HEI,
-                    font_size=FontSize.XIAO_SI,
-                    font_color=FontColor.BLACK,
-                    bold=True,
-                    italic=False,
-                    underline=False
-                ).apply_to(run)
-                self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
-            else:
-                # 对剩余部分的run设置样式
-                CharacterStyle(
-                    font_name=FontName.SIM_SUN,
-                    font_size=FontSize.XIAO_SI,
-                    font_color=FontColor.BLACK,
-                    bold=False,
-                    italic=False,
-                    underline=False
-                ).apply_to(run)
-                self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        # cfg = self.config
+        # ps = ParagraphStyle(
+        #     alignment=cfg.get('alignment', '左对齐'),
+        #     space_before=cfg.get('space_before', 'NONE'),
+        #     space_after=cfg.get('space_after', 'NONE'),
+        #     line_spacing=cfg.get('line_spacing', '1.5倍'),
+        #     first_line_indent=cfg.get('first_line_indent', '2字符'),
+        #     builtin_style_name=cfg.get('builtin_style_name', '正文')
+        # )
+        # ps.apply_to(self.paragraph)
+        # for index, run in enumerate(self.paragraph.runs):
+        #     # 检查标题是否包含在正文中
+        #     if self.check_title(run):
+        #         # 对run对象设置样式
+        #         CharacterStyle(
+        #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #             font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #             font_size=cfg.get('font_size', '小四'),
+        #             font_color=cfg.get('font_color', 'BLACK'),
+        #             bold=cfg.get('bold', True),
+        #             italic=cfg.get('italic', False),
+        #             underline=cfg.get('underline', False),
+        #         ).apply_to(run)
+        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        #     else:
+        #         # 对剩余部分的run设置样式
+        #         CharacterStyle(
+        #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #             font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #             font_size=cfg.get('font_size', '小四'),
+        #             font_color=cfg.get('font_color', 'BLACK'),
+        #             bold=cfg.get('bold', True),
+        #             italic=cfg.get('italic', False),
+        #             underline=cfg.get('underline', False),
+        #         ).apply_to(run)
+        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
 
         return []
 
@@ -215,33 +214,36 @@ class KeywordsCN(FormatNode):
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
         """解析关键词字符串为列表"""
-        ps = ParagraphStyle(
-            alignment=Alignment.JUSTIFY,
-            space_before=Spacing.NONE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.TWO_CHARS,
-            builtin_style_name=BuiltInStyle.NORMAL
-        )
-        ps.apply_to(self.paragraph)
-        for index, run in enumerate(self.paragraph.runs):
-            if self.check_keword(run):
-                CharacterStyle(
-                    font_name=FontName.SIM_HEI,
-                    font_size=FontSize.SI_HAO,
-                    font_color=FontColor.BLACK,
-                    bold=True,
-                    italic=False,
-                    underline=False
-                ).apply_to(run)
-                self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
-            else:
-                CharacterStyle(
-                    font_name=FontName.SIM_SUN,
-                    font_size=FontSize.XIAO_SI,
-                    font_color=FontColor.BLACK,
-                    bold=False,
-                    italic=False,
-                    underline=False
-                ).apply_to(run)
+        # cfg = self.config
+        # ps = ParagraphStyle(
+        #     alignment=cfg.get('alignment', '左对齐'),
+        #     space_before=cfg.get('space_before', 'NONE'),
+        #     space_after=cfg.get('space_after', 'NONE'),
+        #     line_spacing=cfg.get('line_spacing', '1.5倍'),
+        #     first_line_indent=cfg.get('first_line_indent', '2字符'),
+        #     builtin_style_name=cfg.get('builtin_style_name', '正文')
+        # )
+        # ps.apply_to(self.paragraph)
+        # for index, run in enumerate(self.paragraph.runs):
+        #     if self.check_keword(run):
+        #         CharacterStyle(
+        #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #             font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #             font_size=cfg.get('font_size', '小四'),
+        #             font_color=cfg.get('font_color', 'BLACK'),
+        #             bold=cfg.get('bold', True),
+        #             italic=cfg.get('italic', False),
+        #             underline=cfg.get('underline', False),
+        #         ).apply_to(run)
+        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        #     else:
+        #         CharacterStyle(
+        #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
+        #             font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+        #             font_size=cfg.get('font_size', '小四'),
+        #             font_color=cfg.get('font_color', 'BLACK'),
+        #             bold=cfg.get('bold', True),
+        #             italic=cfg.get('italic', False),
+        #             underline=cfg.get('underline', False),
+        #         ).apply_to(run)
         return []

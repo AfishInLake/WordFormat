@@ -62,14 +62,14 @@ def xg(root_node, paragraph):
     )
 
 
-def main():
+def auto_format_thesis_document(jsonpath: str, docxpath:str, savepath: str, configpath: str):
     from src.utils import load_yaml_with_merge
-    root_node = DocumentBuilder.build_from_json('tmp/毕业设计说明书.json')
+    root_node = DocumentBuilder.build_from_json(jsonpath)
     root_node.children = [
         node for node in root_node.children
         if node.value.get('category') != 'body_text'
     ]
-    document = Document('毕业设计说明书.docx')
+    document = Document(docxpath)
     for paragraph in document.paragraphs:
         if not paragraph.text:
             continue
@@ -90,9 +90,5 @@ def main():
             target_type=value
         )
     print_tree(root_node)
-    apply_format_check_to_all_nodes(root_node, document, load_yaml_with_merge(r'G:\desktop\WordFormat\test\undergrad_thesis.yaml'))
-    document.save('毕业设计说明书-修改版.docx')
-
-
-if __name__ == '__main__':
-    main()
+    apply_format_check_to_all_nodes(root_node, document, load_yaml_with_merge(configpath))
+    document.save(savepath)
