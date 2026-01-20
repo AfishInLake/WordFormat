@@ -4,14 +4,44 @@
 # @Author  : afish
 # @File    : style.py
 from dataclasses import dataclass
-from typing import Union, Any, Optional, Tuple, List
+from typing import Union, Any, Tuple, List
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+
+from src.rules.get_some import (
+    paragraph_get_alignment,
+    paragraph_get_space_before,
+    paragraph_get_space_after,
+    paragraph_get_line_spacing,
+    paragraph_get_first_line_indent,
+    paragraph_get_builtin_style_name,
+    run_get_font_bold,
+    run_get_font_italic,
+    run_get_font_underline,
+    run_get_font_size,
+    run_get_font_color,
+    run_get_font_name
+)
+
+
+@dataclass
+class DIFFResult:
+    """
+    用来保存段落差异
+
+    Attributes:
+        diff_type: 不同类别
+        expected_value: 期待值
+        current_value: 当前值
+        comment: 评论
+    """
+    diff_type: str = None
+    expected_value: Any = None
+    current_value: Any = None
+    comment: str = None
 
 
 class LabelEnum:
@@ -223,11 +253,7 @@ class LineSpacing(LabelEnum):
 
 class FirstLineIndent(LabelEnum):
     """
-    首行缩进枚举（单位：厘米 / cm），适用于中文排版。
-
-    使用示例：
-        style = ParagraphStyle(first_line_indent=FirstLineIndent.TWO_CHARS)
-        paragraph.paragraph_format.first_line_indent = style.first_line_indent.to_pt()
+    首行缩进枚举，适用于中文排版。
     """
     NONE = 0  # 无缩进（用于标题、列表等）
     ONE_CHAR = 1  # 1 字符（约）
@@ -305,80 +331,41 @@ class CharacterStyle:
         self.italic: bool = italic
         self.underline: bool = underline
 
-    def _get_run_font_name_cn(self, run) -> Optional[str]:
-        """从 run 中提取中文字体 (w:eastAsia)"""
-        rPr = run._element.rPr
-        if rPr is not None and rPr.rFonts is not None:
-            return rPr.rFonts.get(qn('w:eastAsia'))
-        return None
-
-    def _get_run_font_name_en(self, run) -> Optional[str]:
-        """从 run 中提取英文字体 (w:ascii 或 w:hAnsi)"""
-        rPr = run._element.rPr
-        if rPr is not None and rPr.rFonts is not None:
-            ascii_font = rPr.rFonts.get(qn('w:ascii'))
-            hansi_font = rPr.rFonts.get(qn('w:hAnsi'))
-            return ascii_font or hansi_font
-        return None
-
-    def _get_run_font_color(self, run) -> Optional[tuple]:
-        """从 run 中提取字体颜色 RGB 元组"""
-        color = run.font.color
-        if color and color.rgb:
-            rgb = color.rgb
-            return (rgb[0], rgb[1], rgb[2])  # RGBColor 是 bytes-like，转为 tuple
-        return None
-
-    def _get_run_font_size_pt(self, run) -> Optional[float]:
-        """从 run 中提取字号（单位：磅）"""
-        size = run.font.size
-        if size is not None:
-            return size.pt  # Pt 对象有 .pt 属性
-        return None
-
     def diff_from_run(self, run) -> List[Tuple[str, Any, Any]]:
         """
-        比较当前 CharacterStyle 与给定 run 的实际格式。
-
-        返回一个列表，每个元素为 (属性名, run当前值, 期望值)，
-        仅包含不一致的属性。
-
-        属性名使用内部字段名（如 'font_name_cn', 'bold' 等）。
+        检查段落样式和指定样式是否一致
         """
         diffs = []
 
         # 1. 加粗
-        if run.bold != self.bold:
-            diffs.append(('bold', run.bold, self.bold))
+        bold = run_get_font_bold(run)
+        if bold != self.bold:
+            diffs.append(DIFFResult('bold', self.bold, bold))
 
         # 2. 斜体
-        if run.italic != self.italic:
-            diffs.append(('italic', run.italic, self.italic))
+        italic = run_get_font_italic(run)
+        if italic != self.italic:
+            diffs.append(DIFFResult('italic', self.italic, italic))
 
         # 3. 下划线
-        if run.underline != self.underline:
-            diffs.append(('underline', run.underline, self.underline))
+        underline = run_get_font_underline(run)
+        if underline != self.underline:
+            diffs.append(DIFFResult('underline', self.underline, underline))
 
         # 4. 字号
-        current_size = self._get_run_font_size_pt(run)
+        current_size = run_get_font_size(run)
         if current_size != self.font_size:
-            diffs.append(('font_size', current_size, self.font_size))
+            diffs.append(DIFFResult('font_size', self.font_size, current_size))
 
         # 5. 字体颜色
-        current_color = self._get_run_font_color(run)
+        current_color = run_get_font_color(run)
         if current_color != self.font_color:
-            diffs.append(('font_color', current_color, self.font_color))
+            diffs.append(DIFFResult('font_color', self.font_color, current_color))
 
-        # 6. 中文字体
-        current_cn = self._get_run_font_name_cn(run)
-        if current_cn != self.font_name_cn:
-            diffs.append(('font_name_cn', current_cn, self.font_name_cn))
-
-        # 7. 英文字体
-        current_en = self._get_run_font_name_en(run)
-        if current_en != self.font_name_en:
-            diffs.append(('font_name_en', current_en, self.font_name_en))
-
+        # 6. 字体
+        font_name = run_get_font_name(run)
+        if font_name != (self.font_name_cn, self.font_name_en, self.font_name_en):
+            diffs.append(DIFFResult('font_name_cn', self.font_name_cn, font_name, f"段落默认的中文字体,ASCII字符,高 ANSI 字符分别为{font_name}"))
         return diffs
 
     def apply_to(self, run: Run):
@@ -397,44 +384,6 @@ class CharacterStyle:
         for attr, current, expected in diffs:
             if attr in setters:
                 setters[attr](expected)
-
-    def _set_run_font_en(self, run, font_name: str):
-        """
-        设置 英文 字体
-        """
-        rPr = run._element.rPr
-        if rPr.rFonts is None:
-            rFonts = OxmlElement('w:rFonts')
-            rPr.append(rFonts)
-        rPr.rFonts.set(qn('w:ascii'), font_name)
-        rPr.rFonts.set(qn('w:hAnsi'), font_name)
-
-    def _set_run_font_cn(self, run, font_name: str):
-        """
-        设置 中文 字体
-        """
-        rPr = run._element.rPr
-        if rPr.rFonts is None:
-            rFonts = OxmlElement('w:rFonts')
-            rPr.append(rFonts)
-        rPr.rFonts.set(qn('w:eastAsia'), font_name)
-
-
-@dataclass
-class DIFFResult:
-    """
-    用来保存段落差异
-
-    Attributes:
-        diff_type: 不同类别
-        expected_value: 期待值
-        current_value: 当前值
-        comment: 评论
-    """
-    diff_type: str = None
-    expected_value: Any = None
-    current_value: Any = None
-    comment: str = None
 
 
 @dataclass
@@ -480,23 +429,33 @@ class ParagraphStyle:
         # TODO:首行缩进量不准确，待确认
         pf.first_line_indent = self.first_line_indent * paragraph.style.font.size
 
-    def diff_from_paragraph(self, paragraph: Paragraph) -> List[Tuple[str, Any, Any]]:
-        """比较当前段落样式与给定段落样式的差异"""
+    def diff_from_paragraph(self, paragraph: Paragraph) -> List[DIFFResult]:
+        """检查当前段落样式与给定段落样式的差异"""
+        if not paragraph:
+            return []
         diffs = []
-        pf = paragraph.paragraph_format
         # 对齐方式
-        if self.alignment != pf.alignment:
-            # TODO: 需要实现格式与术语之间的转化
-            diffs.append(DIFFResult('alignment', self.alignment, pf.alignment, "对齐方式错误;"))
-        if self.space_before != pf.space_before:
-            diffs.append(DIFFResult('space_before', self.space_before, pf.space_before, f"段前间距错误:期待{self.space_before}实际{pf.space_before};"))
-        if self.space_after != pf.space_after:
-            diffs.append(DIFFResult('space_after', self.space_after, pf.space_after, f"段后间距错误:期待{self.space_before}实际{pf.space_before};"))
-        if self.line_spacing != pf.line_spacing:
-            diffs.append(DIFFResult('line_spacing', self.line_spacing, pf.line_spacing, f"行距错误:期待{self.line_spacing}实际{pf.line_spacing};"))
-        first_line_indent = pf.first_line_indent if pf.first_line_indent else 0
+        alignment = paragraph_get_alignment(paragraph)
+        if self.alignment != alignment:
+            diffs.append(DIFFResult('alignment', self.alignment, alignment, f"对齐方式期待{self.alignment}实际{alignment};"))
+        # 段前间距(行)
+        space_before = paragraph_get_space_before(paragraph)
+        if self.space_before != space_before:
+            diffs.append(DIFFResult('space_before', self.space_before, space_before, f"段前间距期待{self.space_before}行，实际{space_before}行;"))
+        # 段后间距(行)
+        space_after = paragraph_get_space_after(paragraph)
+        if self.space_after != space_after:
+            diffs.append(DIFFResult('space_after', self.space_after, space_after, f"段后间距期待{self.space_before}行，实际{space_before}行;"))
+        # 行距
+        line_spacing = paragraph_get_line_spacing(paragraph)
+        if self.line_spacing != line_spacing:
+            diffs.append(DIFFResult('line_spacing', self.line_spacing, line_spacing, f"行距期待{self.line_spacing}倍，实际{line_spacing}行;"))
+        # 首行缩进
+        first_line_indent = paragraph_get_first_line_indent(paragraph)
         if self.first_line_indent != first_line_indent:
-            diffs.append(DIFFResult('first_line_indent', self.first_line_indent, pf.first_line_indent, f"首行缩进错误:期待{self.first_line_indent}实际{pf.first_line_indent};"))
-        if self.builtin_style_name != paragraph.style.name:
-            diffs.append(DIFFResult('builtin_style_name', self.builtin_style_name, paragraph.style.name, f"样式错误:期待{self.builtin_style_name}实际{paragraph.style.name};"))
+            diffs.append(DIFFResult('first_line_indent', self.first_line_indent, first_line_indent, f"首行缩进期待{self.first_line_indent}字符，实际{first_line_indent}字符;"))
+        # 样式
+        builtin_style_name = paragraph_get_builtin_style_name(paragraph)
+        if self.builtin_style_name.lower() != builtin_style_name:
+            diffs.append(DIFFResult('builtin_style_name', self.builtin_style_name, builtin_style_name, f"样式期待{self.builtin_style_name}字符，实际{builtin_style_name}字符;"))
         return diffs

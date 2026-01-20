@@ -7,7 +7,7 @@ import re
 from typing import Dict, List, Any
 
 from src.rules.node import FormatNode
-from src.rules.style import ParagraphStyle
+from src.rules.style import ParagraphStyle, CharacterStyle
 
 
 class AbstractTitleCN(FormatNode):
@@ -29,6 +29,16 @@ class AbstractTitleCN(FormatNode):
         )
         issues = ps.diff_from_paragraph(self.paragraph)
         print(issues)
+        for run in self.paragraph.runs:
+            CharacterStyle(
+                font_name_cn=cfg.get('chinese_font_name', '宋体'),
+                font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+                font_size=cfg.get('font_size', '小四'),
+                font_color=cfg.get('font_color', 'BLACK'),
+                bold=cfg.get('bold', True),
+                italic=cfg.get('italic', False),
+                underline=cfg.get('underline', False),
+            ).diff_from_run(run)
         return []
 
 
