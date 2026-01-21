@@ -52,7 +52,6 @@ class TreeNode:
             # 路径不存在或结构不匹配，返回空配置
             self.__config = {}
 
-
     def __set_fingerprint(self):
         if self.value and isinstance(self.value, dict):
             if self.value.get('category') == 'top':
@@ -93,4 +92,5 @@ class FormatNode(TreeNode):
         raise NotImplementedError("Subclasses should implement this!")
 
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
-        doc.add_comment(runs=runs, text=text, author="论文解析器", initials="afish")
+        if text.strip():
+            doc.add_comment(runs=runs, text=text, author="论文解析器", initials="afish")

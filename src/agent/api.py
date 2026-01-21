@@ -13,7 +13,7 @@ from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMe
 
 
 class OpenAIAgent:
-
+    # TODO:需要计算token用量
     def __init__(
             self,
             system_prompt: str,

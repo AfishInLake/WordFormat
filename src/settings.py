@@ -10,3 +10,12 @@ API_KEY = ''
 MODEL = "qwen3-4b-no-think"
 # 模型链接
 MODEL_URL = "http://localhost:11434/v1"
+
+CHARACTER_STYLE_CHECKS = {
+    'bold': True,
+    'italic': True,
+    'underline': True,
+    'font_size': True,
+    'font_color': False,
+    'font_name': False,
+}

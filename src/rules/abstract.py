@@ -54,7 +54,6 @@ class AbstractTitleContentCN(FormatNode):
         pattern = r'摘[^a-zA-Z0-9\u4e00-\u9fff]*要'
         if re.search(pattern, run.text):
             return True
-
         return False
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
@@ -162,7 +161,6 @@ class AbstractTitleEN(FormatNode):
                 self.add_comment(doc=doc, runs=run, text=''.join(str(dr) for dr in diff_result))
         if issues:
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=''.join(str(dr) for dr in issues))
-        return []
         return []
 
 
@@ -379,5 +377,4 @@ class KeywordsCN(FormatNode):
                         runs=run,
                         text=f"关键词内容格式不符: {''.join(str(d) for d in diff)}"
                     )
-
         return []

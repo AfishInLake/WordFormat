@@ -25,6 +25,11 @@ from src.rules.get_some import (
     run_get_font_color,
     run_get_font_name
 )
+from src.settings import CHARACTER_STYLE_CHECKS
+
+for check in ['bold', 'italic', 'underline', 'font_size', 'font_color', 'font_name']:
+    if check not in CHARACTER_STYLE_CHECKS:
+        raise ValueError(f" 未在 `settings.py` 的 CHARACTER_STYLE_CHECKS 配置中找到 {check}")
 
 
 @dataclass
@@ -299,7 +304,6 @@ class BuiltInStyle(LabelEnum):
     }
 
 
-
 class CharacterStyle:
     """字符样式类，用于定义 Word 文档中 Run 级别的文本格式。
 
@@ -343,31 +347,37 @@ class CharacterStyle:
         # 1. 加粗
         bold = run_get_font_bold(run)
         if bold != self.bold:
-            diffs.append(DIFFResult('bold', self.bold, bold, f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};"))
+            if CHARACTER_STYLE_CHECKS['bold']:
+                diffs.append(DIFFResult('bold', self.bold, bold, f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};"))
         # 2. 斜体
         italic = run_get_font_italic(run)
         if italic != self.italic:
-            diffs.append(DIFFResult('italic', self.italic, italic, f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};"))
+            if CHARACTER_STYLE_CHECKS['italic']:
+                diffs.append(DIFFResult('italic', self.italic, italic, f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};"))
 
         # 3. 下划线
         underline = run_get_font_underline(run)
         if underline != self.underline:
-            diffs.append(DIFFResult('underline', self.underline, underline, f"期待{'有下划线' if self.underline else '无下划线'}，实际{'有下划线' if underline else '无下划线'};"))
+            if CHARACTER_STYLE_CHECKS['underline']:
+                diffs.append(DIFFResult('underline', self.underline, underline, f"期待{'有下划线' if self.underline else '无下划线'}，实际{'有下划线' if underline else '无下划线'};"))
 
         # 4. 字号
         current_size = run_get_font_size(run)
         if current_size != self.font_size:
-            diffs.append(DIFFResult('font_size', self.font_size, current_size, f"期待字号{self.font_size}，实际字号{current_size};"))
+            if CHARACTER_STYLE_CHECKS['font_size']:
+                diffs.append(DIFFResult('font_size', self.font_size, current_size, f"期待字号{self.font_size}，实际字号{current_size};"))
 
         # 5. 字体颜色
         current_color = run_get_font_color(run)
         if current_color != self.font_color:
-            diffs.append(DIFFResult('font_color', self.font_color, current_color, f"期待字体颜色{self.font_color}, 实际字体颜色{current_color};"))
+            if CHARACTER_STYLE_CHECKS['font_color']:
+                diffs.append(DIFFResult('font_color', self.font_color, current_color, f"期待字体颜色{self.font_color}, 实际字体颜色{current_color};"))
 
         # 6. 字体
         font_name = run_get_font_name(run)
         if font_name != (self.font_name_cn, self.font_name_en, self.font_name_en):
-            diffs.append(DIFFResult('font_name_cn', self.font_name_cn, font_name, f"段落默认的中文字体,ASCII字符,高 ANSI 字符分别为{font_name}"))
+            if CHARACTER_STYLE_CHECKS['font_name']:
+                diffs.append(DIFFResult('font_name_cn', self.font_name_cn, font_name, f"段落默认的中文字体,ASCII字符,高 ANSI 字符分别为{font_name}"))
         return diffs
 
     def apply_to(self, run: Run):

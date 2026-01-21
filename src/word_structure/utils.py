@@ -3,11 +3,14 @@
 # @Time    : 2026/1/11 20:19
 # @Author  : afish
 # @File    : utils.py
+
+from typing import Callable
+
 from src.rules.body import BodyText
 from src.rules.node import FormatNode
 
 
-def find_and_modify_first(root: FormatNode, condition):
+def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bool]):
     """
     找到第一个满足 condition 的节点，调用 modifier(node) 修改它，并返回该节点。
     :param root: 树的根节点（FormatNode 实例）

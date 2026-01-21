@@ -8,24 +8,53 @@
 """
 from typing import Optional, Tuple
 
-from docx.enum.text import WD_LINE_SPACING
+from docx.enum.text import WD_LINE_SPACING, WD_ALIGN_PARAGRAPH
 from docx.oxml.shared import qn
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
 
-def paragraph_get_alignment(paragraph: Paragraph):
-    """
-    获取段落对齐方式
-    Params:
-        paragraph: 段落对象，通常是 python-docx 的 Paragraph 对象
+def _wd_align_to_str(alignment) -> str:
+    """将 WD_ALIGN_PARAGRAPH 枚举转为中文描述"""
+    mapping = {
+        WD_ALIGN_PARAGRAPH.LEFT: '左对齐',
+        WD_ALIGN_PARAGRAPH.CENTER: '居中',
+        WD_ALIGN_PARAGRAPH.RIGHT: '右对齐',
+        WD_ALIGN_PARAGRAPH.JUSTIFY: '两端对齐',
+        WD_ALIGN_PARAGRAPH.DISTRIBUTE: '分散对齐',
+    }
+    return mapping.get(alignment, f'未知({alignment})')
 
-    Return:
-        str: 对齐方式的描述字符串
+
+def paragraph_get_alignment(paragraph: Paragraph) -> str:
     """
-    alignment = paragraph.paragraph_format.alignment
-    return alignment if alignment else '未设置'
+    获取段落的有效对齐方式（考虑直接格式 + 样式继承）
+
+    Args:
+        paragraph: python-docx 的 Paragraph 对象
+
+    Returns:
+        str: 对齐方式描述，如 '左对齐', '居中', '右对齐', '两端对齐'，若均未设置则返回 '未设置'
+    """
+    # 1. 先看段落是否显式设置了对齐
+    direct_alignment = paragraph.paragraph_format.alignment
+    if direct_alignment is not None:
+        return _wd_align_to_str(direct_alignment)
+
+    # 2. 否则，从段落样式中获取
+    style = paragraph.style
+    while style is not None:
+        if hasattr(style, 'paragraph_format') and style.paragraph_format.alignment is not None:
+            return _wd_align_to_str(style.paragraph_format.alignment)
+        # 尝试向上查找基础样式（部分版本支持 _base_style）
+        base_style = getattr(style, '_base_style', None)
+        if base_style is None:
+            break
+        style = base_style
+
+    # 3. 所有地方都没设置 → Word 默认是左对齐，但为严谨返回“未设置”
+    return '未设置'
 
 
 def _get_effective_line_height(paragraph: Paragraph) -> Optional[float]:
@@ -138,6 +167,7 @@ def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):
     Return:
         int: 首行缩进的字符大小（近似值），如果无法计算返回0
     """
+    # FIXME: 首行缩进按字符计算有误，需要修改
     try:
         para_format = paragraph.paragraph_format
         first_line_indent = para_format.first_line_indent
@@ -268,9 +298,13 @@ def run_get_font_size(run: Run):
         float: 字体大小，单位为pt
     """
     font_size = run.font.size
-    if font_size is None:
-        return None
-    return font_size.pt
+    if font_size is not None:
+        return font_size.pt
+    # 直接取段落样式的字号（大多数情况足够）
+    style = run._parent.style
+    if style and style.font.size is not None:
+        return style.font.size.pt
+    return 12.0
 
 
 def run_get_font_color(run: Run) -> Optional[Tuple[int, int, int]]:
