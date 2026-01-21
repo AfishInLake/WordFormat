@@ -28,17 +28,20 @@ class AbstractTitleCN(FormatNode):
             builtin_style_name=cfg.get('builtin_style_name', '正文')
         )
         issues = ps.diff_from_paragraph(self.paragraph)
-        print(issues)
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.get('chinese_font_name', '宋体'),
+            font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+            font_size=cfg.get('font_size', '小四'),
+            font_color=cfg.get('font_color', 'BLACK'),
+            bold=cfg.get('bold', True),
+            italic=cfg.get('italic', False),
+            underline=cfg.get('underline', False),
+        )
+
         for run in self.paragraph.runs:
-            CharacterStyle(
-                font_name_cn=cfg.get('chinese_font_name', '宋体'),
-                font_name_en=cfg.get('english_font_name', 'Times New Roman'),
-                font_size=cfg.get('font_size', '小四'),
-                font_color=cfg.get('font_color', 'BLACK'),
-                bold=cfg.get('bold', True),
-                italic=cfg.get('italic', False),
-                underline=cfg.get('underline', False),
-            ).diff_from_run(run)
+            diff_result = cstyle.diff_from_run(run)
+            self.add_comment(doc=doc, runs=run, text=''.join([str(dr) for dr in diff_result]))
+        self.add_comment(doc=doc, runs=self.paragraph.runs, text=''.join([str(dr) for dr in issues]))
         return []
 
 
@@ -102,26 +105,29 @@ class AbstractContentCN(FormatNode):
     NODE_TYPE = 'abstract.chinese.chinese_content'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
-        # cfg = self.config
-        # ps = ParagraphStyle(
-        #     alignment=cfg.get('alignment', '左对齐'),
-        #     space_before=cfg.get('space_before', 'NONE'),
-        #     space_after=cfg.get('space_after', 'NONE'),
-        #     line_spacing=cfg.get('line_spacing', '1.5倍'),
-        #     first_line_indent=cfg.get('first_line_indent', '2字符'),
-        #     builtin_style_name=cfg.get('builtin_style_name', '正文')
-        # )
-        # ps.apply_to(self.paragraph)
-        # for index, run in enumerate(self.paragraph.runs):
-        #     CharacterStyle(
-        #         font_name_cn=cfg.get('chinese_font_name', '宋体'),
-        #         font_name_en=cfg.get('english_font_name', 'Times New Roman'),
-        #         font_size=cfg.get('font_size', '小四'),
-        #         font_color=cfg.get('font_color', 'BLACK'),
-        #         bold=cfg.get('bold', True),
-        #         italic=cfg.get('italic', False),
-        #         underline=cfg.get('underline', False),
-        #     ).apply_to(run)
+        cfg = self.config
+        ps = ParagraphStyle(
+            alignment=cfg.get('alignment', '左对齐'),
+            space_before=cfg.get('space_before', 'NONE'),
+            space_after=cfg.get('space_after', 'NONE'),
+            line_spacing=cfg.get('line_spacing', '1.5倍'),
+            first_line_indent=cfg.get('first_line_indent', '2字符'),
+            builtin_style_name=cfg.get('builtin_style_name', '正文')
+        )
+        issues = ps.diff_from_paragraph(self.paragraph)
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.get('chinese_font_name', '宋体'),
+            font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+            font_size=cfg.get('font_size', '小四'),
+            font_color=cfg.get('font_color', 'BLACK'),
+            bold=cfg.get('bold', True),
+            italic=cfg.get('italic', False),
+            underline=cfg.get('underline', False),
+        )
+        for index, run in enumerate(self.paragraph.runs):
+            diff_result = cstyle.diff_from_run(run)
+            self.add_comment(doc=doc, runs=run, text=''.join([str(dr) for dr in diff_result]))
+        self.add_comment(doc=doc, runs=self.paragraph.runs, text=''.join([str(dr) for dr in issues]))
         return []
 
 
@@ -130,9 +136,34 @@ class AbstractTitleEN(FormatNode):
     NODE_TYPE = 'abstract.english.english_title'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
-        issues = []
+        cfg = self.config
+        ps = ParagraphStyle(
+            alignment=cfg.get('alignment', '居中'),
+            space_before=cfg.get('space_before', 'NONE'),
+            space_after=cfg.get('space_after', 'NONE'),
+            line_spacing=cfg.get('line_spacing', '单倍'),
+            first_line_indent=cfg.get('first_line_indent', 'NONE'),
+            builtin_style_name=cfg.get('builtin_style_name', '标题')
+        )
+        issues = ps.diff_from_paragraph(self.paragraph)
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.get('chinese_font_name', '宋体'),
+            font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+            font_size=cfg.get('font_size', '三号'),
+            font_color=cfg.get('font_color', 'BLACK'),
+            bold=cfg.get('bold', True),  # 标题通常加粗
+            italic=cfg.get('italic', False),
+            underline=cfg.get('underline', False),
+        )
 
-        return issues
+        for run in self.paragraph.runs:
+            diff_result = cstyle.diff_from_run(run)
+            if diff_result:
+                self.add_comment(doc=doc, runs=run, text=''.join(str(dr) for dr in diff_result))
+        if issues:
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=''.join(str(dr) for dr in issues))
+        return []
+        return []
 
 
 class AbstractTitleContentEN(FormatNode):
@@ -196,10 +227,32 @@ class AbstractContentEN(FormatNode):
     NODE_TYPE = 'abstract.english.english_content'
 
     def check_format(self, doc) -> List[Dict[str, Any]]:
-        issues = []
-        rule = self.expected_rule.get("english", {})
-        # 检查 content_font / content_size_pt
-        return issues
+        cfg = self.config
+        ps = ParagraphStyle(
+            alignment=cfg.get('alignment', '左对齐'),
+            space_before=cfg.get('space_before', 'NONE'),
+            space_after=cfg.get('space_after', 'NONE'),
+            line_spacing=cfg.get('line_spacing', '1.5倍'),
+            first_line_indent=cfg.get('first_line_indent', 'NONE'),  # 英文段落通常无首行缩进
+            builtin_style_name=cfg.get('builtin_style_name', '正文')
+        )
+        issues = ps.diff_from_paragraph(self.paragraph)
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.get('chinese_font_name', '宋体'),  # 虽为英文内容，但可能混排中文
+            font_name_en=cfg.get('english_font_name', 'Times New Roman'),
+            font_size=cfg.get('font_size', '小四'),
+            font_color=cfg.get('font_color', 'BLACK'),
+            bold=cfg.get('bold', False),  # 英文摘要内容通常不加粗
+            italic=cfg.get('italic', False),
+            underline=cfg.get('underline', False),
+        )
+        for run in self.paragraph.runs:
+            diff_result = cstyle.diff_from_run(run)
+            if diff_result:  # 可选：仅当有差异时才添加批注
+                self.add_comment(doc=doc, runs=run, text=''.join(str(dr) for dr in diff_result))
+        if issues:
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=''.join(str(dr) for dr in issues))
+        return []
 
 
 class KeywordsEN(FormatNode):

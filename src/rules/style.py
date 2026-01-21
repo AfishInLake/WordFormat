@@ -4,7 +4,7 @@
 # @Author  : afish
 # @File    : style.py
 from dataclasses import dataclass
-from typing import Union, Any, Tuple, List
+from typing import Union, Any, List
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
@@ -42,6 +42,9 @@ class DIFFResult:
     expected_value: Any = None
     current_value: Any = None
     comment: str = None
+
+    def __str__(self):
+        return self.comment
 
 
 class LabelEnum:
@@ -296,7 +299,7 @@ class BuiltInStyle(LabelEnum):
     }
 
 
-@dataclass
+
 class CharacterStyle:
     """字符样式类，用于定义 Word 文档中 Run 级别的文本格式。
 
@@ -331,7 +334,7 @@ class CharacterStyle:
         self.italic: bool = italic
         self.underline: bool = underline
 
-    def diff_from_run(self, run) -> List[Tuple[str, Any, Any]]:
+    def diff_from_run(self, run) -> List[DIFFResult]:
         """
         检查段落样式和指定样式是否一致
         """
@@ -340,27 +343,26 @@ class CharacterStyle:
         # 1. 加粗
         bold = run_get_font_bold(run)
         if bold != self.bold:
-            diffs.append(DIFFResult('bold', self.bold, bold))
-
+            diffs.append(DIFFResult('bold', self.bold, bold, f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};"))
         # 2. 斜体
         italic = run_get_font_italic(run)
         if italic != self.italic:
-            diffs.append(DIFFResult('italic', self.italic, italic))
+            diffs.append(DIFFResult('italic', self.italic, italic, f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};"))
 
         # 3. 下划线
         underline = run_get_font_underline(run)
         if underline != self.underline:
-            diffs.append(DIFFResult('underline', self.underline, underline))
+            diffs.append(DIFFResult('underline', self.underline, underline, f"期待{'有下划线' if self.underline else '无下划线'}，实际{'有下划线' if underline else '无下划线'};"))
 
         # 4. 字号
         current_size = run_get_font_size(run)
         if current_size != self.font_size:
-            diffs.append(DIFFResult('font_size', self.font_size, current_size))
+            diffs.append(DIFFResult('font_size', self.font_size, current_size, f"期待字号{self.font_size}，实际字号{current_size};"))
 
         # 5. 字体颜色
         current_color = run_get_font_color(run)
         if current_color != self.font_color:
-            diffs.append(DIFFResult('font_color', self.font_color, current_color))
+            diffs.append(DIFFResult('font_color', self.font_color, current_color, f"期待字体颜色{self.font_color}, 实际字体颜色{current_color};"))
 
         # 6. 字体
         font_name = run_get_font_name(run)
@@ -386,7 +388,6 @@ class CharacterStyle:
                 setters[attr](expected)
 
 
-@dataclass
 class ParagraphStyle:
     """段落样式类，用于定义 Word 文档中 Paragraph 级别的排版格式。
 

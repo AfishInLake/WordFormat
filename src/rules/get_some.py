@@ -65,7 +65,7 @@ def _get_effective_line_height(paragraph: Paragraph) -> Optional[float]:
         return font_size_pt
 
 
-def paragraph_get_space_before(paragraph: Paragraph):
+def paragraph_get_space_before(paragraph: Paragraph) -> float:
     """
     获取段落前间距(行)
     Params:
@@ -76,16 +76,16 @@ def paragraph_get_space_before(paragraph: Paragraph):
     """
     space_before = paragraph.paragraph_format.space_before
     if space_before is None:
-        return None
+        return 0.0
 
     line_height = _get_effective_line_height(paragraph)
     if line_height is None or line_height <= 0:
-        return None
+        return 0.0
 
     return round(space_before.pt / line_height, 1)
 
 
-def paragraph_get_space_after(paragraph: Paragraph):
+def paragraph_get_space_after(paragraph: Paragraph) -> float:
     """
     获取段落后间距(行)
     Params:
@@ -96,11 +96,11 @@ def paragraph_get_space_after(paragraph: Paragraph):
     """
     space_after = paragraph.paragraph_format.space_after
     if space_after is None:
-        return None
+        return 0.0
 
     line_height = _get_effective_line_height(paragraph)
     if line_height is None or line_height <= 0:
-        return None
+        return 0.0
 
     return round(space_after.pt / line_height, 1)
 
@@ -124,6 +124,8 @@ def paragraph_get_line_spacing(paragraph: Paragraph):
             return 1.0  # Word 默认单倍行距
         return float(spacing)
     else:
+        if spacing is None:
+            return 1.0  # Word 默认单倍行距
         return float(spacing)
 
 
