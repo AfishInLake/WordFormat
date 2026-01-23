@@ -8,26 +8,14 @@
 """
 from typing import Optional, Tuple
 
-from docx.enum.text import WD_LINE_SPACING, WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_LINE_SPACING
 from docx.oxml.shared import qn
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
 
-def _wd_align_to_str(alignment) -> str:
-    """将 WD_ALIGN_PARAGRAPH 枚举转为中文描述"""
-    mapping = {
-        WD_ALIGN_PARAGRAPH.LEFT: '左对齐',
-        WD_ALIGN_PARAGRAPH.CENTER: '居中',
-        WD_ALIGN_PARAGRAPH.RIGHT: '右对齐',
-        WD_ALIGN_PARAGRAPH.JUSTIFY: '两端对齐',
-        WD_ALIGN_PARAGRAPH.DISTRIBUTE: '分散对齐',
-    }
-    return mapping.get(alignment, f'未知({alignment})')
-
-
-def paragraph_get_alignment(paragraph: Paragraph) -> str:
+def paragraph_get_alignment(paragraph: Paragraph) -> object:
     """
     获取段落的有效对齐方式（考虑直接格式 + 样式继承）
 
@@ -40,13 +28,13 @@ def paragraph_get_alignment(paragraph: Paragraph) -> str:
     # 1. 先看段落是否显式设置了对齐
     direct_alignment = paragraph.paragraph_format.alignment
     if direct_alignment is not None:
-        return _wd_align_to_str(direct_alignment)
+        return direct_alignment
 
     # 2. 否则，从段落样式中获取
     style = paragraph.style
     while style is not None:
         if hasattr(style, 'paragraph_format') and style.paragraph_format.alignment is not None:
-            return _wd_align_to_str(style.paragraph_format.alignment)
+            return style.paragraph_format.alignment
         # 尝试向上查找基础样式（部分版本支持 _base_style）
         base_style = getattr(style, '_base_style', None)
         if base_style is None:
@@ -54,7 +42,7 @@ def paragraph_get_alignment(paragraph: Paragraph) -> str:
         style = base_style
 
     # 3. 所有地方都没设置 → Word 默认是左对齐，但为严谨返回“未设置”
-    return '未设置'
+    return None
 
 
 def _get_effective_line_height(paragraph) -> Optional[float]:
@@ -122,13 +110,13 @@ def _get_style_spacing(style, spacing_type='before'):
     # 1. 获取样式的XML元素
     style_elem = style.element
     style_pPr = style_elem.find(qn('w:pPr'))
-    if not style_pPr:
+    if style_pPr is None:
         # 递归查基样式
         return _get_style_spacing(style.base_style, spacing_type)
 
     # 2. 查找样式中的spacing元素
     spacing = style_pPr.find(qn('w:spacing'))
-    if not spacing:
+    if spacing is None:
         # 递归查基样式
         return _get_style_spacing(style.base_style, spacing_type)
 
@@ -141,10 +129,10 @@ def _get_style_spacing(style, spacing_type='before'):
     twips_val = int(twips_attr) if twips_attr is not None else 0
 
     if lines_val > 0:
-        return (lines_val, twips_val)
+        return lines_val, twips_val
     # 无Lines值时，返回twips值，继续递归查基样式（避免漏基样式的设置）
     base_lines, base_twips = _get_style_spacing(style.base_style, spacing_type)
-    return (lines_val if lines_val > 0 else base_lines, twips_val if twips_val > 0 else base_twips)
+    return lines_val if lines_val > 0 else base_lines, twips_val if twips_val > 0 else base_twips
 
 
 def paragraph_get_space_before(paragraph):
@@ -193,7 +181,6 @@ def paragraph_get_space_before(paragraph):
     return 0.0  # 正文默认0行
 
 
-# 段后间距函数（同理，仅修改spacing_type为after）
 def paragraph_get_space_after(paragraph):
     font_size_pt = _get_font_size_pt(paragraph)
     actual_line_twips = font_size_pt * 20

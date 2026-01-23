@@ -27,7 +27,7 @@ class TreeNode:
 
     def load_config(self, full_config: Union[Dict, Any]) -> None:
         """
-        根据 self.NODE_TYPE（点分路径）从 full_config 中提取子配置。
+        根据 cls.NODE_TYPE（点分路径）从 full_config 中提取子配置。
 
         例如：
           NODE_TYPE = 'abstract.keywords.chinese'

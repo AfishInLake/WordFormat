@@ -60,7 +60,7 @@ class AbstractTitleContentCN(FormatNode):
         """
         设置 摘要 样式
         """
-        # cfg = self.config
+        # cfg = cls.config
         # ps = ParagraphStyle(
         #     alignment=cfg.get('alignment', '左对齐'),
         #     space_before=cfg.get('space_before', 'NONE'),
@@ -69,11 +69,11 @@ class AbstractTitleContentCN(FormatNode):
         #     first_line_indent=cfg.get('first_line_indent', '2字符'),
         #     builtin_style_name=cfg.get('builtin_style_name', '正文')
         # )
-        # ps.apply_to(self.paragraph)
+        # ps.apply_to(cls.paragraph)
         #
-        # for index, run in enumerate(self.paragraph.runs):
+        # for index, run in enumerate(cls.paragraph.runs):
         #     # 检查标题是否包含在正文中
-        #     if self.check_title(run):
+        #     if cls.check_title(run):
         #         # 对run对象设置样式
         #         CharacterStyle(
         #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
@@ -84,7 +84,7 @@ class AbstractTitleContentCN(FormatNode):
         #             italic=cfg.get('italic', False),
         #             underline=cfg.get('underline', False),
         #         ).apply_to(run)
-        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        #         cls.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
         #     else:
         #         # 对剩余部分的run设置样式
         #         CharacterStyle(
@@ -180,7 +180,7 @@ class AbstractTitleContentEN(FormatNode):
         """
         设置 摘要 样式
         """
-        # cfg = self.config
+        # cfg = cls.config
         # ps = ParagraphStyle(
         #     alignment=cfg.get('alignment', '左对齐'),
         #     space_before=cfg.get('space_before', 'NONE'),
@@ -189,10 +189,10 @@ class AbstractTitleContentEN(FormatNode):
         #     first_line_indent=cfg.get('first_line_indent', '2字符'),
         #     builtin_style_name=cfg.get('builtin_style_name', '正文')
         # )
-        # ps.apply_to(self.paragraph)
-        # for index, run in enumerate(self.paragraph.runs):
+        # ps.apply_to(cls.paragraph)
+        # for index, run in enumerate(cls.paragraph.runs):
         #     # 检查标题是否包含在正文中
-        #     if self.check_title(run):
+        #     if cls.check_title(run):
         #         # 对run对象设置样式
         #         CharacterStyle(
         #             font_name_cn=cfg.get('chinese_font_name', '宋体'),
@@ -203,7 +203,7 @@ class AbstractTitleContentEN(FormatNode):
         #             italic=cfg.get('italic', False),
         #             underline=cfg.get('underline', False),
         #         ).apply_to(run)
-        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        #         cls.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
         #     else:
         #         # 对剩余部分的run设置样式
         #         CharacterStyle(
@@ -215,7 +215,7 @@ class AbstractTitleContentEN(FormatNode):
         #             italic=cfg.get('italic', False),
         #             underline=cfg.get('underline', False),
         #         ).apply_to(run)
-        #         self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+        #         cls.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
 
         return []
 
