@@ -11,9 +11,8 @@ from .abstract import (
     AbstractTitleContentEN,
     AbstractContentCN,
     AbstractContentEN,
-    KeywordsEN,
-    KeywordsCN
 )
+from .keywords import KeywordsEN, KeywordsCN
 from .acknowledgement import Acknowledgements, AcknowledgementsCN
 from .body import BodyText
 from .caption import CaptionFigure, CaptionTable
