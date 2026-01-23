@@ -157,6 +157,13 @@ class FontName(LabelEnum):
         else:
             return False
 
+    @classmethod
+    def to_string(cls, value: Any) -> str:
+        real_value = value.value if hasattr(value, 'value') else value
+        if isinstance(real_value, tuple) and len(real_value) == 3:
+            cn, ascii_, high_ansi = real_value
+            return f"中文字体: {cn}, ASCII: {ascii_}, High ANSI: {high_ansi}"
+        return str(real_value)
 
 
 class FontSize(LabelEnum):
@@ -277,7 +284,6 @@ class Spacing(LabelEnum):
         'LARGE': LARGE,
         'EXTRA_LARGE': EXTRA_LARGE,
     }
-
 
 
 class LineSpacing(LabelEnum):
@@ -418,9 +424,10 @@ class CharacterStyle:
 
         # 6. 字体
         font_name = run_get_font_name(run)
-        if font_name != (self.font_name_cn, self.font_name_en, self.font_name_en):
+        except_font = (self.font_name_cn, self.font_name_en, self.font_name_en)
+        if font_name != except_font:
             if CHARACTER_STYLE_CHECKS['font_name']:
-                diffs.append(DIFFResult('font_name_cn', self.font_name_cn, font_name, f"段落默认的中文字体,ASCII字符,高 ANSI 字符分别为{FontName.to_string(font_name)}"))
+                diffs.append(DIFFResult('font_name_cn', self.font_name_cn, font_name, f"期待的字体:{FontName.to_string(except_font)}，实际的字体:{FontName.to_string(font_name)}"))
         return diffs
 
     def apply_to(self, run: Run):
