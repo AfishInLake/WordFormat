@@ -5,7 +5,7 @@
 # @File    : tree.py
 from typing import Any, List, Iterator, Optional, TypeVar, Generic, Callable
 
-from src.rules.node import TreeNode, FormatNode
+from src.rules.node import TreeNode
 
 
 class Tree:

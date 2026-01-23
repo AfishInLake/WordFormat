@@ -11,9 +11,9 @@ from docx.text.paragraph import Paragraph
 from lxml import etree
 
 
-def get_paragraph_xml_fingerprint(paragraph: Paragraph):
-    xml_str = etree.tostring(paragraph._element, encoding='utf-8', method='xml')
-    return hashlib.sha256(xml_str).hexdigest()
+def get_paragraph_fingerprint(paragraph: Paragraph):
+    """使用段落的前20个字生成指纹"""
+    return hashlib.sha256(paragraph.text[:20].strip().encode("utf-8")).hexdigest()
 
 
 def load_yaml_with_merge(file_path: str) -> Dict[str, Any]:

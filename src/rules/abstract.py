@@ -7,7 +7,7 @@ import re
 from typing import Dict, List, Any
 
 from src.rules.node import FormatNode
-from src.rules.style import ParagraphStyle, CharacterStyle
+from src.style.check_format import ParagraphStyle, CharacterStyle
 
 
 class AbstractTitleCN(FormatNode):

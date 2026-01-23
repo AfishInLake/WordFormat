@@ -3,10 +3,10 @@
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : body.py
-from typing import Dict
+from typing import Dict, List, Any
 
 from src.rules.node import FormatNode
-from src.rules.style import *
+from src.style.check_format import ParagraphStyle, CharacterStyle
 
 
 class BodyText(FormatNode):

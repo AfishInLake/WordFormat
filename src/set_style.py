@@ -10,7 +10,7 @@ from loguru import logger
 
 from src.rules import *
 from src.tree import print_tree
-from src.utils import get_paragraph_xml_fingerprint
+from src.utils import get_paragraph_fingerprint
 from src.word_structure.document_builder import DocumentBuilder
 from src.word_structure.utils import find_and_modify_first, promote_bodytext_in_subtrees_of_type
 
@@ -54,7 +54,7 @@ def xg(root_node, paragraph):
 
     def condition(node):
         if getattr(node, 'fingerprint', False):
-            return node.fingerprint == get_paragraph_xml_fingerprint(paragraph)
+            return node.fingerprint == get_paragraph_fingerprint(paragraph)
         return False
 
     return find_and_modify_first(

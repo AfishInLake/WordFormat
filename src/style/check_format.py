@@ -11,7 +11,7 @@ from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
-from src.rules.get_some import (
+from src.style.get_some import (
     paragraph_get_alignment,
     paragraph_get_space_before,
     paragraph_get_space_after,
@@ -460,7 +460,7 @@ class ParagraphStyle:
         # 行距
         line_spacing = paragraph_get_line_spacing(paragraph)
         if self.line_spacing != line_spacing:
-            diffs.append(DIFFResult('line_spacing', self.line_spacing, line_spacing, f"行距期待{self.line_spacing}倍，实际{line_spacing}行;"))
+            diffs.append(DIFFResult('line_spacing', self.line_spacing, line_spacing, f"行距期待{self.line_spacing}倍，实际{line_spacing}倍;"))
         # 首行缩进
         first_line_indent = paragraph_get_first_line_indent(paragraph)
         if self.first_line_indent != first_line_indent:

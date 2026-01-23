@@ -10,7 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_t
 from src.agent.api import OpenAIAgent
 from src.agent.message import MessageManager
 from src.settings import API_KEY, MODEL, MODEL_URL
-from src.utils import get_paragraph_xml_fingerprint
+from src.utils import get_paragraph_fingerprint
 
 
 class DocxBase:
@@ -45,7 +45,7 @@ class DocxBase:
 
                 }
 
-            response['fingerprint'] = get_paragraph_xml_fingerprint(paragraph)
+            response['fingerprint'] = get_paragraph_fingerprint(paragraph)
             print(response)
             result.append(response)
         return result
