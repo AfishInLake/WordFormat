@@ -4,6 +4,7 @@
 # @File    : main.py
 from set_style import auto_format_thesis_document
 
+# from set_tag import main
 # docxpath = "tmp/毕业设计说明书.docx"
 # main(docxpath)
 
