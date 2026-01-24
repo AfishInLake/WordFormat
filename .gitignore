@@ -19,3 +19,4 @@ __pycache__
 .gitattributes
 test
 tmp
+.trae

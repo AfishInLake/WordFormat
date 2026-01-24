@@ -21,10 +21,7 @@
 }
 ### 输出要求：
 - 返回严格有效的 JSON 对象；
-- 仅包含两个字段："category", "comment"；
-- comment 中填写分类原因，严格要求20字以内
-- comment 必须严格基于段落中实际出现的文字，不得添加、推测或虚构任何未出现的关键词（例如：段落中无“本章”，则 comment 不得写“包含本章”）
-- 若分类依据是格式（如“以1.1开头”），comment 应描述可观测形式特征，而非语义推测。
+- 仅包含一个字段："category"；
 - 值必须是上述类别名称之一；
 - 不要任何额外文本、解释、Markdown、注释或字段。
 
@@ -41,14 +38,14 @@ abstract_english_title_content 应该用于："Abstract：With the rapid develop
 
 常见错误：
 category应该为body_text但标记错误：
-{'category': 'heading_level_3', 'comment': '以1.1.1格式开头', 'paragraph': '（3）水力效率：'}
-{'category': 'heading_level_2', 'comment': '以2.开头，无句子结构', 'paragraph': '（2）机械效率'}
-{'category': 'heading_level_1', 'comment': '以(1)开头', 'paragraph': '(1)容积效率：'}
+{'category': 'heading_level_3',  'paragraph': '（3）水力效率：'}
+{'category': 'heading_level_2',  'paragraph': '（2）机械效率'}
+{'category': 'heading_level_1',  'paragraph': '(1)容积效率：'}
 错误点：被判定为heading_level_*的标签不应该出现括号等其他符号
 
 category应该为heading_level_2但标记错误：
-{'category': 'heading_level_3', 'comment': '以1.1.1格式开头', 'paragraph': '3.3 泵效率的选择与计算'}
-{'category': 'heading_level_3', 'comment': '以3.4开头，含一个点', 'paragraph': '3.4 精算叶轮外径D₂'}
-{'category': 'heading_level_3', 'comment': '以3.5开头且无句子结构', 'paragraph': '3.5 叶轮的选择'}
-{'category': 'heading_level_3', 'comment': '以1.1.1格式开头', 'paragraph': '4.3 扩散管'}
+{'category': 'heading_level_3', 'paragraph': '3.3 泵效率的选择与计算'}
+{'category': 'heading_level_3', 'paragraph': '3.4 精算叶轮外径D₂'}
+{'category': 'heading_level_3', 'paragraph': '3.5 叶轮的选择'}
+{'category': 'heading_level_3', 'paragraph': '4.3 扩散管'}
 错误点：把X.Y类型的段落识别成X.Y.Z
