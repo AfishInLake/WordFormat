@@ -10,7 +10,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fi
 from src.agent.api import OpenAIAgent
 from src.agent.message import MessageManager
 from src.settings import API_KEY, MODEL, MODEL_URL
-from src.utils import get_paragraph_fingerprint
+from src.utils import get_paragraph_xml_fingerprint
 
 
 class DocxBase:
@@ -39,8 +39,6 @@ class DocxBase:
                 continue
             try:
                 response = await self.parse_paragraph(paragraph.text)
-                if response["category"] == "heading_fulu":
-                    break
             except Exception as e:
                 response = {
                     "category": "body_text",
@@ -48,8 +46,10 @@ class DocxBase:
                     "paragraph": paragraph.text,
                 }
 
-            response["fingerprint"] = get_paragraph_fingerprint(paragraph)
+            response["fingerprint"] = get_paragraph_xml_fingerprint(paragraph)
             logger.info(response)
+            if response["category"] == "heading_fulu":
+                break
             result.append(response)
         self.base_agent.print_token_usage()
         return result

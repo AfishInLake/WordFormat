@@ -10,13 +10,15 @@ from src.rules.node import FormatNode
 from src.word_structure.settings import CATEGORY_TO_CLASS
 
 
-def create_node(item: dict[str, Any], level: int, config: dict[str, Any]) -> FormatNode | None:
+def create_node(
+    item: dict[str, Any], level: int, config: dict[str, Any]
+) -> FormatNode | None:
     """
     根据 item['category'] 创建对应的 FormatNode 子类实例。
     """
     category = item.get("category")
     if not category:
-        raise ValueError("Item missing 'category' field")
+        raise ValueError(f"Item {item} missing 'category' field")
 
     if category in CATEGORY_TO_CLASS:
         cls = CATEGORY_TO_CLASS[category]

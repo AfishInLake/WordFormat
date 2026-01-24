@@ -2,7 +2,6 @@
 # @Time    : 2026/1/11 19:51
 # @Author  : afish
 # @File    : set_style.py
-import os
 from pathlib import Path
 
 from docx import Document
@@ -18,7 +17,7 @@ from src.rules import (
     References,
 )
 from src.tree import print_tree
-from src.utils import get_paragraph_fingerprint
+from src.utils import get_paragraph_xml_fingerprint
 from src.word_structure.document_builder import DocumentBuilder
 from src.word_structure.utils import (
     find_and_modify_first,
@@ -67,7 +66,7 @@ def xg(root_node, paragraph):
 
     def condition(node):
         if getattr(node, "fingerprint", False):
-            return node.fingerprint == get_paragraph_fingerprint(paragraph)
+            return node.fingerprint == get_paragraph_xml_fingerprint(paragraph)
         return False
 
     return find_and_modify_first(root=root_node, condition=condition)
@@ -109,10 +108,9 @@ def auto_format_thesis_document(
         ...     "format_rules.yaml"
         ... )
     """
-    from src.utils import load_yaml_with_merge
+    from src.utils import get_file_name, load_yaml_with_merge
 
-    basename = os.path.basename(docxpath)
-    filename_without_ext, _ = os.path.splitext(basename)  # 提取docx文件名称
+    filename_without_ext = get_file_name(docxpath)
     root_node = DocumentBuilder.build_from_json(jsonpath)
     root_node.children = [
         node for node in root_node.children if node.value.get("category") != "body_text"

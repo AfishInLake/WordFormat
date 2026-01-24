@@ -10,6 +10,7 @@ from typing import Any
 import yaml
 from docx.text.paragraph import Paragraph
 from loguru import logger
+from lxml import etree
 
 
 def check_duplicate_fingerprints(data):
@@ -42,9 +43,9 @@ def check_duplicate_fingerprints(data):
         logger.info("未发现重复的 fingerprint。")
 
 
-def get_paragraph_fingerprint(paragraph: Paragraph):
-    """使用段落的前20个字生成指纹"""
-    return hashlib.sha256(paragraph.text[:20].strip().encode("utf-8")).hexdigest()
+def get_paragraph_xml_fingerprint(paragraph: Paragraph):
+    xml_str = etree.tostring(paragraph._element, encoding="utf-8", method="xml")
+    return hashlib.sha256(xml_str).hexdigest()
 
 
 def load_yaml_with_merge(file_path: str) -> dict[str, Any]:
@@ -68,3 +69,9 @@ def ensure_is_directory(path):
         raise ValueError(f"路径不存在: '{path}'")
     if not os.path.isdir(path):
         raise ValueError(f"路径不是一个文件夹（它可能是一个文件）: '{path}'")
+
+
+def get_file_name(file_name: str):
+    basename = os.path.basename(file_name)
+    filename_without_ext, _ = os.path.splitext(basename)  # 提取docx文件名称
+    return filename_without_ext

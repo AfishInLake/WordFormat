@@ -61,10 +61,10 @@ class OpenAIAgent:
         response = await self.client.chat.completions.create(
             **api_params, extra_body=extra_body
         )
-        if not stream:
-            logger.debug(
-                f"API调用成功，token使用: {response.usage if hasattr(response, 'usage') else '未知'}"
-            )
+        # if not stream:
+        #     logger.debug(
+        #         f"API调用成功，token使用: {response.usage if hasattr(response, 'usage') else '未知'}"
+        #     )
         return response
 
     async def get_function(self) -> list[ChatCompletionMessageToolCall] | None:
