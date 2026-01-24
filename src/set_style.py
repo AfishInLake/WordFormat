@@ -7,6 +7,7 @@ from pathlib import Path
 from docx import Document
 from loguru import logger
 
+from config.datamodel import NodeConfigRoot
 from src.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -110,6 +111,18 @@ def auto_format_thesis_document(
     """
     from src.utils import get_file_name, load_yaml_with_merge
 
+    try:
+        # 加载合并后的配置字典
+        raw_config = load_yaml_with_merge(configpath)
+        # 关键：用Pydantic验证配置结构（确保配置符合datamodel定义）
+        root_config_model = NodeConfigRoot(**raw_config)
+        # 转换为字典（供节点加载）
+        config = root_config_model.model_dump()
+        logger.info("配置文件验证通过")
+    except Exception as e:
+        logger.error(f"配置文件加载/验证失败: {str(e)}")
+        raise
+
     filename_without_ext = get_file_name(docxpath)
     root_node = DocumentBuilder.build_from_json(jsonpath)
     root_node.children = [
@@ -139,9 +152,7 @@ def auto_format_thesis_document(
     观察到不属于正文的内容被处理，需要剪枝
     word样式太多，需要考虑重置
     """
-    apply_format_check_to_all_nodes(
-        root_node, document, load_yaml_with_merge(configpath)
-    )
+    apply_format_check_to_all_nodes(root_node, document, config)
     savepath = Path(savepath)
     savepath.mkdir(exist_ok=True)
     document.save(str(savepath / f"{filename_without_ext}--修改版.docx"))

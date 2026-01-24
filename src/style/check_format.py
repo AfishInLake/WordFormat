@@ -537,8 +537,8 @@ class ParagraphStyle:
         alignment: str = "左对齐",
         space_before: float = 0.0,
         space_after: float = 0.0,
-        line_spacing: float = 1.5,
-        first_line_indent: float = 0.0,
+        line_spacing: float | str = 1.5,
+        first_line_indent: float | str = 0.0,
         builtin_style_name: str = "正文",
     ):
         self.alignment: tuple = Alignment.from_label(alignment)

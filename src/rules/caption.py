@@ -4,6 +4,7 @@
 # @File    : caption.py
 from typing import Any
 
+from config.datamodel import FiguresConfig, TablesConfig
 from src.rules.node import FormatNode
 from style.check_format import CharacterStyle, ParagraphStyle
 
@@ -12,6 +13,7 @@ class CaptionFigure(FormatNode):
     """题注-图片"""
 
     NODE_TYPE = "figures"
+    CONFIG_MODEL = FiguresConfig
 
     def check_format(self, doc) -> list[dict[str, Any]]:
         cfg = self.config
@@ -59,6 +61,7 @@ class CaptionTable(FormatNode):
     """题注-表格"""
 
     NODE_TYPE = "tables"
+    CONFIG_MODEL = TablesConfig
 
     def check_format(self, doc) -> list[dict[str, Any]]:
         # TODO:暂时无法处理表格分页情况
