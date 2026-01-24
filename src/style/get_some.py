@@ -143,9 +143,14 @@ def paragraph_get_space_before(paragraph):
     """
     精准获取段前间距（单位：行）
     完全复刻Word逻辑：段落自身 > 样式继承（Lines→twips） > 内置默认
+    核心修复：解决小数值twips被误判为非零行数的问题（如100twips→0.4行）
     """
     font_size_pt = _get_font_size_pt(paragraph)
     actual_line_twips = font_size_pt * 20  # 当前字体1行=字体大小×20twips
+    # 核心阈值：小于单行高度50%的twips视为"0行"（匹配Word视觉逻辑）
+    MIN_EFFECTIVE_TWIPS_RATIO = 0.5
+    effective_twips_threshold = actual_line_twips * MIN_EFFECTIVE_TWIPS_RATIO
+
     p = paragraph._element
     pPr = p.find(qn("w:pPr"))
 
@@ -155,39 +160,61 @@ def paragraph_get_space_before(paragraph):
     if pPr is not None:
         spacing = pPr.find(qn("w:spacing"))
         if spacing is not None:
-            # 1.1 优先查Lines属性
+            # 1.1 优先查Lines属性（Word中Lines优先级高于twips）
             before_lines_attr = spacing.get(qn("w:beforeLines"))
             if before_lines_attr is not None:
-                self_lines = int(before_lines_attr) / 100.0
-            # 1.2 查twips属性（兜底）
+                try:
+                    self_lines = (
+                        int(before_lines_attr) / 100.0
+                    )  # Word中Lines单位是1/100行
+                except (ValueError, TypeError):
+                    self_lines = 0.0  # 异常值兜底为0
+            # 1.2 查twips属性（兜底）+ 类型校验
             before_twips_attr = spacing.get(qn("w:before"))
-            self_twips = int(before_twips_attr) if before_twips_attr is not None else 0
+            try:
+                self_twips = (
+                    int(before_twips_attr) if before_twips_attr is not None else 0
+                )
+            except (ValueError, TypeError):
+                self_twips = 0  # 非数字twips值视为0
 
     # 第二步：自身无值，查样式继承
     style_lines, style_twips = _get_style_spacing(paragraph.style, "before")
     final_lines = self_lines if self_lines > 0 else style_lines
     final_twips = self_twips if self_twips > 0 else style_twips
 
-    # 第三步：有Lines值直接返回
+    # 第三步：有Lines值直接返回（Lines是Word显性设置，优先级最高）
     if final_lines > 0:
         return round(final_lines, 1)
 
-    # 第四步：无Lines值，用twips换算（核心修复：不再直接返回0.0，而是用样式的twips换算）
+    # 第四步：无Lines值，用twips换算（核心修复逻辑）
     if final_twips > 0:
+        # 修复1：小数值twips视为0行（如100twips<12pt字体的阈值120twips→0行）
+        if final_twips < effective_twips_threshold:
+            return 0.0
+        # 修复2：有效twips值才换算为行数（避免无效小值误判）
         before_lines = final_twips / actual_line_twips
         return round(before_lines, 1)
 
-    # 第五步：终极兜底（Word内置默认值，可根据需求调整）
-    # 比如：标题样式默认0.5行，正文默认0行，可根据实际场景加判断
+    # 第五步：终极兜底（Word内置默认值，仅无任何设置时触发）
     style_name = paragraph.style.name.lower()
     if any(key in style_name for key in ["标题", "heading", "title"]):
-        return 0.5  # 标题默认0.5行
-    return 0.0  # 正文默认0行
+        return 0.5  # 标题样式默认0.5行
+    return 0.0  # 正文样式默认0行
 
 
 def paragraph_get_space_after(paragraph):
+    """
+    获取段落段后间距（行），修复默认twips值误判问题
+    核心修复：
+    1. 区分「有效twips值」和「默认twips值」（0/100等小值视为0行）
+    2. 严格匹配Word的「0行」逻辑：twips<单行高度的1/2视为0行
+    """
     font_size_pt = _get_font_size_pt(paragraph)
-    actual_line_twips = font_size_pt * 20
+    actual_line_twips = font_size_pt * 20  # 1pt=20twips，单行高度
+    MIN_EFFECTIVE_TWIPS_RATIO = 0.5  # 小于单行高度50%的twips视为0行
+    effective_twips_threshold = actual_line_twips * MIN_EFFECTIVE_TWIPS_RATIO
+
     p = paragraph._element
     pPr = p.find(qn("w:pPr"))
 
@@ -197,28 +224,40 @@ def paragraph_get_space_after(paragraph):
     if pPr is not None:
         spacing = pPr.find(qn("w:spacing"))
         if spacing is not None:
+            # 读取Lines值（优先）
             after_lines_attr = spacing.get(qn("w:afterLines"))
             if after_lines_attr is not None:
-                self_lines = int(after_lines_attr) / 100.0
+                self_lines = float(int(after_lines_attr) / 100.0)
+            # 读取twips值（注意："0"转为0，非数字视为0）
             after_twips_attr = spacing.get(qn("w:after"))
-            self_twips = int(after_twips_attr) if after_twips_attr is not None else 0
+            try:
+                self_twips = (
+                    int(after_twips_attr) if after_twips_attr is not None else 0
+                )
+            except (ValueError, TypeError):
+                self_twips = 0
 
     # 第二步：自身无值，查样式继承
     style_lines, style_twips = _get_style_spacing(paragraph.style, "after")
     final_lines = self_lines if self_lines > 0 else style_lines
     final_twips = self_twips if self_twips > 0 else style_twips
 
-    # 第三步：有Lines值直接返回
+    # 第三步：有Lines值直接返回（Lines优先级最高）
     if final_lines > 0:
         return round(final_lines, 1)
 
-    # 第四步：无Lines值，用twips换算（核心修复）
+    # 第四步：修复核心——判断twips是否为有效非零值
     if final_twips > 0:
+        # 关键：小于阈值的twips视为0行（解决100twips=0.4行的错误）
+        if final_twips < effective_twips_threshold:
+            return 0.0
+        # 有效twips值，换算为行数
         after_lines = final_twips / actual_line_twips
         return round(after_lines, 1)
 
     # 第五步：终极兜底（Word内置默认值）
     style_name = paragraph.style.name.lower()
+    # 修复：仅当无任何设置时才用兜底值，避免覆盖0行逻辑
     if any(key in style_name for key in ["标题", "heading", "title"]):
         return 0.5
     return 0.0

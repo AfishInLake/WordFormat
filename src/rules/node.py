@@ -3,11 +3,17 @@
 # @Author  : afish
 # @File    : node.py
 from collections.abc import Sequence
-from typing import Any
+from pathlib import Path
+from typing import Any, Dict, Optional, Type
 
+import yaml
 from docx.document import Document
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+from loguru import logger
+from pydantic import ValidationError
+
+from src.config.datamodel import BaseModel
 
 
 class TreeNode:
@@ -80,6 +86,8 @@ class TreeNode:
 class FormatNode(TreeNode):
     """所有格式检查节点的基类"""
 
+    CONFIG_MODEL: Type[BaseModel] = BaseModel
+
     def __init__(
         self,
         value,
@@ -91,6 +99,53 @@ class FormatNode(TreeNode):
         self.level: int | float = level
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
+        self._pydantic_config: Optional[BaseModel] = None  # Pydantic配置对象
+
+    @property
+    def pydantic_config(self) -> BaseModel:
+        """只读属性：获取类型安全的Pydantic配置对象"""
+        if self._pydantic_config is None:
+            raise ValueError(f"节点 {self.NODE_TYPE} 尚未加载Pydantic配置")
+        return self._pydantic_config
+
+    @classmethod
+    def load_yaml_config(cls, config_path: str | Path) -> Dict[str, Any]:
+        """加载并解析YAML配置文件"""
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                raw_config = yaml.safe_load(f)
+            # 使用根模型验证整个配置结构
+            from src.config.datamodel import NodeConfigRoot
+
+            root_config = NodeConfigRoot(**raw_config)
+            return root_config.model_dump()
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"配置文件 {config_path} 不存在") from e
+        except ValidationError as e:
+            raise ValueError(f"配置文件格式错误: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"加载配置失败: {e}") from e
+
+    def load_config(self, full_config: dict | Any) -> None:
+        """重写父类方法：同时加载字典配置和Pydantic配置"""
+        # 1. 先执行父类的字典配置加载（兼容旧逻辑）
+        super().load_config(full_config)
+
+        # 2. 基于父类加载的字典配置，转换为Pydantic模型对象
+        if not isinstance(full_config, dict) or not self.NODE_TYPE:
+            self._pydantic_config = self.CONFIG_MODEL()  # 使用默认配置
+            return
+
+        try:
+            # 转换字典配置为Pydantic模型
+            self._pydantic_config = self.CONFIG_MODEL(**self.config)
+        except ValidationError as e:
+            # 配置验证失败时，使用默认配置并提示
+            self._pydantic_config = self.CONFIG_MODEL()
+            logger.error(f"警告：{self.NODE_TYPE} 配置验证失败，使用默认值。错误：{e}")
+        except Exception as e:
+            self._pydantic_config = self.CONFIG_MODEL()
+            logger.error(f"警告：{self.NODE_TYPE} 配置加载异常，使用默认值。错误：{e}")
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph

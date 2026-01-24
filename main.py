@@ -2,13 +2,13 @@
 # @Time    : 2026/1/18 13:22
 # @Author  : afish
 # @File    : main.py
-from src.set_tag import main
+from set_style import auto_format_thesis_document
 
-docxpath = "tmp/毕业设计说明书.docx"
-main(docxpath)
+# docxpath = "tmp/毕业设计说明书.docx"
+# main(docxpath)
 
-# auto_format_thesis_document(
-#     jsonpath="tmp/毕业设计说明书.json",
-#     docxpath="tmp/毕业设计说明书.docx",
-#     configpath="test/undergrad_thesis.yaml",
-# )
+auto_format_thesis_document(
+    jsonpath="tmp/毕业设计说明书.json",
+    docxpath="tmp/毕业设计说明书.docx",
+    configpath="test/undergrad_thesis.yaml",
+)
