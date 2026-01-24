@@ -6,7 +6,6 @@ repos:
         args: [
           --fix,
           --exit-non-zero-on-fix,
-          --show-files
         ]
         stages: [ pre-commit ]
       - id: ruff-format
