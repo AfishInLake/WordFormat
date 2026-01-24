@@ -3,7 +3,7 @@ repos:
     rev: v0.14.13
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-        stages: [pre-commit]
+        args: [ --fix, --exit-non-zero-on-fix ]
+        stages: [ pre-commit ]
       - id: ruff-format
-        stages: [pre-commit]
+        stages: [ pre-commit ]
