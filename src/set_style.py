@@ -2,6 +2,8 @@
 # @Time    : 2026/1/11 19:51
 # @Author  : afish
 # @File    : set_style.py
+import os
+from pathlib import Path
 
 from docx import Document
 from loguru import logger
@@ -11,6 +13,7 @@ from src.rules import (
     AbstractContentEN,
     AbstractTitleCN,
     AbstractTitleEN,
+    FormatNode,
     ReferenceEntry,
     References,
 )
@@ -23,7 +26,7 @@ from src.word_structure.utils import (
 )
 
 
-def apply_format_check_to_all_nodes(root_node, document, config: dict):
+def apply_format_check_to_all_nodes(root_node: FormatNode, document, config: dict):
     """
     递归遍历文档树中的所有节点，
     对每个具有 check_format 方法的节点执行该方法。
@@ -40,7 +43,9 @@ def apply_format_check_to_all_nodes(root_node, document, config: dict):
                 if node.value.get("category") != "top":
                     node.load_config(config)
                     # TODO: 添加判断的参数
-                    node.check_format(document)
+                    logger.debug(node)
+                    if node.paragraph:
+                        node.check_format(document)
             except Exception as e:
                 logger.warning(f"Node {node} not format, beacuse: {str(e)}")
                 raise e
@@ -69,7 +74,7 @@ def xg(root_node, paragraph):
 
 
 def auto_format_thesis_document(
-    jsonpath: str, docxpath: str, savepath: str, configpath: str
+    jsonpath: str, docxpath: str, configpath: str, savepath: str = "output/"
 ):
     """自动对学位论文文档进行格式校验与批注。
 
@@ -106,6 +111,8 @@ def auto_format_thesis_document(
     """
     from src.utils import load_yaml_with_merge
 
+    basename = os.path.basename(docxpath)
+    filename_without_ext, _ = os.path.splitext(basename)  # 提取docx文件名称
     root_node = DocumentBuilder.build_from_json(jsonpath)
     root_node.children = [
         node for node in root_node.children if node.value.get("category") != "body_text"
@@ -137,4 +144,6 @@ def auto_format_thesis_document(
     apply_format_check_to_all_nodes(
         root_node, document, load_yaml_with_merge(configpath)
     )
-    document.save(savepath)
+    savepath = Path(savepath)
+    savepath.mkdir(exist_ok=True)
+    document.save(str(savepath / f"{filename_without_ext}--修改版.docx"))

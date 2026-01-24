@@ -8,6 +8,7 @@ from typing import Any
 
 from src.rules.node import FormatNode
 from src.word_structure.tree_builder import DocumentTreeBuilder
+from utils import check_duplicate_fingerprints
 
 
 class DocumentBuilder:
@@ -21,5 +22,6 @@ class DocumentBuilder:
     @classmethod
     def build_from_json(cls, json_path: str) -> FormatNode:
         paragraphs = cls.load_paragraphs(json_path)
+        check_duplicate_fingerprints(paragraphs)  # 检查重复的指纹
         builder = DocumentTreeBuilder()
         return builder.build_tree(paragraphs)

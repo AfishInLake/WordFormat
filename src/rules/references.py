@@ -18,8 +18,8 @@ class References(FormatNode):
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.get("alignment", "两端对齐"),
-            space_before=cfg.get("space_before", "0磅"),
-            space_after=cfg.get("space_after", "0磅"),
+            space_before=cfg.get("space_before", 0),
+            space_after=cfg.get("space_after", 0),
             line_spacing=cfg.get("line_spacing", "1.5倍"),
             first_line_indent=cfg.get("first_line_indent", "2字符"),
             builtin_style_name=cfg.get("builtin_style_name", "正文"),
@@ -63,8 +63,8 @@ class ReferenceEntry(FormatNode):
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.get("alignment", "两端对齐"),
-            space_before=cfg.get("space_before", "0磅"),
-            space_after=cfg.get("space_after", "0磅"),
+            space_before=cfg.get("space_before", 0),
+            space_after=cfg.get("space_after", 0),
             line_spacing=cfg.get("line_spacing", "1.5倍"),
             first_line_indent=cfg.get("first_line_indent", "2字符"),
             builtin_style_name=cfg.get("builtin_style_name", "正文"),

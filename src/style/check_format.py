@@ -568,6 +568,7 @@ class ParagraphStyle:
         diffs = []
         # 对齐方式
         alignment = paragraph_get_alignment(paragraph)
+        alignment = alignment if alignment else Alignment.LEFT  # 默认左对齐
         if self.alignment != alignment:
             diffs.append(
                 DIFFResult(

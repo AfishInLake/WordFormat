@@ -16,6 +16,7 @@ from .body import BodyText
 from .caption import CaptionFigure, CaptionTable
 from .heading import HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node
 from .keywords import KeywordsCN, KeywordsEN
+from .node import FormatNode
 from .references import ReferenceEntry, References
 
 __all__ = [
@@ -37,4 +38,5 @@ __all__ = [
     "HeadingLevel3Node",
     "References",
     "ReferenceEntry",
+    "FormatNode",
 ]
