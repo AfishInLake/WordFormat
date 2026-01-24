@@ -1,12 +1,29 @@
+default_language_version:
+  python: python3.11
+files: ".*.py|json"
+default_stages: [ pre-commit, pre-push ]
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.13
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: debug-statements
+      - id: check-yaml
+      - id: pretty-format-json
+        args: [ "--autofix" ]
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.1
+    hooks:
+      - id: pyupgrade
+        args:
+          - --py3-plus
+          - --keep-runtime-typing
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.11.8
     hooks:
       - id: ruff
-        args: [
-          --fix,
-          --exit-non-zero-on-fix,
-        ]
-        stages: [ pre-commit ]
+        args:
+          - --fix
       - id: ruff-format
-        stages: [ pre-commit ]
+
