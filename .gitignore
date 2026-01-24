@@ -22,3 +22,4 @@ test/*
 tmp
 tmp/*
 .trae
+output/*
