@@ -31,7 +31,10 @@ def paragraph_get_alignment(paragraph: Paragraph) -> object:
     # 2. 否则，从段落样式中获取
     style = paragraph.style
     while style is not None:
-        if hasattr(style, "paragraph_format") and style.paragraph_format.alignment is not None:
+        if (
+            hasattr(style, "paragraph_format")
+            and style.paragraph_format.alignment is not None
+        ):
             return style.paragraph_format.alignment
         # 尝试向上查找基础样式（部分版本支持 _base_style）
         base_style = getattr(style, "_base_style", None)
@@ -43,7 +46,7 @@ def paragraph_get_alignment(paragraph: Paragraph) -> object:
     return None
 
 
-def _get_effective_line_height(paragraph) -> float | None:
+def _get_effective_line_height(paragraph) -> float | None:  # noqa c901
     """
     计算段落的有效行高（单位：pt）
     """
@@ -130,7 +133,10 @@ def _get_style_spacing(style, spacing_type="before"):
         return lines_val, twips_val
     # 无Lines值时，返回twips值，继续递归查基样式（避免漏基样式的设置）
     base_lines, base_twips = _get_style_spacing(style.base_style, spacing_type)
-    return lines_val if lines_val > 0 else base_lines, twips_val if twips_val > 0 else base_twips
+    return (
+        lines_val if lines_val > 0 else base_lines,
+        twips_val if twips_val > 0 else base_twips,
+    )
 
 
 def paragraph_get_space_before(paragraph):
@@ -249,7 +255,7 @@ def _get_space_from_style(paragraph, spacing_type):
     return 0.0
 
 
-def paragraph_get_line_spacing(paragraph):
+def paragraph_get_line_spacing(paragraph):  # noqa c901
     """
     获取段落行间距（倍数）
     Params:
@@ -263,7 +269,9 @@ def paragraph_get_line_spacing(paragraph):
     spacing = fmt.line_spacing
 
     # 如果没有直接设置，检查样式
-    if (rule is None or rule == WD_LINE_SPACING.SINGLE) and (spacing is None or spacing == 1.0):
+    if (rule is None or rule == WD_LINE_SPACING.SINGLE) and (
+        spacing is None or spacing == 1.0
+    ):
         style = paragraph.style
         if style and hasattr(style, "paragraph_format"):
             style_fmt = style.paragraph_format
@@ -312,7 +320,7 @@ def _get_font_size_pt(paragraph):
     return max(result) if result else default_font_size_pt
 
 
-def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):
+def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):  # noqa c901
     """
     获取段落首行缩进
     Params:

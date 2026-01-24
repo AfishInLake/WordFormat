@@ -28,7 +28,9 @@ from src.style.get_some import (
 
 for check in ["bold", "italic", "underline", "font_size", "font_color", "font_name"]:
     if check not in CHARACTER_STYLE_CHECKS:
-        raise ValueError(f" 未在 `settings.py` 的 CHARACTER_STYLE_CHECKS 配置中找到 {check}")
+        raise ValueError(
+            f" 未在 `settings.py` 的 CHARACTER_STYLE_CHECKS 配置中找到 {check}"
+        )
 
 
 @dataclass
@@ -82,9 +84,15 @@ class LabelEnum:
                     if not callable(value):  # 排除方法
                         return value
         # 检查是否是int, float, tuple三类数据结构
-        if isinstance(label, int) or isinstance(label, float) or isinstance(label, tuple):
+        if (
+            isinstance(label, int)
+            or isinstance(label, float)
+            or isinstance(label, tuple)
+        ):
             return label
-        raise ValueError(f"未知段落样式: '{cls.__name__}:{label}'，支持的有: {list(cls._LABEL_MAP.keys())}")
+        raise ValueError(
+            f"未知段落样式: '{cls.__name__}:{label}'，支持的有: {list(cls._LABEL_MAP.keys())}"
+        )
 
     @classmethod
     def to_string(cls, value: Any) -> str:
@@ -156,7 +164,9 @@ class FontName(LabelEnum):
 
     def is_chinese(self, value: str):
         if value not in self._LABEL_MAP:
-            raise ValueError(f"未知字体: '{value}'，支持的有: {list(self._LABEL_MAP.keys())}")
+            raise ValueError(
+                f"未知字体: '{value}'，支持的有: {list(self._LABEL_MAP.keys())}"
+            )
         if value in ["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]:
             return True
         else:
@@ -399,7 +409,7 @@ class CharacterStyle:
         self.italic: bool = italic
         self.underline: bool = underline
 
-    def diff_from_run(self, run) -> list[DIFFResult]:
+    def diff_from_run(self, run) -> list[DIFFResult]:  # noqa c901
         """
         检查段落样式和指定样式是否一致
         """
@@ -439,7 +449,8 @@ class CharacterStyle:
                         "underline",
                         self.underline,
                         underline,
-                        f"期待{'有下划线' if self.underline else '无下划线'}，实际{'有下划线' if underline else '无下划线'};",
+                        f"期待{'有下划线' if self.underline else '无下划线'}，"
+                        f"实际{'有下划线' if underline else '无下划线'};",
                     )
                 )
 
@@ -452,7 +463,8 @@ class CharacterStyle:
                         "font_size",
                         self.font_size,
                         current_size,
-                        f"期待字号{FontSize.to_string(self.font_size)}，实际字号{FontSize.to_string(current_size)};",
+                        f"期待字号{FontSize.to_string(self.font_size)}，"
+                        f"实际字号{FontSize.to_string(current_size)};",
                     )
                 )
 
@@ -465,7 +477,8 @@ class CharacterStyle:
                         "font_color",
                         self.font_color,
                         current_color,
-                        f"期待字体颜色{FontColor.to_string(self.font_color)}, 实际字体颜色{FontColor.to_string(current_color)};",
+                        f"期待字体颜色{FontColor.to_string(self.font_color)}, "
+                        f"实际字体颜色{FontColor.to_string(current_color)};",
                     )
                 )
 
@@ -479,7 +492,8 @@ class CharacterStyle:
                         "font_name_cn",
                         self.font_name_cn,
                         font_name,
-                        f"期待的字体:{FontName.to_string(except_font)}，实际的字体:{FontName.to_string(font_name)}",
+                        f"期待的字体:{FontName.to_string(except_font)}，"
+                        f"实际的字体:{FontName.to_string(font_name)}",
                     )
                 )
         return diffs
@@ -497,7 +511,7 @@ class CharacterStyle:
             "font_name_cn": lambda v: self._set_run_font_cn(run, v),
         }
 
-        for attr, current, expected in diffs:
+        for attr, _current, expected in diffs:
             if attr in setters:
                 setters[attr](expected)
 
@@ -511,10 +525,10 @@ class ParagraphStyle:
 
     Attributes:
         alignment (Alignment): 段落对齐方式。例如左对齐（LEFT）、居中（CENTER）、两端对齐（JUSTIFY）等。
-        space_before (Spacing): 段前间距，表示当前段落与上一段之间的垂直距离（单位：磅）。默认为无间距（NONE）。
-        space_after (Spacing): 段后间距，表示当前段落与下一段之间的垂直距离（单位：磅）。默认为无间距（NONE）。
-        line_spacing (LineSpacing): 行距设置，支持固定值（如单倍、1.5 倍、双倍）或精确磅值。默认为 1.5 倍行距。
-        first_line_indent (FirstLineIndent): 首行缩进量，通常用于正文段落（如缩进两个汉字）。标题类段落一般设为 NONE。
+        space_before (Spacing): 段前间距，表示当前段落与上一段之间的垂直距离（单位：磅）。
+        space_after (Spacing): 段后间距，表示当前段落与下一段之间的垂直距离（单位：磅）。
+        line_spacing (LineSpacing): 行距设置，支持固定值（如单倍、1.5 倍、双倍）或精确磅值。
+        first_line_indent (FirstLineIndent): 首行缩进量，通常用于正文段落（如缩进两个汉字）。
         builtin_style_name ():预设样式
     """
 
@@ -531,7 +545,9 @@ class ParagraphStyle:
         self.space_before: float = float(Spacing.from_label(space_before))
         self.space_after: float = float(Spacing.from_label(space_after))
         self.line_spacing: LineSpacing | float = LineSpacing.from_label(line_spacing)
-        self.first_line_indent: FirstLineIndent | float = FirstLineIndent.from_label(first_line_indent)
+        self.first_line_indent: FirstLineIndent | float = FirstLineIndent.from_label(
+            first_line_indent
+        )
         self.builtin_style_name: str = BuiltInStyle.from_label(builtin_style_name)
 
     def apply_to(self, paragraph: Paragraph):
@@ -558,7 +574,8 @@ class ParagraphStyle:
                     "alignment",
                     self.alignment,
                     alignment,
-                    f"对齐方式期待{Alignment.to_string(self.alignment)}实际{Alignment.to_string(alignment)};",
+                    f"对齐方式期待{Alignment.to_string(self.alignment)},"
+                    f"实际{Alignment.to_string(alignment)};",
                 )
             )
         # 段前间距(行)
@@ -591,7 +608,8 @@ class ParagraphStyle:
                     "line_spacing",
                     self.line_spacing,
                     line_spacing,
-                    f"行距期待{LineSpacing.to_string(self.line_spacing)}，实际{LineSpacing.to_string(line_spacing)};",
+                    f"行距期待{LineSpacing.to_string(self.line_spacing)}，"
+                    f"实际{LineSpacing.to_string(line_spacing)};",
                 )
             )
         # 首行缩进
@@ -602,8 +620,8 @@ class ParagraphStyle:
                     "first_line_indent",
                     self.first_line_indent,
                     first_line_indent,
-                    f"首行缩进期待{FirstLineIndent.to_string(self.first_line_indent)}字符，实际"
-                    f"{FirstLineIndent.to_string(first_line_indent)}字符;",
+                    f"首行缩进期待{FirstLineIndent.to_string(self.first_line_indent)}字符，"
+                    f"实际{FirstLineIndent.to_string(first_line_indent)}字符;",
                 )
             )
         # 样式
@@ -614,7 +632,8 @@ class ParagraphStyle:
                     "builtin_style_name",
                     self.builtin_style_name,
                     builtin_style_name,
-                    f"样式期待{BuiltInStyle.to_string(self.builtin_style_name)}样式，实际{BuiltInStyle.to_string(builtin_style_name)}样式;",
+                    f"样式期待{BuiltInStyle.to_string(self.builtin_style_name)}样式，"
+                    f"实际{BuiltInStyle.to_string(builtin_style_name)}样式;",
                 )
             )
         return diffs

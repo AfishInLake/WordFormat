@@ -6,11 +6,21 @@
 from docx import Document
 from loguru import logger
 
-from src.rules import *
+from src.rules import (
+    AbstractContentCN,
+    AbstractContentEN,
+    AbstractTitleCN,
+    AbstractTitleEN,
+    ReferenceEntry,
+    References,
+)
 from src.tree import print_tree
 from src.utils import get_paragraph_fingerprint
 from src.word_structure.document_builder import DocumentBuilder
-from src.word_structure.utils import find_and_modify_first, promote_bodytext_in_subtrees_of_type
+from src.word_structure.utils import (
+    find_and_modify_first,
+    promote_bodytext_in_subtrees_of_type,
+)
 
 
 def apply_format_check_to_all_nodes(root_node, document, config: dict):
@@ -58,7 +68,9 @@ def xg(root_node, paragraph):
     return find_and_modify_first(root=root_node, condition=condition)
 
 
-def auto_format_thesis_document(jsonpath: str, docxpath: str, savepath: str, configpath: str):
+def auto_format_thesis_document(
+    jsonpath: str, docxpath: str, savepath: str, configpath: str
+):
     """自动对学位论文文档进行格式校验与批注。
 
     该函数根据结构化 JSON 描述和 YAML 格式配置，对指定的 Word 文档进行格式合规性检查，
@@ -95,7 +107,9 @@ def auto_format_thesis_document(jsonpath: str, docxpath: str, savepath: str, con
     from src.utils import load_yaml_with_merge
 
     root_node = DocumentBuilder.build_from_json(jsonpath)
-    root_node.children = [node for node in root_node.children if node.value.get("category") != "body_text"]
+    root_node.children = [
+        node for node in root_node.children if node.value.get("category") != "body_text"
+    ]
     document = Document(docxpath)
     for paragraph in document.paragraphs:
         if not paragraph.text:
@@ -111,12 +125,16 @@ def auto_format_thesis_document(jsonpath: str, docxpath: str, savepath: str, con
         References: ReferenceEntry,
     }
     for key, value in subtress_dict.items():
-        promote_bodytext_in_subtrees_of_type(root_node, parent_type=key, target_type=value)
+        promote_bodytext_in_subtrees_of_type(
+            root_node, parent_type=key, target_type=value
+        )
     print_tree(root_node)
     # FIXME: 临时解决
     """
     观察到不属于正文的内容被处理，需要剪枝
     word样式太多，需要考虑重置
     """
-    apply_format_check_to_all_nodes(root_node, document, load_yaml_with_merge(configpath))
+    apply_format_check_to_all_nodes(
+        root_node, document, load_yaml_with_merge(configpath)
+    )
     document.save(savepath)

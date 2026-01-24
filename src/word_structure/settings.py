@@ -2,7 +2,24 @@
 # @Time    : 2026/1/11 22:25
 # @Author  : afish
 # @File    : settings.py
-from src.rules import *
+from src.rules import (
+    AbstractContentCN,
+    AbstractContentEN,
+    AbstractTitleCN,
+    AbstractTitleContentCN,
+    AbstractTitleContentEN,
+    AbstractTitleEN,
+    Acknowledgements,
+    BodyText,
+    CaptionFigure,
+    CaptionTable,
+    HeadingLevel1Node,
+    HeadingLevel2Node,
+    HeadingLevel3Node,
+    KeywordsCN,
+    KeywordsEN,
+    References,
+)
 
 # 标签节点映射
 CATEGORY_TO_CLASS = {

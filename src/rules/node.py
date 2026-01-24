@@ -60,8 +60,8 @@ class TreeNode:
                 return
             try:
                 self.fingerprint = self.value["fingerprint"]
-            except KeyError:
-                raise ValueError(f"{self.value} must have a 'fingerprint' key")
+            except KeyError as err:
+                raise ValueError(f"{self.value} must have a 'fingerprint' key") from err
 
     def add_child(self, child_value: Any) -> "TreeNode":
         """添加一个子节点，并返回该子节点（便于链式调用）"""
@@ -81,7 +81,11 @@ class FormatNode(TreeNode):
     """所有格式检查节点的基类"""
 
     def __init__(
-        self, value, level: int | float, paragraph: Paragraph = None, expected_rule: dict[str, Any] = None
+        self,
+        value,
+        level: int | float,
+        paragraph: Paragraph = None,
+        expected_rule: dict[str, Any] = None,
     ):
         super().__init__(value=value)  # value 就是 paragraph
         self.level: int | float = level

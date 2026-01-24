@@ -8,12 +8,21 @@ from collections.abc import AsyncGenerator
 from loguru import logger
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
-from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
+from openai.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+)
 
 
 class OpenAIAgent:
     def __init__(
-        self, system_prompt: str, messageManager, model: str, baseurl, api_key: str = "", *args, **kwargs
+        self,
+        system_prompt: str,
+        messageManager,
+        model: str,
+        baseurl,
+        api_key: str = "",
+        *args,
+        **kwargs,
     ):
         self.total_tokens = 0
         self.total_completion_tokens = 0
@@ -35,7 +44,12 @@ class OpenAIAgent:
             "stream": stream,
         }
         extra_body = {
-            "options": {"temperature": 0.0, "top_p": 0.9, "repeat_penalty": 1.1, "num_predict": 96}
+            "options": {
+                "temperature": 0.0,
+                "top_p": 0.9,
+                "repeat_penalty": 1.1,
+                "num_predict": 96,
+            }
         }
 
         match response_format:
@@ -44,7 +58,9 @@ class OpenAIAgent:
                 api_params["parallel_tool_calls"] = False
                 api_params.pop("tools", None)
 
-        response = await self.client.chat.completions.create(**api_params, extra_body=extra_body)
+        response = await self.client.chat.completions.create(
+            **api_params, extra_body=extra_body
+        )
         if not stream:
             logger.debug(
                 f"API调用成功，token使用: {response.usage if hasattr(response, 'usage') else '未知'}"
@@ -130,5 +146,6 @@ class OpenAIAgent:
     def print_token_usage(self) -> None:
         """打印 token 用量到日志"""
         logger.debug(
-            f"累计使用 {self.total_tokens} tokens，其中 {self.total_prompt_tokens} tokens 用于提示，{self.total_completion_tokens} tokens 用于生成"
+            f"累计使用 {self.total_tokens} tokens，其中 {self.total_prompt_tokens} tokens 用于提示，"
+            f"{self.total_completion_tokens} tokens 用于生成"
         )

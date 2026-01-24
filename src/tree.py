@@ -52,7 +52,9 @@ class Tree:
             queue.extend(node.children)
 
     # ===== 查找与工具方法 =====
-    def find_by_condition(self, condition: Callable[[Any], bool]) -> Optional["TreeNode"]:
+    def find_by_condition(
+        self, condition: Callable[[Any], bool]
+    ) -> Optional["TreeNode"]:
         """
         根据条件函数查找节点。
         :param condition: 接收 node.value，返回 bool
@@ -155,15 +157,15 @@ def print_tree(node: TreeNode, prefix: str = "", is_last: bool = True) -> None:
     if isinstance(value, dict):
         cat = value.get("category", "unknown")
         para = value.get("paragraph", "")[:50]  # 截断长文本
-        display = f"[{cat}] {para}"
+        display = f"【{cat}】 {para}"
     elif hasattr(value, "paragraph") and isinstance(value.paragraph, dict):
         cat = value.paragraph.get("category", "unknown")
         para = value.paragraph.get("paragraph", "")[:50]
-        display = f"[{cat}] {para}"
+        display = f"【{cat}】 {para}"
     else:
         display = str(value)[:60]
 
-    print(prefix + connector + display)
+    print(prefix + connector + display)  # noqa t201
 
     # 递归打印子节点
     if hasattr(node, "children"):

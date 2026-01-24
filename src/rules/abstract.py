@@ -40,8 +40,12 @@ class AbstractTitleCN(FormatNode):
 
         for run in self.paragraph.runs:
             diff_result = cstyle.diff_from_run(run)
-            self.add_comment(doc=doc, runs=run, text="".join([str(dr) for dr in diff_result]))
-        self.add_comment(doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues]))
+            self.add_comment(
+                doc=doc, runs=run, text="".join([str(dr) for dr in diff_result])
+            )
+        self.add_comment(
+            doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
+        )
         return []
 
 
@@ -125,10 +129,14 @@ class AbstractContentCN(FormatNode):
             italic=cfg.get("italic", False),
             underline=cfg.get("underline", False),
         )
-        for index, run in enumerate(self.paragraph.runs):
+        for _, run in enumerate(self.paragraph.runs):
             diff_result = cstyle.diff_from_run(run)
-            self.add_comment(doc=doc, runs=run, text="".join([str(dr) for dr in diff_result]))
-        self.add_comment(doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues]))
+            self.add_comment(
+                doc=doc, runs=run, text="".join([str(dr) for dr in diff_result])
+            )
+        self.add_comment(
+            doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
+        )
         return []
 
 
@@ -161,9 +169,15 @@ class AbstractTitleEN(FormatNode):
         for run in self.paragraph.runs:
             diff_result = cstyle.diff_from_run(run)
             if diff_result:
-                self.add_comment(doc=doc, runs=run, text="".join(str(dr) for dr in diff_result))
+                self.add_comment(
+                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                )
         if issues:
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text="".join(str(dr) for dr in issues))
+            self.add_comment(
+                doc=doc,
+                runs=self.paragraph.runs,
+                text="".join(str(dr) for dr in issues),
+            )
         return []
 
 
@@ -236,12 +250,16 @@ class AbstractContentEN(FormatNode):
             space_before=cfg.get("space_before", "NONE"),
             space_after=cfg.get("space_after", "NONE"),
             line_spacing=cfg.get("line_spacing", "1.5倍"),
-            first_line_indent=cfg.get("first_line_indent", "NONE"),  # 英文段落通常无首行缩进
+            first_line_indent=cfg.get(
+                "first_line_indent", "NONE"
+            ),  # 英文段落通常无首行缩进
             builtin_style_name=cfg.get("builtin_style_name", "正文"),
         )
         issues = ps.diff_from_paragraph(self.paragraph)
         cstyle = CharacterStyle(
-            font_name_cn=cfg.get("chinese_font_name", "宋体"),  # 虽为英文内容，但可能混排中文
+            font_name_cn=cfg.get(
+                "chinese_font_name", "宋体"
+            ),  # 虽为英文内容，但可能混排中文
             font_name_en=cfg.get("english_font_name", "Times New Roman"),
             font_size=cfg.get("font_size", "小四"),
             font_color=cfg.get("font_color", "BLACK"),
@@ -252,7 +270,13 @@ class AbstractContentEN(FormatNode):
         for run in self.paragraph.runs:
             diff_result = cstyle.diff_from_run(run)
             if diff_result:  # 可选：仅当有差异时才添加批注
-                self.add_comment(doc=doc, runs=run, text="".join(str(dr) for dr in diff_result))
+                self.add_comment(
+                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                )
         if issues:
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text="".join(str(dr) for dr in issues))
+            self.add_comment(
+                doc=doc,
+                runs=self.paragraph.runs,
+                text="".join(str(dr) for dr in issues),
+            )
         return []

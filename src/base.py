@@ -4,6 +4,7 @@
 # @File    : DocxBase.py
 import json
 
+from loguru import logger
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from src.agent.api import OpenAIAgent
@@ -48,7 +49,7 @@ class DocxBase:
                 }
 
             response["fingerprint"] = get_paragraph_fingerprint(paragraph)
-            print(response)
+            logger.info(response)
             result.append(response)
         self.base_agent.print_token_usage()
         return result
