@@ -1,9 +1,7 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/11 19:51
 # @Author  : afish
 # @File    : set_style.py
-from typing import Dict
 
 from docx import Document
 from loguru import logger
@@ -15,7 +13,7 @@ from src.word_structure.document_builder import DocumentBuilder
 from src.word_structure.utils import find_and_modify_first, promote_bodytext_in_subtrees_of_type
 
 
-def apply_format_check_to_all_nodes(root_node, document, config: Dict):
+def apply_format_check_to_all_nodes(root_node, document, config: dict):
     """
     递归遍历文档树中的所有节点，
     对每个具有 check_format 方法的节点执行该方法。
@@ -26,10 +24,10 @@ def apply_format_check_to_all_nodes(root_node, document, config: Dict):
 
     def traverse(node):
         # 执行当前节点的格式检查（如果定义了）
-        if hasattr(node, 'check_format'):
+        if hasattr(node, "check_format"):
             try:
                 # HACK: 应该使用not in list
-                if node.value.get('category') != 'top':
+                if node.value.get("category") != "top":
                     node.load_config(config)
                     # TODO: 添加判断的参数
                     node.check_format(document)
@@ -53,56 +51,51 @@ def xg(root_node, paragraph):
     """
 
     def condition(node):
-        if getattr(node, 'fingerprint', False):
+        if getattr(node, "fingerprint", False):
             return node.fingerprint == get_paragraph_fingerprint(paragraph)
         return False
 
-    return find_and_modify_first(
-        root=root_node,
-        condition=condition
-    )
+    return find_and_modify_first(root=root_node, condition=condition)
 
 
 def auto_format_thesis_document(jsonpath: str, docxpath: str, savepath: str, configpath: str):
     """自动对学位论文文档进行格式校验与批注。
 
-        该函数根据结构化 JSON 描述和 YAML 格式配置，对指定的 Word 文档进行格式合规性检查，
-        并在不符合规范的位置插入批注（comments）。主要用于学术论文（如本科/硕士/博士论文）
-        的自动化格式审查。
+    该函数根据结构化 JSON 描述和 YAML 格式配置，对指定的 Word 文档进行格式合规性检查，
+    并在不符合规范的位置插入批注（comments）。主要用于学术论文（如本科/硕士/博士论文）
+    的自动化格式审查。
 
-        流程说明：
-            1. 从 JSON 文件加载文档逻辑结构树；
-            2. 过滤掉类别为 'body_text' 的节点（保留标题、摘要、参考文献等结构节点）；
-            3. 加载 Word 文档，并将每个非空段落匹配到对应的结构节点；
-            4. 对特定子树（如中英文摘要、参考文献）执行节点提升操作，确保内容节点正确挂载；
-            5. 遍历所有结构节点，依据配置文件中的格式规则进行校验，并在文档中添加批注；
-            6. 保存带批注的文档到指定路径。
+    流程说明：
+        1. 从 JSON 文件加载文档逻辑结构树；
+        2. 过滤掉类别为 'body_text' 的节点（保留标题、摘要、参考文献等结构节点）；
+        3. 加载 Word 文档，并将每个非空段落匹配到对应的结构节点；
+        4. 对特定子树（如中英文摘要、参考文献）执行节点提升操作，确保内容节点正确挂载；
+        5. 遍历所有结构节点，依据配置文件中的格式规则进行校验，并在文档中添加批注；
+        6. 保存带批注的文档到指定路径。
 
-        Args:
-            jsonpath (str): 文档逻辑结构的 JSON 文件路径，描述各章节/段落的语义类型。
-            docxpath (str): 待处理的原始 Word (.docx) 文档路径。
-            savepath (str): 处理完成后带批注的文档保存路径。
-            configpath (str): 格式规范配置文件（YAML）路径，支持继承与合并。
+    Args:
+        jsonpath (str): 文档逻辑结构的 JSON 文件路径，描述各章节/段落的语义类型。
+        docxpath (str): 待处理的原始 Word (.docx) 文档路径。
+        savepath (str): 处理完成后带批注的文档保存路径。
+        configpath (str): 格式规范配置文件（YAML）路径，支持继承与合并。
 
-        Side Effects:
-            - 读取 jsonpath、docxpath 和 configpath 指定的文件；
-            - 在 docx 文档中插入批注（不修改原文内容，仅添加审阅意见）；
-            - 将结果文档写入 savepath。
+    Side Effects:
+        - 读取 jsonpath、docxpath 和 configpath 指定的文件；
+        - 在 docx 文档中插入批注（不修改原文内容，仅添加审阅意见）；
+        - 将结果文档写入 savepath。
 
-        Example:
-            >>> auto_format_thesis_document(
-            ...     "thesis_structure.json",
-            ...     "draft.docx",
-            ...     "formatted_with_comments.docx",
-            ...     "format_rules.yaml"
-            ... )
+    Example:
+        >>> auto_format_thesis_document(
+        ...     "thesis_structure.json",
+        ...     "draft.docx",
+        ...     "formatted_with_comments.docx",
+        ...     "format_rules.yaml"
+        ... )
     """
     from src.utils import load_yaml_with_merge
+
     root_node = DocumentBuilder.build_from_json(jsonpath)
-    root_node.children = [
-        node for node in root_node.children
-        if node.value.get('category') != 'body_text'
-    ]
+    root_node.children = [node for node in root_node.children if node.value.get("category") != "body_text"]
     document = Document(docxpath)
     for paragraph in document.paragraphs:
         if not paragraph.text:
@@ -115,14 +108,10 @@ def auto_format_thesis_document(jsonpath: str, docxpath: str, savepath: str, con
     subtress_dict = {
         AbstractTitleCN: AbstractContentCN,
         AbstractTitleEN: AbstractContentEN,
-        References: ReferenceEntry
+        References: ReferenceEntry,
     }
     for key, value in subtress_dict.items():
-        promote_bodytext_in_subtrees_of_type(
-            root_node,
-            parent_type=key,
-            target_type=value
-        )
+        promote_bodytext_in_subtrees_of_type(root_node, parent_type=key, target_type=value)
     print_tree(root_node)
     # FIXME: 临时解决
     """

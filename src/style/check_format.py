@@ -1,10 +1,9 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/12 10:46
 # @Author  : afish
 # @File    : style.py
 from dataclasses import dataclass
-from typing import Union, Any, List
+from typing import Any
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
@@ -14,20 +13,20 @@ from docx.text.run import Run
 from src.settings import CHARACTER_STYLE_CHECKS
 from src.style.get_some import (
     paragraph_get_alignment,
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name,
+    paragraph_get_first_line_indent,
+    paragraph_get_line_spacing,
+    paragraph_get_space_after,
+    paragraph_get_space_before,
     run_get_font_bold,
-    run_get_font_italic,
-    run_get_font_underline,
-    run_get_font_size,
     run_get_font_color,
-    run_get_font_name
+    run_get_font_italic,
+    run_get_font_name,
+    run_get_font_size,
+    run_get_font_underline,
 )
 
-for check in ['bold', 'italic', 'underline', 'font_size', 'font_color', 'font_name']:
+for check in ["bold", "italic", "underline", "font_size", "font_color", "font_name"]:
     if check not in CHARACTER_STYLE_CHECKS:
         raise ValueError(f" 未在 `settings.py` 的 CHARACTER_STYLE_CHECKS 配置中找到 {check}")
 
@@ -43,6 +42,7 @@ class DIFFResult:
         current_value: 当前值
         comment: 评论
     """
+
     diff_type: str = None
     expected_value: Any = None
     current_value: Any = None
@@ -61,22 +61,22 @@ class LabelEnum:
         子类初始化钩子：自动生成【值->标签】的反向映射
         """
         super().__init_subclass__(**kwargs)
-        if hasattr(cls, '_LABEL_MAP') and cls._LABEL_MAP:
+        if hasattr(cls, "_LABEL_MAP") and cls._LABEL_MAP:
             cls._VALUE_TO_LABEL = {}
             for label, value in cls._LABEL_MAP.items():
                 # 若值是枚举成员（如FontSize.YI_HAO），取其值；否则直接用值
-                real_value = value.value if hasattr(value, 'value') else value
+                real_value = value.value if hasattr(value, "value") else value
                 if real_value not in cls._VALUE_TO_LABEL:
                     cls._VALUE_TO_LABEL[real_value] = label
 
     @classmethod
-    def from_label(cls, label: Any) -> Union[int, float, str, tuple]:
+    def from_label(cls, label: Any) -> int | float | str | tuple:
         # 检查配置是否有映射
         if label in cls._LABEL_MAP:
             return cls._LABEL_MAP[label]
         # 检查配置是否是类成员
         if isinstance(label, str):
-            if label.isupper() and not label.startswith('_'):  # 只允许如 "BLACK"
+            if label.isupper() and not label.startswith("_"):  # 只允许如 "BLACK"
                 if hasattr(cls, label):
                     value = getattr(cls, label)
                     if not callable(value):  # 排除方法
@@ -89,14 +89,14 @@ class LabelEnum:
     @classmethod
     def to_string(cls, value: Any) -> str:
         """通用to_string:优先用反向映射，无规则格式化输出"""
-        real_value = value.value if hasattr(value, 'value') else value
+        real_value = value.value if hasattr(value, "value") else value
 
         # 1. 优先从反向映射找标签
         if real_value in cls._VALUE_TO_LABEL:
             return cls._VALUE_TO_LABEL[real_value]
 
         # 2. 特殊值格式化（如倍数、RGB元组）
-        if isinstance(real_value, float) and cls.__name__ == 'LineSpacing':
+        if isinstance(real_value, float) and cls.__name__ == "LineSpacing":
             return f"{real_value}倍"  # 行距特殊格式化
         if isinstance(real_value, tuple) and len(real_value) == 3:
             return cls._rgb_to_name(real_value)  # 颜色RGB转名称（可选）
@@ -108,8 +108,12 @@ class LabelEnum:
     def _rgb_to_name(rgb: tuple[int, int, int]) -> str:
         """辅助：RGB元组转颜色名称（可选扩展）"""
         color_map = {
-            (0, 0, 0): '黑色', (255, 255, 255): '白色', (255, 0, 0): '红色',
-            (0, 128, 0): '绿色', (0, 0, 255): '蓝色', (128, 128, 128): '灰色'
+            (0, 0, 0): "黑色",
+            (255, 255, 255): "白色",
+            (255, 0, 0): "红色",
+            (0, 128, 0): "绿色",
+            (0, 0, 255): "蓝色",
+            (128, 128, 128): "灰色",
         }
         return color_map.get(rgb, f"RGB{rgb}")
 
@@ -121,6 +125,7 @@ class FontName(LabelEnum):
         font = FontName.SIM_SUN  # '宋体'
         style = ParagraphStyle(font_name=font)
     """
+
     # 中文字体
     SIM_SUN = "宋体"
     SIM_HEI = "黑体"
@@ -159,7 +164,7 @@ class FontName(LabelEnum):
 
     @classmethod
     def to_string(cls, value: Any) -> str:
-        real_value = value.value if hasattr(value, 'value') else value
+        real_value = value.value if hasattr(value, "value") else value
         if isinstance(real_value, tuple) and len(real_value) == 3:
             cn, ascii_, high_ansi = real_value
             return f"中文字体: {cn}, ASCII: {ascii_}, High ANSI: {high_ansi}"
@@ -175,6 +180,7 @@ class FontSize(LabelEnum):
         size = FontSize.XIAO_SI  # 12
         run.font.size = Pt(size)
     """
+
     YI_HAO = 26  # 一号
     XIAO_YI = 24  # 小一
     ER_HAO = 22  # 二号
@@ -189,18 +195,18 @@ class FontSize(LabelEnum):
     QI_HAO = 5.5  # 七号（极少用）
 
     _LABEL_MAP = {
-        '一号': YI_HAO,
-        '小一': XIAO_YI,
-        '二号': ER_HAO,
-        '小二': XIAO_ER,
-        '三号': SAN_HAO,
-        '小三': XIAO_SAN,
-        '四号': SI_HAO,
-        '小四': XIAO_SI,
-        '五号': WU_HAO,
-        '小五': XIAO_WU,
-        '六号': LIU_HAO,
-        '七号': QI_HAO,
+        "一号": YI_HAO,
+        "小一": XIAO_YI,
+        "二号": ER_HAO,
+        "小二": XIAO_ER,
+        "三号": SAN_HAO,
+        "小三": XIAO_SAN,
+        "四号": SI_HAO,
+        "小四": XIAO_SI,
+        "五号": WU_HAO,
+        "小五": XIAO_WU,
+        "六号": LIU_HAO,
+        "七号": QI_HAO,
     }
 
 
@@ -212,6 +218,7 @@ class FontColor(LabelEnum):
         color = FontColor.BLACK  # (0, 0, 0)
         run.font.color.rgb = RGBColor(*color)
     """
+
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
     RED = (255, 0, 0)
@@ -238,6 +245,7 @@ class Alignment(LabelEnum):
         # 或直接传给 paragraph.alignment
         paragraph.alignment = Alignment.LEFT.to_docx()
     """
+
     LEFT = WD_ALIGN_PARAGRAPH.LEFT  # 左侧对齐
     CENTER = WD_ALIGN_PARAGRAPH.CENTER  # 居中对齐
     RIGHT = WD_ALIGN_PARAGRAPH.RIGHT  # 右侧对齐
@@ -245,26 +253,27 @@ class Alignment(LabelEnum):
     DISTRIBUTE = WD_ALIGN_PARAGRAPH.DISTRIBUTE  # 分散对齐（较少用）
 
     _LABEL_MAP = {
-        '左对齐': LEFT,
-        '居中对齐': CENTER,
-        '右对齐': RIGHT,
-        '两端对齐': JUSTIFY,
-        '分散对齐': DISTRIBUTE,
+        "左对齐": LEFT,
+        "居中对齐": CENTER,
+        "右对齐": RIGHT,
+        "两端对齐": JUSTIFY,
+        "分散对齐": DISTRIBUTE,
     }
 
 
 class Spacing(LabelEnum):
     """
-       常用段落间距枚举（单位：磅 / pt）。
+    常用段落间距枚举（单位：磅 / pt）。
 
-       适用于段前（space_before）或段后（space_after）。
+    适用于段前（space_before）或段后（space_after）。
 
-       示例：
-           style = ParagraphStyle(
-               space_before=ParagraphSpacing.NONE,
-               space_after=ParagraphSpacing.NORMAL
-           )
-       """
+    示例：
+        style = ParagraphStyle(
+            space_before=ParagraphSpacing.NONE,
+            space_after=ParagraphSpacing.NORMAL
+        )
+    """
+
     NONE = 0  # 无间距
     TINY = 3  # 微小间距（如列表项）
     SMALL = 6  # 小间距（常见于正文段落之间）
@@ -275,14 +284,14 @@ class Spacing(LabelEnum):
     EXTRA_LARGE = 36  # 超大间距（封面、分章）
 
     _LABEL_MAP = {
-        'NONE': NONE,
-        'TINY': TINY,
-        'SMALL': SMALL,
-        'HALF_LINE': HALF_LINE,
-        'NORMAL': NORMAL,
-        'MEDIUM': MEDIUM,
-        'LARGE': LARGE,
-        'EXTRA_LARGE': EXTRA_LARGE,
+        "NONE": NONE,
+        "TINY": TINY,
+        "SMALL": SMALL,
+        "HALF_LINE": HALF_LINE,
+        "NORMAL": NORMAL,
+        "MEDIUM": MEDIUM,
+        "LARGE": LARGE,
+        "EXTRA_LARGE": EXTRA_LARGE,
     }
 
 
@@ -297,14 +306,15 @@ class LineSpacing(LabelEnum):
         style = ParagraphStyle(line_spacing=LineSpacing.ONE_POINT_FIVE)
         paragraph.paragraph_format.line_spacing = style.line_spacing
     """
+
     SINGLE = 1.0  # 单倍行距
     ONE_POINT_FIVE = 1.5  # 1.5 倍
     DOUBLE = 2.0  # 双倍
 
     _LABEL_MAP = {
-        '单倍行距': SINGLE,
-        '1.5倍': ONE_POINT_FIVE,
-        '双倍': DOUBLE,
+        "单倍行距": SINGLE,
+        "1.5倍": ONE_POINT_FIVE,
+        "双倍": DOUBLE,
     }
 
 
@@ -312,16 +322,17 @@ class FirstLineIndent(LabelEnum):
     """
     首行缩进枚举，适用于中文排版。
     """
+
     NONE = 0  # 无缩进（用于标题、列表等）
     ONE_CHAR = 1  # 1 字符（约）
     TWO_CHARS = 2  # 2 字符（标准中文正文）
     THREE_CHARS = 3  # 3 字符（较少用）
 
     _LABEL_MAP = {
-        '无缩进': NONE,
-        '1字符': ONE_CHAR,
-        '2字符': TWO_CHARS,
-        '3字符': THREE_CHARS,
+        "无缩进": NONE,
+        "1字符": ONE_CHAR,
+        "2字符": TWO_CHARS,
+        "3字符": THREE_CHARS,
     }
 
 
@@ -332,6 +343,7 @@ class BuiltInStyle(LabelEnum):
     注意：这些名称是 python-docx 和 Word API 的标准名称，
     即使文档界面显示为“标题 1”，实际样式名仍是 "Heading 1"。
     """
+
     HEADING_1 = "Heading 1"
     HEADING_2 = "Heading 2"
     HEADING_3 = "Heading 3"
@@ -342,14 +354,14 @@ class BuiltInStyle(LabelEnum):
     LIST_PARAGRAPH = "List Paragraph"
 
     _LABEL_MAP = {
-        'Heading 1': HEADING_1,
+        "Heading 1": HEADING_1,
         "Heading 2": HEADING_2,
         "Heading 3": HEADING_3,
         "Heading 4": HEADING_4,
-        '正文': NORMAL,
-        '标题': TITLE,
-        '副标题': SUBTITLE,
-        '列表项': LIST_PARAGRAPH,
+        "正文": NORMAL,
+        "标题": TITLE,
+        "副标题": SUBTITLE,
+        "列表项": LIST_PARAGRAPH,
     }
 
 
@@ -370,14 +382,14 @@ class CharacterStyle:
     """
 
     def __init__(
-            self,
-            font_name_cn: str = '宋体',
-            font_name_en: str = 'Times New Roman',
-            font_size: Union[str, float] = '小四',
-            font_color: Union[str, tuple] = 'BLACK',
-            bold: bool = False,
-            italic: bool = False,
-            underline: bool = False
+        self,
+        font_name_cn: str = "宋体",
+        font_name_en: str = "Times New Roman",
+        font_size: str | float = "小四",
+        font_color: str | tuple = "BLACK",
+        bold: bool = False,
+        italic: bool = False,
+        underline: bool = False,
     ):
         self.font_name_cn: str = FontName.from_label(font_name_cn)
         self.font_name_en: str = FontName.from_label(font_name_en)
@@ -387,7 +399,7 @@ class CharacterStyle:
         self.italic: bool = italic
         self.underline: bool = underline
 
-    def diff_from_run(self, run) -> List[DIFFResult]:
+    def diff_from_run(self, run) -> list[DIFFResult]:
         """
         检查段落样式和指定样式是否一致
         """
@@ -396,51 +408,93 @@ class CharacterStyle:
         # 1. 加粗
         bold = run_get_font_bold(run)
         if bold != self.bold:
-            if CHARACTER_STYLE_CHECKS['bold']:
-                diffs.append(DIFFResult('bold', self.bold, bold, f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};"))
+            if CHARACTER_STYLE_CHECKS["bold"]:
+                diffs.append(
+                    DIFFResult(
+                        "bold",
+                        self.bold,
+                        bold,
+                        f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};",
+                    )
+                )
         # 2. 斜体
         italic = run_get_font_italic(run)
         if italic != self.italic:
-            if CHARACTER_STYLE_CHECKS['italic']:
-                diffs.append(DIFFResult('italic', self.italic, italic, f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};"))
+            if CHARACTER_STYLE_CHECKS["italic"]:
+                diffs.append(
+                    DIFFResult(
+                        "italic",
+                        self.italic,
+                        italic,
+                        f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};",
+                    )
+                )
 
         # 3. 下划线
         underline = run_get_font_underline(run)
         if underline != self.underline:
-            if CHARACTER_STYLE_CHECKS['underline']:
-                diffs.append(DIFFResult('underline', self.underline, underline, f"期待{'有下划线' if self.underline else '无下划线'}，实际{'有下划线' if underline else '无下划线'};"))
+            if CHARACTER_STYLE_CHECKS["underline"]:
+                diffs.append(
+                    DIFFResult(
+                        "underline",
+                        self.underline,
+                        underline,
+                        f"期待{'有下划线' if self.underline else '无下划线'}，实际{'有下划线' if underline else '无下划线'};",
+                    )
+                )
 
         # 4. 字号
         current_size = run_get_font_size(run)
         if current_size != self.font_size:
-            if CHARACTER_STYLE_CHECKS['font_size']:
-                diffs.append(DIFFResult('font_size', self.font_size, current_size, f"期待字号{FontSize.to_string(self.font_size)}，实际字号{FontSize.to_string(current_size)};"))
+            if CHARACTER_STYLE_CHECKS["font_size"]:
+                diffs.append(
+                    DIFFResult(
+                        "font_size",
+                        self.font_size,
+                        current_size,
+                        f"期待字号{FontSize.to_string(self.font_size)}，实际字号{FontSize.to_string(current_size)};",
+                    )
+                )
 
         # 5. 字体颜色
         current_color = run_get_font_color(run)
         if current_color != self.font_color:
-            if CHARACTER_STYLE_CHECKS['font_color']:
-                diffs.append(DIFFResult('font_color', self.font_color, current_color, f"期待字体颜色{FontColor.to_string(self.font_color)}, 实际字体颜色{FontColor.to_string(current_color)};"))
+            if CHARACTER_STYLE_CHECKS["font_color"]:
+                diffs.append(
+                    DIFFResult(
+                        "font_color",
+                        self.font_color,
+                        current_color,
+                        f"期待字体颜色{FontColor.to_string(self.font_color)}, 实际字体颜色{FontColor.to_string(current_color)};",
+                    )
+                )
 
         # 6. 字体
         font_name = run_get_font_name(run)
         except_font = (self.font_name_cn, self.font_name_en, self.font_name_en)
         if font_name != except_font:
-            if CHARACTER_STYLE_CHECKS['font_name']:
-                diffs.append(DIFFResult('font_name_cn', self.font_name_cn, font_name, f"期待的字体:{FontName.to_string(except_font)}，实际的字体:{FontName.to_string(font_name)}"))
+            if CHARACTER_STYLE_CHECKS["font_name"]:
+                diffs.append(
+                    DIFFResult(
+                        "font_name_cn",
+                        self.font_name_cn,
+                        font_name,
+                        f"期待的字体:{FontName.to_string(except_font)}，实际的字体:{FontName.to_string(font_name)}",
+                    )
+                )
         return diffs
 
     def apply_to(self, run: Run):
         """将字符样式应用到 docx.Run 对象"""
         diffs = self.diff_from_run(run)
         setters = {
-            'bold': lambda v: setattr(run, 'bold', v),
-            'italic': lambda v: setattr(run, 'italic', v),
-            'underline': lambda v: setattr(run, 'underline', v),
-            'font_size': lambda v: setattr(run.font, 'size', Pt(v)),
-            'font_color': lambda v: setattr(run.font.color, 'rgb', RGBColor(*v)),
-            'font_name_en': lambda v: self._set_run_font_en(run, v),
-            'font_name_cn': lambda v: self._set_run_font_cn(run, v),
+            "bold": lambda v: setattr(run, "bold", v),
+            "italic": lambda v: setattr(run, "italic", v),
+            "underline": lambda v: setattr(run, "underline", v),
+            "font_size": lambda v: setattr(run.font, "size", Pt(v)),
+            "font_color": lambda v: setattr(run.font.color, "rgb", RGBColor(*v)),
+            "font_name_en": lambda v: self._set_run_font_en(run, v),
+            "font_name_cn": lambda v: self._set_run_font_cn(run, v),
         }
 
         for attr, current, expected in diffs:
@@ -464,19 +518,20 @@ class ParagraphStyle:
         builtin_style_name ():预设样式
     """
 
-    def __init__(self,
-                 alignment: str = '左对齐',
-                 space_before: float = .0,
-                 space_after: float = .0,
-                 line_spacing: float = 1.5,
-                 first_line_indent: float = .0,
-                 builtin_style_name: str = '正文'
-                 ):
+    def __init__(
+        self,
+        alignment: str = "左对齐",
+        space_before: float = 0.0,
+        space_after: float = 0.0,
+        line_spacing: float = 1.5,
+        first_line_indent: float = 0.0,
+        builtin_style_name: str = "正文",
+    ):
         self.alignment: tuple = Alignment.from_label(alignment)
         self.space_before: float = float(Spacing.from_label(space_before))
         self.space_after: float = float(Spacing.from_label(space_after))
-        self.line_spacing: Union[LineSpacing, float] = LineSpacing.from_label(line_spacing)
-        self.first_line_indent: Union[FirstLineIndent, float] = FirstLineIndent.from_label(first_line_indent)
+        self.line_spacing: LineSpacing | float = LineSpacing.from_label(line_spacing)
+        self.first_line_indent: FirstLineIndent | float = FirstLineIndent.from_label(first_line_indent)
         self.builtin_style_name: str = BuiltInStyle.from_label(builtin_style_name)
 
     def apply_to(self, paragraph: Paragraph):
@@ -490,7 +545,7 @@ class ParagraphStyle:
         # TODO:首行缩进量不准确，待确认
         pf.first_line_indent = self.first_line_indent * paragraph.style.font.size
 
-    def diff_from_paragraph(self, paragraph: Paragraph) -> List[DIFFResult]:
+    def diff_from_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:
         """检查当前段落样式与给定段落样式的差异"""
         if not paragraph:
             return []
@@ -498,27 +553,68 @@ class ParagraphStyle:
         # 对齐方式
         alignment = paragraph_get_alignment(paragraph)
         if self.alignment != alignment:
-            diffs.append(DIFFResult('alignment', self.alignment, alignment, f"对齐方式期待{Alignment.to_string(self.alignment)}实际{Alignment.to_string(alignment)};"))
+            diffs.append(
+                DIFFResult(
+                    "alignment",
+                    self.alignment,
+                    alignment,
+                    f"对齐方式期待{Alignment.to_string(self.alignment)}实际{Alignment.to_string(alignment)};",
+                )
+            )
         # 段前间距(行)
         space_before = paragraph_get_space_before(paragraph)
         if self.space_before != space_before:
-            diffs.append(DIFFResult('space_before', self.space_before, space_before, f"段前间距期待{self.space_before}行，实际{space_before}行;"))
+            diffs.append(
+                DIFFResult(
+                    "space_before",
+                    self.space_before,
+                    space_before,
+                    f"段前间距期待{self.space_before}行，实际{space_before}行;",
+                )
+            )
         # 段后间距(行)
         space_after = paragraph_get_space_after(paragraph)
         if self.space_after != space_after:
-            diffs.append(DIFFResult('space_after', self.space_after, space_after, f"段后间距期待{self.space_before}行，实际{space_before}行;"))
+            diffs.append(
+                DIFFResult(
+                    "space_after",
+                    self.space_after,
+                    space_after,
+                    f"段后间距期待{self.space_before}行，实际{space_before}行;",
+                )
+            )
         # 行距
         line_spacing = paragraph_get_line_spacing(paragraph)
         if self.line_spacing != line_spacing:
-            diffs.append(DIFFResult('line_spacing', self.line_spacing, line_spacing, f"行距期待{LineSpacing.to_string(self.line_spacing)}，实际{LineSpacing.to_string(line_spacing)};"))
+            diffs.append(
+                DIFFResult(
+                    "line_spacing",
+                    self.line_spacing,
+                    line_spacing,
+                    f"行距期待{LineSpacing.to_string(self.line_spacing)}，实际{LineSpacing.to_string(line_spacing)};",
+                )
+            )
         # 首行缩进
         first_line_indent = paragraph_get_first_line_indent(paragraph)
         if self.first_line_indent != first_line_indent:
-            diffs.append(DIFFResult('first_line_indent', self.first_line_indent, first_line_indent, f"首行缩进期待{FirstLineIndent.to_string(self.first_line_indent)}字符，实际"
-                                                                                                    f"{FirstLineIndent.to_string(first_line_indent)}字符;"))
+            diffs.append(
+                DIFFResult(
+                    "first_line_indent",
+                    self.first_line_indent,
+                    first_line_indent,
+                    f"首行缩进期待{FirstLineIndent.to_string(self.first_line_indent)}字符，实际"
+                    f"{FirstLineIndent.to_string(first_line_indent)}字符;",
+                )
+            )
         # 样式
         builtin_style_name = paragraph_get_builtin_style_name(paragraph)
         if self.builtin_style_name.lower() != builtin_style_name:
-            diffs.append(DIFFResult('builtin_style_name', self.builtin_style_name, builtin_style_name,
-                                    f"样式期待{BuiltInStyle.to_string(self.builtin_style_name)}样式，实际{BuiltInStyle.to_string(builtin_style_name)}样式;"))
+            diffs.append(
+                DIFFResult(
+                    "builtin_style_name",
+                    self.builtin_style_name,
+                    builtin_style_name,
+                    f"样式期待{BuiltInStyle.to_string(self.builtin_style_name)}样式，实际{BuiltInStyle.to_string(builtin_style_name)}样式;",
+                )
+            )
         return diffs

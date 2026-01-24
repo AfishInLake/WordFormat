@@ -1,12 +1,10 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/12 15:18
 # @Author  : afish
 # @File    : utils.py
 """
 获取 段落/字体 属性
 """
-from typing import Optional, Tuple
 
 from docx.enum.text import WD_LINE_SPACING
 from docx.oxml.shared import qn
@@ -33,10 +31,10 @@ def paragraph_get_alignment(paragraph: Paragraph) -> object:
     # 2. 否则，从段落样式中获取
     style = paragraph.style
     while style is not None:
-        if hasattr(style, 'paragraph_format') and style.paragraph_format.alignment is not None:
+        if hasattr(style, "paragraph_format") and style.paragraph_format.alignment is not None:
             return style.paragraph_format.alignment
         # 尝试向上查找基础样式（部分版本支持 _base_style）
-        base_style = getattr(style, '_base_style', None)
+        base_style = getattr(style, "_base_style", None)
         if base_style is None:
             break
         style = base_style
@@ -45,7 +43,7 @@ def paragraph_get_alignment(paragraph: Paragraph) -> object:
     return None
 
 
-def _get_effective_line_height(paragraph) -> Optional[float]:
+def _get_effective_line_height(paragraph) -> float | None:
     """
     计算段落的有效行高（单位：pt）
     """
@@ -56,7 +54,7 @@ def _get_effective_line_height(paragraph) -> Optional[float]:
 
     # 首先尝试从段落样式获取
     style = paragraph.style
-    if style and hasattr(style, 'font') and style.font.size is not None:
+    if style and hasattr(style, "font") and style.font.size is not None:
         font_size_pt = style.font.size.pt
     else:
         # 检查runs中的字体大小
@@ -71,11 +69,11 @@ def _get_effective_line_height(paragraph) -> Optional[float]:
     rule = fmt.line_spacing_rule
 
     # 如果段落没有设置行距，检查样式中的行距
-    if line_spacing is None and style and hasattr(style, 'paragraph_format'):
+    if line_spacing is None and style and hasattr(style, "paragraph_format"):
         style_fmt = style.paragraph_format
-        if hasattr(style_fmt, 'line_spacing'):
+        if hasattr(style_fmt, "line_spacing"):
             line_spacing = style_fmt.line_spacing
-            if hasattr(style_fmt, 'line_spacing_rule'):
+            if hasattr(style_fmt, "line_spacing_rule"):
                 rule = style_fmt.line_spacing_rule
 
     # 3. 根据规则计算行高
@@ -90,14 +88,14 @@ def _get_effective_line_height(paragraph) -> Optional[float]:
 
     elif rule in (WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST):
         # 固定行高或最小行高
-        if line_spacing is not None and hasattr(line_spacing, 'pt'):
+        if line_spacing is not None and hasattr(line_spacing, "pt"):
             return line_spacing.pt
 
     # 默认单倍行距
     return font_size_pt
 
 
-def _get_style_spacing(style, spacing_type='before'):
+def _get_style_spacing(style, spacing_type="before"):
     """
     递归查找样式中的段前/段后间距（支持Lines和twips两种格式）
     :param style: docx.styles.style._ParagraphStyle 对象
@@ -109,23 +107,23 @@ def _get_style_spacing(style, spacing_type='before'):
 
     # 1. 获取样式的XML元素
     style_elem = style.element
-    style_pPr = style_elem.find(qn('w:pPr'))
+    style_pPr = style_elem.find(qn("w:pPr"))
     if style_pPr is None:
         # 递归查基样式
         return _get_style_spacing(style.base_style, spacing_type)
 
     # 2. 查找样式中的spacing元素
-    spacing = style_pPr.find(qn('w:spacing'))
+    spacing = style_pPr.find(qn("w:spacing"))
     if spacing is None:
         # 递归查基样式
         return _get_style_spacing(style.base_style, spacing_type)
 
     # 3. 优先读取Lines属性（beforeLines/afterLines）
-    lines_attr = spacing.get(qn(f'w:{spacing_type}Lines'))
+    lines_attr = spacing.get(qn(f"w:{spacing_type}Lines"))
     lines_val = int(lines_attr) / 100.0 if lines_attr is not None else 0.0
 
     # 4. 读取twips属性（before/after）
-    twips_attr = spacing.get(qn(f'w:{spacing_type}'))
+    twips_attr = spacing.get(qn(f"w:{spacing_type}"))
     twips_val = int(twips_attr) if twips_attr is not None else 0
 
     if lines_val > 0:
@@ -143,24 +141,24 @@ def paragraph_get_space_before(paragraph):
     font_size_pt = _get_font_size_pt(paragraph)
     actual_line_twips = font_size_pt * 20  # 当前字体1行=字体大小×20twips
     p = paragraph._element
-    pPr = p.find(qn('w:pPr'))
+    pPr = p.find(qn("w:pPr"))
 
     # 第一步：查段落自身的设置
     self_lines = 0.0
     self_twips = 0
     if pPr is not None:
-        spacing = pPr.find(qn('w:spacing'))
+        spacing = pPr.find(qn("w:spacing"))
         if spacing is not None:
             # 1.1 优先查Lines属性
-            before_lines_attr = spacing.get(qn('w:beforeLines'))
+            before_lines_attr = spacing.get(qn("w:beforeLines"))
             if before_lines_attr is not None:
                 self_lines = int(before_lines_attr) / 100.0
             # 1.2 查twips属性（兜底）
-            before_twips_attr = spacing.get(qn('w:before'))
+            before_twips_attr = spacing.get(qn("w:before"))
             self_twips = int(before_twips_attr) if before_twips_attr is not None else 0
 
     # 第二步：自身无值，查样式继承
-    style_lines, style_twips = _get_style_spacing(paragraph.style, 'before')
+    style_lines, style_twips = _get_style_spacing(paragraph.style, "before")
     final_lines = self_lines if self_lines > 0 else style_lines
     final_twips = self_twips if self_twips > 0 else style_twips
 
@@ -176,7 +174,7 @@ def paragraph_get_space_before(paragraph):
     # 第五步：终极兜底（Word内置默认值，可根据需求调整）
     # 比如：标题样式默认0.5行，正文默认0行，可根据实际场景加判断
     style_name = paragraph.style.name.lower()
-    if any(key in style_name for key in ['标题', 'heading', 'title']):
+    if any(key in style_name for key in ["标题", "heading", "title"]):
         return 0.5  # 标题默认0.5行
     return 0.0  # 正文默认0行
 
@@ -185,22 +183,22 @@ def paragraph_get_space_after(paragraph):
     font_size_pt = _get_font_size_pt(paragraph)
     actual_line_twips = font_size_pt * 20
     p = paragraph._element
-    pPr = p.find(qn('w:pPr'))
+    pPr = p.find(qn("w:pPr"))
 
     # 第一步：查段落自身的设置
     self_lines = 0.0
     self_twips = 0
     if pPr is not None:
-        spacing = pPr.find(qn('w:spacing'))
+        spacing = pPr.find(qn("w:spacing"))
         if spacing is not None:
-            after_lines_attr = spacing.get(qn('w:afterLines'))
+            after_lines_attr = spacing.get(qn("w:afterLines"))
             if after_lines_attr is not None:
                 self_lines = int(after_lines_attr) / 100.0
-            after_twips_attr = spacing.get(qn('w:after'))
+            after_twips_attr = spacing.get(qn("w:after"))
             self_twips = int(after_twips_attr) if after_twips_attr is not None else 0
 
     # 第二步：自身无值，查样式继承
-    style_lines, style_twips = _get_style_spacing(paragraph.style, 'after')
+    style_lines, style_twips = _get_style_spacing(paragraph.style, "after")
     final_lines = self_lines if self_lines > 0 else style_lines
     final_twips = self_twips if self_twips > 0 else style_twips
 
@@ -215,7 +213,7 @@ def paragraph_get_space_after(paragraph):
 
     # 第五步：终极兜底（Word内置默认值）
     style_name = paragraph.style.name.lower()
-    if any(key in style_name for key in ['标题', 'heading', 'title']):
+    if any(key in style_name for key in ["标题", "heading", "title"]):
         return 0.5
     return 0.0
 
@@ -231,19 +229,19 @@ def _get_space_from_style(paragraph, spacing_type):
     # 递归查找样式链中的间距设置
     current_style = style
     while current_style:
-        if hasattr(current_style, 'paragraph_format'):
+        if hasattr(current_style, "paragraph_format"):
             style_fmt = current_style.paragraph_format
 
-            if spacing_type == 'after':
+            if spacing_type == "after":
                 spacing = style_fmt.space_after
             else:
                 spacing = style_fmt.space_before
 
-            if spacing is not None and hasattr(spacing, 'pt'):
+            if spacing is not None and hasattr(spacing, "pt"):
                 return spacing.pt
 
         # 检查基样式
-        if hasattr(current_style, 'base_style') and current_style.base_style:
+        if hasattr(current_style, "base_style") and current_style.base_style:
             current_style = current_style.base_style
         else:
             break
@@ -267,12 +265,12 @@ def paragraph_get_line_spacing(paragraph):
     # 如果没有直接设置，检查样式
     if (rule is None or rule == WD_LINE_SPACING.SINGLE) and (spacing is None or spacing == 1.0):
         style = paragraph.style
-        if style and hasattr(style, 'paragraph_format'):
+        if style and hasattr(style, "paragraph_format"):
             style_fmt = style.paragraph_format
             # 优先使用样式的行距设置
-            if hasattr(style_fmt, 'line_spacing_rule'):
+            if hasattr(style_fmt, "line_spacing_rule"):
                 rule = style_fmt.line_spacing_rule
-            if hasattr(style_fmt, 'line_spacing'):
+            if hasattr(style_fmt, "line_spacing"):
                 spacing = style_fmt.line_spacing
 
     # 只处理 MULTIPLE（多倍行距）的情况
@@ -295,7 +293,7 @@ def paragraph_get_line_spacing(paragraph):
         font_size_pt = _get_font_size_pt(paragraph)
 
         if rule in (WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST):
-            if spacing is not None and hasattr(spacing, 'pt'):
+            if spacing is not None and hasattr(spacing, "pt"):
                 line_height_pt = spacing.pt
                 if font_size_pt > 0:
                     return line_height_pt / font_size_pt
@@ -332,7 +330,7 @@ def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):
             return 0
 
         # 获取缩进值（以pt为单位）
-        if hasattr(first_line_indent, 'pt'):
+        if hasattr(first_line_indent, "pt"):
             # 是python-docx的Length对象
             indent_pt = first_line_indent.pt
             if indent_pt is None:
@@ -349,7 +347,7 @@ def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):
         if paragraph.runs and len(paragraph.runs) > 0:
             for run in paragraph.runs:
                 if run.font and run.font.size:
-                    if hasattr(run.font.size, 'pt'):
+                    if hasattr(run.font.size, "pt"):
                         font_size_pt = run.font.size.pt
                     else:
                         try:
@@ -361,10 +359,10 @@ def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):
                         break
 
         # 如果第一个run没有字体大小，尝试从样式获取
-        if font_size_pt == 12.0 and hasattr(paragraph, 'style') and paragraph.style:
+        if font_size_pt == 12.0 and hasattr(paragraph, "style") and paragraph.style:
             try:
-                if hasattr(paragraph.style.font, 'size'):
-                    if hasattr(paragraph.style.font.size, 'pt'):
+                if hasattr(paragraph.style.font, "size"):
+                    if hasattr(paragraph.style.font.size, "pt"):
                         font_size_pt = paragraph.style.font.size.pt
                     else:
                         try:
@@ -417,7 +415,7 @@ def paragraph_get_builtin_style_name(paragraph: Paragraph):
     return style.name.lower()
 
 
-def run_get_font_name(run: Run) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def run_get_font_name(run: Run) -> tuple[str | None, str | None, str | None]:
     """
     获取run的字体
     Params:
@@ -438,9 +436,9 @@ def run_get_font_name(run: Run) -> Tuple[Optional[str], Optional[str], Optional[
         return None, None, None
 
     # 使用 qn() 获取带命名空间的属性名
-    east_asia = rFonts.get(qn('w:eastAsia'))
-    ascii_font = rFonts.get(qn('w:ascii'))
-    h_ansi = rFonts.get(qn('w:hAnsi'))
+    east_asia = rFonts.get(qn("w:eastAsia"))
+    ascii_font = rFonts.get(qn("w:ascii"))
+    h_ansi = rFonts.get(qn("w:hAnsi"))
     return east_asia, ascii_font, h_ansi
 
 
@@ -463,7 +461,7 @@ def run_get_font_size(run: Run):
     return 12.0
 
 
-def run_get_font_color(run: Run) -> Optional[Tuple[int, int, int]]:
+def run_get_font_color(run: Run) -> tuple[int, int, int] | None:
     """
     获取run的字体颜色
     Params:

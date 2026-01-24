@@ -1,7 +1,7 @@
 [project]
-name = "wordparse"
+name = "wordformat"
 version = "0.1.0"
-description = "Add your description here"
+description = "论文格式自动化处理工具"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -26,8 +26,11 @@ exclude = [
     "build",
     "dist",
     "*.egg-info",
-    ".idea"
+    ".idea",
+    ".code",
+    ".trae"
 ]
+
 [tool.ruff.lint]
 # 启用的规则集（默认已启用很多）
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]

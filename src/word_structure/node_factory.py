@@ -1,9 +1,8 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/11 19:37
 # @Author  : afish
 # @File    : node_factory.py
-from typing import Dict, Any, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -11,11 +10,11 @@ from src.rules.node import FormatNode
 from src.word_structure.settings import CATEGORY_TO_CLASS
 
 
-def create_node(item: Dict[str, Any], level: int, config: Dict[str, Any]) -> Optional[FormatNode]:
+def create_node(item: dict[str, Any], level: int, config: dict[str, Any]) -> FormatNode | None:
     """
     根据 item['category'] 创建对应的 FormatNode 子类实例。
     """
-    category = item.get('category')
+    category = item.get("category")
     if not category:
         raise ValueError("Item missing 'category' field")
 

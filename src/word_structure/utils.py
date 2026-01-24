@@ -1,10 +1,9 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/11 20:19
 # @Author  : afish
 # @File    : utils.py
 
-from typing import Callable
+from collections.abc import Callable
 
 from src.rules.body import BodyText
 from src.rules.node import FormatNode
@@ -18,6 +17,7 @@ def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bo
     :return: 被修改的节点（FormatNode） if found, else None
     """
     from collections import deque
+
     queue = deque([root])
     while queue:
         node = queue.popleft()
@@ -27,11 +27,7 @@ def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bo
     return None
 
 
-def promote_bodytext_in_subtrees_of_type(
-        root: 'FormatNode',
-        parent_type: type,
-        target_type: type
-):
+def promote_bodytext_in_subtrees_of_type(root: "FormatNode", parent_type: type, target_type: type):
     """
     遍历整棵树：
       - 找到所有类型为 parent_type 的节点；
