@@ -1,85 +1,155 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : heading.py
-from typing import List, Dict, Any
+from typing import Any, Dict, List, cast
 
+from docx.document import Document
+from loguru import logger  # 推荐添加日志，便于调试
+
+from src.config.datamodel import HeadingLevelConfig, NodeConfigRoot
 from src.rules.node import FormatNode
-from src.rules.style import *
+from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class HeadingLevel1Node(FormatNode):
+class BaseHeadingNode(FormatNode):
+    """标题节点基类（复用1/2/3级标题的通用逻辑）"""
+
+    LEVEL: int = 0  # 标题层级（1/2/3）
+    NODE_TYPE: str = ""
+    CONFIG_MODEL = HeadingLevelConfig
+
+    def _get_level_config(self, root_config: NodeConfigRoot) -> HeadingLevelConfig:
+        """根据层级获取对应配置"""
+        level_config_map = {
+            1: root_config.headings.level_1,
+            2: root_config.headings.level_2,
+            3: root_config.headings.level_3,
+        }
+        target_config = level_config_map.get(self.LEVEL, root_config.headings.level_1)
+        logger.debug(
+            f"{self.LEVEL}级标题从Pydantic模型加载配置：对齐方式={target_config.alignment}，行距={target_config.line_spacing}"
+        )
+        return target_config
+
+    def load_config(self, root_config: dict | NodeConfigRoot):
+        """重载加载配置方法，自动匹配对应层级的配置"""
+        try:
+            if isinstance(root_config, dict):
+                # 修复：使用单下划线 _config（匹配基类@property的底层属性）
+                level_config_dict = root_config.get("headings", {}).get(
+                    f"level_{self.LEVEL}", {}
+                )
+                self._config = level_config_dict  # 正确赋值给单下划线私有属性
+                self._pydantic_config = self.CONFIG_MODEL(
+                    **self._config
+                )  # 读取赋值后的 _config
+
+            elif isinstance(root_config, NodeConfigRoot):
+                # 修复：先赋值 _pydantic_config，再同步到 _config
+                self._pydantic_config = self._get_level_config(root_config)
+                self._config = (
+                    self._pydantic_config.model_dump()
+                )  # 读取底层 _pydantic_config
+                logger.debug(f"{self.LEVEL}级标题Pydantic配置转字典：{self._config}")
+
+            else:
+                raise TypeError(
+                    f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"
+                )
+
+        except Exception as e:
+            logger.error(f"{self.LEVEL}级标题配置加载失败：{str(e)}")
+            raise  # 抛出异常，避免后续使用错误配置
+
+    def check_format(self, doc: Document) -> List[Dict[str, Any]]:
+        """通用标题格式检查逻辑"""
+        # 修复：空值校验（直接检查底层私有属性 _pydantic_config）
+        if self._pydantic_config is None:
+            error_msg = f"{self.LEVEL}级标题配置未加载，跳过检查"
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=error_msg)
+            logger.warning(error_msg)
+            return [
+                {"error": error_msg, "level": self.LEVEL, "node_type": self.NODE_TYPE}
+            ]
+
+        # 类型断言（读取@property的 pydantic_config，本质是 _pydantic_config）
+        cfg: HeadingLevelConfig = cast("HeadingLevelConfig", self.pydantic_config)
+        # 段落样式检查（完整使用所有配置字段）
+        ps = ParagraphStyle(
+            alignment=cfg.alignment,
+            space_before=cfg.space_before,
+            space_after=cfg.space_after,
+            line_spacing=cfg.line_spacing,
+            first_line_indent=cfg.first_line_indent,
+            builtin_style_name=cfg.builtin_style_name,
+        )
+        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+
+        # 字符样式检查（完整使用所有配置字段）
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.chinese_font_name,
+            font_name_en=cfg.english_font_name,
+            font_size=cfg.font_size,
+            font_color=cfg.font_color,
+            bold=cfg.bold,
+            italic=cfg.italic,
+            underline=cfg.underline,
+        )
+
+        # 逐run检查并添加批注
+        run_issues = []
+        for idx, run in enumerate(self.paragraph.runs):
+            if not run.text.strip():
+                continue  # 跳过空白run，减少无效检查
+            diff_result = cstyle.diff_from_run(run)
+            if diff_result:
+                run_issue = {
+                    "run_index": idx,
+                    "run_text": run.text,
+                    "diff": diff_result,
+                }
+                run_issues.append(run_issue)
+                self.add_comment(
+                    doc=doc, runs=run, text=f"{''.join(str(dr) for dr in diff_result)}"
+                )
+
+        # 段落样式批注
+        all_issues = []
+        if paragraph_issues:
+            para_issue = {
+                "type": "paragraph_style",
+                "diff": paragraph_issues,
+                "paragraph_text": self.paragraph.text[:50] + "..."
+                if len(self.paragraph.text) > 50
+                else self.paragraph.text,
+            }
+            all_issues.append(para_issue)
+            self.add_comment(
+                doc=doc,
+                runs=self.paragraph.runs,
+                text=f"{''.join(str(dr) for dr in paragraph_issues)}",
+            )
+        return []
+
+
+# 各层级标题节点（无需重写check_format，直接复用基类逻辑）
+class HeadingLevel1Node(BaseHeadingNode):
     """一级标题节点"""
-    NODE_TYPE = 'headings.level_1'
 
-    def check_format(self, doc) -> List[Dict[str, Any]]:
-        ps = ParagraphStyle(
-            alignment=Alignment.LEFT,
-            space_before=Spacing.HALF_LINE,
-            space_after=Spacing.HALF_LINE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.NONE,
-            builtin_style_name=BuiltInStyle.HEADING_1
-        )
-        ps.apply_to(self.paragraph)
-        for index, run in enumerate(self.paragraph.runs):
-            CharacterStyle(
-                font_name=FontName.SIM_HEI,
-                font_size=FontSize.XIAO_ER,
-                font_color=FontColor.BLACK,
-                bold=False,
-                italic=False,
-                underline=False
-            ).apply_to(run)
-        return []
+    LEVEL = 1
+    NODE_TYPE = "headings.level_1"
 
 
-class HeadingLevel2Node(FormatNode):
+class HeadingLevel2Node(BaseHeadingNode):
     """二级标题节点"""
-    NODE_TYPE = 'headings.level_2'
-    def check_format(self, doc) -> List[Dict[str, Any]]:
-        ps = ParagraphStyle(
-            alignment=Alignment.LEFT,
-            space_before=Spacing.HALF_LINE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.NONE,
-            builtin_style_name=BuiltInStyle.HEADING_2
-        )
-        ps.apply_to(self.paragraph)
-        for index, run in enumerate(self.paragraph.runs):
-            CharacterStyle(
-                font_name=FontName.SIM_HEI,
-                font_size=FontSize.SAN_HAO,
-                font_color=FontColor.BLACK,
-                bold=False,
-                italic=False,
-                underline=False
-            ).apply_to(run)
-        return []
+
+    LEVEL = 2
+    NODE_TYPE = "headings.level_2"
 
 
-class HeadingLevel3Node(FormatNode):
+class HeadingLevel3Node(BaseHeadingNode):
     """三级标题节点"""
-    NODE_TYPE = 'headings.level_3'
-    def check_format(self, doc) -> List[Dict[str, Any]]:
-        ps = ParagraphStyle(
-            alignment=Alignment.LEFT,
-            space_before=Spacing.HALF_LINE,
-            space_after=Spacing.NONE,
-            line_spacing=LineSpacing.ONE_POINT_FIVE,
-            first_line_indent=FirstLineIndent.NONE,
-            builtin_style_name=BuiltInStyle.HEADING_3
-        )
-        ps.apply_to(self.paragraph)
-        for index, run in enumerate(self.paragraph.runs):
-            CharacterStyle(
-                font_name=FontName.SIM_HEI,
-                font_size=FontSize.XIAO_SI,
-                font_color=FontColor.BLACK,
-                bold=False,
-                italic=False,
-                underline=False
-            ).apply_to(run)
-        return []
+
+    LEVEL = 3
+    NODE_TYPE = "headings.level_3"

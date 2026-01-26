@@ -1,13 +1,15 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/11 20:19
 # @Author  : afish
 # @File    : utils.py
+
+from collections.abc import Callable
+
 from src.rules.body import BodyText
 from src.rules.node import FormatNode
 
 
-def find_and_modify_first(root: FormatNode, condition):
+def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bool]):
     """
     找到第一个满足 condition 的节点，调用 modifier(node) 修改它，并返回该节点。
     :param root: 树的根节点（FormatNode 实例）
@@ -15,6 +17,7 @@ def find_and_modify_first(root: FormatNode, condition):
     :return: 被修改的节点（FormatNode） if found, else None
     """
     from collections import deque
+
     queue = deque([root])
     while queue:
         node = queue.popleft()
@@ -24,11 +27,7 @@ def find_and_modify_first(root: FormatNode, condition):
     return None
 
 
-def promote_bodytext_in_subtrees_of_type(
-        root: 'FormatNode',
-        parent_type: type,
-        target_type: type
-):
+def promote_bodytext_in_subtrees_of_type(root: "FormatNode", parent_type: type, target_type: type):
     """
     遍历整棵树：
       - 找到所有类型为 parent_type 的节点；

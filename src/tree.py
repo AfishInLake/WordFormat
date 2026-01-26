@@ -1,11 +1,11 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/8 15:00
 # @Author  : afish
 # @File    : tree.py
-from typing import Any, List, Iterator, Optional, TypeVar, Generic, Callable
+from collections.abc import Callable, Iterator
+from typing import Any, Generic, Optional, TypeVar
 
-from src.rules.node import TreeNode, FormatNode
+from src.rules.node import TreeNode
 
 
 class Tree:
@@ -52,14 +52,16 @@ class Tree:
             queue.extend(node.children)
 
     # ===== 查找与工具方法 =====
-    def find_by_condition(self, condition: Callable[[Any], bool]) -> Optional['TreeNode']:
+    def find_by_condition(
+        self, condition: Callable[[Any], bool]
+    ) -> Optional["TreeNode"]:
         """
         根据条件函数查找节点。
         :param condition: 接收 node.value，返回 bool
         :return: 匹配的第一个节点（DFS顺序），或 None
         """
 
-        def _dfs(node: 'TreeNode'):
+        def _dfs(node: "TreeNode"):
             if node and condition(node.value):
                 return node
             for child in node.children:
@@ -88,14 +90,14 @@ class Tree:
         return f"Tree(root={self.root.value})"
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Stack(Generic[T]):
     """一个简单的后进先出（LIFO）栈"""
 
     def __init__(self) -> None:
-        self._items: List[T] = []
+        self._items: list[T] = []
 
     def push(self, item: T) -> None:
         """将元素压入栈顶"""
@@ -113,7 +115,7 @@ class Stack(Generic[T]):
             raise IndexError("peek from empty stack")
         return self._items[-1]
 
-    def peek_safe(self) -> Optional[T]:
+    def peek_safe(self) -> T | None:
         """安全地查看栈顶元素，若栈为空返回 None"""
         return self._items[-1] if self._items else None
 
@@ -137,7 +139,6 @@ class Stack(Generic[T]):
         return not self.is_empty()
 
 
-
 def print_tree(node: TreeNode, prefix: str = "", is_last: bool = True) -> None:
     """
     以树形结构打印多叉树（类似 Linux 的 tree 命令）
@@ -154,26 +155,24 @@ def print_tree(node: TreeNode, prefix: str = "", is_last: bool = True) -> None:
 
     # 尝试提取可读内容
     if isinstance(value, dict):
-        cat = value.get('category', 'unknown')
-        para = value.get('paragraph', '')[:50]  # 截断长文本
-        display = f"[{cat}] {para}"
-    elif hasattr(value, 'paragraph') and isinstance(value.paragraph, dict):
-        cat = value.paragraph.get('category', 'unknown')
-        para = value.paragraph.get('paragraph', '')[:50]
-        display = f"[{cat}] {para}"
+        cat = value.get("category", "unknown")
+        para = value.get("paragraph", "")[:50]  # 截断长文本
+        display = f"【{cat}】 {para}"
+    elif hasattr(value, "paragraph") and isinstance(value.paragraph, dict):
+        cat = value.paragraph.get("category", "unknown")
+        para = value.paragraph.get("paragraph", "")[:50]
+        display = f"【{cat}】 {para}"
     else:
         display = str(value)[:60]
 
-    print(prefix + connector + display)
+    print(prefix + connector + display)  # noqa t201
 
     # 递归打印子节点
-    if hasattr(node, 'children'):
+    if hasattr(node, "children"):
         children = node.children
         for i, child in enumerate(children):
-            is_last_child = (i == len(children) - 1)
+            is_last_child = i == len(children) - 1
             # 下一级前缀
             extension = "    " if is_last else "│   "
             new_prefix = prefix + extension
             print_tree(child, new_prefix, is_last_child)
-
-

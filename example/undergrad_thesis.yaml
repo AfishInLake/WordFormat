@@ -1,0 +1,172 @@
+style_checks_warning: # 样式检查预警设置
+  bold: true # 是否预警
+  italic: true
+  underline: true
+  font_size: true
+  font_color: false
+  font_name: true
+
+
+# 全局页面格式（正文通用）
+global_format: &global_format
+  alignment: '两端对齐'
+  space_before: 0.0
+  space_after: 0.0
+  line_spacing: '1.5倍'
+  first_line_indent: '2字符'
+  builtin_style_name: '正文'
+  chinese_font_name: '宋体'
+  english_font_name: 'Times New Roman'
+  font_size: '小四'
+  font_color: 'BLACK'
+  bold: false
+  italic: false
+  underline: false
+
+# 摘要部分（中英文）
+abstract:
+  chinese:
+    chinese_title:
+      <<: *global_format
+      alignment: '居中对齐'
+      first_line_indent: '无缩进'
+      chinese_font_name: '黑体'
+      font_size: '小二'
+      bold: true
+    chinese_content:
+      <<: *global_format
+      alignment: '两端对齐'
+      first_line_indent: '无缩进'  # 摘要正文通常不首行缩进（按规范示例）
+  english:
+    english_title:
+      <<: *global_format
+      alignment: '居中对齐'
+      first_line_indent: '无缩进'
+      english_font_name: 'Times New Roman'
+      font_size: '四号'
+      bold: true
+    english_content:
+      <<: *global_format
+      alignment: '两端对齐'
+      first_line_indent: '无缩进'
+      english_font_name: 'Times New Roman'
+      font_size: '小四'
+  keywords:
+    chinese:
+      <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '无缩进'
+      chinese_font_name: '黑体'
+      font_size: '小四'
+      kewords_bold: true  # 规范未要求加粗，仅字体为黑体四号
+      count_min: 3
+      count_max: 5
+      trailing_punct_forbidden: true
+    english:
+      <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '无缩进'
+      english_font_name: 'Times New Roman'
+      font_size: '小四'
+      kewords_bold: true
+      count_min: 3
+      count_max: 5
+      trailing_punct_forbidden: true
+
+# 各级标题格式（章、节、小节）
+headings:
+  level_1: # 一级标题（如“第一章 绪论”）
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '无缩进'
+    chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
+    font_size: '小二'
+    bold: false
+    space_before: 0.5
+    space_after: 0.5
+    line_spacing: '1.5倍'  # 标题通常单倍行距
+    builtin_style_name: 'Heading 1'
+
+  level_2: # 二级标题（如“1.1 研究背景”）
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '无缩进'
+    chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
+    font_size: '三号'
+    bold: false
+    space_before: 0.5
+    space_after: 0.5
+    builtin_style_name: 'Heading 2'
+
+  level_3: # 三级标题（如“1.1.1 国内现状”）
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '无缩进'
+    chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
+    font_size: '小四'
+    bold: false
+    space_before: 0.5
+    space_after: 0.5
+    builtin_style_name: 'Heading 3'
+
+# 正文段落格式
+body_text:
+  <<: *global_format
+  # 已在 global_format 中定义，此处可省略或保留以强调
+
+# 插图（Figure）格式
+figures:
+  caption_position: "below"          # 图名置于图之下（规范明确要求）
+  caption_prefix: "图"               # 如“图2.1”
+  caption_numbering: "per_chapter"   # 分章编号
+  caption_font: "宋体"
+  caption_font_size: "五号"
+  require_label: true                # 必须有图名
+
+# 表格（Table）格式
+tables:
+  caption_position: "above"          # 表名置于表之上（规范明确要求）
+  caption_prefix: "表"               # 如“表5.1”
+  caption_numbering: "per_chapter"   # 分章编号
+  caption_font: "宋体"
+  caption_font_size: "五号"
+  english_font: "Times New Roman"    # 表格内英文用 Times New Roman 五号
+
+# 参考文献（References）
+references:
+  title:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '无缩进'
+    chinese_font_name: '黑体'
+    font_size: '三号'
+    bold: true
+    section_title: "参考文献"
+  content:
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '无缩进'
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '五号'
+    entry_indent: 0.0                # 顶格（序号[1]顶格）
+    entry_ending_punct: "."          # 每条以句号结束
+    numbering_format: "[1], [2], ..."
+
+# 致谢（Acknowledgements）
+acknowledgements:
+  title:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '无缩进'
+    chinese_font_name: '黑体'
+    font_size: '小二'
+    bold: true
+    section_title: "致谢"
+  content:
+    <<: *global_format
+    alignment: '两端对齐'
+    first_line_indent: '2字符'

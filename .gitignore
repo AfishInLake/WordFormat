@@ -18,4 +18,8 @@ __pycache__
 .gitkeep
 .gitattributes
 test
+test/*
 tmp
+tmp/*
+.trae
+output/*

@@ -1,29 +1,61 @@
 #! /usr/bin/env python
-# -*- coding: utf-8 -*-
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : body.py
-from typing import List, Dict, Any
+from typing import Any, cast
 
+from src.config.datamodel import BodyTextConfig
 from src.rules.node import FormatNode
-from src.rules.style import *
+from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
 class BodyText(FormatNode):
     """正文节点"""
-    NODE_TYPE = 'body_text'
-    def check_format(self, doc) -> List[Dict[str, Any]]:
+
+    NODE_TYPE = "body_text"
+    CONFIG_MODEL = BodyTextConfig
+
+    def check_format(self, doc) -> list[dict[str, Any]]:
         """
-        设置 正文 样式
+        检查正文段落的字符与段落格式是否符合规范。
         """
-        for index, run in enumerate(self.paragraph.runs):
-            CharacterStyle(
-                font_name_en=FontName.SIM_SUN,
-                font_name_cn=self.config.get(''),
-                font_size=FontSize.XIAO_SI,
-                font_color=FontColor.BLACK,
-                bold=False,
-                italic=False,
-                underline=False
-            ).apply_to(run)
+        cfg: BodyTextConfig = cast("BodyTextConfig", self.pydantic_config)
+        # 段落样式
+        ps = ParagraphStyle(
+            alignment=cfg.alignment,
+            space_before=cfg.space_before,
+            space_after=cfg.space_after,
+            line_spacing=cfg.line_spacing,
+            first_line_indent=cfg.first_line_indent,
+            builtin_style_name=cfg.builtin_style_name,
+        )
+        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+
+        # 字符样式
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.chinese_font_name,
+            font_name_en=cfg.english_font_name,
+            font_size=cfg.font_size,
+            font_color=cfg.font_color,
+            bold=cfg.bold,
+            italic=cfg.italic,
+            underline=cfg.underline,
+        )
+
+        # 检查每个 run 的字符格式
+        for run in self.paragraph.runs:
+            diff_result = cstyle.diff_from_run(run)
+            if diff_result:  # 仅当有差异时添加批注
+                self.add_comment(
+                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                )
+
+        # 检查段落格式差异
+        if paragraph_issues:
+            self.add_comment(
+                doc=doc,
+                runs=self.paragraph.runs,
+                text="".join(str(issue) for issue in paragraph_issues),
+            )
+
         return []
