@@ -7,7 +7,7 @@ from pathlib import Path
 from docx import Document
 from loguru import logger
 
-from config.datamodel import NodeConfigRoot
+from config.config import get_config, init_config
 from src.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -109,18 +109,15 @@ def auto_format_thesis_document(
         ...     "format_rules.yaml"
         ... )
     """
-    from src.utils import get_file_name, load_yaml_with_merge
+    from src.utils import get_file_name
 
+    init_config(configpath)
     try:
-        # 加载合并后的配置字典
-        raw_config = load_yaml_with_merge(configpath)
-        # 关键：用Pydantic验证配置结构（确保配置符合datamodel定义）
-        root_config_model = NodeConfigRoot(**raw_config)
-        # 转换为字典（供节点加载）
-        config = root_config_model.model_dump()
+        config_model = get_config()  # 首次调用：触发load()
+        config = config_model.model_dump()
         logger.info("配置文件验证通过")
     except Exception as e:
-        logger.error(f"配置文件加载/验证失败: {str(e)}")
+        logger.error(f"配置加载失败: {str(e)}")
         raise
 
     filename_without_ext = get_file_name(docxpath)
@@ -155,4 +152,6 @@ def auto_format_thesis_document(
     apply_format_check_to_all_nodes(root_node, document, config)
     savepath = Path(savepath)
     savepath.mkdir(exist_ok=True)
-    document.save(str(savepath / f"{filename_without_ext}--修改版.docx"))
+    docx_path = str(savepath / f"{filename_without_ext}--修改版.docx")
+    logger.info(f"保存文件到 {docx_path}")
+    document.save(docx_path)

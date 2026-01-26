@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.style.check_format import FontColor, FontName, FontSize
+from src.style.style_enum import FontColor, FontName, FontSize
 
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型
@@ -66,6 +66,20 @@ FontSizeType = Union[
     float,
     int,
 ]
+
+
+# -------------------------- 预警字段配置模型 --------------------------
+
+
+class WarningFieldConfig(BaseModel):
+    """预警字段配置模型"""
+
+    bold: bool = Field(default=True)
+    italic: bool = Field(default=True)
+    underline: bool = Field(default=True)
+    font_size: bool = Field(default=True)
+    font_name: bool = Field(default=False)
+    font_color: bool = Field(default=False)
 
 
 # -------------------------- 基础配置模型 --------------------------
@@ -500,6 +514,7 @@ class AcknowledgementsConfig(BaseModel):
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
 
+    style_checks_warning: WarningFieldConfig = Field(default_factory=WarningFieldConfig)
     global_format: GlobalFormatConfig = Field(default_factory=GlobalFormatConfig)
     abstract: AbstractConfig = Field(default_factory=AbstractConfig)
     headings: HeadingsConfig = Field(default_factory=HeadingsConfig)
