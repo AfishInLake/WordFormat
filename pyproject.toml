@@ -10,6 +10,7 @@ dependencies = [
     "pre-commit>=4.5.1",
     "pydantic>=2.12.5",
     "python-docx>=1.2.0",
+    "python-dotenv>=1.2.1",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
     "ruff>=0.14.14",

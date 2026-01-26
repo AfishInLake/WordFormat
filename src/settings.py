@@ -2,13 +2,17 @@
 # @Time    : 2026/1/18 11:48
 # @Author  : afish
 # @File    : settings.py
+import os
 
-# 模型api_key
-API_KEY = ""
-# 模型名称
-MODEL = "qwen3-4b-no-think"
-# 模型链接
-MODEL_URL = "http://localhost:11434/v1"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# 从环境变量获取配置，如果不存在则使用默认值
+API_KEY = os.getenv("WORDFORMAT_API_KEY", "")
+MODEL = os.getenv("WORDFORMAT_MODEL", "")
+MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
+
 
 CHARACTER_STYLE_CHECKS = {
     "bold": True,
