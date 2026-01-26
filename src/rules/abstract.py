@@ -5,7 +5,7 @@
 import re
 from typing import Any, cast
 
-from config.datamodel import (
+from src.config.datamodel import (
     AbstractChineseConfig,
     AbstractContentConfig,
     AbstractEnglishConfig,

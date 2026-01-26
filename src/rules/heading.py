@@ -7,7 +7,7 @@ from typing import Any, Dict, List, cast
 from docx.document import Document
 from loguru import logger  # 推荐添加日志，便于调试
 
-from config.datamodel import HeadingLevelConfig, NodeConfigRoot
+from src.config.datamodel import HeadingLevelConfig, NodeConfigRoot
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 

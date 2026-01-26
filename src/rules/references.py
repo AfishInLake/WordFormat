@@ -4,9 +4,9 @@
 # @File    : references.py
 from typing import Any, cast
 
-from config.datamodel import ReferencesContentConfig, ReferencesTitleConfig
+from src.config.datamodel import ReferencesContentConfig, ReferencesTitleConfig
 from src.rules.node import FormatNode
-from style.check_format import CharacterStyle, ParagraphStyle
+from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
 class References(FormatNode):

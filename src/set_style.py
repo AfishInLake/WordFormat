@@ -7,7 +7,7 @@ from pathlib import Path
 from docx import Document
 from loguru import logger
 
-from config.config import get_config, init_config
+from src.config.config import get_config, init_config
 from src.rules import (
     AbstractContentCN,
     AbstractContentEN,

@@ -48,7 +48,7 @@ class DocxBase:
 
             response["fingerprint"] = get_paragraph_xml_fingerprint(paragraph)
             logger.info(response)
-            if response["category"] == "heading_fulu":
+            if response["category"] == "body_text":
                 break
             result.append(response)
         self.base_agent.print_token_usage()

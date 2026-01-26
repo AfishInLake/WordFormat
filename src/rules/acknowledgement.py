@@ -4,9 +4,12 @@
 # @File    : acknowledgement.py
 from typing import Any, cast
 
-from config.datamodel import AcknowledgementsContentConfig, AcknowledgementsTitleConfig
+from src.config.datamodel import (
+    AcknowledgementsContentConfig,
+    AcknowledgementsTitleConfig,
+)
 from src.rules.node import FormatNode
-from style.check_format import CharacterStyle, ParagraphStyle
+from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
 class Acknowledgements(FormatNode):

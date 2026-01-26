@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Literal, cast
 
 from docx import Document
 
-from config.datamodel import KeywordsConfig, NodeConfigRoot
+from src.config.datamodel import KeywordsConfig, NodeConfigRoot
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 

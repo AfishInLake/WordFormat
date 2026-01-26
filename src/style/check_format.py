@@ -9,8 +9,8 @@ from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
-from config.config import get_config
-from config.datamodel import WarningFieldConfig
+from src.config.config import get_config
+from src.config.datamodel import WarningFieldConfig
 from src.style.get_some import (
     paragraph_get_alignment,
     paragraph_get_builtin_style_name,

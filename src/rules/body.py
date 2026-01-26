@@ -4,7 +4,7 @@
 # @File    : body.py
 from typing import Any, cast
 
-from config.datamodel import BodyTextConfig
+from src.config.datamodel import BodyTextConfig
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 

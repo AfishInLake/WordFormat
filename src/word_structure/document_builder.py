@@ -9,8 +9,8 @@ from typing import Any
 from loguru import logger
 
 from src.rules.node import FormatNode
+from src.utils import check_duplicate_fingerprints
 from src.word_structure.tree_builder import DocumentTreeBuilder
-from utils import check_duplicate_fingerprints
 
 
 class DocumentBuilder:
