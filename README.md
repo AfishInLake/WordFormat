@@ -77,17 +77,28 @@ cd WordFormat
 uv sync
 
 # 或使用 pip
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# linux/macOS
+source venv/bin/activate
+# windows
+venv\Scripts\activate
+
+# 安装项目依赖
 pip install -e .
 ```
 
 #### 3. 配置环境变量
 创建 `.env` 文件，配置 LLM API 密钥等必要参数：
 ```env
-# 示例：OpenAI API 配置
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-# 或其他 LLM 配置（如智谱AI）
-ZHIPU_API_KEY=your-zhipu-api-key
+# 配置api key
+WORDFORMAT_API_KEY=''
+# 模型名称
+WORDFORMAT_MODEL='qwen3-4b-no-think'
+# 模型地址
+WORDFORMAT_MODEL_URL='http://localhost:11434/v1'
 ```
 
 ### 核心使用方法
