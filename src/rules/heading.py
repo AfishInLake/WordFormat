@@ -40,6 +40,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
                     f"level_{self.LEVEL}", {}
                 )
                 self._config = level_config_dict  # 正确赋值给单下划线私有属性
+                logger.debug(f"{self.LEVEL}级标题字典配置：{self._config}")
                 self._pydantic_config = self.CONFIG_MODEL(
                     **self._config
                 )  # 读取赋值后的 _config
