@@ -4,16 +4,15 @@
 # @File    : node.py
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
 import yaml
 from docx.document import Document
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
-from loguru import logger
 from pydantic import ValidationError
 
-from src.config.datamodel import BaseModel
+from src.config.datamodel import BaseModel, NodeConfigRoot
 
 
 class TreeNode:
@@ -83,10 +82,13 @@ class TreeNode:
         return f"TreeNode({self.value})"
 
 
-class FormatNode(TreeNode):
+T = TypeVar("T", bound=BaseModel)
+
+
+class FormatNode(TreeNode, Generic[T]):
     """所有格式检查节点的基类"""
 
-    CONFIG_MODEL: Type[BaseModel] = BaseModel
+    CONFIG_MODEL: Type[T]
 
     def __init__(
         self,
@@ -99,10 +101,10 @@ class FormatNode(TreeNode):
         self.level: int | float = level
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
-        self._pydantic_config: Optional[BaseModel] = None  # Pydantic配置对象
+        self._pydantic_config: Optional[T] = None  # Pydantic配置对象
 
     @property
-    def pydantic_config(self) -> BaseModel:
+    def pydantic_config(self) -> T:
         """只读属性：获取类型安全的Pydantic配置对象"""
         if self._pydantic_config is None:
             raise ValueError(f"节点 {self.NODE_TYPE} 尚未加载Pydantic配置")
@@ -126,31 +128,42 @@ class FormatNode(TreeNode):
         except Exception as e:
             raise RuntimeError(f"加载配置失败: {e}") from e
 
-    def load_config(self, full_config: dict | Any) -> None:
+    def load_config(self, full_config: NodeConfigRoot):  # noqa C901
         """重写父类方法：同时加载字典配置和Pydantic配置"""
         # 1. 先执行父类的字典配置加载（兼容旧逻辑）
         super().load_config(full_config)
 
-        # 2. 基于父类加载的字典配置，转换为Pydantic模型对象
-        if not isinstance(full_config, dict) or not self.NODE_TYPE:
-            self._pydantic_config = self.CONFIG_MODEL()  # 使用默认配置
-            return
-
-        try:
-            # 转换字典配置为Pydantic模型
-            self._pydantic_config = self.CONFIG_MODEL(**self.config)
-        except ValidationError as e:
-            # 配置验证失败时，使用默认配置并提示
-            self._pydantic_config = self.CONFIG_MODEL()
-            logger.error(f"警告：{self.NODE_TYPE} 配置验证失败，使用默认值。错误：{e}")
-        except Exception as e:
-            self._pydantic_config = self.CONFIG_MODEL()
-            logger.error(f"警告：{self.NODE_TYPE} 配置加载异常，使用默认值。错误：{e}")
+        class_name = self.CONFIG_MODEL.__name__
+        match str(class_name):
+            case "AbstractChineseConfig":
+                self._pydantic_config = full_config.abstract.chinese
+            case "AbstractEnglishConfig":
+                self._pydantic_config = full_config.abstract.english
+            case "KeywordsConfig":
+                self._pydantic_config = full_config.abstract.keywords
+            case "HeadingLevelConfig":
+                self._pydantic_config = full_config.headings
+            case "BodyTextConfig":
+                self._pydantic_config = full_config.body_text
+            case "FiguresConfig":
+                self._pydantic_config = full_config.figures
+            case "TablesConfig":
+                self._pydantic_config = full_config.tables
+            case "ReferencesTitleConfig":
+                self._pydantic_config = full_config.references.title
+            case "ReferencesContentConfig":
+                self._pydantic_config = full_config.references.content
+            case "AcknowledgementsTitleConfig":
+                self._pydantic_config = full_config.acknowledgements.title
+            case "AcknowledgementsContentConfig":
+                self._pydantic_config = full_config.acknowledgements.content
+            case _:
+                raise ValueError(f"未知的配置类型: {class_name}")
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph
 
-    def check_format(self, doc: Document) -> list[dict[str, Any]]:
+    def check_format(self, doc: Document):
         """虚方法：由子类实现具体的格式检查逻辑"""
         raise NotImplementedError("Subclasses should implement this!")
 

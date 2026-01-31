@@ -2,24 +2,23 @@
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : body.py
-from typing import Any, cast
 
 from src.config.datamodel import BodyTextConfig
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class BodyText(FormatNode):
+class BodyText(FormatNode[BodyTextConfig]):
     """正文节点"""
 
     NODE_TYPE = "body_text"
     CONFIG_MODEL = BodyTextConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def check_format(self, doc):
         """
         检查正文段落的字符与段落格式是否符合规范。
         """
-        cfg: BodyTextConfig = cast("BodyTextConfig", self.pydantic_config)
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,

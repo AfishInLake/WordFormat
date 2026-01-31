@@ -63,6 +63,13 @@ if __name__ == "__main__":
     parser_gen = subparsers.add_parser(
         "generate-json", help="仅生成文档结构JSON文件，不执行格式校验"
     )
+    parser_gen.add_argument(
+        "--config",
+        "-c",
+        required=True,
+        type=lambda x: validate_file(x, "配置文件"),
+        help="格式配置YAML路径（必填），例如：test/undergrad_thesis.yaml",
+    )
 
     # 3.2 模式2：仅执行格式校验（需指定JSON和配置）
     parser_check = subparsers.add_parser(
@@ -119,7 +126,11 @@ if __name__ == "__main__":
         logger.info(f"📋 生成的JSON路径：{default_json_path}")
         logger.info("=" * 60)
 
-        set_tag_main(docx_path=args.docx, json_save_path=str(default_json_path))
+        set_tag_main(
+            docx_path=args.docx,
+            json_save_path=str(default_json_path),
+            configpath=args.config,
+        )
         logger.info("\n✅ JSON文件已生成完成！")
         logger.info(f"📝 JSON路径：{os.path.abspath(default_json_path)}")
         logger.info("💡 你可手动修改该JSON文件后，使用 check-format 模式执行校验")

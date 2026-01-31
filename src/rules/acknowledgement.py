@@ -2,7 +2,6 @@
 # @Time    : 2026/1/11 21:57
 # @Author  : afish
 # @File    : acknowledgement.py
-from typing import Any, cast
 
 from src.config.datamodel import (
     AcknowledgementsContentConfig,
@@ -12,16 +11,14 @@ from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class Acknowledgements(FormatNode):
+class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
     """致谢节点"""
 
     NODE_TYPE = "acknowledgements"
     CONFIG_MODEL = AcknowledgementsTitleConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AcknowledgementsTitleConfig = cast(
-            "AcknowledgementsTitleConfig", self.pydantic_config
-        )
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -63,16 +60,14 @@ class Acknowledgements(FormatNode):
         return []
 
 
-class AcknowledgementsCN(FormatNode):
+class AcknowledgementsCN(FormatNode[AcknowledgementsContentConfig]):
     """致谢内容"""
 
     NODE_TYPE = "acknowledgements.content"
     CONFIG_MODEL = AcknowledgementsContentConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AcknowledgementsContentConfig = cast(
-            "AcknowledgementsContentConfig", self.pydantic_config
-        )
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,

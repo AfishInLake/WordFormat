@@ -22,9 +22,10 @@ class DocumentBuilder:
             return json.load(f)
 
     @classmethod
-    def build_from_json(cls, json_path: str) -> FormatNode:
+    def build_from_json(cls, json_path: str, config) -> FormatNode:
         paragraphs = cls.load_paragraphs(json_path)
         logger.debug(f"共有 {len(paragraphs)} 条语料")
         check_duplicate_fingerprints(paragraphs)  # 检查重复的指纹
+        DocumentTreeBuilder.CONFIG = config
         builder = DocumentTreeBuilder()
         return builder.build_tree(paragraphs)

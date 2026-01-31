@@ -184,6 +184,7 @@ auto_format_thesis_document(
 ##### 3. 工具文件
 ```bash
 # 修改print_tree.py的 `JSON_PATH` 为生成的 JSON 文件路径
+# 修改print_tree.py的 `YAML_PATH` 为格式配置文件路径
 # 执行如下命令可以查看生成的树
 python print_tree.py 
 ```

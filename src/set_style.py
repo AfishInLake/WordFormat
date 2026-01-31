@@ -26,7 +26,7 @@ from src.word_structure.utils import (
 )
 
 
-def apply_format_check_to_all_nodes(root_node: FormatNode, document, config: dict):
+def apply_format_check_to_all_nodes(root_node: FormatNode, document, config):
     """
     递归遍历文档树中的所有节点，
     对每个具有 check_format 方法的节点执行该方法。
@@ -114,14 +114,13 @@ def auto_format_thesis_document(
     init_config(configpath)
     try:
         config_model = get_config()  # 首次调用：触发load()
-        config = config_model.model_dump()
         logger.info("配置文件验证通过")
     except Exception as e:
         logger.error(f"配置加载失败: {str(e)}")
         raise
 
     filename_without_ext = get_file_name(docxpath)
-    root_node = DocumentBuilder.build_from_json(jsonpath)
+    root_node = DocumentBuilder.build_from_json(jsonpath, config=config_model)
     root_node.children = [
         node for node in root_node.children if node.value.get("category") != "body_text"
     ]
@@ -149,7 +148,7 @@ def auto_format_thesis_document(
     观察到不属于正文的内容被处理，需要剪枝
     word样式太多，需要考虑重置
     """
-    apply_format_check_to_all_nodes(root_node, document, config)
+    apply_format_check_to_all_nodes(root_node, document, config_model)
     savepath = Path(savepath)
     savepath.mkdir(exist_ok=True)
     docx_path = str(savepath / f"{filename_without_ext}--修改版.docx")
