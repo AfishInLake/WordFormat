@@ -3,7 +3,6 @@
 # @Author  : afish
 # @File    : abstract.py
 import re
-from typing import Any, cast
 
 from src.config.datamodel import (
     AbstractChineseConfig,
@@ -15,17 +14,17 @@ from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class AbstractTitleCN(FormatNode):
+class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
     """摘要标题中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_title"
     CONFIG_MODEL = AbstractTitleConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def check_format(self, doc):
         """
         检查 摘要 样式
         """
-        cfg: AbstractTitleConfig = cast("AbstractTitleConfig", self.pydantic_config)
+        cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
             space_before=cfg.space_before,
@@ -56,7 +55,7 @@ class AbstractTitleCN(FormatNode):
         return []
 
 
-class AbstractTitleContentCN(FormatNode):
+class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
     """摘要标题正文混合中文节点"""
 
     NODE_TYPE = "abstract.chinese"
@@ -69,7 +68,7 @@ class AbstractTitleContentCN(FormatNode):
             return True
         return False
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def check_format(self, doc):
         """
         设置 摘要 样式
         """
@@ -112,14 +111,14 @@ class AbstractTitleContentCN(FormatNode):
         return []
 
 
-class AbstractContentCN(FormatNode):
+class AbstractContentCN(FormatNode[AbstractContentConfig]):
     """摘要内容中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_content"
     CONFIG_MODEL = AbstractContentConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AbstractContentConfig = cast("AbstractContentConfig", self.pydantic_config)
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
             space_before=cfg.space_before,
@@ -149,14 +148,14 @@ class AbstractContentCN(FormatNode):
         return []
 
 
-class AbstractTitleEN(FormatNode):
+class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
     """摘要标题英文节点"""
 
     NODE_TYPE = "abstract.english.english_title"
     CONFIG_MODEL = AbstractTitleConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AbstractTitleConfig = cast("AbstractTitleConfig", self.pydantic_config)
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
             space_before=cfg.space_before,
@@ -191,7 +190,7 @@ class AbstractTitleEN(FormatNode):
         return []
 
 
-class AbstractTitleContentEN(FormatNode):
+class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
     """摘要标题正文混合英文节点"""
 
     NODE_TYPE = "abstract.english"
@@ -205,7 +204,7 @@ class AbstractTitleContentEN(FormatNode):
 
         return False
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def check_format(self, doc):
         """
         设置 摘要 样式
         """
@@ -249,14 +248,14 @@ class AbstractTitleContentEN(FormatNode):
         return []
 
 
-class AbstractContentEN(FormatNode):
+class AbstractContentEN(FormatNode[AbstractContentConfig]):
     """摘要内容英文节点"""
 
     NODE_TYPE = "abstract.english.english_content"
     CONFIG_MODEL = AbstractContentConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AbstractContentConfig = cast("AbstractContentConfig", self.pydantic_config)
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
             space_before=cfg.space_before,

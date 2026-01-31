@@ -4,7 +4,7 @@
 # @File    : node.py
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
 import yaml
 from docx.document import Document
@@ -83,10 +83,13 @@ class TreeNode:
         return f"TreeNode({self.value})"
 
 
-class FormatNode(TreeNode):
+T = TypeVar("T", bound=BaseModel)
+
+
+class FormatNode(TreeNode, Generic[T]):
     """所有格式检查节点的基类"""
 
-    CONFIG_MODEL: Type[BaseModel] = BaseModel
+    CONFIG_MODEL: Type[T]
 
     def __init__(
         self,
@@ -99,10 +102,10 @@ class FormatNode(TreeNode):
         self.level: int | float = level
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
-        self._pydantic_config: Optional[BaseModel] = None  # Pydantic配置对象
+        self._pydantic_config: Optional[T] = None  # Pydantic配置对象
 
     @property
-    def pydantic_config(self) -> BaseModel:
+    def pydantic_config(self) -> T:
         """只读属性：获取类型安全的Pydantic配置对象"""
         if self._pydantic_config is None:
             raise ValueError(f"节点 {self.NODE_TYPE} 尚未加载Pydantic配置")
@@ -150,7 +153,7 @@ class FormatNode(TreeNode):
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph
 
-    def check_format(self, doc: Document) -> list[dict[str, Any]]:
+    def check_format(self, doc: Document):
         """虚方法：由子类实现具体的格式检查逻辑"""
         raise NotImplementedError("Subclasses should implement this!")
 

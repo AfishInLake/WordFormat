@@ -2,21 +2,20 @@
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : references.py
-from typing import Any, cast
 
 from src.config.datamodel import ReferencesContentConfig, ReferencesTitleConfig
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class References(FormatNode):
+class References(FormatNode[ReferencesTitleConfig]):
     """参考文献节点"""
 
     NODE_TYPE = "references"
     CONFIG_MODEL = ReferencesTitleConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: ReferencesTitleConfig = cast("ReferencesTitleConfig", self.pydantic_config)
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -57,15 +56,13 @@ class References(FormatNode):
         return []
 
 
-class ReferenceEntry(FormatNode):
+class ReferenceEntry(FormatNode[ReferencesContentConfig]):
     """参考文献条目节点"""
 
     CONFIG_MODEL = ReferencesContentConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: ReferencesContentConfig = cast(
-            "ReferencesContentConfig", self.pydantic_config
-        )
+    def check_format(self, doc):
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,

@@ -2,20 +2,19 @@
 # @Time    : 2026/1/11 19:43
 # @Author  : afish
 # @File    : caption.py
-from typing import Any
 
 from src.config.datamodel import FiguresConfig, TablesConfig
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class CaptionFigure(FormatNode):
+class CaptionFigure(FormatNode[FiguresConfig]):
     """题注-图片"""
 
     NODE_TYPE = "figures"
     CONFIG_MODEL = FiguresConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def check_format(self, doc):
         cfg = self.config
         # 段落样式
         ps = ParagraphStyle(
@@ -57,13 +56,13 @@ class CaptionFigure(FormatNode):
         return []
 
 
-class CaptionTable(FormatNode):
+class CaptionTable(FormatNode[FiguresConfig]):
     """题注-表格"""
 
     NODE_TYPE = "tables"
     CONFIG_MODEL = TablesConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def check_format(self, doc):
         # TODO:暂时无法处理表格分页情况
         # cfg = self.config
         # # 段落样式

@@ -2,7 +2,6 @@
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : heading.py
-from typing import Any, Dict, List, cast
 
 from docx.document import Document
 from loguru import logger  # 推荐添加日志，便于调试
@@ -12,7 +11,7 @@ from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class BaseHeadingNode(FormatNode):
+class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
     """标题节点基类（复用1/2/3级标题的通用逻辑）"""
 
     LEVEL: int = 0  # 标题层级（1/2/3）
@@ -62,7 +61,7 @@ class BaseHeadingNode(FormatNode):
             logger.error(f"{self.LEVEL}级标题配置加载失败：{str(e)}")
             raise  # 抛出异常，避免后续使用错误配置
 
-    def check_format(self, doc: Document) -> List[Dict[str, Any]]:
+    def check_format(self, doc: Document):
         """通用标题格式检查逻辑"""
         # 修复：空值校验（直接检查底层私有属性 _pydantic_config）
         if self._pydantic_config is None:
@@ -74,7 +73,7 @@ class BaseHeadingNode(FormatNode):
             ]
 
         # 类型断言（读取@property的 pydantic_config，本质是 _pydantic_config）
-        cfg: HeadingLevelConfig = cast("HeadingLevelConfig", self.pydantic_config)
+        cfg = self.pydantic_config
         # 段落样式检查（完整使用所有配置字段）
         ps = ParagraphStyle(
             alignment=cfg.alignment,

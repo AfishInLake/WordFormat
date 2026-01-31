@@ -48,8 +48,14 @@ class DocxBase:
             if not paragraph.text:
                 continue
             try:
+                """
+                使用bert进行标签分类，使用正则进行标签匹配，通过率高的视为正确
+
+                以下代码暂时注释
+                """
                 # 正则提取
-                tag, re = self.get_tag_by_regex(paragraph.text)
+                # tag, re = self.get_tag_by_regex(paragraph.text)
+                tag = None
                 if tag:
                     response = {
                         "category": tag,
@@ -62,11 +68,11 @@ class DocxBase:
                 else:
                     # 置信度低和正则无法提取的交由llm处理
                     response = await self.get_tag_by_llm(paragraph.text)
-                    response = {
-                        "category": "body_text",
-                        "comment": "没有匹配到，手动设置",
-                        "paragraph": paragraph.text,
-                    }
+                    # response = {
+                    #     "category": "body_text",
+                    #     "comment": "没有匹配到，手动设置",
+                    #     "paragraph": paragraph.text,
+                    # }
             except Exception as e:
                 response = {
                     "category": "body_text",
