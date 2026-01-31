@@ -130,7 +130,12 @@ class BaseHeadingNode(FormatNode):
                 runs=self.paragraph.runs,
                 text=f"{''.join(str(dr) for dr in paragraph_issues)}",
             )
-        return []
+
+        # 添加字符样式问题
+        if run_issues:
+            all_issues.extend(run_issues)
+
+        return all_issues
 
 
 # 各层级标题节点（无需重写check_format，直接复用基类逻辑）

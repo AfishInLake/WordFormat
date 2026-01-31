@@ -177,6 +177,7 @@ class KeywordsConfig(BaseModel):
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
+    section_title_re: str = Field(default=None, description="关键词匹配的正则表达式")
 
     # 关键词特有配置
     kewords_bold: bool = Field(default=True, description="关键字加粗")
@@ -213,6 +214,7 @@ class AbstractTitleConfig(BaseModel):
     bold: bool = Field(default=True)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
+    section_title_re: str = Field(description="标题正则表达式")
 
     # 复用验证器
     validate_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
@@ -291,6 +293,7 @@ class HeadingLevelConfig(BaseModel):
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
+    section_title_re: str = Field(description="标题正则表达式")
 
     # 复用验证器
     validate_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
@@ -334,59 +337,60 @@ class BodyTextConfig(BaseModel):
 class FiguresConfig(BaseModel):
     """插图配置"""
 
+    alignment: AlignmentType = Field(default="左对齐")
+    space_before: float = Field(default=0.5)
+    space_after: float = Field(default=0.5)
+    line_spacing: LineSpacingType = Field(default="1.5倍")
+    first_line_indent: FirstLineIndentType = Field(default="无缩进")
+    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    chinese_font_name: ChineseFontType = Field(default="宋体")
+    english_font_name: EnglishFontType = Field(default="Times New Roman")
+    font_size: FontSizeType = Field(default="小四")  # 修正类型
+    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    bold: bool = Field(default=False)
+    italic: bool = Field(default=False)
+    underline: bool = Field(default=False)
+    section_title_re: str = Field(description="图注正则表达式")
+
     caption_position: Literal["above", "below"] = Field(
         default="below", description="图注位置"
     )
     caption_prefix: Optional[str] = Field(default="图", description="图注编号前缀")
-    caption_numbering: Literal["per_document", "per_chapter"] = Field(
-        default="per_document", description="编号范围"
-    )
-    caption_font: Optional[str] = Field(default="楷体_GB2312", description="图注字体")
-    caption_font_size: Optional[FontSizeType] = Field(
-        default="五号", description="图注字号"
-    )  # 修正类型
-    require_label: bool = Field(default=True, description="是否强制要求图名")
 
     # 复用字号验证器
-    validate_caption_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
-
-    @field_validator("caption_font")
-    def validate_caption_font(cls, v):
-        """验证图注字体"""
-        if v is None:
-            return v
-        try:
-            FontName.from_label(v)
-            return v
-        except ValueError as e:
-            raise ValueError(
-                f"无效的图注字体：{v}，支持的有：{list(FontName._LABEL_MAP.keys())}"
-            ) from e
+    validate_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
+    validate_font_color: ClassVar[Any] = GlobalFormatConfig.validate_font_color
+    validate_font_name: ClassVar[Any] = GlobalFormatConfig.validate_font_name
 
 
 # -------------------------- 表格配置模型 --------------------------
 class TablesConfig(BaseModel):
     """表格配置"""
 
+    alignment: AlignmentType = Field(default="左对齐")
+    space_before: float = Field(default=0.5)
+    space_after: float = Field(default=0.5)
+    line_spacing: LineSpacingType = Field(default="1.5倍")
+    first_line_indent: FirstLineIndentType = Field(default="无缩进")
+    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    chinese_font_name: ChineseFontType = Field(default="宋体")
+    english_font_name: EnglishFontType = Field(default="Times New Roman")
+    font_size: FontSizeType = Field(default="小四")  # 修正类型
+    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    bold: bool = Field(default=False)
+    italic: bool = Field(default=False)
+    underline: bool = Field(default=False)
+    section_title_re: str = Field(description="图注正则表达式")
+
     caption_position: Literal["above", "below"] = Field(
         default="above", description="表注位置"
     )
     caption_prefix: Optional[str] = Field(default="表", description="表注编号前缀")
-    caption_numbering: Literal["per_document", "per_chapter"] = Field(
-        default="per_document", description="编号范围"
-    )
-    caption_font: Optional[str] = Field(default="楷体_GB2312", description="表注字体")
-    caption_font_size: Optional[FontSizeType] = Field(
-        default="五号", description="表注字号"
-    )  # 修正类型
-    english_font: Optional[str] = Field(
-        default="Arial", description="表格内英文专用字体"
-    )
 
     # 复用验证器
-    validate_caption_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
-    validate_caption_font: ClassVar[Any] = FiguresConfig.validate_caption_font
-    validate_english_font: ClassVar[Any] = GlobalFormatConfig.validate_font_name
+    validate_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
+    validate_font_color: ClassVar[Any] = GlobalFormatConfig.validate_font_color
+    validate_font_name: ClassVar[Any] = GlobalFormatConfig.validate_font_name
 
 
 # -------------------------- 参考文献配置模型 --------------------------
@@ -406,6 +410,7 @@ class ReferencesTitleConfig(BaseModel):
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
+    section_title_re: str = Field(description="参考文献正则表达式")
 
     section_title: Optional[str] = Field(
         default="参考文献", description="参考文献章节标题"
@@ -468,7 +473,7 @@ class AcknowledgementsTitleConfig(BaseModel):
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
-    section_title: Optional[str] = Field(default="致谢", description="致谢章节标题")
+    section_title_re: str = Field(description="致谢标题正则表达式")
 
     # 复用验证器
     validate_font_size: ClassVar[Any] = GlobalFormatConfig.validate_font_size
@@ -510,6 +515,19 @@ class AcknowledgementsConfig(BaseModel):
     )
 
 
+# -------------------------- 版本管理配置模型 --------------------------
+class VersionManagementConfig(BaseModel):
+    """版本管理配置模型"""
+
+    enabled: bool = Field(default=True, description="是否启用版本管理")
+    versions_dir: str = Field(default="./rule_versions", description="版本存储目录")
+    max_versions: int = Field(default=50, description="最大版本数量")
+    auto_create_version: bool = Field(default=False, description="是否自动创建版本")
+    auto_create_interval: int = Field(
+        default=3600, description="自动创建版本的时间间隔（秒）"
+    )
+
+
 # -------------------------- 根配置模型 --------------------------
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
@@ -524,4 +542,7 @@ class NodeConfigRoot(BaseModel):
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     acknowledgements: AcknowledgementsConfig = Field(
         default_factory=AcknowledgementsConfig
+    )
+    version_management: VersionManagementConfig = Field(
+        default_factory=VersionManagementConfig
     )

@@ -12,11 +12,24 @@ from src.rules import (
     AbstractContentCN,
     AbstractContentEN,
     AbstractTitleCN,
+    AbstractTitleContentCN,
+    AbstractTitleContentEN,
     AbstractTitleEN,
+    Acknowledgements,
+    AcknowledgementsCN,
+    BodyText,
+    CaptionFigure,
+    CaptionTable,
     FormatNode,
+    HeadingLevel1Node,
+    HeadingLevel2Node,
+    HeadingLevel3Node,
+    KeywordsCN,
+    KeywordsEN,
     ReferenceEntry,
     References,
 )
+from src.rules.engine import RuleEngine
 from src.tree import print_tree
 from src.utils import get_paragraph_xml_fingerprint
 from src.word_structure.document_builder import DocumentBuilder
@@ -34,6 +47,28 @@ def apply_format_check_to_all_nodes(root_node: FormatNode, document, config: dic
     :param root_node: 树的根节点（FormatNode 或其子类实例）
     :param document: docx文档的实例
     """
+    # 初始化规则引擎
+    rule_engine = RuleEngine()
+
+    # 注册规则
+    rule_engine.register_rule("abstract.chinese.chinese_title", AbstractTitleCN)
+    rule_engine.register_rule("abstract.chinese", AbstractTitleContentCN)
+    rule_engine.register_rule("abstract.chinese.chinese_content", AbstractContentCN)
+    rule_engine.register_rule("abstract.english.english_title", AbstractTitleEN)
+    rule_engine.register_rule("abstract.english", AbstractTitleContentEN)
+    rule_engine.register_rule("abstract.english.english_content", AbstractContentEN)
+    rule_engine.register_rule("keywords.chinese", KeywordsCN)
+    rule_engine.register_rule("keywords.english", KeywordsEN)
+    rule_engine.register_rule("acknowledgements", Acknowledgements)
+    rule_engine.register_rule("acknowledgements.chinese", AcknowledgementsCN)
+    rule_engine.register_rule("body_text", BodyText)
+    rule_engine.register_rule("figures", CaptionFigure)
+    rule_engine.register_rule("tables", CaptionTable)
+    rule_engine.register_rule("headings.level_1", HeadingLevel1Node)
+    rule_engine.register_rule("headings.level_2", HeadingLevel2Node)
+    rule_engine.register_rule("headings.level_3", HeadingLevel3Node)
+    rule_engine.register_rule("references", References)
+    rule_engine.register_rule("reference_entry", ReferenceEntry)
 
     def traverse(node):
         # 执行当前节点的格式检查（如果定义了）
@@ -45,7 +80,11 @@ def apply_format_check_to_all_nodes(root_node: FormatNode, document, config: dic
                     # TODO: 添加判断的参数
                     logger.debug(node)
                     if node.paragraph:
-                        node.check_format(document)
+                        # 使用规则引擎执行检查
+                        result = rule_engine.execute_rules(node, document)
+                        logger.debug(
+                            f"Rule execution result for {node.NODE_TYPE}: {result}"
+                        )
             except Exception as e:
                 logger.warning(f"Node {node} not format, beacuse: {str(e)}")
                 raise e
@@ -55,6 +94,9 @@ def apply_format_check_to_all_nodes(root_node: FormatNode, document, config: dic
             traverse(child)
 
     traverse(root_node)
+
+    # 记录规则执行统计信息
+    rule_engine.rule_monitor.log_stats()
 
 
 def xg(root_node, paragraph):

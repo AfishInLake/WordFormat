@@ -6,7 +6,7 @@
 from src.tree import print_tree
 from src.word_structure.document_builder import DocumentBuilder
 
-JSON_PATH = "output/论文.json"
+JSON_PATH = "output/毕业设计说明书.json"
 
 
 def main():
