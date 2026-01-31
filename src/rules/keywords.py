@@ -50,7 +50,7 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        return ps.diff_from_paragraph(self.paragraph)
+        return [o.comment for o in ps.diff_from_paragraph(self.paragraph)]
 
 
 # 第二步：英文关键词节点（专属逻辑）
@@ -158,12 +158,6 @@ class KeywordsEN(BaseKeywordsNode):
             issue = f"英文关键词数量超限（最多{cfg.count_max}个，当前{len(keyword_list)}个）"
             all_issues.append({"type": "count", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-
-        return (
-            [{"node_type": self.NODE_TYPE, "lang": "en", "issues": all_issues}]
-            if all_issues
-            else []
-        )
 
 
 # 第三步：中文关键词节点（专属逻辑）
@@ -282,9 +276,3 @@ class KeywordsCN(BaseKeywordsNode):
             issue = "中文关键词末尾禁止出现标点符号"
             all_issues.append({"type": "punct", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-
-        return (
-            [{"node_type": self.NODE_TYPE, "lang": "cn", "issues": all_issues}]
-            if all_issues
-            else []
-        )
