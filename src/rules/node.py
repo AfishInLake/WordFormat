@@ -4,7 +4,7 @@
 # @File    : node.py
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, Generic, Optional, Type, TypeVar, get_args, get_origin
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
 import yaml
 from docx.document import Document
@@ -12,7 +12,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pydantic import ValidationError
 
-from src.config.datamodel import BaseModel
+from src.config.datamodel import BaseModel, NodeConfigRoot
 
 
 class TreeNode:
@@ -128,62 +128,37 @@ class FormatNode(TreeNode, Generic[T]):
         except Exception as e:
             raise RuntimeError(f"加载配置失败: {e}") from e
 
-    def load_config(self, full_config: dict | BaseModel) -> None:
+    def load_config(self, full_config: NodeConfigRoot):  # noqa C901
         """重写父类方法：同时加载字典配置和Pydantic配置"""
         # 1. 先执行父类的字典配置加载（兼容旧逻辑）
         super().load_config(full_config)
 
-        # 2. 基于父类加载的字典配置，转换为Pydantic模型对象
-        # if not isinstance(full_config, dict) or not self.NODE_TYPE:
-        #     raise ValueError(f"{self.NODE_TYPE} 缺少有效配置字典")
-
-        if isinstance(full_config, BaseModel):
-            # 获取当前 CONFIG_MODEL 的实际类型（去掉 Generic 包装）
-            target_type = self.CONFIG_MODEL
-
-            # 遍历 full_config 的所有字段
-            for field_name, field_info in full_config.model_fields.items():
-                field_annotation = field_info.annotation
-
-                # 处理 Optional[T]、Union[T, None] 等情况
-                origin = get_origin(field_annotation)
-                args = get_args(field_annotation)
-
-                # 提取真实的类型（去掉 Optional / Union[ ..., None]）
-                if origin is not None:
-                    # 如果是 Optional[T]，args 可能是 (T, type(None))
-                    real_types = [t for t in args if t is not type(None)]
-                    if len(real_types) == 1:
-                        field_type = real_types[0]
-                    else:
-                        field_type = field_annotation  # 保守处理
-                else:
-                    field_type = field_annotation
-
-                # 判断是否匹配：field_type 是 target_type 或其子类
-                try:
-                    if (
-                        isinstance(field_type, type)
-                        and issubclass(field_type, BaseModel)
-                        and issubclass(field_type, target_type)
-                    ):
-                        # 找到了！获取该字段的值
-                        field_value = getattr(full_config, field_name)
-                        self._pydantic_config = field_value
-                        return
-                except TypeError:
-                    # field_type 不是 class（比如是 ForwardRef），跳过
-                    continue
-
-            # 如果没找到，可以报错或 fallback
-            raise ValueError(
-                f"未能在 {type(full_config).__name__} 中找到类型为 {target_type.__name__} 的字段"
-            )
-
-        elif isinstance(full_config, dict):
-            self._pydantic_config = self.CONFIG_MODEL(**full_config)
-        else:
-            raise TypeError(f"不支持的配置类型: {type(full_config)}")
+        class_name = self.CONFIG_MODEL.__name__
+        match str(class_name):
+            case "AbstractChineseConfig":
+                self._pydantic_config = full_config.abstract.chinese
+            case "AbstractEnglishConfig":
+                self._pydantic_config = full_config.abstract.english
+            case "KeywordsConfig":
+                self._pydantic_config = full_config.abstract.keywords
+            case "HeadingLevelConfig":
+                self._pydantic_config = full_config.headings
+            case "BodyTextConfig":
+                self._pydantic_config = full_config.body_text
+            case "FiguresConfig":
+                self._pydantic_config = full_config.figures
+            case "TablesConfig":
+                self._pydantic_config = full_config.tables
+            case "ReferencesTitleConfig":
+                self._pydantic_config = full_config.references.title
+            case "ReferencesContentConfig":
+                self._pydantic_config = full_config.references.content
+            case "AcknowledgementsTitleConfig":
+                self._pydantic_config = full_config.acknowledgements.title
+            case "AcknowledgementsContentConfig":
+                self._pydantic_config = full_config.acknowledgements.content
+            case _:
+                raise ValueError(f"未知的配置类型: {class_name}")
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph

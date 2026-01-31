@@ -515,19 +515,6 @@ class AcknowledgementsConfig(BaseModel):
     )
 
 
-# -------------------------- 版本管理配置模型 --------------------------
-class VersionManagementConfig(BaseModel):
-    """版本管理配置模型"""
-
-    enabled: bool = Field(default=True, description="是否启用版本管理")
-    versions_dir: str = Field(default="./rule_versions", description="版本存储目录")
-    max_versions: int = Field(default=50, description="最大版本数量")
-    auto_create_version: bool = Field(default=False, description="是否自动创建版本")
-    auto_create_interval: int = Field(
-        default=3600, description="自动创建版本的时间间隔（秒）"
-    )
-
-
 # -------------------------- 根配置模型 --------------------------
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
@@ -542,7 +529,4 @@ class NodeConfigRoot(BaseModel):
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     acknowledgements: AcknowledgementsConfig = Field(
         default_factory=AcknowledgementsConfig
-    )
-    version_management: VersionManagementConfig = Field(
-        default_factory=VersionManagementConfig
     )

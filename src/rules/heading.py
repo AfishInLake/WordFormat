@@ -26,9 +26,6 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             3: root_config.headings.level_3,
         }
         target_config = level_config_map.get(self.LEVEL, root_config.headings.level_1)
-        logger.debug(
-            f"{self.LEVEL}级标题从Pydantic模型加载配置：对齐方式={target_config.alignment}，行距={target_config.line_spacing}"
-        )
         return target_config
 
     def load_config(self, root_config: dict | NodeConfigRoot):
@@ -51,8 +48,6 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
                 self._config = (
                     self._pydantic_config.model_dump()
                 )  # 读取底层 _pydantic_config
-                logger.debug(f"{self.LEVEL}级标题Pydantic配置转字典：{self._config}")
-
             else:
                 raise TypeError(
                     f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"
