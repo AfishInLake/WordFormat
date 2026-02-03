@@ -5,6 +5,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from docx.shared import Pt
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
@@ -26,7 +27,12 @@ from src.style.get_some import (
     run_get_font_underline,
 )
 
-from .set_some import run_set_font_name
+from .set_some import (
+    run_set_font_name,
+    set_paragraph_first_line_indent,
+    set_paragraph_space_after,
+    set_paragraph_space_before,
+)
 from .style_enum import (
     Alignment,
     BuiltInStyle,
@@ -222,7 +228,7 @@ class CharacterStyle:
                     run.underline = diff.expected_value
                     tmp_str = f"下划线修正，原：{'有下划线' if diff.current_value else '无下划线'}；"
                 case "font_size":
-                    run.font.size = diff.expected_value
+                    run.font.size = Pt(diff.expected_value)
                     tmp_str = (
                         f"字号修正，原：{FontSize.to_string(diff.current_value)}；"
                     )
@@ -330,18 +336,18 @@ class ParagraphStyle:
                         f"对齐方式修正，原：{Alignment.to_string(diff.current_value)}；"
                     )
                 case "space_before":
-                    paragraph.space_before = diff.expected_value
+                    set_paragraph_space_before(paragraph, diff.expected_value)
                     tmp_str = f"段前间距修正，原：{diff.current_value}行；"
                 case "space_after":
-                    paragraph.space_after = diff.expected_value
+                    set_paragraph_space_after(paragraph, diff.expected_value)
                     tmp_str = f"段后间距修正，原：{diff.current_value}行；"
                 case "line_spacing":
-                    paragraph.line_spacing = diff.expected_value
+                    paragraph.style.paragraph_format.line_spacing = diff.expected_value
                     tmp_str = (
                         f"行距修正，原：{LineSpacing.to_string(diff.current_value)}；"
                     )
                 case "first_line_indent":
-                    paragraph.first_line_indent = diff.expected_value
+                    set_paragraph_first_line_indent(paragraph, diff.expected_value)
                     tmp_str = f"首行缩进修正，原：{FirstLineIndent.to_string(diff.current_value)}字符；"
                 case "builtin_style_name":
                     paragraph.style = diff.expected_value
