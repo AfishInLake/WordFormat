@@ -20,10 +20,7 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
     NODE_TYPE = "abstract.chinese.chinese_title"
     CONFIG_MODEL = AbstractTitleConfig
 
-    def check_format(self, doc):
-        """
-        检查 摘要 样式
-        """
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -33,7 +30,10 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
             font_name_en=cfg.english_font_name,
@@ -45,9 +45,12 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
         )
 
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text="".join([str(dr) for dr in diff_result])
+                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
             doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
@@ -67,10 +70,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
             return True
         return False
 
-    def check_format(self, doc):
-        """
-        设置 摘要 样式
-        """
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.chinese_content.alignment,
@@ -80,12 +80,15 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
             first_line_indent=cfg.chinese_content.first_line_indent,
             builtin_style_name=cfg.chinese_content.builtin_style_name,
         )
-        issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
 
         for run in self.paragraph.runs:  # 检查标题是否包含在正文中
             if self.check_title(run):
                 # 对run对象设置样式
-                diff_result = CharacterStyle(
+                C = CharacterStyle(
                     font_name_cn=cfg.chinese_title.chinese_font_name,
                     font_name_en=cfg.chinese_title.english_font_name,
                     font_size=cfg.chinese_title.font_size,
@@ -93,11 +96,14 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
                     bold=cfg.chinese_title.bold,
                     italic=cfg.chinese_title.italic,
                     underline=cfg.chinese_title.underline,
-                ).diff_from_run(run)
-                self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+                )
+                if r:
+                    diff_result = C.diff_from_run(run)
+                else:
+                    diff_result = C.apply_to_run(run)
             else:
                 # 对剩余部分的run设置样式
-                diff_result = CharacterStyle(
+                C = CharacterStyle(
                     font_name_cn=cfg.chinese_content.chinese_font_name,
                     font_name_en=cfg.chinese_content.english_font_name,
                     font_size=cfg.chinese_content.font_size,
@@ -105,9 +111,13 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
                     bold=cfg.chinese_content.bold,
                     italic=cfg.chinese_content.italic,
                     underline=cfg.chinese_content.underline,
-                ).diff_from_run(run)
+                )
+                if r:
+                    diff_result = C.diff_from_run(run)
+                else:
+                    diff_result = C.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text="".join([str(dr) for dr in diff_result])
+                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
             doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
@@ -120,7 +130,7 @@ class AbstractContentCN(FormatNode[AbstractContentConfig]):
     NODE_TYPE = "abstract.chinese.chinese_content"
     CONFIG_MODEL = AbstractContentConfig
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -130,7 +140,10 @@ class AbstractContentCN(FormatNode[AbstractContentConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
             font_name_en=cfg.english_font_name,
@@ -141,9 +154,12 @@ class AbstractContentCN(FormatNode[AbstractContentConfig]):
             underline=cfg.underline,
         )
         for _, run in enumerate(self.paragraph.runs):
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text="".join([str(dr) for dr in diff_result])
+                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
             doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
@@ -156,7 +172,7 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
     NODE_TYPE = "abstract.english.english_title"
     CONFIG_MODEL = AbstractTitleConfig
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -166,7 +182,10 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
             font_name_en=cfg.english_font_name,
@@ -178,10 +197,13 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
         )
 
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
         if issues:
             self.add_comment(
@@ -206,7 +228,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
 
         return False
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         """
         设置 摘要 样式
         """
@@ -219,13 +241,16 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
             first_line_indent=cfg.english_content.first_line_indent,
             builtin_style_name=cfg.english_content.builtin_style_name,
         )
-        issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
 
         for run in self.paragraph.runs:
             # 检查标题是否包含在正文中
             if self.check_title(run):
                 # 对run对象设置样式
-                diff_result = CharacterStyle(
+                c = CharacterStyle(
                     font_name_cn=cfg.english_title.chinese_font_name,
                     font_name_en=cfg.english_title.english_font_name,
                     font_size=cfg.english_title.font_size,
@@ -233,11 +258,11 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
                     bold=cfg.english_title.bold,
                     italic=cfg.english_title.italic,
                     underline=cfg.english_title.underline,
-                ).diff_from_run(run)
-                self.add_comment(doc=doc, runs=run, text=f"{run.text} 已经设置")
+                )
+
             else:
                 # 对剩余部分的run设置样式
-                diff_result = CharacterStyle(
+                c = CharacterStyle(
                     font_name_cn=cfg.english_content.chinese_font_name,
                     font_name_en=cfg.english_content.english_font_name,
                     font_size=cfg.english_content.font_size,
@@ -245,9 +270,13 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
                     bold=cfg.english_content.bold,
                     italic=cfg.english_content.italic,
                     underline=cfg.english_content.underline,
-                ).diff_from_run(run)
+                )
+            if r:
+                diff_result = c.diff_from_run(run)
+            else:
+                diff_result = c.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text="".join([str(dr) for dr in diff_result])
+                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
             doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
@@ -260,7 +289,7 @@ class AbstractContentEN(FormatNode[AbstractContentConfig]):
     NODE_TYPE = "abstract.english.english_content"
     CONFIG_MODEL = AbstractContentConfig
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -270,7 +299,10 @@ class AbstractContentEN(FormatNode[AbstractContentConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
             font_name_en=cfg.english_font_name,
@@ -281,10 +313,13 @@ class AbstractContentEN(FormatNode[AbstractContentConfig]):
             underline=cfg.underline,
         )
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 可选：仅当有差异时才添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
         if issues:
             self.add_comment(

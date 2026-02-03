@@ -40,3 +40,15 @@ CATEGORY_TO_CLASS = {
     "caption_table": CaptionTable,
     "body_text": BodyText,
 }
+LEVEL_MAP = {
+    "heading_level_1": 1,
+    "heading_level_2": 2,
+    "heading_level_3": 3,
+    "heading_fulu": 4,
+    "references_title": 1,
+    "acknowledgements_title": 1,
+    "abstract_chinese_title": 1,
+    "abstract_english_title": 1,
+    "keywords_chinese": 3,
+    "keywords_english": 3,
+}

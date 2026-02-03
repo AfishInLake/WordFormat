@@ -14,7 +14,7 @@ class CaptionFigure(FormatNode[FiguresConfig]):
     NODE_TYPE = "figures"
     CONFIG_MODEL = FiguresConfig
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
@@ -25,7 +25,10 @@ class CaptionFigure(FormatNode[FiguresConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
 
         # 字符样式
         cstyle = CharacterStyle(
@@ -40,10 +43,13 @@ class CaptionFigure(FormatNode[FiguresConfig]):
 
         # 检查每个 run 的字符格式
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 检查段落格式差异
@@ -61,7 +67,7 @@ class CaptionTable(FormatNode[TablesConfig]):
     NODE_TYPE = "tables"
     CONFIG_MODEL = TablesConfig
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         # TODO:暂时无法处理表格分页情况
         # cfg = self.config
         # # 段落样式

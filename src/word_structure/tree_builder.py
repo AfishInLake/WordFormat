@@ -7,7 +7,7 @@
 from src.rules.node import FormatNode
 from src.tree import Stack
 
-from .settings import CATEGORY_TO_CLASS
+from .settings import CATEGORY_TO_CLASS, LEVEL_MAP
 
 
 class DocumentTreeBuilder:
@@ -40,7 +40,9 @@ class DocumentTreeBuilder:
         return root
 
     def _create_root_node(self) -> FormatNode:
-        return FormatNode(value={"category": "top", "paragraph": "[ROOT]"}, expected_rule={}, level=0)
+        return FormatNode(
+            value={"category": "top", "paragraph": "[ROOT]"}, expected_rule={}, level=0
+        )
 
     def _create_node_from_item(self, item: dict) -> FormatNode | None:
         from src.word_structure.node_factory import create_node
@@ -50,19 +52,7 @@ class DocumentTreeBuilder:
 
     def _determine_level(self, category: str) -> int:
         """根据 category 映射到逻辑层级"""
-        level_map = {
-            "heading_level_1": 1,
-            "heading_level_2": 2,
-            "heading_level_3": 3,
-            "heading_fulu": 4,
-            "references_title": 1,
-            "acknowledgements_title": 1,
-            "abstract_chinese_title": 1,
-            "abstract_english_title": 1,
-            "keywords_chinese": 3,
-            "keywords_english": 3,
-        }
-        return level_map.get(category, 999)
+        return LEVEL_MAP.get(category, 999)
 
     def _is_heading_category(self, category: str) -> bool:
         return category in self.HEADING_CATEGORIES
@@ -82,5 +72,7 @@ class DocumentTreeBuilder:
 
     def _attach_body_node(self, node: FormatNode):
         """处理正文类节点：挂到最近的标题下"""
-        parent = self.stack.peek() if not self.stack.is_empty() else self._create_root_node()
+        parent = (
+            self.stack.peek() if not self.stack.is_empty() else self._create_root_node()
+        )
         parent.add_child_node(node)

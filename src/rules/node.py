@@ -163,9 +163,16 @@ class FormatNode(TreeNode, Generic[T]):
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph
 
+    def _base(self, doc, p: bool, r: bool):
+        raise NotImplementedError("Subclasses should implement this!")
+
     def check_format(self, doc: Document):
         """虚方法：由子类实现具体的格式检查逻辑"""
-        raise NotImplementedError("Subclasses should implement this!")
+        self._base(doc, p=True, r=True)
+
+    def apply_format(self, doc: Document):
+        """虚方法：由子类实现具体的格式应用逻辑"""
+        self._base(doc, p=False, r=False)
 
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         if text.strip():

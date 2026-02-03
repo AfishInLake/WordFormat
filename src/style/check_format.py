@@ -5,9 +5,10 @@
 from dataclasses import dataclass
 from typing import Any
 
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+from loguru import logger
 
 from src.config.config import get_config
 from src.config.datamodel import WarningFieldConfig
@@ -26,6 +27,12 @@ from src.style.get_some import (
     run_get_font_underline,
 )
 
+from .set_some import (
+    run_set_font_name,
+    set_paragraph_first_line_indent,
+    set_paragraph_space_after,
+    set_paragraph_space_before,
+)
 from .style_enum import (
     Alignment,
     BuiltInStyle,
@@ -38,13 +45,6 @@ from .style_enum import (
 )
 
 style_checks_warning: WarningFieldConfig | None = None
-
-
-# for check in ["bold", "italic", "underline", "font_size", "font_color", "font_name"]:
-#     if check not in CHARACTER_STYLE_CHECKS:
-#         raise ValueError(
-#             f" 未在 `settings.py` 的 CHARACTER_STYLE_CHECKS 配置中找到 {check}"
-#         )
 
 
 @dataclass
@@ -63,6 +63,7 @@ class DIFFResult:
     expected_value: Any = None
     current_value: Any = None
     comment: str = None
+    level: int = 0
 
     def __str__(self):
         return self.comment
@@ -114,102 +115,174 @@ class CharacterStyle:
         # 1. 加粗
         bold = run_get_font_bold(run)
         if bold != self.bold:
-            if style_checks_warning.bold:
-                diffs.append(
-                    DIFFResult(
-                        "bold",
-                        self.bold,
-                        bold,
-                        f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};",
-                    )
+            diffs.append(
+                DIFFResult(
+                    "bold",
+                    self.bold,
+                    bold,
+                    f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};",
+                    1,
                 )
+            )
         # 2. 斜体
         italic = run_get_font_italic(run)
         if italic != self.italic:
-            if style_checks_warning.italic:
-                diffs.append(
-                    DIFFResult(
-                        "italic",
-                        self.italic,
-                        italic,
-                        f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};",
-                    )
+            diffs.append(
+                DIFFResult(
+                    "italic",
+                    self.italic,
+                    italic,
+                    f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};",
+                    1,
                 )
+            )
 
         # 3. 下划线
         underline = run_get_font_underline(run)
         if underline != self.underline:
-            if style_checks_warning.underline:
-                diffs.append(
-                    DIFFResult(
-                        "underline",
-                        self.underline,
-                        underline,
-                        f"期待{'有下划线' if self.underline else '无下划线'}，"
-                        f"实际{'有下划线' if underline else '无下划线'};",
-                    )
+            diffs.append(
+                DIFFResult(
+                    "underline",
+                    self.underline,
+                    underline,
+                    f"期待{'有下划线' if self.underline else '无下划线'}，"
+                    f"实际{'有下划线' if underline else '无下划线'};",
+                    1,
                 )
+            )
 
         # 4. 字号
         current_size = run_get_font_size(run)
         if current_size != self.font_size:
-            if style_checks_warning.font_size:
-                diffs.append(
-                    DIFFResult(
-                        "font_size",
-                        self.font_size,
-                        current_size,
-                        f"期待字号{FontSize.to_string(self.font_size)}，"
-                        f"实际字号{FontSize.to_string(current_size)};",
-                    )
+            diffs.append(
+                DIFFResult(
+                    "font_size",
+                    self.font_size,
+                    current_size,
+                    f"期待字号{FontSize.to_string(self.font_size)}，"
+                    f"实际字号{FontSize.to_string(current_size)};",
+                    1,
                 )
+            )
 
         # 5. 字体颜色
         current_color = run_get_font_color(run)
         if current_color != self.font_color:
-            if style_checks_warning.font_color:
-                diffs.append(
-                    DIFFResult(
-                        "font_color",
-                        self.font_color,
-                        current_color,
-                        f"期待字体颜色{FontColor.to_string(self.font_color)}, "
-                        f"实际字体颜色{FontColor.to_string(current_color)};",
-                    )
+            diffs.append(
+                DIFFResult(
+                    "font_color",
+                    self.font_color,
+                    current_color,
+                    f"期待字体颜色{FontColor.to_string(self.font_color)}, "
+                    f"实际字体颜色{FontColor.to_string(current_color)};",
+                    1,
                 )
+            )
 
-        # 6. 字体
+        # 6. 东亚字体
         font_name = run_get_font_name(run)
-        except_font = (self.font_name_cn, self.font_name_en, self.font_name_en)
-        if font_name != except_font:
-            if style_checks_warning.font_name:
-                diffs.append(
-                    DIFFResult(
-                        "font_name_cn",
-                        self.font_name_cn,
-                        font_name,
-                        f"期待的字体:{FontName.to_string(except_font)}，"
-                        f"实际的字体:{FontName.to_string(font_name)}",
-                    )
+        if font_name != self.font_name_cn:
+            diffs.append(
+                DIFFResult(
+                    "font_name_cn",
+                    self.font_name_cn,
+                    font_name,
+                    f"期待的中文字体:{self.font_name_cn}，实际的字体:{font_name}",
+                    1,
                 )
-        return diffs
+            )
+        # 7. 非东亚字体
+        ascii_font = run.font.name  # 注意：可能为 None
+        if ascii_font != self.font_name_en:
+            diffs.append(
+                DIFFResult(
+                    "font_name_en",
+                    self.font_name_en,
+                    ascii_font,
+                    f"期待的英文字体:{self.font_name_en}，"
+                    f"实际的字体:{ascii_font if ascii_font else '无'}",
+                    1,
+                )
+            )
 
-    def apply_to(self, run: Run):
+        return sorted(diffs, key=lambda x: x.level)
+
+    def apply_to_run(self, run: Run):
         """将字符样式应用到 docx.Run 对象"""
         diffs = self.diff_from_run(run)
-        setters = {
-            "bold": lambda v: setattr(run, "bold", v),
-            "italic": lambda v: setattr(run, "italic", v),
-            "underline": lambda v: setattr(run, "underline", v),
-            "font_size": lambda v: setattr(run.font, "size", Pt(v)),
-            "font_color": lambda v: setattr(run.font.color, "rgb", RGBColor(*v)),
-            "font_name_en": lambda v: self._set_run_font_en(run, v),
-            "font_name_cn": lambda v: self._set_run_font_cn(run, v),
-        }
+        result = []
+        for diff in diffs:
+            tmp_str = ""
+            match diff.diff_type:
+                case "bold":
+                    run.bold = diff.expected_value
+                    tmp_str = (
+                        f"加粗修正，原：{'加粗' if diff.current_value else '非加粗'}；"
+                    )
+                case "italic":
+                    run.italic = diff.expected_value
+                    tmp_str = (
+                        f"斜体修正，原：{'斜体' if diff.current_value else '非斜体'}；"
+                    )
+                case "underline":
+                    run.underline = diff.expected_value
+                    tmp_str = f"下划线修正，原：{'有下划线' if diff.current_value else '无下划线'}；"
+                case "font_size":
+                    run.font.size = Pt(diff.expected_value)
+                    tmp_str = (
+                        f"字号修正，原：{FontSize.to_string(diff.current_value)}；"
+                    )
+                case "font_color":
+                    run.font.color.rgb = FontColor.to_RGBObject(diff.expected_value)
+                    tmp_str = (
+                        f"字体颜色修正，原：{FontColor.to_string(diff.current_value)}；"
+                    )
+                case "font_name_cn":
+                    run_set_font_name(run, diff.expected_value)
+                    tmp_str = (
+                        f"中文字体修正，原：{FontName.to_string(diff.current_value)}；"
+                    )
+                case "font_name_en":
+                    run.font.name = diff.expected_value
+                    tmp_str = (
+                        f"英文字体修正，原：{FontName.to_string(diff.current_value)}；"
+                    )
+                case _:
+                    logger.warning(f"未知的 diff_type: {diff.diff_type}")
+            diff.comment = tmp_str
+            result.append(diff)
 
-        for attr, _current, expected in diffs:
-            if attr in setters:
-                setters[attr](expected)
+        return result
+
+    @staticmethod
+    def to_string(value: list[DIFFResult]) -> str:
+        """
+        将列表的DIFFResult转换为字符串
+        Args:
+            value:
+
+        Returns:
+
+        """
+        t = []
+        for diff in value:
+            if style_checks_warning.bold and diff.diff_type == "bold":
+                t.append(diff)
+            if style_checks_warning.italic and diff.diff_type == "italic":
+                t.append(diff)
+            if style_checks_warning.underline and diff.diff_type == "underline":
+                t.append(diff)
+            if style_checks_warning.font_size and diff.diff_type == "font_size":
+                t.append(diff)
+            if style_checks_warning.font_color and diff.diff_type == "font_color":
+                t.append(diff)
+            if style_checks_warning.font_name and diff.diff_type in (
+                "font_name_cn",
+                "font_name_en",
+            ):
+                t.append(diff)
+
+        return "\n".join([str(i) for i in t])
 
 
 class ParagraphStyle:
@@ -245,17 +318,51 @@ class ParagraphStyle:
             first_line_indent
         )
         self.builtin_style_name: str = BuiltInStyle.from_label(builtin_style_name)
+        if globals()["style_checks_warning"] is None:
+            globals()["style_checks_warning"] = get_config().style_checks_warning
 
-    def apply_to(self, paragraph: Paragraph):
-        """将段落样式应用到 docx.Paragraph 对象"""
-        paragraph.style = self.builtin_style_name
-        pf = paragraph.paragraph_format
-        pf.alignment = self.alignment
-        pf.space_before = Pt(self.space_before)
-        pf.space_after = Pt(self.space_after)
-        pf.line_spacing = self.line_spacing
-        # TODO:首行缩进量不准确，待确认
-        pf.first_line_indent = self.first_line_indent * paragraph.style.font.size
+    def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:
+        """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果"""
+        # 先检测当前段落与目标样式的差异
+        diffs = self.diff_from_paragraph(paragraph)
+        result = []
+        # 遍历差异项，逐一项修正并记录修正日志
+        for diff in diffs:
+            tmp_str = ""
+            match diff.diff_type:
+                case "alignment":
+                    paragraph.alignment = diff.expected_value
+                    tmp_str = (
+                        f"对齐方式修正，原：{Alignment.to_string(diff.current_value)}；"
+                    )
+                case "space_before":
+                    set_paragraph_space_before(paragraph, diff.expected_value)
+                    tmp_str = f"段前间距修正，原：{diff.current_value}行；"
+                case "space_after":
+                    set_paragraph_space_after(paragraph, diff.expected_value)
+                    tmp_str = f"段后间距修正，原：{diff.current_value}行；"
+                case "line_spacing":
+                    paragraph.style.paragraph_format.line_spacing = diff.expected_value
+                    tmp_str = (
+                        f"行距修正，原：{LineSpacing.to_string(diff.current_value)}；"
+                    )
+                case "first_line_indent":
+                    set_paragraph_first_line_indent(paragraph, diff.expected_value)
+                    tmp_str = f"首行缩进修正，原：{FirstLineIndent.to_string(diff.current_value)}字符；"
+                case "builtin_style_name":
+                    paragraph.style = diff.expected_value
+                    tmp_str = f"内置样式修正，原：{BuiltInStyle.to_string(diff.current_value)}；"
+                case _:
+                    # 替换原异常抛出，改用日志记录未知类型，避免程序中断
+                    logger.warning(
+                        f"未知的段落样式diff_type: {diff.diff_type}，跳过该样式修正"
+                    )
+                    continue
+            # 更新差异项的评论为修正日志，加入结果列表
+            diff.comment = tmp_str
+            result.append(diff)
+        # 返回所有修正结果，便于外部查看/记录
+        return result
 
     def diff_from_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:
         """检查当前段落样式与给定段落样式的差异"""
@@ -273,6 +380,7 @@ class ParagraphStyle:
                     alignment,
                     f"对齐方式期待{Alignment.to_string(self.alignment)},"
                     f"实际{Alignment.to_string(alignment)};",
+                    0,
                 )
             )
         # 段前间距(行)
@@ -284,6 +392,7 @@ class ParagraphStyle:
                     self.space_before,
                     space_before,
                     f"段前间距期待{self.space_before}行，实际{space_before}行;",
+                    1,
                 )
             )
         # 段后间距(行)
@@ -295,6 +404,7 @@ class ParagraphStyle:
                     self.space_after,
                     space_after,
                     f"段后间距期待{self.space_before}行，实际{space_before}行;",
+                    1,
                 )
             )
         # 行距
@@ -307,6 +417,7 @@ class ParagraphStyle:
                     line_spacing,
                     f"行距期待{LineSpacing.to_string(self.line_spacing)}，"
                     f"实际{LineSpacing.to_string(line_spacing)};",
+                    2,
                 )
             )
         # 首行缩进
@@ -319,6 +430,7 @@ class ParagraphStyle:
                     first_line_indent,
                     f"首行缩进期待{FirstLineIndent.to_string(self.first_line_indent)}字符，"
                     f"实际{FirstLineIndent.to_string(first_line_indent)}字符;",
+                    1,
                 )
             )
         # 样式
@@ -331,6 +443,7 @@ class ParagraphStyle:
                     builtin_style_name,
                     f"样式期待{BuiltInStyle.to_string(self.builtin_style_name)}样式，"
                     f"实际{BuiltInStyle.to_string(builtin_style_name)}样式;",
+                    0,
                 )
             )
-        return diffs
+        return sorted(diffs, key=lambda x: x.level)
