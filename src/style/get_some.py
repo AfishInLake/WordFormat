@@ -195,11 +195,6 @@ def paragraph_get_space_before(paragraph):
         # 修复2：有效twips值才换算为行数（避免无效小值误判）
         before_lines = final_twips / actual_line_twips
         return round(before_lines, 1)
-
-    # 第五步：终极兜底（Word内置默认值，仅无任何设置时触发）
-    style_name = paragraph.style.name.lower()
-    if any(key in style_name for key in ["标题", "heading", "title"]):
-        return 0.5  # 标题样式默认0.5行
     return 0.0  # 正文样式默认0行
 
 
@@ -462,31 +457,23 @@ def paragraph_get_builtin_style_name(paragraph: Paragraph):
     return style.name.lower()
 
 
-def run_get_font_name(run: Run) -> tuple[str | None, str | None, str | None]:
+def run_get_font_name(run: Run) -> str | None:
     """
-    获取run的字体
+    获取 Run 对象的东亚字体（eastAsia font）名称。
     Params:
         run: python-docx 的 Run 对象
 
     Return:
-        tuple: (eastAsia, ascii, hAnsi)
-        - ascii: 英文字体（如 "Times New Roman"）
-        - hAnsi: 高 ANSI 字符字体（通常与 ascii 相同）
-        - 未设置时返回 None
+       str: 东亚字体名称（如 "Microsoft YaHei"），如果未设置则返回 None。
     """
     rPr = run._element.rPr
-    if rPr is None:
-        return None, None, None
-
-    rFonts = rPr.rFonts
-    if rFonts is None:
-        return None, None, None
-
-    # 使用 qn() 获取带命名空间的属性名
-    east_asia = rFonts.get(qn("w:eastAsia"))
-    ascii_font = rFonts.get(qn("w:ascii"))
-    h_ansi = rFonts.get(qn("w:hAnsi"))
-    return east_asia, ascii_font, h_ansi
+    if rPr is not None:
+        rFonts = rPr.rFonts
+        if rFonts is not None:
+            # 获取 w:eastAsia 属性
+            east_asia = rFonts.get(qn("w:eastAsia"))
+            return east_asia if east_asia else None
+    return None
 
 
 def run_get_font_size(run: Run):

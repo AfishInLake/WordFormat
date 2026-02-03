@@ -57,7 +57,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             logger.error(f"{self.LEVEL}级标题配置加载失败：{str(e)}")
             raise  # 抛出异常，避免后续使用错误配置
 
-    def check_format(self, doc: Document):
+    def _base(self, doc: Document, p: bool, r: bool):
         """通用标题格式检查逻辑"""
         # 修复：空值校验（直接检查底层私有属性 _pydantic_config）
         if self._pydantic_config is None:
@@ -79,7 +79,10 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
 
         # 字符样式检查（完整使用所有配置字段）
         cstyle = CharacterStyle(
@@ -97,7 +100,10 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
         for idx, run in enumerate(self.paragraph.runs):
             if not run.text.strip():
                 continue  # 跳过空白run，减少无效检查
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:
                 run_issue = {
                     "run_index": idx,
