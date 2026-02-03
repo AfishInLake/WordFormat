@@ -2,7 +2,6 @@
 # @Time    : 2026/1/11 21:57
 # @Author  : afish
 # @File    : acknowledgement.py
-from typing import Any, cast
 
 from src.config.datamodel import (
     AcknowledgementsContentConfig,
@@ -12,16 +11,14 @@ from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class Acknowledgements(FormatNode):
+class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
     """致谢节点"""
 
     NODE_TYPE = "acknowledgements"
     CONFIG_MODEL = AcknowledgementsTitleConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AcknowledgementsTitleConfig = cast(
-            "AcknowledgementsTitleConfig", self.pydantic_config
-        )
+    def _base(self, doc, p: bool, r: bool):
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -31,7 +28,10 @@ class Acknowledgements(FormatNode):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
 
         # 字符样式
         cstyle = CharacterStyle(
@@ -46,10 +46,13 @@ class Acknowledgements(FormatNode):
 
         # 检查每个 run 的字符格式
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 检查段落格式差异
@@ -63,16 +66,14 @@ class Acknowledgements(FormatNode):
         return []
 
 
-class AcknowledgementsCN(FormatNode):
+class AcknowledgementsCN(FormatNode[AcknowledgementsContentConfig]):
     """致谢内容"""
 
     NODE_TYPE = "acknowledgements.content"
     CONFIG_MODEL = AcknowledgementsContentConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
-        cfg: AcknowledgementsContentConfig = cast(
-            "AcknowledgementsContentConfig", self.pydantic_config
-        )
+    def _base(self, doc, p: bool, r: bool):
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -82,7 +83,10 @@ class AcknowledgementsCN(FormatNode):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
 
         # 字符样式
         cstyle = CharacterStyle(
@@ -97,10 +101,13 @@ class AcknowledgementsCN(FormatNode):
 
         # 检查每个 run 的字符格式
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 检查段落格式差异

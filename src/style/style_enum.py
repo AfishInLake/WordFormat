@@ -6,6 +6,7 @@
 from typing import Any
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import RGBColor
 
 
 class LabelEnum:
@@ -126,14 +127,6 @@ class FontName(LabelEnum):
         else:
             return False
 
-    @classmethod
-    def to_string(cls, value: Any) -> str:
-        real_value = value.value if hasattr(value, "value") else value
-        if isinstance(real_value, tuple) and len(real_value) == 3:
-            cn, ascii_, high_ansi = real_value
-            return f"中文字体: {cn}, ASCII: {ascii_}, High ANSI: {high_ansi}"
-        return str(real_value)
-
 
 class FontSize(LabelEnum):
     """
@@ -198,6 +191,13 @@ class FontColor(LabelEnum):
     # 中文公文常用色
     OFFICIAL_RED = (204, 0, 0)  # 公文红头常用色（如“中共中央文件”）
     LINK_BLUE = (0, 102, 204)  # 超链接蓝色
+
+    @staticmethod
+    def to_RGBObject(value: tuple):
+        """
+        辅助：将 RGB 元组转换为 RGBColor 对象。
+        """
+        return RGBColor(*value)
 
 
 class Alignment(LabelEnum):

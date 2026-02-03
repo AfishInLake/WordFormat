@@ -1,7 +1,5 @@
 import re
-from typing import Any, Dict, List, Literal, cast
-
-from docx import Document
+from typing import List, Literal
 
 from src.config.datamodel import KeywordsConfig, NodeConfigRoot
 from src.rules.node import FormatNode
@@ -9,7 +7,7 @@ from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
 # 第一步：提取关键词基类，复用通用逻辑
-class BaseKeywordsNode(FormatNode):
+class BaseKeywordsNode(FormatNode[KeywordsConfig]):
     """关键词节点基类（复用中英文通用逻辑）"""
 
     # 子类必须定义的属性
@@ -42,7 +40,7 @@ class BaseKeywordsNode(FormatNode):
                 f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"
             )
 
-    def _check_paragraph_style(self, cfg: KeywordsConfig) -> List[str]:
+    def _check_paragraph_style(self, cfg: KeywordsConfig, p: bool) -> List[str]:
         """通用段落样式检查（复用）"""
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -52,7 +50,10 @@ class BaseKeywordsNode(FormatNode):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        return ps.diff_from_paragraph(self.paragraph)
+        if p:
+            return [o.comment for o in ps.diff_from_paragraph(self.paragraph)]
+        else:
+            return [o.comment for o in ps.apply_to_paragraph(self.paragraph)]
 
 
 # 第二步：英文关键词节点（专属逻辑）
@@ -67,7 +68,7 @@ class KeywordsEN(BaseKeywordsNode):
         pattern = r"Keywords?|KEY\s*WORDS"
         return bool(re.search(pattern, run.text, re.IGNORECASE))
 
-    def check_format(self, doc: Document) -> List[Dict[str, Any]]:  # noqa C901
+    def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
         校验英文关键词格式：
         - 段落整体格式（对齐、行距等）
@@ -80,11 +81,11 @@ class KeywordsEN(BaseKeywordsNode):
             )
             return [{"error": "配置未加载", "lang": "en", "node_type": self.NODE_TYPE}]
 
-        cfg: KeywordsConfig = cast("KeywordsConfig", self.pydantic_config)
+        cfg = self.pydantic_config
         all_issues = []
 
         # 2. 段落样式检查
-        paragraph_issues = self._check_paragraph_style(cfg)
+        paragraph_issues = self._check_paragraph_style(cfg, p)
         if paragraph_issues:
             all_issues.extend(paragraph_issues)
             self.add_comment(
@@ -122,7 +123,10 @@ class KeywordsEN(BaseKeywordsNode):
 
             if self._check_keyword_label(run):
                 # 检查标签样式
-                diff = label_style.diff_from_run(run)
+                if r:
+                    diff = label_style.diff_from_run(run)
+                else:
+                    diff = label_style.apply_to_run(run)
                 if diff:
                     all_issues.append(
                         {"run_text": run.text, "diff": diff, "type": "label"}
@@ -134,7 +138,10 @@ class KeywordsEN(BaseKeywordsNode):
                     )
             else:
                 # 检查内容样式
-                diff = content_style.diff_from_run(run)
+                if r:
+                    diff = content_style.diff_from_run(run)
+                else:
+                    diff = content_style.apply_to_run(run)
                 if diff:
                     all_issues.append(
                         {"run_text": run.text, "diff": diff, "type": "content"}
@@ -161,12 +168,6 @@ class KeywordsEN(BaseKeywordsNode):
             all_issues.append({"type": "count", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
 
-        return (
-            [{"node_type": self.NODE_TYPE, "lang": "en", "issues": all_issues}]
-            if all_issues
-            else []
-        )
-
 
 # 第三步：中文关键词节点（专属逻辑）
 class KeywordsCN(BaseKeywordsNode):
@@ -180,7 +181,7 @@ class KeywordsCN(BaseKeywordsNode):
         pattern = r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词"
         return bool(re.search(pattern, run.text))
 
-    def check_format(self, doc: Document) -> List[Dict[str, Any]]:  # noqa C901
+    def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
         校验中文关键词格式：
         - 段落整体格式（对齐、行距等）
@@ -194,11 +195,11 @@ class KeywordsCN(BaseKeywordsNode):
             )
             return [{"error": "配置未加载", "lang": "cn", "node_type": self.NODE_TYPE}]
 
-        cfg: KeywordsConfig = cast("KeywordsConfig", self.pydantic_config)
+        cfg = self.pydantic_config
         all_issues = []
 
         # 2. 段落样式检查（复用基类方法）
-        paragraph_issues = self._check_paragraph_style(cfg)
+        paragraph_issues = self._check_paragraph_style(cfg, p)
         if paragraph_issues:
             all_issues.extend(paragraph_issues)
             self.add_comment(
@@ -236,7 +237,10 @@ class KeywordsCN(BaseKeywordsNode):
 
             if self._check_keyword_label(run):
                 # 检查标签样式
-                diff = label_style.diff_from_run(run)
+                if r:
+                    diff = label_style.diff_from_run(run)
+                else:
+                    diff = label_style.apply_to_run(run)
                 if diff:
                     all_issues.append(
                         {"run_text": run.text, "diff": diff, "type": "label"}
@@ -248,7 +252,10 @@ class KeywordsCN(BaseKeywordsNode):
                     )
             else:
                 # 检查内容样式
-                diff = content_style.diff_from_run(run)
+                if r:
+                    diff = content_style.diff_from_run(run)
+                else:
+                    diff = content_style.apply_to_run(run)
                 if diff:
                     all_issues.append(
                         {"run_text": run.text, "diff": diff, "type": "content"}
@@ -284,9 +291,3 @@ class KeywordsCN(BaseKeywordsNode):
             issue = "中文关键词末尾禁止出现标点符号"
             all_issues.append({"type": "punct", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-
-        return (
-            [{"node_type": self.NODE_TYPE, "lang": "cn", "issues": all_issues}]
-            if all_issues
-            else []
-        )

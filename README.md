@@ -77,17 +77,28 @@ cd WordFormat
 uv sync
 
 # 或使用 pip
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# linux/macOS
+source venv/bin/activate
+# windows
+venv\Scripts\activate
+
+# 安装项目依赖
 pip install -e .
 ```
 
 #### 3. 配置环境变量
 创建 `.env` 文件，配置 LLM API 密钥等必要参数：
 ```env
-# 示例：OpenAI API 配置
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-# 或其他 LLM 配置（如智谱AI）
-ZHIPU_API_KEY=your-zhipu-api-key
+# 配置api key
+WORDFORMAT_API_KEY=''
+# 模型名称
+WORDFORMAT_MODEL='qwen3-4b-no-think'
+# 模型地址
+WORDFORMAT_MODEL_URL='http://localhost:11434/v1'
 ```
 
 ### 核心使用方法
@@ -95,129 +106,188 @@ ZHIPU_API_KEY=your-zhipu-api-key
 WordFormat 提供**命令行交互**和**Python 编程调用**两种使用方式，推荐使用命令行方式（更便捷）。
 
 #### 方式一：命令行使用（推荐）
-工具提供三种执行模式，支持灵活控制流程：
+工具提供**三种核心执行模式**，全局参数统一管控核心文件路径，子命令参数管控配置与输出，参数顺序遵循「全局参数 → 子命令 → 子命令专属参数」规则，灵活控制处理流程：
 
-##### 1. 生成文档结构 JSON（第一步）
-解析 Word 文档并生成结构化 JSON 文件（可手动调整后再执行校验）：
+##### 全局参数通用规则
+所有模式均需先指定全局参数（`--docx`/`-d` 待处理Word文档、`--json`/`-jf` JSON完整路径），`--json-dir`/`-j` 仅为 `generate-json` 模式的JSON生成目录，其他模式忽略该参数。
+
+##### 1. 生成文档结构 JSON（第一步：解析文档结构）
+解析 Word 文档并生成结构化 JSON 文件（可手动调整JSON后再执行校验/格式化），**配置文件为必填项**：
 ```bash
-# 基础用法（JSON 保存到默认 tmp/ 目录）
-uv run main.py -d your_document.docx generate-json
+# 基础用法（JSON 生成到默认 tmp/ 目录，自动匹配Word同名）
+python main.py -d your_document.docx -jf your_document.json generate-json -c example/undergrad_thesis.yaml
 
-# 自定义 JSON 保存目录
-uv run main.py -d your_document.docx -j output/ generate-json
+# 自定义 JSON 生成目录（生成到 output/ 目录，自动匹配Word同名）
+python main.py -d your_document.docx -jf your_document.json -j output/ generate-json -c example/undergrad_thesis.yaml
 ```
 
-##### 2. 执行格式校验（第二步）
-使用生成/修改后的 JSON 文件执行格式校验，生成带批注的文档：
+##### 2. 执行格式校验（第二步：仅检查+添加批注）
+使用生成/修改后的**完整JSON路径**执行格式校验，不在原文档修改，仅在违规位置添加Word批注，生成带批注的新文档，**配置文件为必填项**：
 ```bash
-# 基础用法（使用默认目录的 JSON 文件）
-uv run main.py -d your_document.docx -j output/ check-format -c config/undergrad_thesis.yaml
+# 基础用法（使用指定的完整JSON路径，校验后文档保存到默认 output/ 目录）
+python main.py -d your_document.docx -jf output/your_document_edited.json check-format -c example/undergrad_thesis.yaml
 
-# 自定义 JSON 文件路径
-uv run main.py -d your_document.docx check-format -c config/undergrad_thesis.yaml -jf output/your_document_edited.json
-
-# 自定义输出目录
-uv run main.py -d your_document.docx check-format -c config/undergrad_thesis.yaml -jf output/your_document.json -o final_output/
+# 自定义校验后文档输出目录
+python main.py -d your_document.docx -jf output/your_document.json check-format -c example/undergrad_thesis.yaml -o check_result/
 ```
 
-##### 3. 完整流程（生成→手动编辑→校验）
-一键执行全流程，中间暂停等待手动调整 JSON 文件：
+##### 3. 执行格式格式化（第三步：自动修正格式）
+使用指定的**完整JSON路径**，根据配置文件**自动修正**文档格式问题，生成格式化后的新文档，**配置文件为必填项**：
 ```bash
-# 基础用法
-uv run main.py -d your_document.docx -j output/ full-pipeline -c config/undergrad_thesis.yaml
+# 基础用法（使用指定的完整JSON路径，格式化后文档保存到默认 output/ 目录）
+python main.py -d your_document.docx -jf output/your_document.json apply-format -c example/undergrad_thesis.yaml
 
-# 自定义输出目录
-uv run main.py -d your_document.docx full-pipeline -c config/grad_thesis.yaml -o final_output/
+# 自定义格式化后文档输出目录
+python main.py -d your_document.docx -jf output/your_document_edited.json apply-format -c example/grad_thesis.yaml -o final_format/
 ```
 
-##### 命令行参数说明
-| 层级       | 参数/子命令         | 简写 | 必填 | 说明                                                                 |
-|------------|---------------------|------|------|----------------------------------------------------------------------|
-| 全局参数   | `--docx`            | `-d` | ✅ 是 | 待处理的 Word 文档路径                                               |
-| 全局参数   | `--json-dir`        | `-j` | ❌ 否 | JSON 文件保存/读取目录（默认：tmp/）|
-| 子命令     | `generate-json`     | -    | -    | 仅生成文档结构 JSON 文件                                             |
-| 子命令     | `check-format`      | -    | -    | 仅执行格式校验                                                       |
-| check-format | `--config`         | `-c` | ✅ 是 | 格式配置 YAML 文件路径                                               |
-| check-format | `--json`           | `-jf`| ❌ 否 | 手动修改后的 JSON 文件路径（优先级高于 --json-dir）|
-| check-format | `--output`         | `-o` | ❌ 否 | 校验后文档保存目录（默认：output/）|
-| full-pipeline | `--config`        | `-c` | ❌ 否 | 格式配置 YAML 文件路径（默认：config/undergrad_thesis.yaml）|
-| full-pipeline | `--output`        | `-o` | ❌ 否 | 校验后文档保存目录（默认：output/）|
+##### 实际测试示例（贴合真实使用场景）
+```bash
+# 1. 生成JSON（到output目录）
+python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json -j .\output\ generate-json -c .\example\undergrad_thesis.yaml
+
+# 2. 执行格式化（使用上一步生成的完整JSON路径）
+python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json apply-format -c .\example\undergrad_thesis.yaml
+
+# 3. 执行校验（自定义输出目录）
+python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json check-format -c .\example\undergrad_thesis.yaml -o .\check_output\
+```
+
+##### 命令行参数详细说明
+| 层级       | 参数/子命令         | 简写 | 必填 | 适用模式          | 说明                                                                 |
+|------------|---------------------|------|------|-------------------|----------------------------------------------------------------------|
+| **全局参数** | `--docx`            | `-d` | ✅ 是 | 所有模式          | 待处理的 Word 文档**完整路径**，例如：`tmp/毕业设计说明书.docx`       |
+| **全局参数** | `--json`            | `-jf`| ✅ 是 | 所有模式          | JSON 文件**完整路径**，例如：`output/毕业设计说明书.json`             |
+| **全局参数** | `--json-dir`        | `-j` | ❌ 否 | 仅generate-json   | JSON 生成目录（其他模式忽略），默认：`tmp/`，自动创建不存在的目录     |
+| **子命令**   | `generate-json`     | -    | -    | 结构解析          | 仅生成文档结构 JSON 文件，需配合 `-c` 指定配置文件                    |
+| **子命令**   | `check-format`      | -    | -    | 格式校验          | 仅执行格式检查，在违规位置添加批注，不修改原文档                      |
+| **子命令**   | `apply-format`      | -    | -    | 格式修正          | 按规范自动修正格式问题，生成格式化后的新文档                          |
+| 子命令参数   | `--config`          | `-c` | ✅ 是 | 所有子命令        | 格式配置 YAML**完整路径**，例如：`example/undergrad_thesis.yaml`      |
+| 子命令参数   | `--output`          | `-o` | ❌ 否 | check/apply       | 校验/格式化后文档**保存目录**，默认：`output/`，自动创建不存在的目录  |
 
 #### 方式二：Python 编程调用
-适合集成到其他项目或自定义扩展：
+适合集成到其他项目或自定义扩展，直接调用核心函数实现解析、校验、格式化：
 
 ##### 1. 生成文档结构 JSON
 ```python
 from src.set_tag import main as set_tag_main
 
-# 解析文档并生成 JSON
+# 解析文档并生成 JSON 结构文件
 set_tag_main(
-    docx_path="your_document.docx",
-    json_save_path="output/your_document.json"
+    docx_path="your_document.docx",  # 原始Word文档路径
+    json_save_path="output/your_document.json",  # JSON保存完整路径
+    configpath="example/undergrad_thesis.yaml"   # 格式配置文件路径
 )
 ```
 
-##### 2. 执行格式检查与修正
+##### 2. 执行格式检查（仅添加批注）
 ```python
 from src.set_style import auto_format_thesis_document
 
-# 执行格式校验并生成带批注的文档
+# 执行格式校验，生成带批注的文档（check=True 仅校验，不修改）
 auto_format_thesis_document(
-    jsonpath="output/your_document.json",  # 结构 JSON 文件路径
-    docxpath="your_document.docx",         # 原始文档路径
+    jsonpath="output/your_document.json",  # 结构JSON完整路径
+    docxpath="your_document.docx",         # 原始Word文档路径
     configpath="example/undergrad_thesis.yaml",  # 格式配置文件
-    savepath="output/"                     # 输出目录
+    savepath="check_result/",              # 校验后文档保存目录
+    check=True                             # 仅校验模式
 )
+```
+
+##### 3. 执行格式自动修正
+```python
+from src.set_style import auto_format_thesis_document
+
+# 执行格式自动修正（check=False 格式化模式）
+auto_format_thesis_document(
+    jsonpath="output/your_document_edited.json",  # 手动调整后的JSON路径
+    docxpath="your_document.docx",                 # 原始Word文档路径
+    configpath="example/grad_thesis.yaml",         # 格式配置文件
+    savepath="final_format/",                      # 格式化后文档保存目录
+    check=False                                    # 格式化模式
+)
+```
+
+##### 4. 查看文档结构树
+辅助工具，验证文档结构解析是否正确：
+```bash
+# 1. 修改 print_tree.py 中的 JSON_PATH 和 YAML_PATH 为实际文件路径
+# 2. 执行命令查看结构化树状结果
+python print_tree.py 
 ```
 
 ## 配置文件说明
 
 ### 配置文件格式
-格式规范通过 YAML 文件定义，示例如下（`example/undergrad_thesis.yaml`）：
+格式规范通过 YAML 文件定义，示例参考项目中 `example/undergrad_thesis.yaml`（本科毕业论文模板）、`example/grad_thesis.yaml`（研究生毕业论文模板），所有配置项均有清晰注释。
 
 ### 自定义配置
-可根据不同学校/期刊的格式要求，修改以下配置项：
-- 各级标题的字体、字号、对齐方式
-- 正文的行距、缩进规则
-- 中英文字体的分别设置
-- 特殊段落（摘要/参考文献）的格式规则
+可根据不同学校/期刊的格式要求，灵活修改以下核心配置项，适配专属格式规范：
+- 各级标题（一级/二级/三级）的字体、字号、对齐方式、行距、缩进规则
+- 正文的行距、首行缩进字符数、段前段后间距
+- 中/英文字体分别设置（完美支持中英文混合文档）
+- 特殊段落（摘要/关键词/参考文献/致谢）的专属格式规则
+- 字符格式（加粗/斜体/下划线/字体颜色）的全局/局部规则
 
 ## 常见问题
 
-### Q1：命令行参数解析错误？
-**原因**：子命令专属参数（如 `-c`）放在了子命令前面  
-**解决**：调整参数顺序，遵循「全局参数 → 子命令 → 子命令参数」规则：
+### Q1：命令行执行报参数解析错误？
+**核心原因**：参数顺序错误，未遵循「全局参数 → 子命令 → 子命令专属参数」规则  
+**错误示例**：子命令参数（`-c`）放在子命令前面
 ```bash
-# 错误示例
-uv run main.py -d doc.docx -c config.yaml check-format
-# 正确示例
-uv run main.py -d doc.docx check-format -c config.yaml
+python main.py -d doc.docx -c config.yaml apply-format -jf output/doc.json
+```
+**正确示例**：先全局参数，再子命令，最后子命令参数
+```bash
+python main.py -d doc.docx -jf output/doc.json apply-format -c config.yaml
 ```
 
-### Q2：JSON 文件生成失败？
-**排查方向**：
-1. 确认 LLM API 密钥配置正确且有效
-2. 检查 Word 文档路径是否正确，文件是否可读取
-3. 确保文档内容完整，无损坏
+### Q2：generate-json 模式报 JSON 文件不存在？
+**原因**：`--json/-jf` 为全局必填参数，该模式下仅作**参数占位**，无需提前创建JSON文件，工具会自动生成  
+**解决**：直接指定JSON保存路径即可，工具会自动创建文件及上级目录，示例：
+```bash
+python main.py -d doc.docx -jf output/未创建的json文件.json generate-json -c config.yaml
+```
 
-### Q3：格式校验无结果/批注未生成？
+### Q3：check-format/apply-format 模式报 JSON 文件不存在？
 **排查方向**：
-1. 检查 JSON 结构文件是否正确（手动调整后需确保 JSON 语法合法）
-2. 确认配置文件格式正确，规则项无拼写错误
-3. 检查文档段落是否被正确识别（可查看 JSON 文件中的 category 字段）
+1. 确认 `--json/-jf` 指定的是**完整JSON文件路径**，而非目录
+2. 检查JSON路径拼写是否正确（区分大小写，Windows系统注意反斜杠/正斜杠）
+3. 确认已执行 `generate-json` 模式生成JSON，或手动创建了合法的JSON文件
+
+### Q4：JSON 文件生成失败？
+**排查方向**：
+1. 检查 `.env` 文件中 LLM 相关配置（API_KEY/MODEL/MODEL_URL）是否正确且有效
+2. 确认待处理Word文档路径正确，文件未损坏、可正常打开
+3. 确保Word文档内容完整，无空文档或特殊字符导致的解析失败
+4. 检查配置文件（`-c`）路径正确，YAML格式合法无语法错误
+
+### Q5：格式校验/格式化无效果、未生成批注/修正？
+**排查方向**：
+1. 检查JSON文件中各段落的 `category` 字段是否正确（标题/正文/摘要等是否识别准确）
+2. 确认配置文件（YAML）中的规则项无拼写错误（如字体名称、对齐方式）
+3. 检查Word文档的段落/字符是否有特殊格式（如手动换行/分节符）导致的解析异常
+4. 验证配置文件中的规则是否与文档实际格式一致（无违规则不会生成批注/修正）
+
+### Q6：执行后生成的Word文档无法打开？
+**排查方向**：
+1. 确认使用的是 Python 3.11+ 版本，避免版本兼容问题
+2. 检查待处理Word文档为 `.docx` 格式，不支持 `.doc` 旧格式
+3. 确保生成的JSON文件语法合法，手动修改后未出现JSON格式错误（如缺少逗号/引号）
 
 ## 贡献指南
 
 ### 贡献方式
-1. 提交 Issue：反馈 bug、提出新功能建议
-2. 提交 Pull Request：修复 bug、新增功能、完善文档
-3. 完善配置规则：补充不同类型论文的格式配置模板
+1. 提交 Issue：反馈 bug、提出新功能建议、补充格式配置模板需求
+2. 提交 Pull Request：修复 bug、新增格式检查规则、完善核心功能、优化文档
+3. 完善配置模板：补充不同学校/期刊/学位的论文格式配置YAML文件，提交到 `example/` 目录
 
 ### 开发规范
-1. 代码遵循 PEP 8 规范
-2. 新增功能需添加对应的单元测试
-3. 重大变更需先提交 Issue 讨论方案
-4. 提交 PR 前需确保代码通过 lint 检查
+1. 代码遵循 PEP 8 编码规范，使用清晰的变量/函数命名
+2. 新增功能/规则需添加对应的注释，关键逻辑添加使用示例
+3. 重大功能变更需先提交 Issue 讨论实现方案，避免重复开发
+4. 提交 PR 前需确保代码可正常运行，无语法错误和逻辑bug
+5. 新增配置项需同步更新文档中的「配置文件说明」部分
 
 ## 许可证
 
@@ -225,7 +295,8 @@ uv run main.py -d doc.docx check-format -c config.yaml
 
 ## 联系方式
 
-- 反馈渠道：GitHub Issues
+- 反馈渠道：GitHub Issues（优先推荐，方便问题跟踪和交流）
 - 联系邮箱：1593699665@qq.com
 
 ## 项目贡献者
+待补充，欢迎各位开发者提交PR贡献代码，一起完善这个工具！

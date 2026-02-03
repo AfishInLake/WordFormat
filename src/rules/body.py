@@ -2,24 +2,23 @@
 # @Time    : 2026/1/11 19:38
 # @Author  : afish
 # @File    : body.py
-from typing import Any, cast
 
 from src.config.datamodel import BodyTextConfig
 from src.rules.node import FormatNode
 from src.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class BodyText(FormatNode):
+class BodyText(FormatNode[BodyTextConfig]):
     """正文节点"""
 
     NODE_TYPE = "body_text"
     CONFIG_MODEL = BodyTextConfig
 
-    def check_format(self, doc) -> list[dict[str, Any]]:
+    def _base(self, doc, p: bool, r: bool):
         """
         检查正文段落的字符与段落格式是否符合规范。
         """
-        cfg: BodyTextConfig = cast("BodyTextConfig", self.pydantic_config)
+        cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
             alignment=cfg.alignment,
@@ -29,7 +28,10 @@ class BodyText(FormatNode):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        if p:
+            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
 
         # 字符样式
         cstyle = CharacterStyle(
@@ -44,10 +46,13 @@ class BodyText(FormatNode):
 
         # 检查每个 run 的字符格式
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 检查段落格式差异

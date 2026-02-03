@@ -33,6 +33,7 @@ abstract:
       chinese_font_name: '黑体'
       font_size: '小二'
       bold: true
+      section_title_re: '^\s*摘\s+要\s*$'
     chinese_content:
       <<: *global_format
       alignment: '两端对齐'
@@ -45,6 +46,7 @@ abstract:
       english_font_name: 'Times New Roman'
       font_size: '四号'
       bold: true
+      section_title_re: '^\\s*[Aa]b\\s*[Ss]t\\s*[Rr]a\\s*[Cc]t\\s*$'
     english_content:
       <<: *global_format
       alignment: '两端对齐'
@@ -62,6 +64,7 @@ abstract:
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
+      section_title_re: '^\s*关键词\s*[：:，,；;\\s—-]*.*$'
     english:
       <<: *global_format
       alignment: '左对齐'
@@ -72,6 +75,7 @@ abstract:
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
+      section_title_re: '^\\s*[Kk]ey\\s*[Ww]ords\\s*[：:，,\\s;—-]*.*$'
 
 # 各级标题格式（章、节、小节）
 headings:
@@ -87,6 +91,7 @@ headings:
     space_after: 0.5
     line_spacing: '1.5倍'  # 标题通常单倍行距
     builtin_style_name: 'Heading 1'
+    section_title_re: '^\d+(?![\.\d])\s*'
 
   level_2: # 二级标题（如“1.1 研究背景”）
     <<: *global_format
@@ -99,6 +104,7 @@ headings:
     space_before: 0.5
     space_after: 0.5
     builtin_style_name: 'Heading 2'
+    section_title_re: '^\d+\.\d+(?![\.\d])\s*'
 
   level_3: # 三级标题（如“1.1.1 国内现状”）
     <<: *global_format
@@ -111,6 +117,7 @@ headings:
     space_before: 0.5
     space_after: 0.5
     builtin_style_name: 'Heading 3'
+    section_title_re: '^\d+\.\d+\.\d+(?!\.)\s*'
 
 # 正文段落格式
 body_text:
@@ -119,21 +126,21 @@ body_text:
 
 # 插图（Figure）格式
 figures:
-  caption_position: "below"          # 图名置于图之下（规范明确要求）
-  caption_prefix: "图"               # 如“图2.1”
-  caption_numbering: "per_chapter"   # 分章编号
-  caption_font: "宋体"
-  caption_font_size: "五号"
-  require_label: true                # 必须有图名
+  <<: *global_format
+  caption_position: 'below'          # 图名置于图之下（规范明确要求）
+  caption_prefix: '图'               # 如“图2.1”
+  section_title_re: '^\s*图\s*\d+(\.\d+)*.*$'
 
 # 表格（Table）格式
 tables:
-  caption_position: "above"          # 表名置于表之上（规范明确要求）
-  caption_prefix: "表"               # 如“表5.1”
-  caption_numbering: "per_chapter"   # 分章编号
-  caption_font: "宋体"
-  caption_font_size: "五号"
-  english_font: "Times New Roman"    # 表格内英文用 Times New Roman 五号
+  <<: *global_format
+  caption_position: 'above'          # 表名置于表之上（规范明确要求）
+  caption_prefix: '表'               # 如“表5.1”
+  caption_numbering: 'per_chapter'   # 分章编号
+  caption_font: '宋体'
+  caption_font_size: '五号'
+  english_font: 'Times New Roman'    # 表格内英文用 Times New Roman 五号
+  section_title_re: '^表\s*\d+(\.\d+)*'
 
 # 参考文献（References）
 references:
@@ -144,7 +151,7 @@ references:
     chinese_font_name: '黑体'
     font_size: '三号'
     bold: true
-    section_title: "参考文献"
+    section_title_re: '参考文献'
   content:
     <<: *global_format
     alignment: '左对齐'
@@ -153,8 +160,8 @@ references:
     english_font_name: 'Times New Roman'
     font_size: '五号'
     entry_indent: 0.0                # 顶格（序号[1]顶格）
-    entry_ending_punct: "."          # 每条以句号结束
-    numbering_format: "[1], [2], ..."
+    entry_ending_punct: '.'          # 每条以句号结束
+    numbering_format: '[1], [2], ...'
 
 # 致谢（Acknowledgements）
 acknowledgements:
@@ -165,7 +172,7 @@ acknowledgements:
     chinese_font_name: '黑体'
     font_size: '小二'
     bold: true
-    section_title: "致谢"
+    section_title_re: '^\s*致\s+谢\s*$'
   content:
     <<: *global_format
     alignment: '两端对齐'
