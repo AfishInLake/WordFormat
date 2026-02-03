@@ -354,92 +354,57 @@ def _get_font_size_pt(paragraph):
     return max(result) if result else default_font_size_pt
 
 
-def paragraph_get_first_line_indent(paragraph: Paragraph, font_size_pt=12.0):  # noqa c901
+def paragraph_get_first_line_indent(paragraph: Paragraph):  # noqa c901
     """
-    获取段落首行缩进
-    Params:
-       paragraph: 段落对象，通常是 python-docx 的 Paragraph 对象
-
-    Return:
-        int: 首行缩进的字符大小（近似值），如果无法计算返回0
+    精准获取首行缩进，优先解析XML字符单位（firstLineChars），兼容物理单位
+    :param para: 目标段落对象
+    :return: 字典结果，包含：
+             - type: 缩进单位类型（char/pt），char=字符单位，pt=物理单位
+             - value: 对应单位的缩进值（字符数为浮点数，pt值为整数）
+             - char_visual: 视觉等效字符数（统一换算，方便对比）
     """
-    # FIXME: 首行缩进按字符计算有误，需要修改
     try:
-        para_format = paragraph.paragraph_format
-        first_line_indent = para_format.first_line_indent
-        # 如果首行缩进为None，返回0
-        if first_line_indent is None:
-            return 0
+        p = paragraph._element
+        pPr = p.find(qn("w:pPr"))
+        if pPr is None:
+            return 0.0
 
-        # 获取缩进值（以pt为单位）
-        if hasattr(first_line_indent, "pt"):
-            # 是python-docx的Length对象
-            indent_pt = first_line_indent.pt
-            if indent_pt is None:
-                return 0
-        else:
-            # 尝试转换为数值
-            try:
-                indent_pt = float(first_line_indent)
-            except (ValueError, TypeError):
-                return 0
+        # 获取XML中的ind节点（缩进核心节点）
+        ind = pPr.find(qn("w:ind"))
+        if ind is None:
+            return 0.0
 
-        # 获取段落字体大小（以pt为单位）
-        # 先尝试获取段落第一个run的字体大小
-        if paragraph.runs and len(paragraph.runs) > 0:
-            for run in paragraph.runs:
-                if run.font and run.font.size:
-                    if hasattr(run.font.size, "pt"):
-                        font_size_pt = run.font.size.pt
-                    else:
-                        try:
-                            font_size_pt = float(run.font.size)
-                        except (ValueError, TypeError):
-                            pass
+        # 步骤1：优先解析字符单位 firstLineChars（核心：值=字符数×100）
+        first_line_chars = ind.get(qn("w:firstLineChars"))
+        if first_line_chars and first_line_chars.isdigit():
+            chars_num = int(first_line_chars) / 100  # 200 → 2.0字符
+            # return {
+            #     "type": "char",
+            #     "value": round(chars_num, 1),
+            #     "char_visual": round(chars_num, 1)
+            # }
+            return chars_num
 
-                    if font_size_pt and font_size_pt > 0:
-                        break
+        # 步骤2：无字符单位，解析物理单位 firstLine（单位：twips，1pt=20twips）
+        first_line_twips = ind.get(qn("w:firstLine"))
+        if first_line_twips and first_line_twips.isdigit():
+            indent_pt = int(first_line_twips) // 20  # twips → pt（取整，避免小数）
+            # 换算为视觉等效字符数（字符数=pt值/字体pt值）
+            font_pt = _get_font_size_pt(paragraph)
+            char_visual = indent_pt / font_pt if font_pt > 0 else 0.0
+            # return {
+            #     "type": "pt",
+            #     "value": indent_pt,
+            #     "char_visual": round(char_visual, 1)
+            # }
+            return round(char_visual, 1)
 
-        # 如果第一个run没有字体大小，尝试从样式获取
-        if font_size_pt == 12.0 and hasattr(paragraph, "style") and paragraph.style:
-            try:
-                if hasattr(paragraph.style.font, "size"):
-                    if hasattr(paragraph.style.font.size, "pt"):
-                        font_size_pt = paragraph.style.font.size.pt
-                    else:
-                        try:
-                            font_size_pt = float(paragraph.style.font.size)
-                        except (ValueError, TypeError):
-                            pass
-            except AttributeError:
-                pass
-
-        # 计算字符大小
-        # 假设中文等宽，字符宽度等于字体大小
-        # 但实际上，中文标点和全角字符占1个字符宽度，英文字符占0.5个字符宽度
-        # 这里我们简单计算：字符数 = 缩进值(pt) / 字体大小(pt)
-
-        if font_size_pt and font_size_pt > 0:
-            # 计算字符数
-            char_count = indent_pt / font_size_pt
-
-            # 考虑到实际排版，可能需要调整
-            # 通常中文段落缩进是2个字符，但Word中缩进可能会有点偏差
-            # 我们将结果四舍五入到最接近的整数
-
-            # 如果缩进是负数（悬挂缩进），也正确处理
-            if char_count >= 0:
-                char_count_int = round(char_count)
-            else:
-                char_count_int = -round(abs(char_count))
-
-            return char_count_int
-        else:
-            return 0
+        # 无任何缩进设置
+        return 0.0
 
     except Exception as e:
-        logger.error(f"获取首行缩进字符大小时出错: {e}")
-        return 0
+        logger.error(f"获取首行缩进失败：{e}")
+        return 0.0
 
 
 def paragraph_get_builtin_style_name(paragraph: Paragraph):

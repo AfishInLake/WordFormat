@@ -8,7 +8,6 @@
 
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
-from docx.shared import Pt
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
@@ -171,68 +170,61 @@ def _set_paragraph_spacing(
 
 
 def set_paragraph_first_line_indent(  # noqa C901
-    paragraph: Paragraph,
-    indent_chars: int,  # 你规定的缩进字符数（核心：自定义，如1/2/3）
-    default_font_size_pt: float = 12.0,
+    para: Paragraph, value: float | int, unit: str = "char"
 ):
     """
-    为段落设置**自定义字符数**的首行缩进，与paragraph_get_first_line_indent计算逻辑完全一致
-    核心互逆公式：目标缩进pt值 = 段落实际字体大小pt × 自定义缩进字符数
-    Params:
-        paragraph: python-docx的Paragraph对象（目标段落）
-        indent_chars: 你规定的缩进字符数（必填，int类型，如1/2/3，支持正整数）
-        default_font_size_pt: 默认字体大小（pt），段落无有效字体大小时使用，默认12.0pt（宋体小四）
-    Return:
-        bool: 设置成功返回True，失败返回False
+    设置首行缩进，支持字符/物理单位，写入Word原生XML字段（firstLineChars/firstLine）
+    :param para: 目标段落对象
+    :param value: 缩进值（字符单位为浮点数/整数，如2/2.0；物理单位为整数pt，如24）
+    :param unit: 缩进单位，char=字符单位（默认），pt=物理单位
+    :return: 设置成功返回True，失败返回False
     """
     try:
-        # 校验缩进字符数：仅支持正整数（符合论文排版常规，避免无效值）
-        if not isinstance(indent_chars, int) or indent_chars < 1:
-            logger.error(f"缩进字符数必须为正整数，当前传入：{indent_chars}")
+        # 入参校验
+        if unit not in ["char", "pt"]:
+            logger.error(f"不支持的缩进单位：{unit}，仅支持char/pt")
             return False
+        if value < 0:
+            logger.warning("缩进值不能为负，自动置为0")
+            value = 0
 
-        # 步骤1：获取段落实际有效字体大小（pt）——与原有获取函数逻辑完全一致
-        font_size_pt = default_font_size_pt
-        # 优先级1：从段落Run中取第一个有效字体大小（遍历所有Run）
-        if paragraph.runs and len(paragraph.runs) > 0:
-            for run in paragraph.runs:
-                if run.font and run.font.size:
-                    if hasattr(run.font.size, "pt"):
-                        current_pt = run.font.size.pt
-                    else:
-                        try:
-                            current_pt = float(run.font.size)
-                        except (ValueError, TypeError):
-                            continue
-                    if current_pt and current_pt > 0:
-                        font_size_pt = current_pt
-                        break
-        # 优先级2：Run无有效值时，从段落样式中获取
-        if (
-            font_size_pt == default_font_size_pt
-            and hasattr(paragraph, "style")
-            and paragraph.style
-        ):
-            try:
-                style_font = paragraph.style.font
-                if hasattr(style_font, "size") and style_font.size:
-                    if hasattr(style_font.size, "pt"):
-                        style_pt = style_font.size.pt
-                    else:
-                        style_pt = float(style_font.size)
-                    if style_pt and style_pt > 0:
-                        font_size_pt = style_pt
-            except AttributeError:
-                pass
+        p = para._element
+        pPr = p.find(qn("w:pPr"))
+        # 无pPr节点则创建
+        if not pPr:
+            pPr = parse_xml(
+                r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+            )
+            p.append(pPr)
 
-        # 步骤2：核心计算——自定义字符数 → 对应pt值（与获取函数互逆）
-        # 原有获取逻辑：字符数 = 缩进pt / 字体pt → 反向推导：缩进pt = 字符数 × 字体pt
-        target_indent_pt = font_size_pt * indent_chars
+        # 核心步骤1：清除原有缩进节点（避免新旧设置冲突）
+        ind = pPr.find(qn("w:ind"))
+        if ind:
+            pPr.remove(ind)
 
-        # 步骤3：设置段落首行缩进（python-docx原生支持pt值直接赋值）
-        paragraph.paragraph_format.first_line_indent = Pt(int(target_indent_pt))
+        # 核心步骤2：根据单位构建新的ind节点
+        if unit == "char":
+            # 字符单位：值×100 → firstLineChars（如2 → 200）
+            chars_int = int(round(float(value) * 100))  # 四舍五入取整，贴合Word存储
+            ind_xml = f'''
+             <w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                    w:firstLineChars="{chars_int}"/>
+             '''
+        else:
+            # 物理单位：pt值×20 → twips，写入firstLine（如24pt → 480twips）
+            indent_pt = int(value)
+            indent_twips = indent_pt * 20
+            ind_xml = f'''
+             <w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                    w:firstLine="{indent_twips}"/>
+             '''
 
+        # 插入新的缩进XML节点
+        new_ind = parse_xml(ind_xml.strip())
+        pPr.append(new_ind)
+        logger.debug(f"首行缩进设置成功：{value}{unit} → XML字段：{ind_xml.strip()}")
         return True
+
     except Exception as e:
-        logger.error(f"设置段落{indent_chars}字符首行缩进失败: {e}")
+        logger.error(f"设置首行缩进失败：{e}")
         return False
