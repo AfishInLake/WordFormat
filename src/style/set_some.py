@@ -191,7 +191,7 @@ def set_paragraph_first_line_indent(  # noqa C901
         p = para._element
         pPr = p.find(qn("w:pPr"))
         # 无pPr节点则创建
-        if not pPr:
+        if pPr is None:
             pPr = parse_xml(
                 r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
             )

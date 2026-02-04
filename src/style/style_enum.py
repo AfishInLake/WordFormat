@@ -316,6 +316,7 @@ class BuiltInStyle(LabelEnum):
     TITLE = "Title"
     SUBTITLE = "Subtitle"
     LIST_PARAGRAPH = "List Paragraph"
+    CAPTION = "Caption"  # 题注
 
     _LABEL_MAP = {
         "Heading 1": HEADING_1,
@@ -326,4 +327,5 @@ class BuiltInStyle(LabelEnum):
         "标题": TITLE,
         "副标题": SUBTITLE,
         "列表项": LIST_PARAGRAPH,
+        "题注": CAPTION,
     }
