@@ -6,7 +6,7 @@ from src.config.config import get_config, init_config
 from src.tree import print_tree
 from src.word_structure.document_builder import DocumentBuilder
 
-JSON_PATH = "test02s/正文.json"
+JSON_PATH = "AAAA/1.json"
 YAML_PATH = "example/undergrad_thesis.yaml"
 
 

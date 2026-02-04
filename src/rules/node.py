@@ -135,6 +135,8 @@ class FormatNode(TreeNode, Generic[T]):
 
         class_name = self.CONFIG_MODEL.__name__
         match str(class_name):
+            case "AbstractTitleConfig":
+                self._pydantic_config = full_config.abstract.chinese.chinese_title
             case "AbstractChineseConfig":
                 self._pydantic_config = full_config.abstract.chinese
             case "AbstractEnglishConfig":

@@ -12,6 +12,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fi
 from config.config import get_config, init_config
 from src.agent.api import OpenAIAgent
 from src.agent.message import MessageManager
+from src.agent.onnx_single_infer import onnx_single_infer
 from src.settings import API_KEY, MODEL, MODEL_URL
 from src.utils import get_paragraph_xml_fingerprint
 
@@ -53,19 +54,9 @@ class DocxBase:
 
                 以下代码暂时注释
                 """
-                # 正则提取
-                # tag, re = self.get_tag_by_regex(paragraph.text)
-                tag = None
-                if tag:
-                    response = {
-                        "category": tag,
-                        "comment": re,
-                        "paragraph": paragraph.text,
-                    }
-                # else:
-                #     # bert打置信度
-                #     pass
-                else:
+                onnx_result = onnx_single_infer(paragraph.text)
+                tag, score = onnx_result["label"], onnx_result["score"]
+                if score < 0.85:
                     # 置信度低和正则无法提取的交由llm处理
                     response = await self.get_tag_by_llm(paragraph.text)
                     # response = {
@@ -73,6 +64,12 @@ class DocxBase:
                     #     "comment": "没有匹配到，手动设置",
                     #     "paragraph": paragraph.text,
                     # }
+                else:
+                    response = {
+                        "category": tag,
+                        "comment": f"置信度：{score}",
+                        "paragraph": paragraph.text,
+                    }
             except Exception as e:
                 response = {
                     "category": "body_text",
