@@ -16,17 +16,6 @@ AlignmentType = Literal["左对齐", "居中对齐", "右对齐", "两端对齐"
 LineSpacingType = Literal["单倍行距", "1.5倍", "双倍"]
 # 首行缩进类型
 FirstLineIndentType = Literal["无缩进", "1字符", "2字符", "3字符"]
-# 内置样式名称类型
-BuiltinStyleType = Literal[
-    "正文",
-    "标题",
-    "副标题",
-    "列表项",
-    "Heading 1",
-    "Heading 2",
-    "Heading 3",
-    "Heading 4",
-]
 # 中文字体类型
 ChineseFontType = Literal["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]
 # 英文字体类型
@@ -91,7 +80,7 @@ class GlobalFormatConfig(BaseModel):
     space_after: float = Field(default=0.5, description="段后间距（行）")
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型和默认值
@@ -169,7 +158,7 @@ class KeywordsConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -206,7 +195,7 @@ class AbstractTitleConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="无缩进")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="黑体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -230,7 +219,7 @@ class AbstractContentConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -285,7 +274,7 @@ class HeadingLevelConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="无缩进")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -318,7 +307,7 @@ class BodyTextConfig(BaseModel):
     space_after: float = Field(default=0.0)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -342,7 +331,7 @@ class FiguresConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="无缩进")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -372,7 +361,7 @@ class TablesConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="无缩进")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -402,7 +391,7 @@ class ReferencesTitleConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -430,7 +419,7 @@ class ReferencesContentConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -465,7 +454,7 @@ class AcknowledgementsTitleConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
@@ -489,7 +478,7 @@ class AcknowledgementsContentConfig(BaseModel):
     space_after: float = Field(default=0.5)
     line_spacing: LineSpacingType = Field(default="1.5倍")
     first_line_indent: FirstLineIndentType = Field(default="2字符")
-    builtin_style_name: BuiltinStyleType = Field(default="正文")
+    builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType = Field(default="宋体")
     english_font_name: EnglishFontType = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
