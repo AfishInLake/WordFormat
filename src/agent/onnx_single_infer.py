@@ -2,15 +2,19 @@ import json
 
 import numpy as np
 import onnxruntime as ort
+from loguru import logger
 from tokenizers import Tokenizer
 
+from src.settings import BERT_MODEL
+
 # ===== 配置 =====
-ONNX_MODEL_PATH = "model/20260204/bert_paragraph_classifier.onnx"
-TOKENIZER_JSON = "model/20260204/tokenizer.json"
-ID2LABEL_PATH = "model/20260204/id2label.json"
+ONNX_MODEL_PATH = BERT_MODEL + "bert_paragraph_classifier.onnx"
+TOKENIZER_JSON = "model/" + "tokenizer.json"
+ID2LABEL_PATH = BERT_MODEL + "id2label.json"
 MAX_LENGTH = 128
 
 # ===== 加载 =====
+logger.info(f"加载模型中：{TOKENIZER_JSON}")
 tokenizer = Tokenizer.from_file(TOKENIZER_JSON)
 ort_sess = ort.InferenceSession(ONNX_MODEL_PATH, providers=["CPUExecutionProvider"])
 with open(ID2LABEL_PATH, encoding="utf-8") as f:

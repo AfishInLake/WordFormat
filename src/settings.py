@@ -13,6 +13,7 @@ API_KEY = os.getenv("WORDFORMAT_API_KEY", "")
 MODEL = os.getenv("WORDFORMAT_MODEL", "")
 MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
+BERT_MODEL = "model/20260204/"
 
 CHARACTER_STYLE_CHECKS = {
     "bold": True,
