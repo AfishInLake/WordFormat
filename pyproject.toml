@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "loguru>=0.7.3",
+    "numpy>=2.4.2",
+    "onnxruntime>=1.23.2",
     "openai>=2.15.0",
     "pre-commit>=4.5.1",
     "pydantic>=2.12.5",
@@ -15,6 +17,7 @@ dependencies = [
     "requests>=2.32.5",
     "ruff>=0.14.14",
     "tenacity>=9.1.2",
+    "tokenizers>=0.22.2",
 ]
 [tool.ruff.lint]
 select = [

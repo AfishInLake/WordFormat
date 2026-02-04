@@ -1,0 +1,17 @@
+{
+  "abstract_chinese_title": 0,
+  "abstract_chinese_title_content": 1,
+  "abstract_english_title": 2,
+  "abstract_english_title_content": 3,
+  "acknowledgements_title": 4,
+  "body_text": 5,
+  "caption_figure": 6,
+  "caption_table": 7,
+  "heading_fulu": 8,
+  "heading_level_1": 9,
+  "heading_level_2": 10,
+  "heading_level_3": 11,
+  "keywords_chinese": 12,
+  "keywords_english": 13,
+  "references_title": 14
+}

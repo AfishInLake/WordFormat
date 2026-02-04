@@ -49,6 +49,8 @@ LEVEL_MAP = {
     "acknowledgements_title": 1,
     "abstract_chinese_title": 1,
     "abstract_english_title": 1,
+    "abstract_chinese_title_content": 1,
+    "abstract_english_title_content": 1,
     "keywords_chinese": 3,
     "keywords_english": 3,
 }
