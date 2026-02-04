@@ -103,6 +103,7 @@ headings:
     bold: false
     space_before: 0.5
     space_after: 0.5
+    line_spacing: '1.5倍'
     builtin_style_name: 'Heading 2'
     section_title_re: '^\d+\.\d+(?![\.\d])\s*'
 
@@ -117,6 +118,7 @@ headings:
     space_before: 0.5
     space_after: 0.5
     builtin_style_name: 'Heading 3'
+    line_spacing: '1.5倍'
     section_title_re: '^\d+\.\d+\.\d+(?!\.)\s*'
 
 # 正文段落格式
@@ -129,7 +131,12 @@ figures:
   <<: *global_format
   caption_position: 'below'          # 图名置于图之下（规范明确要求）
   caption_prefix: '图'               # 如“图2.1”
+  font_size: '五号'
   section_title_re: '^\s*图\s*\d+(\.\d+)*.*$'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '无缩进'
+
 
 # 表格（Table）格式
 tables:
@@ -137,10 +144,14 @@ tables:
   caption_position: 'above'          # 表名置于表之上（规范明确要求）
   caption_prefix: '表'               # 如“表5.1”
   caption_numbering: 'per_chapter'   # 分章编号
-  caption_font: '宋体'
-  caption_font_size: '五号'
-  english_font: 'Times New Roman'    # 表格内英文用 Times New Roman 五号
+  chinese_font_name: '宋体'
+  font_size: '五号'
+  english_font_name: 'Times New Roman'    # 表格内英文用 Times New Roman 五号
   section_title_re: '^表\s*\d+(\.\d+)*'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '无缩进'
+
 
 # 参考文献（References）
 references:
