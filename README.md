@@ -28,26 +28,6 @@
 
 ## 技术架构
 
-### 核心模块
-```
-src/
-├── agent/           # LLM 交互模块（文档结构识别）
-├── config/          # 配置管理与数据模型（Pydantic 验证）
-├── rules/           # 格式检查规则集
-│   ├── heading.py   # 标题格式检查规则
-│   ├── abstract.py  # 摘要格式检查规则
-│   ├── body.py      # 正文格式检查规则
-│   ├── keywords.py  # 关键词格式检查规则
-│   └── references.py# 参考文献格式检查规则
-├── style/           # 格式检查与修正核心
-│   ├── check_format.py # 格式校验逻辑
-│   └── set_style.py    # 格式修正与批注生成
-├── word_structure/  # 文档结构构建与树形表示
-├── base.py          # 基础文档处理类（Word 操作/LLM 封装）
-├── set_tag.py       # 文档结构标记主入口（生成 JSON）
-└── set_style.py     # 格式检查主入口（执行校验/修正）
-```
-
 ### 格式规范配置项
 | 类别       | 可配置参数                                                                 |
 |------------|----------------------------------------------------------------------------|
@@ -230,6 +210,7 @@ python print_tree.py
 - 特殊段落（摘要/关键词/参考文献/致谢）的专属格式规则
 - 字符格式（加粗/斜体/下划线/字体颜色）的全局/局部规则
 
+---
 ## 常见问题
 
 ### Q1：命令行执行报参数解析错误？
@@ -276,6 +257,22 @@ python main.py -d doc.docx -jf output/未创建的json文件.json generate-json 
 2. 检查待处理Word文档为 `.docx` 格式，不支持 `.doc` 旧格式
 3. 确保生成的JSON文件语法合法，手动修改后未出现JSON格式错误（如缺少逗号/引号）
 
+### Q7：为什么使用 SSH 推送时 Git LFS 会卡住或失败？
+**排查方向**：
+1. GitHub **不支持通过 SSH 协议上传 Git LFS 文件**。
+虽然普通代码可以通过 `git@github.com` 正常推送，但 LFS 在 SSH 模式下会尝试执行 `git-lfs-transfer` 命令，而 GitHub 的 SSH 服务并不识别该命令，导致连接被立即关闭（报错如 `EOF` 或 `Unable to negotiate version`）。
+
+**正确做法**：  
+- 将远程仓库地址改为 **HTTPS**：
+  ```bash
+  git remote set-url origin https://github.com/AfishInLake/WordFormat.git
+  ```
+- 使用 **Personal Access Token (PAT)** 作为密码（非 GitHub 登录密码）
+- 确保网络能访问 GitHub（国内用户若遇 LFS 上传慢/失败，可考虑配合代理或使用 Gitee 托管 LFS）
+
+> 💡 提示：只要远程地址是 `git@github.com:...`，Git LFS **一定无法上传成功**——这是 GitHub 的设计限制，非配置错误。
+
+---
 ## 贡献指南
 
 ### 贡献方式
