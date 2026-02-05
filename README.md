@@ -169,14 +169,15 @@ python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说�
 适合集成到其他项目或自定义扩展，直接调用核心函数实现解析、校验、格式化：
 
 ##### 1. 生成文档结构 JSON
+
 ```python
-from src.set_tag import main as set_tag_main
+from src.set_tag import set_tag_main as set_tag_main
 
 # 解析文档并生成 JSON 结构文件
 set_tag_main(
     docx_path="your_document.docx",  # 原始Word文档路径
     json_save_path="output/your_document.json",  # JSON保存完整路径
-    configpath="example/undergrad_thesis.yaml"   # 格式配置文件路径
+    configpath="example/undergrad_thesis.yaml"  # 格式配置文件路径
 )
 ```
 

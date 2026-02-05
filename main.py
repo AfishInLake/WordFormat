@@ -10,7 +10,7 @@ from loguru import logger
 
 # 导入核心函数
 from src.set_style import auto_format_thesis_document
-from src.set_tag import main as set_tag_main
+from src.set_tag import set_tag_main
 
 
 def validate_file(path: str, file_type: str = "文件") -> str:

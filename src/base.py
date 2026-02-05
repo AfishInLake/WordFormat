@@ -2,18 +2,13 @@
 # @Time    : 2025/12/22 21:47
 # @Author  : afish
 # @File    : DocxBase.py
-import json
 import re
 from typing import Tuple
 
 from loguru import logger
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from config.config import get_config, init_config
-from src.agent.api import OpenAIAgent
-from src.agent.message import MessageManager
 from src.agent.onnx_single_infer import onnx_single_infer
-from src.settings import API_KEY, MODEL, MODEL_URL
 from src.utils import get_paragraph_xml_fingerprint
 
 
@@ -24,14 +19,6 @@ class DocxBase:
         self.re_dict = {}
         self.docx_file = docx_file
         self.document = Document(docx_file)
-
-        self.base_agent = OpenAIAgent(
-            system_prompt=system_prompt,
-            messageManager=MessageManager(),
-            model=MODEL,
-            baseurl=MODEL_URL,
-            api_key=API_KEY,
-        )
         init_config(configpath)
         try:
             self.config_model = get_config()  # 首次调用：触发load()
@@ -42,39 +29,28 @@ class DocxBase:
             raise
         self.regex_init()
 
-    async def parse(self) -> list[dict]:
+    def parse(self) -> list[dict]:
         result = []
         for paragraph in self.document.paragraphs:
             # 跳过空段落
-            if not paragraph.text:
+            text = paragraph.text.strip()
+            if not paragraph.text.strip():
                 continue
             try:
-                """
-                使用bert进行标签分类，使用正则进行标签匹配，通过率高的视为正确
-
-                以下代码暂时注释
-                """
-                onnx_result = onnx_single_infer(paragraph.text)
+                onnx_result = onnx_single_infer(text)
                 tag, score = onnx_result["label"], onnx_result["score"]
-                if score < 0.85:
-                    # 置信度低和正则无法提取的交由llm处理
-                    response = await self.get_tag_by_llm(paragraph.text)
-                    # response = {
-                    #     "category": "body_text",
-                    #     "comment": "没有匹配到，手动设置",
-                    #     "paragraph": paragraph.text,
-                    # }
-                else:
-                    response = {
-                        "category": tag,
-                        "comment": f"置信度：{score}",
-                        "paragraph": paragraph.text,
-                    }
+                response = {
+                    "category": tag,
+                    "comment": f"置信度：{score}",
+                    "paragraph": text,
+                }
+                if score < 0.6:  # 置信度过低
+                    response["category"] = "body_text"
             except Exception as e:
                 response = {
                     "category": "body_text",
                     "comment": str(e),
-                    "paragraph": paragraph.text,
+                    "paragraph": text,
                 }
 
             response["fingerprint"] = get_paragraph_xml_fingerprint(paragraph)
@@ -82,32 +58,7 @@ class DocxBase:
             if response["category"] == "heading_fulu":
                 break
             result.append(response)
-        self.base_agent.print_token_usage()
         return result
-
-    @retry(
-        retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(5),
-        wait=wait_fixed(5),
-        reraise=True,
-    )
-    async def get_tag_by_llm(self, paragraph: str) -> dict:
-        self.base_agent.message_manager.clear()  # 清空消息
-        # 创建基础agent
-        response = await self.base_agent.response(
-            f"""当前段落：{paragraph}\n属于哪个标签""",
-            stream=False,
-            response_format="json",
-        )
-        jsondata = json.loads(response)
-        result_dict = {}
-        for key in ["category"]:
-            if key not in jsondata:
-                raise Exception(f"{key} not found in response")
-            result_dict[key] = jsondata.get(key)
-        jsondata["paragraph"] = paragraph
-
-        return jsondata
 
     def get_tag_by_regex(self, paragraph: str) -> Tuple[str, str]:
         """
