@@ -16,7 +16,6 @@ __pycache__
 .gitlab
 .github
 .gitkeep
-.gitattributes
 test
 test/*
 tmp
