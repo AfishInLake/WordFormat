@@ -14,7 +14,7 @@ class References(FormatNode[ReferencesTitleConfig]):
     NODE_TYPE = "references"
     CONFIG_MODEL = ReferencesTitleConfig
 
-    def check_format(self, doc):
+    def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         # 段落样式
         ps = ParagraphStyle(
@@ -25,8 +25,10 @@ class References(FormatNode[ReferencesTitleConfig]):
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
-        paragraph_issues = ps.diff_from_paragraph(self.paragraph)
-
+        if p:
+            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
         # 字符样式
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
@@ -40,7 +42,10 @@ class References(FormatNode[ReferencesTitleConfig]):
 
         # 检查每个 run 的字符格式
         for run in self.paragraph.runs:
-            diff_result = cstyle.diff_from_run(run)
+            if r:
+                diff_result = cstyle.diff_from_run(run)
+            else:
+                diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
                     doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)

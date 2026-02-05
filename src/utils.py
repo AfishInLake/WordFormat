@@ -71,7 +71,7 @@ def ensure_is_directory(path):
         raise ValueError(f"路径不是一个文件夹（它可能是一个文件）: '{path}'")
 
 
-def get_file_name(file_name: str):
+def get_file_name(file_name: str) -> str:
     basename = os.path.basename(file_name)
     filename_without_ext, _ = os.path.splitext(basename)  # 提取docx文件名称
     return filename_without_ext
