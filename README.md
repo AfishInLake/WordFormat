@@ -197,6 +197,28 @@ auto_format_thesis_document(
 python print_tree.py 
 ```
 
+#### 方式三：api调用
+- 在 `.env` 配置以下参数
+```.env
+# 配置服务地址
+HOST="127.0.0.1"
+# 配置服务端口
+PORT="8000"
+```
+- 在命令窗口中执行以下命令启动服务
+```bash
+# 创建venv环境
+uv venv
+# 激活venv环境
+source venv/bin/activate
+# 安装依赖
+uv sync
+# 启动服务
+uv run start_api.py
+```
+> 💡 提示：接口文档请访问`http://{HOST}:{PORT}/docs`
+>   示例： [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
 ## 配置文件说明
 
 ### 配置文件格式
