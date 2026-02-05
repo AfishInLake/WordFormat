@@ -17,3 +17,8 @@
   "13": "keywords_english",
   "14": "references_title"
 }
+
+目前发现的问题：
+将Mechanical Gripper 识别为 heading_fulu 应为 body_text
+将Track Inspection Robot for Transformer Room 识别为 heading_fulu 应为 body_text
+将段落中的如图x.x所示标记为 caption_figure
