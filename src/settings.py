@@ -3,10 +3,17 @@
 # @Author  : afish
 # @File    : settings.py
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# 设置工作目录
+WORK_DIR = Path(__file__).parent.parent
+HOST = os.getenv("HOST", "127.0.0.1")
+PORT = int(os.getenv("PORT", "8000"))
+SERVER_HOST = f"http://{HOST}:{PORT}"
 
 # 从环境变量获取配置，如果不存在则使用默认值
 API_KEY = os.getenv("WORDFORMAT_API_KEY", "")

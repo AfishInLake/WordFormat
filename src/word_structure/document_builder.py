@@ -17,12 +17,19 @@ class DocumentBuilder:
     """对外统一接口：加载 JSON 并构建文档树"""
 
     @staticmethod
-    def load_paragraphs(json_path: str) -> list[dict[str, Any]]:
-        with open(json_path, encoding="utf-8") as f:
-            return json.load(f)
+    def load_paragraphs(json_path: str | list) -> list[dict[str, Any]]:
+        try:
+            if isinstance(json_path, list):
+                return json_path
+            else:
+                return json.loads(json_path)
+        except Exception as e:
+            logger.warning(f"JSON 文件加载失败: {str(e)}")
+            with open(json_path, encoding="utf-8") as f:
+                return json.load(f)
 
     @classmethod
-    def build_from_json(cls, json_path: str, config) -> FormatNode:
+    def build_from_json(cls, json_path: str | list, config) -> FormatNode:
         paragraphs = cls.load_paragraphs(json_path)
         logger.debug(f"共有 {len(paragraphs)} 条语料")
         check_duplicate_fingerprints(paragraphs)  # 检查重复的指纹

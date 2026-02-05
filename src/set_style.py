@@ -79,7 +79,11 @@ def xg(root_node, paragraph):
 
 
 def auto_format_thesis_document(
-    jsonpath: str, docxpath: str, configpath: str, savepath: str = "output/", check=True
+    jsonpath: str | list,
+    docxpath: str,
+    configpath: str,
+    savepath: str = "output/",
+    check=True,
 ):
     """自动对学位论文文档进行格式校验与批注。
 
@@ -96,7 +100,7 @@ def auto_format_thesis_document(
         6. 保存带批注的文档到指定路径。
 
     Args:
-        jsonpath (str): 文档逻辑结构的 JSON 文件路径，描述各章节/段落的语义类型。
+        jsonpath (str): 文档逻辑结构的 JSON 文件路径 或 json 数据，描述各章节/段落的语义类型。
         docxpath (str): 待处理的原始 Word (.docx) 文档路径。
         savepath (str): 处理完成后带批注的文档保存路径。
         configpath (str): 格式规范配置文件（YAML）路径，支持继承与合并。
@@ -162,3 +166,4 @@ def auto_format_thesis_document(
         docx_path = str(savepath / f"{filename_without_ext}--修改版.docx")
     logger.info(f"保存文件到 {docx_path}")
     document.save(docx_path)
+    return docx_path
