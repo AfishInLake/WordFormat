@@ -8,12 +8,9 @@ from loguru import logger
 
 from src.base import DocxBase
 
-with open("src/system_prompt.txt", encoding="utf-8") as f:
-    system_prompt = f.read()
-
 
 def run(docx_path: str, json_save_path: str, configpath) -> list:
-    dox = DocxBase(docx_path, system_prompt=system_prompt, configpath=configpath)
+    dox = DocxBase(docx_path, configpath=configpath)
     a = dox.parse()
 
     with open(json_save_path, "w", encoding="utf-8") as f:

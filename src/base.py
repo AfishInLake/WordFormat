@@ -13,7 +13,7 @@ from src.utils import get_paragraph_xml_fingerprint
 
 
 class DocxBase:
-    def __init__(self, docx_file, system_prompt, configpath):
+    def __init__(self, docx_file, configpath):
         from docx import Document
 
         self.re_dict = {}

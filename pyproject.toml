@@ -12,6 +12,7 @@ dependencies = [
     "openai>=2.15.0",
     "pre-commit>=4.5.1",
     "pydantic>=2.12.5",
+    "pyinstaller>=6.18.0",
     "python-docx>=1.2.0",
     "python-dotenv>=1.2.1",
     "python-multipart>=0.0.22",

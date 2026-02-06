@@ -23,3 +23,5 @@ tmp/*
 .trae
 output/*
 temp
+dist
+build
