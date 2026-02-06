@@ -42,13 +42,16 @@ class DocxBase:
                 response = {
                     "category": tag,
                     "comment": f"置信度：{score}",
+                    "score": score,
                     "paragraph": text,
                 }
                 if score < 0.6:  # 置信度过低
                     response["category"] = "body_text"
+                    response["comment"] = f"原本标签为{tag},已自动格式化为body_text"
             except Exception as e:
                 response = {
                     "category": "body_text",
+                    "score": 0,
                     "comment": str(e),
                     "paragraph": text,
                 }

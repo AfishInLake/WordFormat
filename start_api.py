@@ -9,4 +9,11 @@ if __name__ == "__main__":
     import uvicorn
 
     # 启动UVICORN服务器，监听所有IP，端口8000，自动重载
-    uvicorn.run(app="src.api:app", host=HOST, port=PORT, reload=True, log_level="info")
+    uvicorn.run(
+        app="src.api:app",
+        host=HOST,
+        port=PORT,
+        reload=False,
+        timeout_keep_alive=600,
+        log_level="info",
+    )

@@ -8,6 +8,7 @@ from typing import Optional
 from urllib.parse import quote
 
 from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pydantic import BaseModel
 from starlette.responses import FileResponse
@@ -24,6 +25,21 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",  # Swagger UI接口文档地址（推荐）
     redoc_url="/redoc",  # ReDoc接口文档地址（备选）
+)
+
+# 🌟 2. 配置CORS跨域（核心代码，复制即可）
+origins = [
+    # 允许你的前端域名访问（必须写全，包括http/https和端口）
+    "http://localhost:1420",
+    "http://127.0.0.1:1420",  # 可选，做兼容，防止前端用这个域名访问
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # 允许上述域名的跨域请求
+    allow_credentials=True,  # 允许携带cookie（可选，建议开）
+    allow_methods=["*"],  # 允许所有请求方法（GET/POST/PUT等）
+    allow_headers=["*"],  # 允许所有请求头（包括文件上传的头）
 )
 
 # ---------------------- 全局配置 ----------------------
@@ -236,11 +252,18 @@ def download_file(filename: str):
         # 校验2：是否为有效文件（非文件夹/链接）
         if not os.path.isfile(file_path):
             raise HTTPException(status_code=400, detail="请求路径不是有效文件")
+        # 核心修复：增加强制下载的响应头
+        headers = {
+            "Content-Disposition": f"attachment; filename={quote(filename)}",  # 强制下载+编码文件名
+            "Cache-Control": "no-cache",  # 避免缓存问题
+            "Pragma": "no-cache",
+        }
         # 以附件形式返回，浏览器自动触发下载，指定docx专属MIME类型
         return FileResponse(
             file_path,
             filename=filename,  # 强制指定下载显示的文件名（与实际保存一致）
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=headers,
         )
     except HTTPException as e:
         logger.error(str(e))
