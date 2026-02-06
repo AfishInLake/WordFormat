@@ -1,3 +1,17 @@
+import os
+import sys
+
+# 适配打包后的路径，优先加载打包目录的ONNX Runtime DLL
+if getattr(sys, "frozen", False):
+    # 文件夹模式：exe所在目录
+    BASE_DIR = os.path.dirname(sys.executable)
+    # ONNX Runtime DLL所在目录
+    ort_capi_dir = os.path.join(BASE_DIR, "onnxruntime", "capi")
+    # 将DLL目录加入系统PATH（优先加载）
+    os.environ["PATH"] = ort_capi_dir + ";" + os.environ["PATH"]
+    os.environ["ORT_DLL_PATH"] = ort_capi_dir  # 强制指定ORT的DLL路径
+    # 禁用GPU，减少初始化依赖
+    os.environ["ORT_DISABLE_GPU"] = "1"
 import json
 
 import numpy as np
