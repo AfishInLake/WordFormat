@@ -36,7 +36,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # 允许上述域名的跨域请求
+    allow_origins=["*"],  # 允许上述域名的跨域请求
     allow_credentials=True,  # 允许携带cookie（可选，建议开）
     allow_methods=["*"],  # 允许所有请求方法（GET/POST/PUT等）
     allow_headers=["*"],  # 允许所有请求头（包括文件上传的头）
