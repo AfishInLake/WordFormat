@@ -3,6 +3,7 @@
 # @Author  : afish
 # @File    : settings.py
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,7 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 设置工作目录
-WORK_DIR = Path(__file__).parent.parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).parent
+
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
 SERVER_HOST = f"http://{HOST}:{PORT}"

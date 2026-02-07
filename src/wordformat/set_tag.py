@@ -6,7 +6,7 @@ import json
 
 from loguru import logger
 
-from src.base import DocxBase
+from wordformat.base import DocxBase
 
 
 def run(docx_path: str, json_save_path: str, configpath) -> list:

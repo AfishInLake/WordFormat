@@ -5,8 +5,8 @@
 
 from collections.abc import Callable
 
-from src.rules.body import BodyText
-from src.rules.node import FormatNode
+from wordformat.rules.body import BodyText
+from wordformat.rules.node import FormatNode
 
 
 def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bool]):
@@ -27,7 +27,9 @@ def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bo
     return None
 
 
-def promote_bodytext_in_subtrees_of_type(root: "FormatNode", parent_type: type, target_type: type):
+def promote_bodytext_in_subtrees_of_type(
+    root: "FormatNode", parent_type: type, target_type: type
+):
     """
     遍历整棵树：
       - 找到所有类型为 parent_type 的节点；

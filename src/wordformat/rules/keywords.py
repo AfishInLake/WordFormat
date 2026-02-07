@@ -1,9 +1,9 @@
 import re
 from typing import List, Literal
 
-from src.config.datamodel import KeywordsConfig, NodeConfigRoot
-from src.rules.node import FormatNode
-from src.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.config.datamodel import KeywordsConfig, NodeConfigRoot
+from wordformat.rules.node import FormatNode
+from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 
 # 第一步：提取关键词基类，复用通用逻辑

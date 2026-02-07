@@ -5,7 +5,7 @@
 from collections.abc import Callable, Iterator
 from typing import Any, Generic, Optional, TypeVar
 
-from src.rules.node import TreeNode
+from wordformat.rules.node import TreeNode
 
 
 class Tree:

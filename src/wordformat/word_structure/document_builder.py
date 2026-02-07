@@ -2,15 +2,15 @@
 # @Time    : 2026/1/11 19:42
 # @Author  : afish
 # @File    : document_builder.py
-# src/document_builder.py
+# wordformat/document_builder.py
 import json
 from typing import Any
 
 from loguru import logger
 
-from src.rules.node import FormatNode
-from src.utils import check_duplicate_fingerprints
-from src.word_structure.tree_builder import DocumentTreeBuilder
+from wordformat.rules.node import FormatNode
+from wordformat.utils import check_duplicate_fingerprints
+from wordformat.word_structure.tree_builder import DocumentTreeBuilder
 
 
 class DocumentBuilder:
@@ -23,8 +23,8 @@ class DocumentBuilder:
                 return json_path
             else:
                 return json.loads(json_path)
-        except Exception as e:
-            logger.warning(f"JSON 文件加载失败: {str(e)}")
+        except Exception:
+            logger.warning("加载json文件...")
             with open(json_path, encoding="utf-8") as f:
                 return json.load(f)
 

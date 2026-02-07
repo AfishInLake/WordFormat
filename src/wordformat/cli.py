@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # @Time    : 2026/1/18 13:22
 # @Author  : afish
-# @File    : main.py
+# @File    : cli.py
 import argparse
 import os
 from pathlib import Path
@@ -9,8 +9,8 @@ from pathlib import Path
 from loguru import logger
 
 # 导入核心函数
-from src.set_style import auto_format_thesis_document
-from src.set_tag import set_tag_main
+from wordformat.set_style import auto_format_thesis_document
+from wordformat.set_tag import set_tag_main
 
 
 def validate_file(path: str, file_type: str = "文件") -> str:
@@ -61,7 +61,7 @@ def validate_json_path(path: str, mode: str) -> str:
     return abs_path
 
 
-if __name__ == "__main__":
+def main():
     # 1. 创建参数解析器
     parser = argparse.ArgumentParser(
         description="学位论文格式自动校验工具（多模式控制）"
@@ -182,3 +182,7 @@ if __name__ == "__main__":
             check=False,
         )
         logger.info(f"\n✅ 格式化完成！格式化后文档已保存至：{args.output}")
+
+
+if __name__ == "__main__":
+    main()
