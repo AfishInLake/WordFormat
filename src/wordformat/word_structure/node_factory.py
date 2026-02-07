@@ -6,8 +6,8 @@ from typing import Any
 
 from loguru import logger
 
-from src.rules.node import FormatNode
-from src.word_structure.settings import CATEGORY_TO_CLASS
+from wordformat.rules.node import FormatNode
+from wordformat.word_structure.settings import CATEGORY_TO_CLASS
 
 
 def create_node(

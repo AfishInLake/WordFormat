@@ -84,3 +84,17 @@ line-ending = "auto"
 max-line-length = 108
 max-doc-length = 200
 ignore-overlong-task-comments = true
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# 显式声明使用 src 布局（推荐）
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+wordformat = ["data/*"]
+
+[project.scripts]
+wordformat = "wordformat.cli:main"

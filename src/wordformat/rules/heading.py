@@ -6,9 +6,9 @@
 from docx.document import Document
 from loguru import logger  # 推荐添加日志，便于调试
 
-from src.config.datamodel import HeadingLevelConfig, NodeConfigRoot
-from src.rules.node import FormatNode
-from src.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.config.datamodel import HeadingLevelConfig, NodeConfigRoot
+from wordformat.rules.node import FormatNode
+from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 
 class BaseHeadingNode(FormatNode[HeadingLevelConfig]):

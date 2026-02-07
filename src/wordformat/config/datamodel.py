@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.style.style_enum import FontColor, FontName, FontSize
+from wordformat.style.style_enum import FontColor, FontName, FontSize
 
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型

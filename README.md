@@ -67,18 +67,15 @@ source venv/bin/activate
 venv\Scripts\activate
 
 # 安装项目依赖
-pip install -e .
+uv pip install -e .
 ```
 
 #### 3. 配置环境变量
-创建 `.env` 文件，配置 LLM API 密钥等必要参数：
+创建 `.env` 文件，配置 HOST PORT等必要参数：
 ```env
-# 配置api key
-WORDFORMAT_API_KEY=''
-# 模型名称
-WORDFORMAT_MODEL='qwen3-4b-no-think'
-# 模型地址
-WORDFORMAT_MODEL_URL='http://localhost:11434/v1'
+HOST="127.0.0.1"
+# 配置服务端口
+PORT="8000"
 ```
 
 ### 核心使用方法
@@ -125,12 +122,14 @@ python main.py -d your_document.docx -jf output/your_document_edited.json apply-
 ```bash
 # 1. 生成JSON（到output目录）
 python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json -j .\output\ generate-json -c .\example\undergrad_thesis.yaml
-
+wordformat --docx "G:\desktop\论文语料集\1 (2).docx" --json "test02s/1.json" generate-json --config "example/undergrad_thesis.yaml"
 # 2. 执行格式化（使用上一步生成的完整JSON路径）
 python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json apply-format -c .\example\undergrad_thesis.yaml
+wordformat --docx "G:\desktop\论文语料集\1 (2).docx" --json "test02s/1.json" apply-format --config "example/undergrad_thesis.yaml"
 
 # 3. 执行校验（自定义输出目录）
 python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json check-format -c .\example\undergrad_thesis.yaml -o .\check_output\
+(wordparse) PS G:\desktop\WordFormat> wordformat --docx "G:\desktop\论文语料集\1 (2).docx" --json "test02s/1.json" check-format --config "example/undergrad_thesis.yaml"
 ```
 
 ##### 命令行参数详细说明
@@ -151,7 +150,7 @@ python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说�
 ##### 1. 生成文档结构 JSON
 
 ```python
-from src.set_tag import set_tag_main as set_tag_main
+from wordformat.set_tag import set_tag_main as set_tag_main
 
 # 解析文档并生成 JSON 结构文件
 set_tag_main(
@@ -163,7 +162,7 @@ set_tag_main(
 
 ##### 2. 执行格式检查（仅添加批注）
 ```python
-from src.set_style import auto_format_thesis_document
+from wordformat.set_style import auto_format_thesis_document
 
 # 执行格式校验，生成带批注的文档（check=True 仅校验，不修改）
 auto_format_thesis_document(
@@ -177,7 +176,7 @@ auto_format_thesis_document(
 
 ##### 3. 执行格式自动修正
 ```python
-from src.set_style import auto_format_thesis_document
+from wordformat.set_style import auto_format_thesis_document
 
 # 执行格式自动修正（check=False 格式化模式）
 auto_format_thesis_document(

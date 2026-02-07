@@ -14,9 +14,9 @@ from pydantic import BaseModel
 from starlette.responses import FileResponse
 
 # 复用原有项目的核心函数和校验工具
-from src.set_style import auto_format_thesis_document
-from src.set_tag import set_tag_main
-from src.settings import SERVER_HOST, WORK_DIR
+from wordformat.set_style import auto_format_thesis_document
+from wordformat.set_tag import set_tag_main
+from wordformat.settings import BASE_DIR, SERVER_HOST
 
 # ---------------------- 初始化FastAPI应用 ----------------------
 app = FastAPI(
@@ -27,12 +27,6 @@ app = FastAPI(
     redoc_url="/redoc",  # ReDoc接口文档地址（备选）
 )
 
-# 🌟 2. 配置CORS跨域（核心代码，复制即可）
-origins = [
-    # 允许你的前端域名访问（必须写全，包括http/https和端口）
-    "http://localhost:1420",
-    "http://127.0.0.1:1420",  # 可选，做兼容，防止前端用这个域名访问
-]
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,11 +38,11 @@ app.add_middleware(
 
 # ---------------------- 全局配置 ----------------------
 # 临时文件目录（存储上传的docx/配置文件、生成的json），自动创建
-TEMP_DIR = WORK_DIR / "temp"
+TEMP_DIR = BASE_DIR / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 logger.info(f"临时文件目录：{TEMP_DIR}")
 # 输出文件目录（存储校验/格式化后的docx）
-OUTPUT_DIR = WORK_DIR / "output"
+OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 logger.info(f"输出文件目录：{OUTPUT_DIR}")  # 修复原日志笔误
 

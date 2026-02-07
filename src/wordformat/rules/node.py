@@ -12,7 +12,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pydantic import ValidationError
 
-from src.config.datamodel import BaseModel, NodeConfigRoot
+from wordformat.config.datamodel import BaseModel, NodeConfigRoot
 
 
 class TreeNode:
@@ -117,7 +117,7 @@ class FormatNode(TreeNode, Generic[T]):
             with open(config_path, encoding="utf-8") as f:
                 raw_config = yaml.safe_load(f)
             # 使用根模型验证整个配置结构
-            from src.config.datamodel import NodeConfigRoot
+            from wordformat.config.datamodel import NodeConfigRoot
 
             root_config = NodeConfigRoot(**raw_config)
             return root_config.model_dump()

@@ -2,7 +2,7 @@
 # @Time    : 2026/1/11 22:25
 # @Author  : afish
 # @File    : settings.py
-from src.rules import (
+from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
     AbstractTitleCN,

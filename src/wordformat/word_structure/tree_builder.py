@@ -2,12 +2,11 @@
 # @Time    : 2026/1/11 19:39
 # @Author  : afish
 # @File    : tree_builder.py
-# src/tree_builder.py
+# wordformat/tree_builder.py
 
-from src.rules.node import FormatNode
-from src.tree import Stack
-
-from .settings import CATEGORY_TO_CLASS, LEVEL_MAP
+from wordformat.rules.node import FormatNode
+from wordformat.tree import Stack
+from wordformat.word_structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 
 
 class DocumentTreeBuilder:
@@ -45,7 +44,7 @@ class DocumentTreeBuilder:
         )
 
     def _create_node_from_item(self, item: dict) -> FormatNode | None:
-        from src.word_structure.node_factory import create_node
+        from wordformat.word_structure.node_factory import create_node
 
         level = self._determine_level(item["category"])
         return create_node(item=item, level=level, config=self.CONFIG)

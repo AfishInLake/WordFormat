@@ -3,9 +3,9 @@
 # @Author  : afish
 # @File    : body.py
 
-from src.config.datamodel import BodyTextConfig
-from src.rules.node import FormatNode
-from src.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.config.datamodel import BodyTextConfig
+from wordformat.rules.node import FormatNode
+from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 
 class BodyText(FormatNode[BodyTextConfig]):

@@ -2,13 +2,13 @@
 # @Time    : 2026/1/26 10:25
 # @Author  : afish
 # @File    : config.py
-# src/config.py
+# wordformat/config.py
 from typing import Optional
 
 from loguru import logger
 from pydantic import ValidationError
 
-from src.utils import load_yaml_with_merge
+from wordformat.utils import load_yaml_with_merge
 
 from .datamodel import NodeConfigRoot
 

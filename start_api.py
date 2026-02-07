@@ -7,16 +7,17 @@ import sys
 
 from loguru import logger
 
-from log_config import setup_uvicorn_loguru
-from src.settings import HOST, PORT
+from wordformat.api import app
+from wordformat.log_config import setup_uvicorn_loguru
+from wordformat.settings import BASE_DIR, HOST, PORT
 
 # ========== 第一步：初始化 Loguru + 修复 Uvicorn 日志 ==========
 setup_uvicorn_loguru()
-
+LOG_FILE = BASE_DIR / "api.log"
 # 自定义 Loguru 输出（可选，根据需求配置）
 logger.remove()  # 移除默认输出
 logger.add(
-    "api.log",  # 日志文件
+    LOG_FILE,  # 日志文件
     rotation="500 MB",  # 按大小分割
     retention="7 days",  # 保留7天
     encoding="utf-8",
@@ -32,15 +33,20 @@ if not sys.stdout.closed:
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",  # noqa E501
     )
 
-# ========== 第二步：启动 Uvicorn ==========
-if __name__ == "__main__":
+
+def main():
     import uvicorn
 
     uvicorn.run(
-        "src.api:app",  # 替换为你的实际应用入口（如 main:app）
+        app,
         host=HOST,
         port=PORT,
-        log_config=None,  # 关键：禁用 Uvicorn 原生日志配置！！
+        log_config=None,
         access_log=True,
-        use_colors=False,  # 禁用颜色，彻底规避 TTY 检测
+        reload=False,
+        use_colors=False,
     )
+
+
+if __name__ == "__main__":
+    main()

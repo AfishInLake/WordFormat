@@ -2,9 +2,9 @@
 # @Time    : 2026/1/11 11:34
 # @Author  : afish
 # @File    : print_tree.py
-from src.config.config import get_config, init_config
-from src.tree import print_tree
-from src.word_structure.document_builder import DocumentBuilder
+from wordformat.config.config import get_config, init_config
+from wordformat.tree import print_tree
+from wordformat.word_structure.document_builder import DocumentBuilder
 
 JSON_PATH = "AAAA/1.json"
 YAML_PATH = "example/undergrad_thesis.yaml"

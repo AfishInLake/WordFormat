@@ -199,7 +199,7 @@ def set_paragraph_first_line_indent(  # noqa C901
 
         # 核心步骤1：清除原有缩进节点（避免新旧设置冲突）
         ind = pPr.find(qn("w:ind"))
-        if ind:
+        if ind is not None:
             pPr.remove(ind)
 
         # 核心步骤2：根据单位构建新的ind节点

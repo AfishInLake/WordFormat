@@ -1,18 +1,21 @@
 #! /usr/bin/env python
-# @Time    : 2026/1/11 19:38
+# @Time    : 2026/1/11 21:57
 # @Author  : afish
-# @File    : references.py
+# @File    : acknowledgement.py
 
-from src.config.datamodel import ReferencesContentConfig, ReferencesTitleConfig
-from src.rules.node import FormatNode
-from src.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.config.datamodel import (
+    AcknowledgementsContentConfig,
+    AcknowledgementsTitleConfig,
+)
+from wordformat.rules.node import FormatNode
+from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 
-class References(FormatNode[ReferencesTitleConfig]):
-    """参考文献节点"""
+class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
+    """致谢节点"""
 
-    NODE_TYPE = "references"
-    CONFIG_MODEL = ReferencesTitleConfig
+    NODE_TYPE = "acknowledgements"
+    CONFIG_MODEL = AcknowledgementsTitleConfig
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -29,6 +32,7 @@ class References(FormatNode[ReferencesTitleConfig]):
             paragraph_issues = ps.diff_from_paragraph(self.paragraph)
         else:
             paragraph_issues = ps.apply_to_paragraph(self.paragraph)
+
         # 字符样式
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
@@ -48,7 +52,7 @@ class References(FormatNode[ReferencesTitleConfig]):
                 diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 检查段落格式差异
@@ -58,13 +62,15 @@ class References(FormatNode[ReferencesTitleConfig]):
                 runs=self.paragraph.runs,
                 text="".join(str(issue) for issue in paragraph_issues),
             )
+
         return []
 
 
-class ReferenceEntry(FormatNode[ReferencesContentConfig]):
-    """参考文献条目节点"""
+class AcknowledgementsCN(FormatNode[AcknowledgementsContentConfig]):
+    """致谢内容"""
 
-    CONFIG_MODEL = ReferencesContentConfig
+    NODE_TYPE = "acknowledgements.content"
+    CONFIG_MODEL = AcknowledgementsContentConfig
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config

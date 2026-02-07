@@ -7,8 +7,8 @@ from pathlib import Path
 from docx import Document
 from loguru import logger
 
-from src.config.config import get_config, init_config
-from src.rules import (
+from wordformat.config.config import get_config, init_config
+from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
     AbstractTitleCN,
@@ -17,10 +17,10 @@ from src.rules import (
     ReferenceEntry,
     References,
 )
-from src.tree import print_tree
-from src.utils import get_paragraph_xml_fingerprint
-from src.word_structure.document_builder import DocumentBuilder
-from src.word_structure.utils import (
+from wordformat.tree import print_tree
+from wordformat.utils import get_paragraph_xml_fingerprint
+from wordformat.word_structure.document_builder import DocumentBuilder
+from wordformat.word_structure.utils import (
     find_and_modify_first,
     promote_bodytext_in_subtrees_of_type,
 )
@@ -118,7 +118,7 @@ def auto_format_thesis_document(
         ...     "format_rules.yaml"
         ... )
     """
-    from src.utils import get_file_name
+    from wordformat.utils import get_file_name
 
     init_config(configpath)
     try:

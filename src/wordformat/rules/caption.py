@@ -3,9 +3,9 @@
 # @Author  : afish
 # @File    : caption.py
 
-from src.config.datamodel import FiguresConfig, TablesConfig
-from src.rules.node import FormatNode
-from src.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.config.datamodel import FiguresConfig, TablesConfig
+from wordformat.rules.node import FormatNode
+from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 
 class CaptionFigure(FormatNode[FiguresConfig]):

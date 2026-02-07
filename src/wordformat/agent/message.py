@@ -37,7 +37,10 @@ class MessageManager:
                 {
                     "id": call.id,
                     "type": call.type,
-                    "function": {"name": call.function.name, "arguments": call.function.arguments},
+                    "function": {
+                        "name": call.function.name,
+                        "arguments": call.function.arguments,
+                    },
                 }
                 for call in tool_calls
             ]
@@ -46,7 +49,9 @@ class MessageManager:
 
     def add_tool_message(self, content: str, tool_call_id):
         """添加工具信息"""
-        self.add_dict_message({"role": "tool", "content": content, "tool_call_id": tool_call_id})
+        self.add_dict_message(
+            {"role": "tool", "content": content, "tool_call_id": tool_call_id}
+        )
 
     def add_system_message(self, content: str):
         """添加系统信息"""
@@ -69,4 +74,6 @@ class MessageManager:
             return self._messages.copy()
 
     def clear(self):
-        self._messages = list(filter(lambda msg: msg.get("role") == "system", self._messages))
+        self._messages = list(
+            filter(lambda msg: msg.get("role") == "system", self._messages)
+        )

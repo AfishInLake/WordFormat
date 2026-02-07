@@ -10,9 +10,9 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from src.config.config import get_config
-from src.config.datamodel import WarningFieldConfig
-from src.style.get_some import (
+from wordformat.config.config import get_config
+from wordformat.config.datamodel import WarningFieldConfig
+from wordformat.style.get_some import (
     paragraph_get_alignment,
     paragraph_get_builtin_style_name,
     paragraph_get_first_line_indent,

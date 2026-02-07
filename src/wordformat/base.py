@@ -7,9 +7,9 @@ from typing import Tuple
 
 from loguru import logger
 
-from src.agent.onnx_single_infer import onnx_single_infer
-from src.config.config import get_config, init_config
-from src.utils import get_paragraph_xml_fingerprint
+from wordformat.agent.onnx_single_infer import onnx_single_infer
+from wordformat.config.config import get_config, init_config
+from wordformat.utils import get_paragraph_xml_fingerprint
 
 
 class DocxBase:
