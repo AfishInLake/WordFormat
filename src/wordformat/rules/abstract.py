@@ -6,7 +6,6 @@ import re
 
 from wordformat.config.datamodel import (
     AbstractChineseConfig,
-    AbstractContentConfig,
     AbstractEnglishConfig,
     AbstractTitleConfig,
 )
@@ -72,6 +71,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
+        # 移除段落的意外字符
         ps = ParagraphStyle(
             alignment=cfg.chinese_content.alignment,
             space_before=cfg.chinese_content.space_before,
@@ -86,6 +86,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
             issues = ps.apply_to_paragraph(self.paragraph)
 
         for run in self.paragraph.runs:  # 检查标题是否包含在正文中
+            run.text = run.text.replace("\r", "").replace("\n", "")
             if self.check_title(run):
                 # 对run对象设置样式
                 C = CharacterStyle(
@@ -124,14 +125,14 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
         )
 
 
-class AbstractContentCN(FormatNode[AbstractContentConfig]):
+class AbstractContentCN(FormatNode[AbstractChineseConfig]):
     """摘要内容中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_content"
-    CONFIG_MODEL = AbstractContentConfig
+    CONFIG_MODEL = AbstractChineseConfig
 
     def _base(self, doc, p: bool, r: bool):
-        cfg = self.pydantic_config
+        cfg = self.pydantic_config.chinese_content
         ps = ParagraphStyle(
             alignment=cfg.alignment,
             space_before=cfg.space_before,
@@ -283,14 +284,14 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
         )
 
 
-class AbstractContentEN(FormatNode[AbstractContentConfig]):
+class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
     """摘要内容英文节点"""
 
     NODE_TYPE = "abstract.english.english_content"
-    CONFIG_MODEL = AbstractContentConfig
+    CONFIG_MODEL = AbstractEnglishConfig
 
     def _base(self, doc, p: bool, r: bool):
-        cfg = self.pydantic_config
+        cfg = self.pydantic_config.english_content
         ps = ParagraphStyle(
             alignment=cfg.alignment,
             space_before=cfg.space_before,

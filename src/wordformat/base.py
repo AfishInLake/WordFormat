@@ -33,12 +33,11 @@ class DocxBase:
     def parse(self) -> list[dict]:
         paragraphs = []
         paragraph_objects = []  # 保存原始 paragraph 对象，用于 fingerprint 和提前终止
-
         # 第一步：收集所有非空段落及其对象
         for para in self.document.paragraphs:
             text = para.text.strip()
             if text:
-                paragraphs.append(text)
+                paragraphs.append(para.text)
                 paragraph_objects.append(para)
 
         result = []

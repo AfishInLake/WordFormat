@@ -17,8 +17,7 @@ from wordformat.rules import (
     ReferenceEntry,
     References,
 )
-from wordformat.tree import print_tree
-from wordformat.utils import get_paragraph_xml_fingerprint
+from wordformat.utils import get_paragraph_xml_fingerprint, remove_all_numbering
 from wordformat.word_structure.document_builder import DocumentBuilder
 from wordformat.word_structure.utils import (
     find_and_modify_first,
@@ -100,6 +99,7 @@ def auto_format_thesis_document(
         6. 保存带批注的文档到指定路径。
 
     Args:
+        check (bool): 用来控制是仅检查还是仅修改
         jsonpath (str): 文档逻辑结构的 JSON 文件路径 或 json 数据，描述各章节/段落的语义类型。
         docxpath (str): 待处理的原始 Word (.docx) 文档路径。
         savepath (str): 处理完成后带批注的文档保存路径。
@@ -134,6 +134,13 @@ def auto_format_thesis_document(
         node for node in root_node.children if node.value.get("category") != "body_text"
     ]
     document = Document(docxpath)
+
+    if not check:
+        style_list = []
+        for style in document.styles:
+            style_list.append(style.name)
+        logger.info(f"可用的样式有：{style_list}")
+
     for paragraph in document.paragraphs:
         if not paragraph.text:
             continue
@@ -151,12 +158,14 @@ def auto_format_thesis_document(
         promote_bodytext_in_subtrees_of_type(
             root_node, parent_type=key, target_type=value
         )
-    print_tree(root_node)
     # FIXME: 临时解决
     """
     观察到不属于正文的内容被处理，需要剪枝
     word样式太多，需要考虑重置
     """
+    # 移除文档中的自动编号
+    remove_all_numbering(document)
+    # 执行格式化
     apply_format_check_to_all_nodes(root_node, document, config_model, check)
     savepath = Path(savepath)
     savepath.mkdir(exist_ok=True)

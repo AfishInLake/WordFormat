@@ -8,6 +8,7 @@ from collections import Counter
 from typing import Any
 
 import yaml
+from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 from loguru import logger
 from lxml import etree
@@ -75,3 +76,33 @@ def get_file_name(file_name: str) -> str:
     basename = os.path.basename(file_name)
     filename_without_ext, _ = os.path.splitext(basename)  # 提取docx文件名称
     return filename_without_ext
+
+
+def remove_all_numbering(doc):
+    """
+    强制解除样式与列表的绑定
+    Args:
+        doc:
+    Returns:
+
+    """
+    title_style_names = ["Heading 1", "Heading 2", "Heading 3"]
+
+    for style_name in title_style_names:
+        if style_name in doc.styles:
+            style = doc.styles[style_name]
+            style_element = style._element
+
+            # 删除 <w:pPr> 中的 numPr（样式级别的编号）
+            pPr = style_element.find(qn("w:pPr"))
+            if pPr is not None:
+                numPr = pPr.find(qn("w:numPr"))
+                if numPr is not None:
+                    pPr.remove(numPr)
+
+                # 可选：也删除 outlineLvl（大纲级别，有时触发编号）
+                outlineLvl = pPr.find(qn("w:outlineLvl"))
+                if outlineLvl is not None:
+                    pPr.remove(outlineLvl)
+
+            logger.debug(f"已解除样式 '{style_name}' 的编号绑定")

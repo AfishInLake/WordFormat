@@ -4,7 +4,7 @@ style_checks_warning: # 样式检查预警设置
   underline: true
   font_size: true
   font_color: false
-  font_name: true
+  font_name: false
 
 
 # 全局页面格式（正文通用）
@@ -37,7 +37,6 @@ abstract:
     chinese_content:
       <<: *global_format
       alignment: '两端对齐'
-      first_line_indent: '无缩进'  # 摘要正文通常不首行缩进（按规范示例）
   english:
     english_title:
       <<: *global_format
@@ -50,7 +49,6 @@ abstract:
     english_content:
       <<: *global_format
       alignment: '两端对齐'
-      first_line_indent: '无缩进'
       english_font_name: 'Times New Roman'
       font_size: '小四'
   keywords:
