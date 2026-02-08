@@ -14,7 +14,7 @@ load_dotenv()
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent
 else:
-    BASE_DIR = Path(__file__).parent
+    BASE_DIR = Path(__file__).parent.parent.parent
 
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
@@ -25,6 +25,7 @@ API_KEY = os.getenv("WORDFORMAT_API_KEY", "")
 MODEL = os.getenv("WORDFORMAT_MODEL", "")
 MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
+BATCH_SIZE = os.getenv("BATCH_SIZE", 64)
 BERT_MODEL = "model/20260204/"
 
 CHARACTER_STYLE_CHECKS = {
