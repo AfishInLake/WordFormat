@@ -38,7 +38,7 @@ def _load_model():
     from tokenizers import Tokenizer
 
     paths = _get_model_paths()
-    logger.info(f"首次调用，正在加载模型：{paths['tokenizer']}")
+    logger.info(f"首次调用，正在加载模型：{paths['onnx']}")
 
     _tokenizer = Tokenizer.from_file(paths["tokenizer"])
     _ort_sess = ort.InferenceSession(paths["onnx"], providers=["CPUExecutionProvider"])
