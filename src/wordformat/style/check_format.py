@@ -347,8 +347,10 @@ class ParagraphStyle:
                         f"行距修正，原：{LineSpacing.to_string(diff.current_value)}；"
                     )
                 case "first_line_indent":
+                    if diff.expected_value == 0:
+                        paragraph.paragraph_format.first_line_indent = None
                     set_paragraph_first_line_indent(paragraph, diff.expected_value)
-                    tmp_str = f"首行缩进修正，原：{FirstLineIndent.to_string(diff.current_value)}字符；"
+                    tmp_str = f"首行缩进{diff.expected_value}字符，原：{FirstLineIndent.to_string(diff.current_value)}字符；"  # noqa E501
                 case "builtin_style_name":
                     paragraph.style = diff.expected_value
                     tmp_str = f"内置样式修正，原：{BuiltInStyle.to_string(diff.current_value)}；"

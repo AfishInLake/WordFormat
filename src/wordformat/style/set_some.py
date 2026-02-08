@@ -180,7 +180,6 @@ def set_paragraph_first_line_indent(  # noqa C901
     :return: 设置成功返回True，失败返回False
     """
     try:
-        # 入参校验
         if unit not in ["char", "pt"]:
             logger.error(f"不支持的缩进单位：{unit}，仅支持char/pt")
             return False
@@ -189,40 +188,47 @@ def set_paragraph_first_line_indent(  # noqa C901
             value = 0
 
         p = para._element
-        pPr = p.find(qn("w:pPr"))
-        # 无pPr节点则创建
-        if pPr is None:
-            pPr = parse_xml(
-                r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-            )
-            p.append(pPr)
+        pPr = p.get_or_add_pPr()
 
-        # 核心步骤1：清除原有缩进节点（避免新旧设置冲突）
+        # 保留 left / right
+        existing_left = None
+        existing_right = None
         ind = pPr.find(qn("w:ind"))
         if ind is not None:
+            existing_left = ind.get(qn("w:left"))
+            existing_right = ind.get(qn("w:right"))
             pPr.remove(ind)
 
-        # 核心步骤2：根据单位构建新的ind节点
-        if unit == "char":
-            # 字符单位：值×100 → firstLineChars（如2 → 200）
-            chars_int = int(round(float(value) * 100))  # 四舍五入取整，贴合Word存储
-            ind_xml = f'''
-             <w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-                    w:firstLineChars="{chars_int}"/>
-             '''
-        else:
-            # 物理单位：pt值×20 → twips，写入firstLine（如24pt → 480twips）
-            indent_pt = int(value)
-            indent_twips = indent_pt * 20
-            ind_xml = f'''
-             <w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-                    w:firstLine="{indent_twips}"/>
-             '''
+        attrs = {}
+        if existing_left is not None:
+            attrs["w:left"] = existing_left
+        if existing_right is not None:
+            attrs["w:right"] = existing_right
 
-        # 插入新的缩进XML节点
-        new_ind = parse_xml(ind_xml.strip())
+        if value == 0:
+            # ✅ 现实主义方案：同时写 firstLine=0 和 firstLineChars=0
+            # 虽然冗余，但能确保 WPS/Word 都清零
+            attrs["w:firstLine"] = "0"
+            attrs["w:firstLineChars"] = "0"
+            attrs["w:hanging"] = "0"  # 顺手清 hanging
+        else:
+            if unit == "char":
+                chars_int = int(round(float(value) * 100))
+                attrs["w:firstLineChars"] = str(chars_int)
+                # 同时写 firstLine 作为 fallback（可选）
+                # twips = chars_int * 20 // 100  # 粗略换算
+                # attrs["w:firstLine"] = str(twips)
+            else:
+                indent_twips = int(value) * 20
+                attrs["w:firstLine"] = str(indent_twips)
+                # 可选：也写 firstLineChars 作为 fallback
+                # chars = int(indent_twips / 20)  # 不精确，慎用
+
+        attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
+        ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501
+
+        new_ind = parse_xml(ind_xml)
         pPr.append(new_ind)
-        logger.debug(f"首行缩进设置成功：{value}{unit} → XML字段：{ind_xml.strip()}")
         return True
 
     except Exception as e:
