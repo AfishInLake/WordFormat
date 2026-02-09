@@ -26,8 +26,7 @@ MODEL = os.getenv("WORDFORMAT_MODEL", "")
 MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
 BATCH_SIZE = os.getenv("BATCH_SIZE", 64)
-BERT_MODEL = "model/20260204/"
-
+ONNX_VERSION = "20260204"
 CHARACTER_STYLE_CHECKS = {
     "bold": True,
     "italic": True,
