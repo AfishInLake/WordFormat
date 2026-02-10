@@ -26,6 +26,7 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
             space_before=cfg.space_before,
             space_after=cfg.space_after,
             line_spacing=cfg.line_spacing,
+            line_spacingrule=cfg.line_spacingrule,
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
@@ -52,7 +53,7 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
                 doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
+            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
         )
 
 
@@ -77,6 +78,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
             space_before=cfg.chinese_content.space_before,
             space_after=cfg.chinese_content.space_after,
             line_spacing=cfg.chinese_content.line_spacing,
+            line_spacingrule=cfg.chinese_content.line_spacingrule,
             first_line_indent=cfg.chinese_content.first_line_indent,
             builtin_style_name=cfg.chinese_content.builtin_style_name,
         )
@@ -121,7 +123,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
                 doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
+            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
         )
 
 
@@ -138,6 +140,7 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
             space_before=cfg.space_before,
             space_after=cfg.space_after,
             line_spacing=cfg.line_spacing,
+            line_spacingrule=cfg.line_spacingrule,
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
@@ -163,7 +166,7 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
                 doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
+            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
         )
 
 
@@ -180,6 +183,7 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
             space_before=cfg.space_before,
             space_after=cfg.space_after,
             line_spacing=cfg.line_spacing,
+            line_spacingrule=cfg.line_spacingrule,
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
@@ -239,6 +243,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
             space_before=cfg.english_content.space_before,
             space_after=cfg.english_content.space_after,
             line_spacing=cfg.english_content.line_spacing,
+            line_spacingrule=cfg.english_content.line_spacingrule,
             first_line_indent=cfg.english_content.first_line_indent,
             builtin_style_name=cfg.english_content.builtin_style_name,
         )
@@ -280,7 +285,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
                 doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text="".join([str(dr) for dr in issues])
+            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
         )
 
 
@@ -297,6 +302,7 @@ class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
             space_before=cfg.space_before,
             space_after=cfg.space_after,
             line_spacing=cfg.line_spacing,
+            line_spacingrule=cfg.line_spacingrule,
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )

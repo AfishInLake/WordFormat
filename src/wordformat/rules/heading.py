@@ -76,6 +76,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             space_before=cfg.space_before,
             space_after=cfg.space_after,
             line_spacing=cfg.line_spacing,
+            line_spacingrule=cfg.line_spacingrule,
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
@@ -129,7 +130,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text=f"{''.join(str(dr) for dr in paragraph_issues)}",
+                text=ParagraphStyle.to_string(paragraph_issues),
             )
 
         # 添加字符样式问题

@@ -354,7 +354,7 @@ def _get_font_size_pt(paragraph):
     return max(result) if result else default_font_size_pt
 
 
-def paragraph_get_first_line_indent(paragraph: Paragraph):  # noqa c901
+def paragraph_get_first_line_indent(paragraph: Paragraph) -> float | None:  # noqa c901
     """
     精准获取首行缩进，优先解析XML字符单位（firstLineChars），兼容物理单位
     :param para: 目标段落对象
@@ -367,12 +367,12 @@ def paragraph_get_first_line_indent(paragraph: Paragraph):  # noqa c901
         p = paragraph._element
         pPr = p.find(qn("w:pPr"))
         if pPr is None:
-            return 0.0
+            return None
 
         # 获取XML中的ind节点（缩进核心节点）
         ind = pPr.find(qn("w:ind"))
         if ind is None:
-            return 0.0
+            return None
 
         # 步骤1：优先解析字符单位 firstLineChars（核心：值=字符数×100）
         first_line_chars = ind.get(qn("w:firstLineChars"))
@@ -400,11 +400,11 @@ def paragraph_get_first_line_indent(paragraph: Paragraph):  # noqa c901
             return round(char_visual, 1)
 
         # 无任何缩进设置
-        return 0.0
+        return None
 
     except Exception as e:
         logger.error(f"获取首行缩进失败：{e}")
-        return 0.0
+        return None
 
 
 def paragraph_get_builtin_style_name(paragraph: Paragraph):
@@ -441,7 +441,7 @@ def run_get_font_name(run: Run) -> str | None:
     return None
 
 
-def run_get_font_size(run: Run):
+def run_get_font_size_pt(run: Run):
     """
     获取run的字体大小
     Params:
@@ -453,7 +453,6 @@ def run_get_font_size(run: Run):
     font_size = run.font.size
     if font_size is not None:
         return font_size.pt
-    # 直接取段落样式的字号（大多数情况足够）
     style = run._parent.style
     if style and style.font.size is not None:
         return style.font.size.pt

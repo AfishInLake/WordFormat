@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
@@ -19,20 +19,11 @@ from wordformat.style.get_some import (
     paragraph_get_line_spacing,
     paragraph_get_space_after,
     paragraph_get_space_before,
-    run_get_font_bold,
     run_get_font_color,
-    run_get_font_italic,
     run_get_font_name,
-    run_get_font_size,
-    run_get_font_underline,
+    run_get_font_size_pt,
 )
 
-from .set_some import (
-    run_set_font_name,
-    set_paragraph_first_line_indent,
-    set_paragraph_space_after,
-    set_paragraph_space_before,
-)
 from .style_enum import (
     Alignment,
     BuiltInStyle,
@@ -41,6 +32,7 @@ from .style_enum import (
     FontName,
     FontSize,
     LineSpacing,
+    LineSpacingRule,
     Spacing,
 )
 
@@ -95,17 +87,17 @@ class CharacterStyle:
         italic: bool = False,
         underline: bool = False,
     ):
-        self.font_name_cn: str = FontName.from_label(font_name_cn)
-        self.font_name_en: str = FontName.from_label(font_name_en)
-        self.font_size: float = FontSize.from_label(font_size)
-        self.font_color: tuple = FontColor.from_label(font_color)
+        self.font_name_cn: FontName = FontName(font_name_cn)
+        self.font_name_en: FontName = FontName(font_name_en)
+        self.font_size: FontSize = FontSize(font_size)
+        self.font_color: FontColor = FontColor(font_color)
         self.bold: bool = bold
         self.italic: bool = italic
         self.underline: bool = underline
         if globals()["style_checks_warning"] is None:
             globals()["style_checks_warning"] = get_config().style_checks_warning
 
-    def diff_from_run(self, run) -> list[DIFFResult]:  # noqa c901
+    def diff_from_run(self, run: Run) -> list[DIFFResult]:  # noqa c901
         """
         检查段落样式和指定样式是否一致
         """
@@ -113,54 +105,52 @@ class CharacterStyle:
         diffs = []
 
         # 1. 加粗
-        bold = run_get_font_bold(run)
+        bold = bool(run.font.bold)
         if bold != self.bold:
             diffs.append(
                 DIFFResult(
                     "bold",
                     self.bold,
                     bold,
-                    f"期待{'加粗' if self.bold else '不加粗'}，实际{'加粗' if bold else '不加粗'};",
+                    f"期待{'加粗' if self.bold else '不加粗'};",
                     1,
                 )
             )
         # 2. 斜体
-        italic = run_get_font_italic(run)
+        italic = bool(run.font.italic)
         if italic != self.italic:
             diffs.append(
                 DIFFResult(
                     "italic",
                     self.italic,
                     italic,
-                    f"期待{'斜体' if self.italic else '非斜体'}，实际{'斜体' if italic else '非斜体'};",
+                    f"期待{'斜体' if self.italic else '非斜体'};",
                     1,
                 )
             )
 
         # 3. 下划线
-        underline = run_get_font_underline(run)
+        underline = bool(run.font.underline)
         if underline != self.underline:
             diffs.append(
                 DIFFResult(
                     "underline",
                     self.underline,
                     underline,
-                    f"期待{'有下划线' if self.underline else '无下划线'}，"
-                    f"实际{'有下划线' if underline else '无下划线'};",
+                    f"期待{'有下划线' if self.underline else '无下划线'};",
                     1,
                 )
             )
 
         # 4. 字号
-        current_size = run_get_font_size(run)
+        current_size = run_get_font_size_pt(run)
         if current_size != self.font_size:
             diffs.append(
                 DIFFResult(
                     "font_size",
                     self.font_size,
                     current_size,
-                    f"期待字号{FontSize.to_string(self.font_size)}，"
-                    f"实际字号{FontSize.to_string(current_size)};",
+                    f"期待字号{str(self.font_size)};",
                     1,
                 )
             )
@@ -173,8 +163,7 @@ class CharacterStyle:
                     "font_color",
                     self.font_color,
                     current_color,
-                    f"期待字体颜色{FontColor.to_string(self.font_color)}, "
-                    f"实际字体颜色{FontColor.to_string(current_color)};",
+                    f"期待字体颜色{str(self.font_color)};",
                     1,
                 )
             )
@@ -187,7 +176,7 @@ class CharacterStyle:
                     "font_name_cn",
                     self.font_name_cn,
                     font_name,
-                    f"期待的中文字体:{self.font_name_cn}，实际的字体:{font_name}",
+                    f"期待的中文字体:{str(self.font_name_cn)}",
                     1,
                 )
             )
@@ -199,8 +188,7 @@ class CharacterStyle:
                     "font_name_en",
                     self.font_name_en,
                     ascii_font,
-                    f"期待的英文字体:{self.font_name_en}，"
-                    f"实际的字体:{ascii_font if ascii_font else '无'}",
+                    f"期待的英文字体:{str(self.font_name_en)};",
                     1,
                 )
             )
@@ -217,36 +205,28 @@ class CharacterStyle:
                 case "bold":
                     run.bold = diff.expected_value
                     tmp_str = (
-                        f"加粗修正，原：{'加粗' if diff.current_value else '非加粗'}；"
+                        f"加粗修正，原：{'加粗' if diff.current_value else '非加粗'};"
                     )
                 case "italic":
                     run.italic = diff.expected_value
                     tmp_str = (
-                        f"斜体修正，原：{'斜体' if diff.current_value else '非斜体'}；"
+                        f"斜体修正，原：{'斜体' if diff.current_value else '非斜体'};"
                     )
                 case "underline":
                     run.underline = diff.expected_value
-                    tmp_str = f"下划线修正，原：{'有下划线' if diff.current_value else '无下划线'}；"
+                    tmp_str = f"下划线修正，原：{'有下划线' if diff.current_value else '无下划线'};"
                 case "font_size":
-                    run.font.size = Pt(diff.expected_value)
-                    tmp_str = (
-                        f"字号修正，原：{FontSize.to_string(diff.current_value)}；"
-                    )
+                    self.font_size.format(docx_obj=run)
+                    tmp_str = f"字号修正:{str(self.font_size)};"
                 case "font_color":
-                    run.font.color.rgb = FontColor.to_RGBObject(diff.expected_value)
-                    tmp_str = (
-                        f"字体颜色修正，原：{FontColor.to_string(diff.current_value)}；"
-                    )
+                    self.font_color.format(docx_obj=run)
+                    tmp_str = f"字体颜色修正:{str(self.font_color)};"
                 case "font_name_cn":
-                    run_set_font_name(run, diff.expected_value)
-                    tmp_str = (
-                        f"中文字体修正，原：{FontName.to_string(diff.current_value)}；"
-                    )
+                    self.font_name_cn.format(docx_obj=run)
+                    tmp_str = f"中文字体修正：{str(self.font_name_cn)};"
                 case "font_name_en":
-                    run.font.name = diff.expected_value
-                    tmp_str = (
-                        f"英文字体修正，原：{FontName.to_string(diff.current_value)}；"
-                    )
+                    self.font_name_en.format(docx_obj=run)
+                    tmp_str = f"英文字体修正：{str(self.font_name_en)};"
                 case _:
                     logger.warning(f"未知的 diff_type: {diff.diff_type}")
             diff.comment = tmp_str
@@ -304,20 +284,20 @@ class ParagraphStyle:
     def __init__(
         self,
         alignment: str = "左对齐",
-        space_before: float = 0.0,
-        space_after: float = 0.0,
-        line_spacing: float | str = 1.5,
-        first_line_indent: float | str = 0.0,
+        space_before: str = "0.5行",
+        space_after: str = "0.5行",
+        line_spacing: str = "1.5倍",
+        line_spacingrule: str = "单倍行距",
+        first_line_indent: str = "0字符",
         builtin_style_name: str = "正文",
     ):
-        self.alignment: tuple = Alignment.from_label(alignment)
-        self.space_before: float = float(Spacing.from_label(space_before))
-        self.space_after: float = float(Spacing.from_label(space_after))
-        self.line_spacing: LineSpacing | float = LineSpacing.from_label(line_spacing)
-        self.first_line_indent: FirstLineIndent | float = FirstLineIndent.from_label(
-            first_line_indent
-        )
-        self.builtin_style_name: str = BuiltInStyle.from_label(builtin_style_name)
+        self.alignment: Alignment = Alignment(alignment)
+        self.space_before: Spacing = Spacing(space_before)
+        self.space_after: Spacing = Spacing(space_after)
+        self.line_spacing: LineSpacing | float = LineSpacing(line_spacing)
+        self.line_spacingrule: LineSpacingRule = LineSpacingRule(line_spacingrule)
+        self.first_line_indent: FirstLineIndent = FirstLineIndent(first_line_indent)
+        self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
         if globals()["style_checks_warning"] is None:
             globals()["style_checks_warning"] = get_config().style_checks_warning
 
@@ -331,29 +311,26 @@ class ParagraphStyle:
             tmp_str = ""
             match diff.diff_type:
                 case "alignment":
-                    paragraph.alignment = diff.expected_value
-                    tmp_str = (
-                        f"对齐方式修正，原：{Alignment.to_string(diff.current_value)}；"
-                    )
+                    self.alignment.format(docx_obj=paragraph)
+                    tmp_str = f"对齐方式修正：{str(self.alignment)};"
                 case "space_before":
-                    set_paragraph_space_before(paragraph, diff.expected_value)
-                    tmp_str = f"段前间距修正，原：{diff.current_value}行；"
+                    self.space_before.format(docx_obj=paragraph, spacing_type="before")
+                    tmp_str = f"段前间距修正：{str(self.space_before)};"
                 case "space_after":
-                    set_paragraph_space_after(paragraph, diff.expected_value)
-                    tmp_str = f"段后间距修正，原：{diff.current_value}行；"
+                    self.space_after.format(docx_obj=paragraph, spacing_type="after")
+                    tmp_str = f"段后间距修正：{str(self.space_after)};"
+                case "line_spacing_rule":
+                    self.line_spacingrule.format(docx_obj=paragraph)
+                    tmp_str = f"间距修正：{str(self.line_spacingrule)};"
                 case "line_spacing":
-                    paragraph.style.paragraph_format.line_spacing = diff.expected_value
-                    tmp_str = (
-                        f"行距修正，原：{LineSpacing.to_string(diff.current_value)}；"
-                    )
+                    self.line_spacing.format(docx_obj=paragraph)
+                    tmp_str = f"行距修正：{str(self.line_spacing)};"
                 case "first_line_indent":
-                    if diff.expected_value == 0:
-                        paragraph.paragraph_format.first_line_indent = None
-                    set_paragraph_first_line_indent(paragraph, diff.expected_value)
-                    tmp_str = f"首行缩进{diff.expected_value}字符，原：{FirstLineIndent.to_string(diff.current_value)}字符；"  # noqa E501
+                    self.first_line_indent.format(docx_obj=paragraph)
+                    tmp_str = f"首行缩进修正;{str(self.first_line_indent)};"  # noqa E501
                 case "builtin_style_name":
-                    paragraph.style = diff.expected_value
-                    tmp_str = f"内置样式修正，原：{BuiltInStyle.to_string(diff.current_value)}；"
+                    self.builtin_style_name.format(docx_obj=paragraph)
+                    tmp_str = f"内置样式修正：{str(self.builtin_style_name)};"
                 case _:
                     # 替换原异常抛出，改用日志记录未知类型，避免程序中断
                     logger.warning(
@@ -366,47 +343,89 @@ class ParagraphStyle:
         # 返回所有修正结果，便于外部查看/记录
         return result
 
-    def diff_from_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:
+    def diff_from_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
         """检查当前段落样式与给定段落样式的差异"""
         if not paragraph:
             return []
         diffs = []
         # 对齐方式
         alignment = paragraph_get_alignment(paragraph)
-        alignment = alignment if alignment else Alignment.LEFT  # 默认左对齐
+        alignment = alignment if alignment else WD_ALIGN_PARAGRAPH.LEFT  # 默认左对齐
         if self.alignment != alignment:
             diffs.append(
                 DIFFResult(
                     "alignment",
                     self.alignment,
                     alignment,
-                    f"对齐方式期待{Alignment.to_string(self.alignment)},"
-                    f"实际{Alignment.to_string(alignment)};",
+                    f"对齐方式期待{str(self.alignment)};",
                     0,
                 )
             )
-        # 段前间距(行)
-        space_before = paragraph_get_space_before(paragraph)
-        if self.space_before != space_before:
+        # 段前间距
+        unit = self.space_before.rel_unit
+        match unit:
+            case "hang":
+                # 段前间距(行)
+                space_before = paragraph_get_space_before(paragraph)
+            case "pt":
+                space_before = paragraph.paragraph_format.space_before.pt
+            case "mm":
+                space_before = paragraph.paragraph_format.space_before.mm
+            case "cm":
+                space_before = paragraph.paragraph_format.space_before.cm
+            case "inch":
+                space_before = paragraph.paragraph_format.space_before.inches
+            case _:
+                raise ValueError(f"未知的段前间距单位: {unit}")
+        if self.space_before != Spacing(f"{space_before}{self.space_before.unit_ch}"):
             diffs.append(
                 DIFFResult(
                     "space_before",
                     self.space_before,
                     space_before,
-                    f"段前间距期待{self.space_before}行，实际{space_before}行;",
+                    f"段前间距期待{str(self.space_before)};",
                     1,
                 )
             )
         # 段后间距(行)
-        space_after = paragraph_get_space_after(paragraph)
-        if self.space_after != space_after:
+        unit = self.space_after.rel_unit
+        match unit:
+            case "hang":
+                # 段前间距(行)
+                space_after = paragraph_get_space_after(paragraph)
+            case "pt":
+                space_after = paragraph.paragraph_format.space_after.pt
+            case "mm":
+                space_after = paragraph.paragraph_format.space_after.mm
+            case "cm":
+                space_after = paragraph.paragraph_format.space_after.cm
+            case "inch":
+                space_after = paragraph.paragraph_format.space_after.inches
+            case _:
+                raise ValueError(f"未知的段后间距单位: {unit}")
+        if self.space_after != Spacing(f"{space_after}{self.space_after.unit_ch}"):
             diffs.append(
                 DIFFResult(
                     "space_after",
                     self.space_after,
                     space_after,
-                    f"段后间距期待{self.space_before}行，实际{space_before}行;",
+                    f"段后间距期待{str(self.space_after)};",
                     1,
+                )
+            )
+        # 行距选项
+        linespacingrule = paragraph.paragraph_format.line_spacing_rule
+        linespacingrule = (
+            linespacingrule if linespacingrule else WD_LINE_SPACING.MULTIPLE
+        )  # 默认单倍行距
+        if self.line_spacingrule != linespacingrule:
+            diffs.append(
+                DIFFResult(
+                    "line_spacing_rule",
+                    self.line_spacingrule,
+                    linespacingrule,
+                    f"行距选项期待{str(self.line_spacingrule)};",
+                    2,
                 )
             )
         # 行距
@@ -417,35 +436,82 @@ class ParagraphStyle:
                     "line_spacing",
                     self.line_spacing,
                     line_spacing,
-                    f"行距期待{LineSpacing.to_string(self.line_spacing)}，"
-                    f"实际{LineSpacing.to_string(line_spacing)};",
-                    2,
+                    f"行距期待{str(self.line_spacing)};",
+                    3,
                 )
             )
         # 首行缩进
-        first_line_indent = paragraph_get_first_line_indent(paragraph)
+        unit = self.first_line_indent.rel_unit
+        if paragraph.paragraph_format.first_line_indent is None:
+            first_line_indent = paragraph_get_first_line_indent(paragraph)
+            if first_line_indent is None:  # 无首行缩进
+                first_line_indent = float("inf")
+        else:
+            match unit:
+                case "char":
+                    # 段前间距(行)
+                    first_line_indent = paragraph_get_first_line_indent(paragraph)
+                case "pt":
+                    first_line_indent = paragraph.paragraph_format.first_line_indent.pt
+                case "mm":
+                    first_line_indent = paragraph.paragraph_format.first_line_indent.mm
+                case "cm":
+                    first_line_indent = paragraph.paragraph_format.first_line_indent.cm
+                case "inch":
+                    first_line_indent = (
+                        paragraph.paragraph_format.first_line_indent.inches
+                    )
+                case _:
+                    raise ValueError(f"未知的段前间距单位: {unit}")
         if self.first_line_indent != first_line_indent:
             diffs.append(
                 DIFFResult(
                     "first_line_indent",
                     self.first_line_indent,
                     first_line_indent,
-                    f"首行缩进期待{FirstLineIndent.to_string(self.first_line_indent)}字符，"
-                    f"实际{FirstLineIndent.to_string(first_line_indent)}字符;",
+                    f"首行缩进期待{str(self.first_line_indent)};",
                     1,
                 )
             )
         # 样式
         builtin_style_name = paragraph_get_builtin_style_name(paragraph)
-        if self.builtin_style_name.lower() != builtin_style_name:
+        if self.builtin_style_name != builtin_style_name:
             diffs.append(
                 DIFFResult(
                     "builtin_style_name",
                     self.builtin_style_name,
                     builtin_style_name,
-                    f"样式期待{BuiltInStyle.to_string(self.builtin_style_name)}样式，"
-                    f"实际{BuiltInStyle.to_string(builtin_style_name)}样式;",
+                    f"样式期待{str(self.builtin_style_name)};",
                     0,
                 )
             )
         return sorted(diffs, key=lambda x: x.level)
+
+    @staticmethod
+    def to_string(value: list[DIFFResult]):
+        t = []
+        for diff in value:
+            if style_checks_warning.alignment and diff.diff_type == "alignment":
+                t.append(diff)
+            if style_checks_warning.space_before and diff.diff_type == "space_before":
+                t.append(diff)
+            if style_checks_warning.space_after and diff.diff_type == "space_after":
+                t.append(diff)
+            if style_checks_warning.line_spacing and diff.diff_type == "line_spacing":
+                t.append(diff)
+            if (
+                style_checks_warning.line_spacingrule
+                and diff.diff_type == "line_spacingrule"
+            ):
+                t.append(diff)
+            if (
+                style_checks_warning.first_line_indent
+                and diff.diff_type == "first_line_indent"
+            ):
+                t.append(diff)
+            if (
+                style_checks_warning.builtin_style_name
+                and diff.diff_type == "builtin_style_name"
+            ):
+                t.append(diff)
+        return "\n".join([str(i) for i in t])

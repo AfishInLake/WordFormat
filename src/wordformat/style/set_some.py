@@ -6,8 +6,10 @@
 设置 段落/字体 属性
 """
 
+from docx.enum.text import WD_LINE_SPACING
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
+from docx.shared import Cm, Inches, Mm, Pt
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
@@ -101,136 +103,334 @@ def set_paragraph_space_after_by_lines(paragraph: Paragraph, lines: float) -> No
     _paragraph_space_by_lines(paragraph, after_lines=lines)
 
 
-def set_paragraph_space_before(paragraph: Paragraph, before_lines: float):
-    """
-    设置段落**段前间距**（单位：行），与paragraph_get_space_before逻辑完全对齐
-    核心规则：Lines属性存储（×100）→ 自动创建缺失节点 → 兼容Word原生逻辑
-    :param paragraph: 目标Paragraph对象
-    :param before_lines: 段前间距（行），支持浮点数（如0.5/1/1.5）
-    """
-    _set_paragraph_spacing(paragraph, spacing_type="before", target_lines=before_lines)
+class _SetSpacing:
+    """设置间距距函数"""
+
+    @staticmethod
+    def set_hang(paragraph: Paragraph, spacing_type: str, value: float):
+        """
+        核心通用设置逻辑：段前/段后间距统一处理（行→Lines属性×100）
+        完全复刻Word逻辑：
+        1. 优先设置w:XXLines属性（值=行×100，Word原生存储规则）
+        2. 自动创建pPr/spacing缺失的XML节点，无空值报错
+        3. 清除兜底的w:XX twips属性，避免与Lines属性冲突
+        4. 支持浮点数行值（如0.5行→50，1.2行→120）
+        """
+        try:
+            # 校验行值：非负数，过大值兜底（避免排版异常）
+            value = max(float(value), 0.0)
+            if value > 10.0:
+                logger.warning(f"间距{value}行过大，自动兜底为10行")
+                value = 10.0
+
+            # 核心：Word中Lines属性以「1/100行」为单位存储（如0.5行→50，1行→100）
+            lines_100unit = int(round(value * 100))  # 四舍五入为整数，匹配Word存储
+
+            p = paragraph._element
+            # 步骤1：创建/获取pPr节点（段落属性根节点，无则创建）
+            pPr = p.find(qn("w:pPr"))
+            if pPr is None:
+                pPr = parse_xml(
+                    r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+                )
+                p.append(pPr)
+
+            # 步骤2：创建/获取spacing节点（间距节点，无则创建）
+            spacing = pPr.find(qn("w:spacing"))
+            if spacing is None:
+                spacing = parse_xml(
+                    r'<w:spacing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+                )
+                pPr.append(spacing)
+
+            # 步骤3：设置核心属性w:XXLines（优先级最高，与获取函数对应）
+            spacing.set(qn(f"w:{spacing_type}Lines"), str(lines_100unit))
+
+            # 步骤4：清除兜底的w:XX twips属性，避免冲突（Word会优先读取Lines，清除后更纯净）
+            if spacing.get(qn(f"w:{spacing_type}")) is not None:
+                spacing.attrib.pop(qn(f"w:{spacing_type}"))
+
+        except Exception as e:
+            logger.error(f"设置段落{spacing_type}间距{value}行失败: {e}")
+
+    @staticmethod
+    def set_pt(paragraph: Paragraph, spacing_type: str, target_value: float):
+        """
+        使用 PT/磅 为单位设置间距（1磅=1PT）
+        Args:
+            paragraph: 目标段落对象
+            spacing_type: 间距类型（"before"=段前，"after"=段后）
+            target_value: PT/磅数值
+        """
+        if spacing_type == "before":
+            paragraph.paragraph_format.space_before = Pt(target_value)
+        else:
+            paragraph.paragraph_format.space_after = Pt(target_value)
+
+    @staticmethod
+    def set_cm(paragraph: Paragraph, spacing_type: str, target_value: float):
+        """
+        使用 厘米(cm/CM) 为单位设置间距
+        Args:
+            paragraph: 目标段落对象
+            spacing_type: 间距类型（"before"=段前，"after"=段后）
+            target_value: 厘米数值
+        """
+        if spacing_type == "before":
+            paragraph.paragraph_format.space_before = Cm(target_value)
+        else:
+            paragraph.paragraph_format.space_after = Cm(target_value)
+
+    @staticmethod
+    def set_inch(paragraph: Paragraph, spacing_type: str, target_value: float):
+        """
+        使用 英寸(inch/Inches) 为单位设置间距
+        Args:
+            paragraph: 目标段落对象
+            spacing_type: 间距类型（"before"=段前，"after"=段后）
+            target_value: 英寸数值
+        """
+        if spacing_type == "before":
+            paragraph.paragraph_format.space_before = Inches(target_value)
+        else:
+            paragraph.paragraph_format.space_after = Inches(target_value)
+
+    @staticmethod
+    def set_mm(paragraph: Paragraph, spacing_type: str, target_value: float):
+        """
+        使用 毫米(mm/MM) 为单位设置间距
+        Args:
+            paragraph: 目标段落对象
+            spacing_type: 间距类型（"before"=段前，"after"=段后）
+            target_value: 毫米数值
+        """
+        if spacing_type == "before":
+            paragraph.paragraph_format.space_before = Mm(target_value)
+        else:
+            paragraph.paragraph_format.space_after = Mm(target_value)
 
 
-def set_paragraph_space_after(paragraph: Paragraph, after_lines: float):
+class _SetLineSpacing:
     """
-    设置段落**段后间距**（单位：行），与paragraph_get_space_after逻辑完全对齐
-    :param paragraph: 目标Paragraph对象
-    :param after_lines: 段后间距（行），支持浮点数（如0.5/1/1.5）
+    设置段落行距
     """
-    _set_paragraph_spacing(paragraph, spacing_type="after", target_lines=after_lines)
+
+    @staticmethod
+    def set_pt(paragraph: Paragraph, target_value: float):
+        """
+        使用 PT/磅 为单位设置行距
+        Args:
+            paragraph: 段落对象
+            target_value: PT/磅数值
+        """
+        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        paragraph.paragraph_format.line_spacing = Pt(target_value)
+
+    @staticmethod
+    def set_cm(paragraph: Paragraph, target_value: float):
+        """
+        使用 厘米(cm/CM) 为单位设置行距
+        Args:
+            paragraph: 段落对象
+            target_value: 厘米数值
+        """
+        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        paragraph.paragraph_format.line_spacing = Cm(target_value)
+
+    @staticmethod
+    def set_inch(paragraph: Paragraph, target_value: float):
+        """
+        使用 英寸(inch/Inches) 为单位设置行距
+        Args:
+            paragraph: 段落对象
+            target_value: 英寸数值
+        """
+        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        paragraph.paragraph_format.line_spacing = Inches(target_value)
+
+    @staticmethod
+    def set_mm(paragraph: Paragraph, target_value: float):
+        """
+        使用 毫米(mm/MM) 为单位设置行距
+        Args:
+            paragraph: 段落对象
+            target_value: 毫米数值
+        """
+        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+        paragraph.paragraph_format.line_spacing = Mm(target_value)
 
 
-def _set_paragraph_spacing(
-    paragraph: Paragraph, spacing_type: str, target_lines: float
-):
+class _SetFirstLineIndent:
     """
-    核心通用设置逻辑：段前/段后间距统一处理（行→Lines属性×100）
-    完全复刻Word逻辑：
-    1. 优先设置w:XXLines属性（值=行×100，Word原生存储规则）
-    2. 自动创建pPr/spacing缺失的XML节点，无空值报错
-    3. 清除兜底的w:XX twips属性，避免与Lines属性冲突
-    4. 支持浮点数行值（如0.5行→50，1.2行→120）
+    设置段落首行缩进
     """
-    try:
-        # 校验行值：非负数，过大值兜底（避免排版异常）
-        target_lines = max(float(target_lines), 0.0)
-        if target_lines > 10.0:
-            logger.warning(f"间距{target_lines}行过大，自动兜底为10行")
-            target_lines = 10.0
 
-        # 核心：Word中Lines属性以「1/100行」为单位存储（如0.5行→50，1行→100）
-        lines_100unit = int(round(target_lines * 100))  # 四舍五入为整数，匹配Word存储
-
+    @staticmethod
+    def clear(paragraph: Paragraph):
+        """
+        清除段落的首行缩进设置（包括 firstLine 和 firstLineChars 字段），
+        同时保留左缩进（left）和右缩进（right）
+        Args:
+            paragraph: 段落对象
+        """
         p = paragraph._element
-        # 步骤1：创建/获取pPr节点（段落属性根节点，无则创建）
-        pPr = p.find(qn("w:pPr"))
-        if pPr is None:
-            pPr = parse_xml(
-                r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-            )
-            p.append(pPr)
-
-        # 步骤2：创建/获取spacing节点（间距节点，无则创建）
-        spacing = pPr.find(qn("w:spacing"))
-        if spacing is None:
-            spacing = parse_xml(
-                r'<w:spacing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-            )
-            pPr.append(spacing)
-
-        # 步骤3：设置核心属性w:XXLines（优先级最高，与获取函数对应）
-        spacing.set(qn(f"w:{spacing_type}Lines"), str(lines_100unit))
-
-        # 步骤4：清除兜底的w:XX twips属性，避免冲突（Word会优先读取Lines，清除后更纯净）
-        if spacing.get(qn(f"w:{spacing_type}")) is not None:
-            spacing.attrib.pop(qn(f"w:{spacing_type}"))
-
-    except Exception as e:
-        logger.error(f"设置段落{spacing_type}间距{target_lines}行失败: {e}")
-
-
-def set_paragraph_first_line_indent(  # noqa C901
-    para: Paragraph, value: float | int, unit: str = "char"
-):
-    """
-    设置首行缩进，支持字符/物理单位，写入Word原生XML字段（firstLineChars/firstLine）
-    :param para: 目标段落对象
-    :param value: 缩进值（字符单位为浮点数/整数，如2/2.0；物理单位为整数pt，如24）
-    :param unit: 缩进单位，char=字符单位（默认），pt=物理单位
-    :return: 设置成功返回True，失败返回False
-    """
-    try:
-        if unit not in ["char", "pt"]:
-            logger.error(f"不支持的缩进单位：{unit}，仅支持char/pt")
-            return False
-        if value < 0:
-            logger.warning("缩进值不能为负，自动置为0")
-            value = 0
-
-        p = para._element
         pPr = p.get_or_add_pPr()
-
-        # 保留 left / right
-        existing_left = None
-        existing_right = None
         ind = pPr.find(qn("w:ind"))
-        if ind is not None:
-            existing_left = ind.get(qn("w:left"))
-            existing_right = ind.get(qn("w:right"))
+
+        if ind is None:
+            # 没有缩进设置，无需操作
+            return
+
+        # 保留 left 和 right
+        left = ind.get(qn("w:left"))
+        right = ind.get(qn("w:right"))
+
+        # 创建新的属性字典，只保留 left / right
+        new_attrs = {}
+        if left is not None:
+            new_attrs[qn("w:left")] = left
+        if right is not None:
+            new_attrs[qn("w:right")] = right
+
+        if new_attrs:
+            # 有保留的属性，更新 <w:ind>
+            # 先清空所有属性
+            ind.clear()
+            # 再设置保留的属性
+            for k, v in new_attrs.items():
+                ind.set(k, v)
+        else:
+            # 没有保留属性，直接删除 <w:ind>
             pPr.remove(ind)
 
-        attrs = {}
-        if existing_left is not None:
-            attrs["w:left"] = existing_left
-        if existing_right is not None:
-            attrs["w:right"] = existing_right
+    @staticmethod
+    def set_char(  # noqa C901
+        paragraph: Paragraph, value: float | int, unit: str = "char"
+    ):
+        """
+        设置首行缩进，支持字符/物理单位，写入Word原生XML字段（firstLineChars/firstLine）
+        :param para: 目标段落对象
+        :param value: 缩进值（字符单位为浮点数/整数，如2/2.0；物理单位为整数pt，如24）
+        :param unit: 缩进单位，char=字符单位（默认），pt=物理单位
+        :return: 设置成功返回True，失败返回False
+        """
+        _SetFirstLineIndent.clear(paragraph)
+        try:
+            if unit not in ["char", "pt"]:
+                logger.error(f"不支持的缩进单位：{unit}，仅支持char/pt")
+                return False
+            if value < 0:
+                logger.warning("缩进值不能为负，自动置为0")
+                value = 0
 
-        if value == 0:
-            # ✅ 现实主义方案：同时写 firstLine=0 和 firstLineChars=0
-            # 虽然冗余，但能确保 WPS/Word 都清零
-            attrs["w:firstLine"] = "0"
-            attrs["w:firstLineChars"] = "0"
-            attrs["w:hanging"] = "0"  # 顺手清 hanging
-        else:
-            if unit == "char":
-                chars_int = int(round(float(value) * 100))
-                attrs["w:firstLineChars"] = str(chars_int)
-                # 同时写 firstLine 作为 fallback（可选）
-                # twips = chars_int * 20 // 100  # 粗略换算
-                # attrs["w:firstLine"] = str(twips)
+            p = paragraph._element
+            pPr = p.get_or_add_pPr()
+
+            # 保留 left / right
+            existing_left = None
+            existing_right = None
+            ind = pPr.find(qn("w:ind"))
+            if ind is not None:
+                existing_left = ind.get(qn("w:left"))
+                existing_right = ind.get(qn("w:right"))
+                pPr.remove(ind)
+
+            attrs = {}
+            if existing_left is not None:
+                attrs["w:left"] = existing_left
+            if existing_right is not None:
+                attrs["w:right"] = existing_right
+
+            if value == 0:
+                # ✅ 现实主义方案：同时写 firstLine=0 和 firstLineChars=0
+                # 虽然冗余，但能确保 WPS/Word 都清零
+                attrs["w:firstLine"] = "0"
+                attrs["w:firstLineChars"] = "0"
+                attrs["w:hanging"] = "0"  # 顺手清 hanging
             else:
-                indent_twips = int(value) * 20
-                attrs["w:firstLine"] = str(indent_twips)
-                # 可选：也写 firstLineChars 作为 fallback
-                # chars = int(indent_twips / 20)  # 不精确，慎用
+                if unit == "char":
+                    chars_int = int(round(float(value) * 100))
+                    attrs["w:firstLineChars"] = str(chars_int)
+                    # 同时写 firstLine 作为 fallback（可选）
+                    # twips = chars_int * 20 // 100  # 粗略换算
+                    # attrs["w:firstLine"] = str(twips)
+                else:
+                    indent_twips = int(value) * 20
+                    attrs["w:firstLine"] = str(indent_twips)
+                    # 可选：也写 firstLineChars 作为 fallback
+                    # chars = int(indent_twips / 20)  # 不精确，慎用
 
-        attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
-        ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501
+            attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
+            ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501
 
-        new_ind = parse_xml(ind_xml)
-        pPr.append(new_ind)
-        return True
+            new_ind = parse_xml(ind_xml)
+            pPr.append(new_ind)
+            return True
 
-    except Exception as e:
-        logger.error(f"设置首行缩进失败：{e}")
-        return False
+        except Exception as e:
+            logger.error(f"设置首行缩进失败：{e}")
+            return False
+
+    @staticmethod
+    def set_inch(paragraph: Paragraph, value: float):
+        """
+        设置首行缩进，支持英寸单位，写入Word原生XML字段（firstLine/firstLineChars）
+        :param para: 段落对象
+        :param value: 缩进值（英寸单位为浮点数，如0.5）
+        :return: 设置成功返回True，失败返回False
+        """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
+        paragraph.paragraph_format.first_line_indent = Inches(value)
+
+    @staticmethod
+    def set_mm(paragraph: Paragraph, value: float):
+        """
+        设置首行缩进，支持毫米单位，写入Word原生XML字段（firstLine/firstLineChars）
+        :param para: 段落对象
+        :param value: 缩进值（毫米单位为浮点数，如5.0）
+        :return:
+        """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
+        paragraph.paragraph_format.first_line_indent = Mm(value)
+
+    @staticmethod
+    def set_pt(paragraph: Paragraph, value: float):
+        """
+        设置首行缩进，支持磅单位，写入Word原生XML字段（firstLine/firstLineChars）
+        :param para: 段落对象
+        :param value: 缩进值（磅单位为浮点数，如0.5）
+        :return:
+        """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
+        paragraph.paragraph_format.first_line_indent = Pt(value)
+
+    @staticmethod
+    def set_cm(paragraph: Paragraph, value: float):
+        """
+        设置首行缩进，支持厘米单位，写入Word原生XML字段（firstLine/firstLineChars）
+        :param para: 段落对象
+        :param value: 缩进值（厘米单位为浮点数，如0.5）
+        :return:
+        """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
+        paragraph.paragraph_format.first_line_indent = Cm(value)

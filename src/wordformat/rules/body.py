@@ -25,6 +25,7 @@ class BodyText(FormatNode[BodyTextConfig]):
             space_before=cfg.space_before,
             space_after=cfg.space_after,
             line_spacing=cfg.line_spacing,
+            line_spacingrule=cfg.line_spacingrule,
             first_line_indent=cfg.first_line_indent,
             builtin_style_name=cfg.builtin_style_name,
         )
@@ -60,7 +61,7 @@ class BodyText(FormatNode[BodyTextConfig]):
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text="".join(str(issue) for issue in paragraph_issues),
+                text=ParagraphStyle.to_string(paragraph_issues),
             )
 
         return []
