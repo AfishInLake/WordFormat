@@ -157,7 +157,7 @@ class CharacterStyle:
 
         # 5. 字体颜色
         current_color = run_get_font_color(run)
-        if current_color != self.font_color:
+        if self.font_color != current_color:
             diffs.append(
                 DIFFResult(
                     "font_color",

@@ -3,7 +3,7 @@ style_checks_warning: # 样式检查预警设置
   italic: true
   underline: true
   font_size: true
-  font_color: false
+  font_color: true
   font_name: false
 
 
@@ -19,7 +19,7 @@ global_format: &global_format
   chinese_font_name: '宋体'
   english_font_name: 'Times New Roman'
   font_size: '小四'
-  font_color: 'BLACK'
+  font_color: '黑色'
   bold: false
   italic: false
   underline: false

@@ -474,16 +474,9 @@ def run_get_font_color(run: Run) -> tuple[int, int, int] | None:
         return 0, 0, 0
 
     rgb_hex = color.rgb  # 如 'FF0000'
-    if not isinstance(rgb_hex, str) or len(rgb_hex) != 6:
-        return 0, 0, 0
-
-    try:
-        r = int(rgb_hex[0:2], 16)
-        g = int(rgb_hex[2:4], 16)
-        b = int(rgb_hex[4:6], 16)
-        return r, g, b
-    except ValueError:
-        return 0, 0, 0
+    if rgb_hex:
+        return rgb_hex[0], rgb_hex[1], rgb_hex[2]
+    return 0, 0, 0
 
 
 def run_get_font_bold(run: Run) -> bool:
