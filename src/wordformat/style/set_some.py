@@ -266,6 +266,44 @@ class _SetFirstLineIndent:
     """
 
     @staticmethod
+    def clear(paragraph: Paragraph):
+        """
+        清除段落的首行缩进设置（包括 firstLine 和 firstLineChars 字段），
+        同时保留左缩进（left）和右缩进（right）
+        Args:
+            paragraph: 段落对象
+        """
+        p = paragraph._element
+        pPr = p.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+
+        if ind is None:
+            # 没有缩进设置，无需操作
+            return
+
+        # 保留 left 和 right
+        left = ind.get(qn("w:left"))
+        right = ind.get(qn("w:right"))
+
+        # 创建新的属性字典，只保留 left / right
+        new_attrs = {}
+        if left is not None:
+            new_attrs[qn("w:left")] = left
+        if right is not None:
+            new_attrs[qn("w:right")] = right
+
+        if new_attrs:
+            # 有保留的属性，更新 <w:ind>
+            # 先清空所有属性
+            ind.clear()
+            # 再设置保留的属性
+            for k, v in new_attrs.items():
+                ind.set(k, v)
+        else:
+            # 没有保留属性，直接删除 <w:ind>
+            pPr.remove(ind)
+
+    @staticmethod
     def set_char(  # noqa C901
         paragraph: Paragraph, value: float | int, unit: str = "char"
     ):
@@ -276,6 +314,7 @@ class _SetFirstLineIndent:
         :param unit: 缩进单位，char=字符单位（默认），pt=物理单位
         :return: 设置成功返回True，失败返回False
         """
+        _SetFirstLineIndent.clear(paragraph)
         try:
             if unit not in ["char", "pt"]:
                 logger.error(f"不支持的缩进单位：{unit}，仅支持char/pt")
@@ -340,6 +379,12 @@ class _SetFirstLineIndent:
         :param value: 缩进值（英寸单位为浮点数，如0.5）
         :return: 设置成功返回True，失败返回False
         """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
         paragraph.paragraph_format.first_line_indent = Inches(value)
 
     @staticmethod
@@ -350,6 +395,12 @@ class _SetFirstLineIndent:
         :param value: 缩进值（毫米单位为浮点数，如5.0）
         :return:
         """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
         paragraph.paragraph_format.first_line_indent = Mm(value)
 
     @staticmethod
@@ -360,6 +411,12 @@ class _SetFirstLineIndent:
         :param value: 缩进值（磅单位为浮点数，如0.5）
         :return:
         """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
         paragraph.paragraph_format.first_line_indent = Pt(value)
 
     @staticmethod
@@ -370,4 +427,10 @@ class _SetFirstLineIndent:
         :param value: 缩进值（厘米单位为浮点数，如0.5）
         :return:
         """
+        _SetFirstLineIndent.clear(paragraph)
+        # 强制清除firstLineChars，避免优先级冲突
+        pPr = paragraph._element.get_or_add_pPr()
+        ind = pPr.find(qn("w:ind"))
+        if ind is not None and ind.get(qn("w:firstLineChars")):
+            del ind.attrib[qn("w:firstLineChars")]
         paragraph.paragraph_format.first_line_indent = Cm(value)

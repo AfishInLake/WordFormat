@@ -14,7 +14,7 @@ global_format: &global_format
   space_after: "0.5行"
   line_spacingrule: "1.5倍行距"
   line_spacing: '1.5倍'
-  first_line_indent: '2字符'
+  first_line_indent: '20磅'
   builtin_style_name: '正文'
   chinese_font_name: '宋体'
   english_font_name: 'Times New Roman'
@@ -46,12 +46,14 @@ abstract:
       english_font_name: 'Times New Roman'
       font_size: '四号'
       bold: true
+      line_spacing: "0倍"
       section_title_re: '^\\s*[Aa]b\\s*[Ss]t\\s*[Rr]a\\s*[Cc]t\\s*$'
     english_content:
       <<: *global_format
       alignment: '两端对齐'
       english_font_name: 'Times New Roman'
       font_size: '小四'
+      line_spacing: "0倍"
   keywords:
     chinese:
       <<: *global_format

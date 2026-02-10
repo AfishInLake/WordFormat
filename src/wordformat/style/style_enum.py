@@ -280,7 +280,7 @@ class Alignment(UnitLabelEnum):
     def base_set(self, docx_obj: Paragraph, *args, **kwargs):
         """仅把字符串转化为枚举类型操作"""
         alignment = self._LABEL_MAP.get(self.value, None)
-        if alignment:
+        if alignment is not None:  # 必须为None 有可能是枚举类型
             docx_obj.alignment = alignment
         else:
             raise ValueError(f"无效的对齐方式: '{self.value}'")
@@ -350,7 +350,9 @@ class LineSpacing(UnitLabelEnum):
     def base_set(self, docx_obj: Paragraph, *args, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self.rel_value
-        if line_spacing:
+        if line_spacing is not None:  # 必须不为None 有可能是 0
+            if line_spacing <= 0:
+                line_spacing = 1  # 行距必须大于0 否则会消失
             docx_obj.paragraph_format.line_spacing = line_spacing
         else:
             raise ValueError(f"无效的行距: '{self.value}'")

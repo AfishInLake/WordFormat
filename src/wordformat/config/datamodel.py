@@ -73,7 +73,7 @@ class WarningFieldConfig(BaseModel):
     line_spacing: bool = Field(default=True)
     line_spacingrule: bool = Field(default=True)
     first_line_indent: bool = Field(default=True)
-    builtin_style_name: str = Field(default=True)
+    builtin_style_name: bool = Field(default=True)
 
 
 # -------------------------- 基础配置模型 --------------------------

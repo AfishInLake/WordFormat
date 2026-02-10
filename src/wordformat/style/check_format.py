@@ -205,28 +205,28 @@ class CharacterStyle:
                 case "bold":
                     run.bold = diff.expected_value
                     tmp_str = (
-                        f"加粗修正，原：{'加粗' if diff.current_value else '非加粗'}；"
+                        f"加粗修正，原：{'加粗' if diff.current_value else '非加粗'};"
                     )
                 case "italic":
                     run.italic = diff.expected_value
                     tmp_str = (
-                        f"斜体修正，原：{'斜体' if diff.current_value else '非斜体'}；"
+                        f"斜体修正，原：{'斜体' if diff.current_value else '非斜体'};"
                     )
                 case "underline":
                     run.underline = diff.expected_value
-                    tmp_str = f"下划线修正，原：{'有下划线' if diff.current_value else '无下划线'}；"
+                    tmp_str = f"下划线修正，原：{'有下划线' if diff.current_value else '无下划线'};"
                 case "font_size":
                     self.font_size.format(docx_obj=run)
-                    tmp_str = f"字号修正:{str(self.font_size)}；"
+                    tmp_str = f"字号修正:{str(self.font_size)};"
                 case "font_color":
                     self.font_color.format(docx_obj=run)
-                    tmp_str = f"字体颜色修正:{str(self.font_color)}；"
+                    tmp_str = f"字体颜色修正:{str(self.font_color)};"
                 case "font_name_cn":
                     self.font_name_cn.format(docx_obj=run)
-                    tmp_str = f"中文字体修正：{str(self.font_name_cn)}；"
+                    tmp_str = f"中文字体修正：{str(self.font_name_cn)};"
                 case "font_name_en":
                     self.font_name_en.format(docx_obj=run)
-                    tmp_str = f"英文字体修正：{str(self.font_name_en)}；"
+                    tmp_str = f"英文字体修正：{str(self.font_name_en)};"
                 case _:
                     logger.warning(f"未知的 diff_type: {diff.diff_type}")
             diff.comment = tmp_str
@@ -312,25 +312,25 @@ class ParagraphStyle:
             match diff.diff_type:
                 case "alignment":
                     self.alignment.format(docx_obj=paragraph)
-                    tmp_str = f"对齐方式修正：{str(self.alignment)}；"
+                    tmp_str = f"对齐方式修正：{str(self.alignment)};"
                 case "space_before":
                     self.space_before.format(docx_obj=paragraph, spacing_type="before")
-                    tmp_str = f"段前间距修正：{str(self.space_before)}；"
+                    tmp_str = f"段前间距修正：{str(self.space_before)};"
                 case "space_after":
                     self.space_after.format(docx_obj=paragraph, spacing_type="after")
-                    tmp_str = f"段后间距修正：{str(self.space_after)}；"
+                    tmp_str = f"段后间距修正：{str(self.space_after)};"
                 case "line_spacing_rule":
                     self.line_spacingrule.format(docx_obj=paragraph)
-                    tmp_str = f"间距修正：{str(self.line_spacingrule)}；"
+                    tmp_str = f"间距修正：{str(self.line_spacingrule)};"
                 case "line_spacing":
                     self.line_spacing.format(docx_obj=paragraph)
-                    tmp_str = f"行距修正：{str(self.line_spacing)}；"
+                    tmp_str = f"行距修正：{str(self.line_spacing)};"
                 case "first_line_indent":
                     self.first_line_indent.format(docx_obj=paragraph)
-                    tmp_str = f"首行缩进修正；{str(self.first_line_indent)}"  # noqa E501
+                    tmp_str = f"首行缩进修正;{str(self.first_line_indent)};"  # noqa E501
                 case "builtin_style_name":
                     self.builtin_style_name.format(docx_obj=paragraph)
-                    tmp_str = f"内置样式修正：{str(self.builtin_style_name)}；"
+                    tmp_str = f"内置样式修正：{str(self.builtin_style_name)};"
                 case _:
                     # 替换原异常抛出，改用日志记录未知类型，避免程序中断
                     logger.warning(
@@ -437,7 +437,7 @@ class ParagraphStyle:
                     self.line_spacing,
                     line_spacing,
                     f"行距期待{str(self.line_spacing)};",
-                    2,
+                    3,
                 )
             )
         # 首行缩进
