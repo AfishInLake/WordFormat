@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : datamodel.py
 
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -19,20 +19,6 @@ ChineseFontType = Literal["宋体", "黑体", "楷体", "仿宋", "微软雅黑"
 # 英文字体类型
 EnglishFontType = Literal[
     "Times New Roman", "Arial", "Calibri", "Courier New", "Helvetica"
-]
-# 字体颜色类型
-FontColorType = Literal[
-    "BLACK",
-    "WHITE",
-    "RED",
-    "GREEN",
-    "BLUE",
-    "GRAY",
-    "DARK_GRAY",
-    "LIGHT_GRAY",
-    "ORANGE",
-    "PURPLE",
-    "BROWN",
 ]
 # 字号类型（兼容字符串和数值）
 FontSizeType = Union[
@@ -90,7 +76,7 @@ class GlobalFormatConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型和默认值
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -111,7 +97,7 @@ class KeywordsConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -144,7 +130,7 @@ class AbstractTitleConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="黑体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=True)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -164,7 +150,7 @@ class AbstractContentConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -215,7 +201,7 @@ class HeadingLevelConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -244,7 +230,7 @@ class BodyTextConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -264,7 +250,7 @@ class FiguresConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -290,7 +276,7 @@ class TablesConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -316,7 +302,7 @@ class ReferencesTitleConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -339,7 +325,7 @@ class ReferencesContentConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -369,7 +355,7 @@ class AcknowledgementsTitleConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)
@@ -389,7 +375,7 @@ class AcknowledgementsContentConfig(BaseModel):
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
     english_font_name: EnglishFontType | str = Field(default="Times New Roman")
     font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: Union[FontColorType, Tuple[int, int, int]] = Field(default="BLACK")
+    font_color: str = Field(default="黑色")
     bold: bool = Field(default=False)
     italic: bool = Field(default=False)
     underline: bool = Field(default=False)

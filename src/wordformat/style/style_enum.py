@@ -3,8 +3,10 @@
 # @Author  : afish
 # @File    : style_enmu.py
 # from src.settings import CHARACTER_STYLE_CHECKS
-from typing import Callable, Optional, Self
+import re
+from typing import Callable, Optional, Tuple
 
+import webcolors
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
@@ -129,14 +131,6 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         else:
             return fun(run=docx_obj, value=self.rel_value, **kwargs)
 
-    def to_docx(self, *args, **kwargs):
-        """将普通值转化为python-docx值"""
-        # 尝试从映射中获取值
-        value = self._LABEL_MAP.get(self.value, None)
-        if value:
-            return value
-        return self.value
-
     def __str__(self):
         return self.value
 
@@ -146,19 +140,6 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         if isinstance(self.rel_value, str):
             return self.value.lower() == other
         return self.rel_value == other
-
-    @classmethod
-    def cls(cls, value) -> Self:
-        """将docx对象转化为此对象"""
-        # 尝试从映射中获取值
-        if cls._LABEL_MAP:
-            for k, v in cls._LABEL_MAP.items():
-                if value == v:
-                    return cls(k)
-            raise ValueError(f"{value} 不是 {cls.__name__} 的值")
-        else:
-            # 尝试直接转换为对象
-            return cls(value)
 
 
 class FontName(UnitLabelEnum):
@@ -175,7 +156,7 @@ class FontName(UnitLabelEnum):
         else:
             return False
 
-    def base_set(self, docx_obj: Run, *args, **kwargs):
+    def base_set(self, docx_obj: Run, **kwargs):
         """设置无单位属性"""
         if self.is_chinese(self.value):
             run_set_font_name(run=docx_obj, font_name=self.value)
@@ -208,7 +189,7 @@ class FontSize(UnitLabelEnum):
         "七号": 5.5,
     }
 
-    def base_set(self, docx_obj: Run, *args, **kwargs):
+    def base_set(self, docx_obj: Run, **kwargs):
         """仅作为将字符串转化为数值操作"""
         size = self._LABEL_MAP.get(self.value, None)
         if size:
@@ -224,39 +205,119 @@ class FontSize(UnitLabelEnum):
 
 class FontColor(UnitLabelEnum):
     """
-    常用字体颜色（RGB 元组）。
-
-    示例：
-        color = FontColor.BLACK  # (0, 0, 0)
-        run.font.color.rgb = RGBColor(*color)
+    字体颜色处理类（基于webcolors标准色）
+    用法：FontColor().base_set(run, color_spec="red")
+    支持color_spec类型：
+    1. webcolors标准英文色名（red/black/lightblue）
+    2. 中文色名（红色/黑色/浅蓝色）
+    3. 十六进制色值（#FF0000/#f00/FF0000）
     """
 
-    BLACK = (0, 0, 0)
-    WHITE = (255, 255, 255)
-    RED = (255, 0, 0)
-    GREEN = (0, 128, 0)  # 深绿（Word 默认绿色）
-    BLUE = (0, 0, 255)
-    GRAY = (128, 128, 128)
-    DARK_GRAY = (64, 64, 64)
-    LIGHT_GRAY = (192, 192, 192)
-    ORANGE = (255, 165, 0)
-    PURPLE = (128, 0, 128)
-    BROWN = (165, 42, 42)
+    # 仅保留中文→英文映射（基于webcolors标准）
+    _ZH_TO_EN = {
+        "黑色": "black",
+        "白色": "white",
+        "红色": "red",
+        "绿色": "green",
+        "蓝色": "blue",
+        "灰色": "gray",
+        "浅灰色": "lightgray",
+        "深灰色": "darkgray",
+        "橙色": "orange",
+        "紫色": "purple",
+        "粉色": "pink",
+        "棕色": "brown",
+        "青色": "cyan",
+        "黄色": "yellow",
+        "品红": "magenta",
+        "浅蓝色": "lightblue",
+    }
 
-    # 中文公文常用色
-    OFFICIAL_RED = (204, 0, 0)  # 公文红头常用色（如“中共中央文件”）
-    LINK_BLUE = (0, 102, 204)  # 超链接蓝色
+    @property
+    def rel_value(self):
+        return self._parse_color(self.value)
 
     @staticmethod
-    def to_RGBObject(value: tuple):
-        """
-        辅助：将 RGB 元组转换为 RGBColor 对象。
-        """
-        return RGBColor(*value)
+    def _is_hex(color_spec: str) -> bool:
+        """静态方法：校验是否为合法十六进制色值"""
+        return bool(
+            re.match(r"^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$", color_spec.strip())
+        )
 
-    def base_set(self, docx_obj: Run, *args, **kwargs):
-        # docx_obj.font.color.rgb = self.to_RGBObject(self.value)
-        pass
+    @staticmethod
+    def _normalize_hex(hex_str: str) -> str:
+        """静态方法：标准化十六进制为6位大写格式"""
+        hex_clean = hex_str.strip().lstrip("#").lower()
+        if len(hex_clean) == 3:
+            hex_clean = "".join([c * 2 for c in hex_clean])
+        return hex_clean.zfill(6).upper()
+
+    @staticmethod
+    def _parse_color(color_spec: str) -> Tuple[int, int, int]:
+        """静态方法：核心解析逻辑，仅支持webcolors标准色，失败直接抛异常"""
+        if not isinstance(color_spec, str):
+            raise TypeError(f"颜色标识必须是字符串，当前类型：{type(color_spec)}")
+
+        color_str = color_spec.strip()
+
+        # 步骤1：处理中文名称
+        if color_str in FontColor._ZH_TO_EN:
+            color_str = FontColor._ZH_TO_EN[color_str]
+
+        # 步骤2：处理十六进制
+        if FontColor._is_hex(color_str):
+            try:
+                normalized_hex = FontColor._normalize_hex(color_str)
+                rgb = webcolors.hex_to_rgb(normalized_hex)
+                return (rgb.red, rgb.green, rgb.blue)
+            except ValueError as e:
+                raise ValueError(
+                    f"非法十六进制色值：{color_spec}\n"
+                    f"错误原因：{str(e)}\n"
+                    "支持格式：#RRGGBB / #RGB / RRGGBB（如#FF0000 / #f00 / FF0000）"
+                ) from e
+
+        # 步骤3：处理webcolors标准英文名称
+        try:
+            # 优先CSS标准色，兼容X11扩展色
+            rgb = webcolors.name_to_rgb(color_str.lower())
+            return (rgb.red, rgb.green, rgb.blue)
+        except ValueError:
+            try:
+                hex_val = webcolors.x11_color_name_to_hex(color_str.lower())
+                rgb = webcolors.hex_to_rgb(hex_val)
+                return (rgb.red, rgb.green, rgb.blue)
+            except ValueError as e:
+                raise ValueError(
+                    f"不支持的颜色名称：{color_spec}（仅支持webcolors标准色）\n"
+                    f"常用示例：{list(FontColor._ZH_TO_EN.keys())} / {list(FontColor._ZH_TO_EN.values())}"
+                ) from e
+
+    def base_set(self, docx_obj: Run, **kwargs):
+        """
+        唯一入口方法：设置字体颜色（符合UnitLabelEnum统一接口）
+        :param docx_obj: Run对象（字体颜色载体）
+        :raises ValueError/TypeError: 颜色解析失败直接抛出异常
+        """
+
+        # 核心逻辑：解析字符串类型的颜色标识（webcolors标准）
+        if not isinstance(self.value, str):
+            raise TypeError(f"颜色标识仅支持字符串，当前类型：{type(self.value)}")
+
+        # 解析颜色并设置
+        rgb_tuple = self._parse_color(self.value)
+        docx_obj.font.color.rgb = RGBColor(*rgb_tuple)
+
+    def __eq__(self, other):
+        # 必须是元组，且长度必须为三，对应r,g,b
+        if not (isinstance(other, tuple) or len(other) != 3):
+            return False
+        # 从rel_value 获取转化的rgb值
+        color_rgb = self.rel_value
+        for i in range(3):
+            if color_rgb[i] != other[i]:
+                return False
+        return True
 
 
 class Alignment(UnitLabelEnum):
@@ -277,7 +338,7 @@ class Alignment(UnitLabelEnum):
         "分散对齐": WD_ALIGN_PARAGRAPH.DISTRIBUTE,  # 分散对齐（较少用）
     }
 
-    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+    def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅把字符串转化为枚举类型操作"""
         alignment = self._LABEL_MAP.get(self.value, None)
         if alignment is not None:  # 必须为None 有可能是枚举类型
@@ -321,7 +382,7 @@ class LineSpacingRule(UnitLabelEnum):
         "多倍行距": WD_LINE_SPACING.MULTIPLE,
     }
 
-    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+    def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self._LABEL_MAP.get(self.value, None)
         if line_spacing:
@@ -347,7 +408,7 @@ class LineSpacing(UnitLabelEnum):
         cm = _SetLineSpacing.set_cm
         inch = _SetLineSpacing.set_inch
 
-    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+    def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self.rel_value
         if line_spacing is not None:  # 必须不为None 有可能是 0
@@ -401,7 +462,7 @@ class BuiltInStyle(UnitLabelEnum):
         "题注": CAPTION,
     }
 
-    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+    def base_set(self, docx_obj: Paragraph, **kwargs):
         style = self._LABEL_MAP.get(self.value, None)
         if style:
             try:
