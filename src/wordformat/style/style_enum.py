@@ -3,85 +3,165 @@
 # @Author  : afish
 # @File    : style_enmu.py
 # from src.settings import CHARACTER_STYLE_CHECKS
-from typing import Any
+from typing import Callable, Optional, Self
 
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, RGBColor
+from docx.text.paragraph import Paragraph
+from docx.text.run import Run
+from loguru import logger
+
+from wordformat.style.set_some import (
+    _SetFirstLineIndent,
+    _SetLineSpacing,
+    _SetSpacing,
+    run_set_font_name,
+)
+from wordformat.style.utils import extract_unit_from_string
 
 
-class LabelEnum:
+class UnitEnumMeta(type):
+    """
+    枚举元类：解析Meta类中的单位函数，绑定到枚举类
+    """
+
+    def __new__(cls, name: str, bases: tuple, attrs: dict):
+        # 1. 提取Meta类中的单位函数映射
+        meta_attrs = {}
+        if "Meta" in attrs:
+            meta_cls = attrs.pop("Meta")
+            # 遍历Meta类的属性，收集单位函数（如chars=chars_format_func）
+            for attr_name, attr_value in meta_cls.__dict__.items():
+                if not attr_name.startswith("_") and callable(attr_value):
+                    meta_attrs[attr_name] = attr_value
+
+        # 2. 创建枚举类
+        enum_cls = super().__new__(cls, name, bases, attrs)
+        # 3. 将Meta中的单位函数绑定到枚举类
+        enum_cls._meta_funcs = meta_attrs
+
+        return enum_cls
+
+
+class UnitLabelEnum(metaclass=UnitEnumMeta):
+    """
+    带有单位的枚举类
+    可以实现自动处理单位问题
+    """
+
     _LABEL_MAP = {}
 
-    @classmethod
-    def __init_subclass__(cls, **kwargs):
+    def __init__(self, value):
+        self.value = value  # 获取的原始值
+        self.original_unit = None  # 解析的单位
+        self.unit_ch = None  # 中文单位
+        self._rel_value = None  # 解析的真实值
+        self._rel_unit = None  # 解析的标准单位
+        self.extract_unit_result = None  # 解析的结果
+        # 对于固定单位的枚举类，如行间距、对齐方式，不需要处理单位
+        if not any([isinstance(self, LineSpacingRule), isinstance(self, Alignment)]):
+            self.split_unit()
+
+    def split_unit(self):
         """
-        子类初始化钩子：自动生成【值->标签】的反向映射
+        将带单位的值拆分为数值和单位
         """
-        super().__init_subclass__(**kwargs)
-        if hasattr(cls, "_LABEL_MAP") and cls._LABEL_MAP:
-            cls._VALUE_TO_LABEL = {}
-            for label, value in cls._LABEL_MAP.items():
-                # 若值是枚举成员（如FontSize.YI_HAO），取其值；否则直接用值
-                real_value = value.value if hasattr(value, "value") else value
-                if real_value not in cls._VALUE_TO_LABEL:
-                    cls._VALUE_TO_LABEL[real_value] = label
+        result = self.extract_unit_result = extract_unit_from_string(str(self.value))
+        self.original_unit = result.original_unit
+        self.unit_ch = result.unit_ch
+        self._rel_unit = result.standard_unit
+        self._rel_value = result.value
+
+    @property
+    def rel_value(self):
+        """
+        真实值
+        优先级：
+            UnitResult
+            _LABEL_MAP
+            原始值
+        Returns:
+            返回枚举类型真实值
+        """
+        if self._rel_value is not None:
+            return self._rel_value
+        value = self._LABEL_MAP.get(self.value, None)
+        if value:
+            self._rel_value = value
+        else:
+            self._rel_value = self.value
+        return self._rel_value
+
+    @rel_value.setter
+    def rel_value(self, value):
+        self._rel_value = value
+
+    @property
+    def rel_unit(self):
+        return self._rel_unit
+
+    def base_set(self, docx_obj, **kwargs):
+        """
+        对于直接设置的属性，应该是直接设置
+        示例：
+            docx_obj.attr = self.value
+            这里赋值原始值
+        """
+        logger.info(f"{self.__class__.__name__} 没有实现 base_set 方法")
+
+    def function_map(self) -> Optional[Callable]:
+        """
+        需要子类根据unit返回指定函数
+        Returns:
+            function 返回一个可迭代对象，由 format 调用
+        """
+        return self._meta_funcs.get(self._rel_unit, None)
+
+    def format(self, docx_obj: Paragraph | Run, **kwargs):
+        """格式化"""
+        # 先从meta_funcs中获取对应的函数
+        fun = self.function_map()
+        # 如果为空就调用子类继承的方法
+        if fun is None:
+            return self.base_set(docx_obj, **kwargs)
+        if isinstance(docx_obj, Paragraph):
+            return fun(paragraph=docx_obj, value=self.rel_value, **kwargs)
+        else:
+            return fun(run=docx_obj, value=self.rel_value, **kwargs)
+
+    def to_docx(self, *args, **kwargs):
+        """将普通值转化为python-docx值"""
+        # 尝试从映射中获取值
+        value = self._LABEL_MAP.get(self.value, None)
+        if value:
+            return value
+        return self.value
+
+    def __str__(self):
+        return self.value
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.rel_value == other.rel_value
+        if isinstance(self.rel_value, str):
+            return self.value.lower() == other
+        return self.rel_value == other
 
     @classmethod
-    def from_label(cls, label: Any) -> int | float | str | tuple:
-        # 检查配置是否有映射
-        if label in cls._LABEL_MAP:
-            return cls._LABEL_MAP[label]
-        # 检查配置是否是类成员
-        if isinstance(label, str):
-            if label.isupper() and not label.startswith("_"):  # 只允许如 "BLACK"
-                if hasattr(cls, label):
-                    value = getattr(cls, label)
-                    if not callable(value):  # 排除方法
-                        return value
-        # 检查是否是int, float, tuple三类数据结构
-        if (
-            isinstance(label, int)
-            or isinstance(label, float)
-            or isinstance(label, tuple)
-        ):
-            return label
-        raise ValueError(
-            f"未知段落样式: '{cls.__name__}:{label}'，支持的有: {list(cls._LABEL_MAP.keys())}"
-        )
-
-    @classmethod
-    def to_string(cls, value: Any) -> str:
-        """通用to_string:优先用反向映射，无规则格式化输出"""
-        real_value = value.value if hasattr(value, "value") else value
-
-        # 1. 优先从反向映射找标签
-        if real_value in cls._VALUE_TO_LABEL:
-            return cls._VALUE_TO_LABEL[real_value]
-
-        # 2. 特殊值格式化（如倍数、RGB元组）
-        if isinstance(real_value, float) and cls.__name__ == "LineSpacing":
-            return f"{real_value}倍"  # 行距特殊格式化
-        if isinstance(real_value, tuple) and len(real_value) == 3:
-            return cls._rgb_to_name(real_value)  # 颜色RGB转名称（可选）
-
-        # 3. 默认返回字符串
-        return str(real_value)
-
-    @staticmethod
-    def _rgb_to_name(rgb: tuple[int, int, int]) -> str:
-        """辅助：RGB元组转颜色名称（可选扩展）"""
-        color_map = {
-            (0, 0, 0): "黑色",
-            (255, 255, 255): "白色",
-            (255, 0, 0): "红色",
-            (0, 128, 0): "绿色",
-            (0, 0, 255): "蓝色",
-            (128, 128, 128): "灰色",
-        }
-        return color_map.get(rgb, f"RGB{rgb}")
+    def cls(cls, value) -> Self:
+        """将docx对象转化为此对象"""
+        # 尝试从映射中获取值
+        if cls._LABEL_MAP:
+            for k, v in cls._LABEL_MAP.items():
+                if value == v:
+                    return cls(k)
+            raise ValueError(f"{value} 不是 {cls.__name__} 的值")
+        else:
+            # 尝试直接转换为对象
+            return cls(value)
 
 
-class FontName(LabelEnum):
+class FontName(UnitLabelEnum):
     """
     常用中英文字体枚举。
     使用示例：
@@ -89,46 +169,21 @@ class FontName(LabelEnum):
         style = ParagraphStyle(font_name=font)
     """
 
-    # 中文字体
-    SIM_SUN = "宋体"
-    SIM_HEI = "黑体"
-    KAI_TI = "楷体"
-    FANG_SONG = "仿宋"
-    MICROSOFT_YAHEI = "微软雅黑"
-    HAN_YI_XIAO_BIAO_SONG = "汉仪小标宋"
-    # 英文字体
-    TIMES_NEW_ROMAN = "Times New Roman"
-    ARIAL = "Arial"
-    CALIBRI = "Calibri"
-    COURIER_NEW = "Courier New"
-    HELVETICA = "Helvetica"
-
-    _LABEL_MAP = {
-        "宋体": SIM_SUN,
-        "黑体": SIM_HEI,
-        "楷体": KAI_TI,
-        "仿宋": FANG_SONG,
-        "微软雅黑": MICROSOFT_YAHEI,
-        "汉仪小标宋": HAN_YI_XIAO_BIAO_SONG,
-        "Times New Roman": TIMES_NEW_ROMAN,
-        "Arial": ARIAL,
-        "Calibri": CALIBRI,
-        "Courier New": COURIER_NEW,
-        "Helvetica": HELVETICA,
-    }
-
     def is_chinese(self, value: str):
-        if value not in self._LABEL_MAP:
-            raise ValueError(
-                f"未知字体: '{value}'，支持的有: {list(self._LABEL_MAP.keys())}"
-            )
         if value in ["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]:
             return True
         else:
             return False
 
+    def base_set(self, docx_obj: Run, *args, **kwargs):
+        """设置无单位属性"""
+        if self.is_chinese(self.value):
+            run_set_font_name(run=docx_obj, font_name=self.value)
+        else:
+            docx_obj.font.name = self.value
 
-class FontSize(LabelEnum):
+
+class FontSize(UnitLabelEnum):
     """
     常用中文字档字号（单位：磅 / pt）。
     继承 IntEnum 以便直接用于数值比较或传递给 Pt()。
@@ -138,36 +193,36 @@ class FontSize(LabelEnum):
         run.font.size = Pt(size)
     """
 
-    YI_HAO = 26  # 一号
-    XIAO_YI = 24  # 小一
-    ER_HAO = 22  # 二号
-    XIAO_ER = 18  # 小二
-    SAN_HAO = 16  # 三号
-    XIAO_SAN = 15  # 小三
-    SI_HAO = 14  # 四号
-    XIAO_SI = 12  # 小四（最常用正文）
-    WU_HAO = 10.5  # 五号（注意：五号是 10.5pt）
-    XIAO_WU = 9  # 小五
-    LIU_HAO = 7.5  # 六号
-    QI_HAO = 5.5  # 七号（极少用）
-
     _LABEL_MAP = {
-        "一号": YI_HAO,
-        "小一": XIAO_YI,
-        "二号": ER_HAO,
-        "小二": XIAO_ER,
-        "三号": SAN_HAO,
-        "小三": XIAO_SAN,
-        "四号": SI_HAO,
-        "小四": XIAO_SI,
-        "五号": WU_HAO,
-        "小五": XIAO_WU,
-        "六号": LIU_HAO,
-        "七号": QI_HAO,
+        "一号": 26,
+        "小一": 24,
+        "二号": 22,
+        "小二": 18,
+        "三号": 16,
+        "小三": 15,
+        "四号": 14,
+        "小四": 12,
+        "五号": 10.5,
+        "小五": 9,
+        "六号": 7.5,
+        "七号": 5.5,
     }
 
+    def base_set(self, docx_obj: Run, *args, **kwargs):
+        """仅作为将字符串转化为数值操作"""
+        size = self._LABEL_MAP.get(self.value, None)
+        if size:
+            docx_obj.font.size = Pt(size)
+        else:
+            try:
+                docx_obj.font.size = Pt(float(self.value))
+            except ValueError as e:
+                raise ValueError(
+                    f"无效的字号: '{self.value}' font_size 必须为数字"
+                ) from e
 
-class FontColor(LabelEnum):
+
+class FontColor(UnitLabelEnum):
     """
     常用字体颜色（RGB 元组）。
 
@@ -199,8 +254,12 @@ class FontColor(LabelEnum):
         """
         return RGBColor(*value)
 
+    def base_set(self, docx_obj: Run, *args, **kwargs):
+        # docx_obj.font.color.rgb = self.to_RGBObject(self.value)
+        pass
 
-class Alignment(LabelEnum):
+
+class Alignment(UnitLabelEnum):
     """
     段落对齐方式枚举，兼容 python-docx。
 
@@ -210,22 +269,24 @@ class Alignment(LabelEnum):
         paragraph.alignment = Alignment.LEFT.to_docx()
     """
 
-    LEFT = WD_ALIGN_PARAGRAPH.LEFT  # 左侧对齐
-    CENTER = WD_ALIGN_PARAGRAPH.CENTER  # 居中对齐
-    RIGHT = WD_ALIGN_PARAGRAPH.RIGHT  # 右侧对齐
-    JUSTIFY = WD_ALIGN_PARAGRAPH.JUSTIFY  # 两端对齐
-    DISTRIBUTE = WD_ALIGN_PARAGRAPH.DISTRIBUTE  # 分散对齐（较少用）
-
     _LABEL_MAP = {
-        "左对齐": LEFT,
-        "居中对齐": CENTER,
-        "右对齐": RIGHT,
-        "两端对齐": JUSTIFY,
-        "分散对齐": DISTRIBUTE,
+        "左对齐": WD_ALIGN_PARAGRAPH.LEFT,  # 左侧对齐,
+        "居中对齐": WD_ALIGN_PARAGRAPH.CENTER,  # 居中对齐,
+        "右对齐": WD_ALIGN_PARAGRAPH.RIGHT,  # 右侧对齐,
+        "两端对齐": WD_ALIGN_PARAGRAPH.JUSTIFY,  # 两端对齐,
+        "分散对齐": WD_ALIGN_PARAGRAPH.DISTRIBUTE,  # 分散对齐（较少用）
     }
 
+    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+        """仅把字符串转化为枚举类型操作"""
+        alignment = self._LABEL_MAP.get(self.value, None)
+        if alignment:
+            docx_obj.alignment = alignment
+        else:
+            raise ValueError(f"无效的对齐方式: '{self.value}'")
 
-class Spacing(LabelEnum):
+
+class Spacing(UnitLabelEnum):
     """
     常用段落间距枚举（单位：磅 / pt）。
 
@@ -238,69 +299,77 @@ class Spacing(LabelEnum):
         )
     """
 
-    NONE = 0  # 无间距
-    TINY = 3  # 微小间距（如列表项）
-    SMALL = 6  # 小间距（常见于正文段落之间）
-    HALF_LINE = 9  # 半行间距
-    NORMAL = 12  # 标准段后间距（中文公文常用）
-    MEDIUM = 18  # 中等间距（章节分隔）
-    LARGE = 24  # 大间距（标题前后）
-    EXTRA_LARGE = 36  # 超大间距（封面、分章）
+    class Meta:
+        hang = _SetSpacing.set_hang
+        pt = _SetSpacing.set_pt
+        mm = _SetSpacing.set_mm
+        cm = _SetSpacing.set_cm
+        inch = _SetSpacing.set_inch
+
+
+class LineSpacingRule(UnitLabelEnum):
+    """
+    设置行距选项
+    """
 
     _LABEL_MAP = {
-        "NONE": NONE,
-        "TINY": TINY,
-        "SMALL": SMALL,
-        "HALF_LINE": HALF_LINE,
-        "NORMAL": NORMAL,
-        "MEDIUM": MEDIUM,
-        "LARGE": LARGE,
-        "EXTRA_LARGE": EXTRA_LARGE,
+        "单倍行距": WD_LINE_SPACING.SINGLE,
+        "1.5倍行距": WD_LINE_SPACING.ONE_POINT_FIVE,
+        "2倍行距": WD_LINE_SPACING.DOUBLE,
+        "最小值": WD_LINE_SPACING.AT_LEAST,
+        "固定值": WD_LINE_SPACING.EXACTLY,
+        "多倍行距": WD_LINE_SPACING.MULTIPLE,
     }
 
+    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+        """仅设置倍为单位的数据"""
+        line_spacing = self._LABEL_MAP.get(self.value, None)
+        if line_spacing:
+            docx_obj.paragraph_format.line_spacing_rule = line_spacing
+        else:
+            raise ValueError(f"无效的行距选项: '{self.value}'")
 
-class LineSpacing(LabelEnum):
+
+class LineSpacing(UnitLabelEnum):
     """
-    常用行距枚举（倍数制），兼容 python-docx。
+    常用行距值，兼容 python-docx。
 
-    注意：此枚举仅适用于“倍数行距”（single, 1.5, double），
-    不包含固定值（如 exactly 20pt）——若需支持固定值，建议单独处理。
+    支持 倍、磅、英寸、厘米、毫米
 
     使用示例：
         style = ParagraphStyle(line_spacing=LineSpacing.ONE_POINT_FIVE)
         paragraph.paragraph_format.line_spacing = style.line_spacing
     """
 
-    SINGLE = 1.0  # 单倍行距
-    ONE_POINT_FIVE = 1.5  # 1.5 倍
-    DOUBLE = 2.0  # 双倍
+    class Meta:
+        pt = _SetLineSpacing.set_pt
+        mm = _SetLineSpacing.set_mm
+        cm = _SetLineSpacing.set_cm
+        inch = _SetLineSpacing.set_inch
 
-    _LABEL_MAP = {
-        "单倍行距": SINGLE,
-        "1.5倍": ONE_POINT_FIVE,
-        "双倍": DOUBLE,
-    }
+    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+        """仅设置倍为单位的数据"""
+        line_spacing = self.rel_value
+        if line_spacing:
+            docx_obj.paragraph_format.line_spacing = line_spacing
+        else:
+            raise ValueError(f"无效的行距: '{self.value}'")
 
 
-class FirstLineIndent(LabelEnum):
+class FirstLineIndent(UnitLabelEnum):
     """
     首行缩进枚举，适用于中文排版。
     """
 
-    NONE = 0  # 无缩进（用于标题、列表等）
-    ONE_CHAR = 1  # 1 字符（约）
-    TWO_CHARS = 2  # 2 字符（标准中文正文）
-    THREE_CHARS = 3  # 3 字符（较少用）
-
-    _LABEL_MAP = {
-        "无缩进": NONE,
-        "1字符": ONE_CHAR,
-        "2字符": TWO_CHARS,
-        "3字符": THREE_CHARS,
-    }
+    class Meta:
+        char = _SetFirstLineIndent.set_char
+        pt = _SetFirstLineIndent.set_pt
+        mm = _SetFirstLineIndent.set_mm
+        cm = _SetFirstLineIndent.set_cm
+        inch = _SetFirstLineIndent.set_inch
 
 
-class BuiltInStyle(LabelEnum):
+class BuiltInStyle(UnitLabelEnum):
     """
     Word 内置段落样式名称（使用英文标准名称，跨语言兼容）。
 
@@ -329,3 +398,16 @@ class BuiltInStyle(LabelEnum):
         "列表项": LIST_PARAGRAPH,
         "题注": CAPTION,
     }
+
+    def base_set(self, docx_obj: Paragraph, *args, **kwargs):
+        style = self._LABEL_MAP.get(self.value, None)
+        if style:
+            try:
+                docx_obj.style = style
+            except ValueError as e:
+                raise ValueError(f"未使用的样式: '{self.value}'") from e
+        else:
+            try:
+                docx_obj.style = self.value
+            except ValueError as e:
+                raise ValueError(f"未使用的样式: '{self.value}'") from e
