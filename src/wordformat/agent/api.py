@@ -70,7 +70,7 @@ class OpenAIAgent:
     async def get_function(self) -> list[ChatCompletionMessageToolCall] | None:
         """获取工具调用（非流式）"""
         if self.completion is None:
-            await self.get_response(stream=False)
+            self.completion = await self.get_response(stream=False)
         msg = self.completion.choices[0].message
         return msg.tool_calls if hasattr(msg, "tool_calls") and msg.tool_calls else None
 

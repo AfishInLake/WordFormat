@@ -5,7 +5,6 @@ __pycache__
 .coverage
 .tox
 .eggs
-
 .mypy_cache
 .nox
 .build

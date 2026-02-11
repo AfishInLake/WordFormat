@@ -1,6 +1,6 @@
 # Makefile
 
-.PHONY: help install build server clean
+.PHONY: help install build server clean tests
 
 PROJECT_ROOT := $(CURDIR)
 
@@ -12,6 +12,7 @@ help:
 	@echo "  build    # Run the build script"
 	@echo "  server   # Start the Uvicorn server"
 	@echo "  clean    # Clean build artifacts"
+	@echo "  tests    # Run the tests using pytest"
 
 ## install: Install the project in editable mode
 install:
@@ -51,6 +52,12 @@ build:
 ## server: Start the Uvicorn development server
 server:
 	uvicorn wordformat.api:app --host 0.0.0.0 --port 8000
+
+## tests: Run the tests using pytest
+tests:
+	@echo "Running tests..."
+	@pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85
+
 ## clean: Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."

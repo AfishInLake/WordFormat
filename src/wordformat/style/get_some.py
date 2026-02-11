@@ -454,7 +454,7 @@ def run_get_font_size_pt(run: Run):
     if font_size is not None:
         return font_size.pt
     style = run._parent.style
-    if style and style.font.size is not None:
+    if style and hasattr(style, "font") and style.font and style.font.size is not None:
         return style.font.size.pt
     return 12.0
 

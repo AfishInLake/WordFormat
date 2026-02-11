@@ -1,6 +1,13 @@
 default_language_version:
   python: python3.11
-files: ".*.py|json"
+exclude: |
+  (?x)^(
+    tests/.* |
+    dist/.* |
+    build/.* |
+    .*\.egg-info/.*
+  )$
+
 default_stages: [ pre-commit, pre-push ]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -26,4 +33,3 @@ repos:
         args:
           - --fix
       - id: ruff-format
-
