@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [ "**" ]          # 所有分支 push 都触发 test
+    branches: [ "**" ]
+    tags: [ "v*" ]
   pull_request:
-    branches: [ "**" ]          # 所有 PR 触发 test + build
+    branches: [ "**" ]
 
 jobs:
   # =============== Job 1: 测试 + PR 构建 ===============
