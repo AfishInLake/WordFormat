@@ -53,21 +53,7 @@ cd WordFormat
 
 #### 2. 安装依赖
 ```bash
-# 使用 uv（推荐）
-uv sync
-
-# 或使用 pip
-# 创建虚拟环境
-python -m venv venv
-
-# 激活虚拟环境
-# linux/macOS
-source venv/bin/activate
-# windows
-venv\Scripts\activate
-
-# 安装项目依赖
-uv pip install -e .
+make install
 ```
 
 #### 3. 配置环境变量
@@ -76,6 +62,18 @@ uv pip install -e .
 HOST="127.0.0.1"
 # 配置服务端口
 PORT="8000"
+```
+#### 4. 启动API服务
+- 或查看 `方式三：api调用` 
+```bash
+# 在虚拟环境下运行
+make server
+```
+
+#### 5. 构建.exe程序
+```bash
+# 在虚拟环境下运行
+make build
 ```
 
 ### 核心使用方法
@@ -92,43 +90,43 @@ WordFormat 提供**命令行交互**和**Python 编程调用**两种使用方式
 解析 Word 文档并生成结构化 JSON 文件（可手动调整JSON后再执行校验/格式化），**配置文件为必填项**：
 ```bash
 # 基础用法（JSON 生成到默认 tmp/ 目录，自动匹配Word同名）
-python main.py -d your_document.docx -jf your_document.json generate-json -c example/undergrad_thesis.yaml
+wordformat -d your_document.docx -jf your_document.json generate-json -c example/undergrad_thesis.yaml
 
 # 自定义 JSON 生成目录（生成到 output/ 目录，自动匹配Word同名）
-python main.py -d your_document.docx -jf your_document.json -j output/ generate-json -c example/undergrad_thesis.yaml
+wordformat -d your_document.docx -jf your_document.json -j output/ generate-json -c example/undergrad_thesis.yaml
 ```
 
 ##### 2. 执行格式校验（第二步：仅检查+添加批注）
 使用生成/修改后的**完整JSON路径**执行格式校验，不在原文档修改，仅在违规位置添加Word批注，生成带批注的新文档，**配置文件为必填项**：
 ```bash
 # 基础用法（使用指定的完整JSON路径，校验后文档保存到默认 output/ 目录）
-python main.py -d your_document.docx -jf output/your_document_edited.json check-format -c example/undergrad_thesis.yaml
+wordformat -d your_document.docx -jf output/your_document_edited.json check-format -c example/undergrad_thesis.yaml
 
 # 自定义校验后文档输出目录
-python main.py -d your_document.docx -jf output/your_document.json check-format -c example/undergrad_thesis.yaml -o check_result/
+wordformat -d your_document.docx -jf output/your_document.json check-format -c example/undergrad_thesis.yaml -o check_result/
 ```
 
 ##### 3. 执行格式格式化（第三步：自动修正格式）
 使用指定的**完整JSON路径**，根据配置文件**自动修正**文档格式问题，生成格式化后的新文档，**配置文件为必填项**：
 ```bash
 # 基础用法（使用指定的完整JSON路径，格式化后文档保存到默认 output/ 目录）
-python main.py -d your_document.docx -jf output/your_document.json apply-format -c example/undergrad_thesis.yaml
+wordformat -d your_document.docx -jf output/your_document.json apply-format -c example/undergrad_thesis.yaml
 
 # 自定义格式化后文档输出目录
-python main.py -d your_document.docx -jf output/your_document_edited.json apply-format -c example/grad_thesis.yaml -o final_format/
+wordformat -d your_document.docx -jf output/your_document_edited.json apply-format -c example/grad_thesis.yaml -o final_format/
 ```
 
 ##### 实际测试示例（贴合真实使用场景）
 ```bash
 # 1. 生成JSON（到output目录）
-python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json -j .\output\ generate-json -c .\example\undergrad_thesis.yaml
+wordformat -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json -j .\output\ generate-json -c .\example\undergrad_thesis.yaml
 wordformat --docx "G:\desktop\论文语料集\1 (2).docx" --json "test02s/1.json" generate-json --config "example/undergrad_thesis.yaml"
 # 2. 执行格式化（使用上一步生成的完整JSON路径）
-python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json apply-format -c .\example\undergrad_thesis.yaml
+wordformat -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json apply-format -c .\example\undergrad_thesis.yaml
 wordformat --docx "G:\desktop\论文语料集\1 (2).docx" --json "test02s/1.json" apply-format --config "example/undergrad_thesis.yaml"
 
 # 3. 执行校验（自定义输出目录）
-python main.py -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json check-format -c .\example\undergrad_thesis.yaml -o .\check_output\
+wordformat -d .\tmp\毕业设计说明书.docx -jf .\output\毕业设计说明书.json check-format -c .\example\undergrad_thesis.yaml -o .\check_output\
 (wordparse) PS G:\desktop\WordFormat> wordformat --docx "G:\desktop\论文语料集\1 (2).docx" --json "test02s/1.json" check-format --config "example/undergrad_thesis.yaml"
 ```
 
@@ -238,18 +236,18 @@ uv run start_api.py
 **核心原因**：参数顺序错误，未遵循「全局参数 → 子命令 → 子命令专属参数」规则  
 **错误示例**：子命令参数（`-c`）放在子命令前面
 ```bash
-python main.py -d doc.docx -c config.yaml apply-format -jf output/doc.json
+wordformat -d doc.docx -c config.yaml apply-format -jf output/doc.json
 ```
 **正确示例**：先全局参数，再子命令，最后子命令参数
 ```bash
-python main.py -d doc.docx -jf output/doc.json apply-format -c config.yaml
+wordformat -d doc.docx -jf output/doc.json apply-format -c config.yaml
 ```
 
 ### Q2：generate-json 模式报 JSON 文件不存在？
 **原因**：`--json/-jf` 为全局必填参数，该模式下仅作**参数占位**，无需提前创建JSON文件，工具会自动生成  
 **解决**：直接指定JSON保存路径即可，工具会自动创建文件及上级目录，示例：
 ```bash
-python main.py -d doc.docx -jf output/未创建的json文件.json generate-json -c config.yaml
+wordformat -d doc.docx -jf output/未创建的json文件.json generate-json -c config.yaml
 ```
 
 ### Q3：check-format/apply-format 模式报 JSON 文件不存在？
