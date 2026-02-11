@@ -45,7 +45,7 @@ jobs:
 
       - name: Install project dependencies
         run: |
-          uv pip install -e .[test]
+          uv pip install --system -e .[test]
 
       - name: Run tests with coverage (fail if <85%)
         run: |
