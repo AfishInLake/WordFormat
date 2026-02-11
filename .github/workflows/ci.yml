@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  test-and-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7.3.0
+        with:
+          enable-cache: true
+
+      - name: Install GNU Make on Windows
+        if: runner.os == 'Windows'
+        run: choco install make --no-progress
+        shell: bash
+
+      - name: Install system dependencies (PyInstaller)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+              xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
+          fi
+
+      - name: Install project dependencies
+        run: |
+          uv pip install -e .[test]
+
+      - name: Run tests with coverage (fail if <85%)
+        run: |
+          make tests
+
+      - name: Build executable (PR only)
+        if: github.event_name == 'pull_request'
+        run: make build
+
+      - name: Upload build artifact (PR only)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordformat-build-${{ runner.os }}
+          path: dist/
+          retention-days: 7
