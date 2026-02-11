@@ -11,9 +11,11 @@ jobs:
   # =============== Job 1: 测试 + PR 构建 ===============
   test-and-build:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
       fail-fast: false
 
     steps:
@@ -85,12 +87,14 @@ jobs:
       contents: write
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
       fail-fast: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
+        with:
+          lfs: true
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6.2.0
