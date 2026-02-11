@@ -9,7 +9,6 @@ dependencies = [
     "loguru>=0.7.3",
     "numpy>=2.4.2",
     "onnxruntime>=1.24.1",
-    "openai>=2.15.0",
     "pre-commit>=4.5.1",
     "pydantic>=2.12.5",
     "pyinstaller>=6.18.0",

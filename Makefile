@@ -9,6 +9,7 @@ help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
+	@echo "  install  # Install the project in editable mode"
 	@echo "  build    # Run the build script"
 	@echo "  server   # Start the Uvicorn server"
 	@echo "  clean    # Clean build artifacts"
@@ -45,9 +46,18 @@ install:
 	@echo "Development environment ready!"
 
 ## build: Run the build script (scripts/build.bat)
-build:
+build: install
 	@echo "Running build script..."
-	@scripts/build.bat "$(PROJECT_ROOT)";
+	@if [ "$$(uname -s)" = "Linux" ] || [ "$$(uname -s)" = "Darwin" ]; then \
+		echo "Detected Unix-like system, using build.sh..."; \
+		chmod +x scripts/build.sh; \
+		scripts/build.sh "$(PROJECT_ROOT)"; \
+	elif [ "$$OS" = "Windows_NT" ] || [ -n "$$WINDIR" ]; then \
+		echo "Detected Windows, using build.bat..."; \
+		scripts/build.bat "$(PROJECT_ROOT)"; \
+	else \
+		echo "Unsupported platform!"; exit 1; \
+	fi
 
 ## server: Start the Uvicorn development server
 server:
@@ -61,11 +71,11 @@ tests:
 ## clean: Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@if [ "$$OS" = "Windows_NT" ]; then \
+	@if [ "$$(uname -s)" = "Linux" ] || [ "$$(uname -s)" = "Darwin" ]; then \
+		rm -rf dist/ build/ output/ *.spec 2>/dev/null; \
+		echo "Clean complete (Unix)."; \
+	elif [ "$$OS" = "Windows_NT" ] || [ -n "$$WINDIR" ]; then \
 		scripts/clean.bat; \
 	else \
-		echo "Cleaning build artifacts..."; \
-		rm -rf dist build output 2>/dev/null; \
-		rm -f *.spec 2>/dev/null; \
-		echo "Clean complete."; \
+		echo "Unknown OS, skipping clean."; \
 	fi

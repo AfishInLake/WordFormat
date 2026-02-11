@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
+        with:
+          lfs: true
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6.2.0
