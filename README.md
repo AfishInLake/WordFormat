@@ -64,7 +64,7 @@ HOST="127.0.0.1"
 PORT="8000"
 ```
 #### 4. 启动API服务
-- 或查看 `方式三：api调用` 
+- 或查看 `方式三：api调用`
 ```bash
 # 在虚拟环境下运行
 make server
@@ -191,7 +191,7 @@ auto_format_thesis_document(
 ```bash
 # 1. 修改 print_tree.py 中的 JSON_PATH 和 YAML_PATH 为实际文件路径
 # 2. 执行命令查看结构化树状结果
-python print_tree.py 
+python print_tree.py
 ```
 
 #### 方式三：api调用
@@ -233,7 +233,7 @@ uv run start_api.py
 ## 常见问题
 
 ### Q1：命令行执行报参数解析错误？
-**核心原因**：参数顺序错误，未遵循「全局参数 → 子命令 → 子命令专属参数」规则  
+**核心原因**：参数顺序错误，未遵循「全局参数 → 子命令 → 子命令专属参数」规则
 **错误示例**：子命令参数（`-c`）放在子命令前面
 ```bash
 wordformat -d doc.docx -c config.yaml apply-format -jf output/doc.json
@@ -244,7 +244,7 @@ wordformat -d doc.docx -jf output/doc.json apply-format -c config.yaml
 ```
 
 ### Q2：generate-json 模式报 JSON 文件不存在？
-**原因**：`--json/-jf` 为全局必填参数，该模式下仅作**参数占位**，无需提前创建JSON文件，工具会自动生成  
+**原因**：`--json/-jf` 为全局必填参数，该模式下仅作**参数占位**，无需提前创建JSON文件，工具会自动生成
 **解决**：直接指定JSON保存路径即可，工具会自动创建文件及上级目录，示例：
 ```bash
 wordformat -d doc.docx -jf output/未创建的json文件.json generate-json -c config.yaml
@@ -281,7 +281,7 @@ wordformat -d doc.docx -jf output/未创建的json文件.json generate-json -c c
 1. GitHub **不支持通过 SSH 协议上传 Git LFS 文件**。
 虽然普通代码可以通过 `git@github.com` 正常推送，但 LFS 在 SSH 模式下会尝试执行 `git-lfs-transfer` 命令，而 GitHub 的 SSH 服务并不识别该命令，导致连接被立即关闭（报错如 `EOF` 或 `Unable to negotiate version`）。
 
-**正确做法**：  
+**正确做法**：
 - 将远程仓库地址改为 **HTTPS**：
   ```bash
   git remote set-url origin https://github.com/AfishInLake/WordFormat.git
