@@ -61,7 +61,9 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         self._rel_unit = None  # 解析的标准单位
         self.extract_unit_result = None  # 解析的结果
         # 对于固定单位的枚举类，如行间距、对齐方式，不需要处理单位
-        if not any([isinstance(self, LineSpacingRule), isinstance(self, Alignment)]):
+        # 但需要确保rel_value正确设置
+        class_name = self.__class__.__name__
+        if class_name not in ["LineSpacingRule", "Alignment"]:
             self.split_unit()
 
     def split_unit(self):
@@ -87,11 +89,14 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         """
         if self._rel_value is not None:
             return self._rel_value
-        value = self._LABEL_MAP.get(self.value, None)
-        if value:
-            self._rel_value = value
-        else:
-            self._rel_value = self.value
+        # 直接访问类的_LABEL_MAP属性
+        if hasattr(self.__class__, "_LABEL_MAP"):
+            label_map = self.__class__._LABEL_MAP
+            if self.value in label_map:
+                self._rel_value = label_map[self.value]
+                return self._rel_value
+        # 如果没有找到映射，返回原始值
+        self._rel_value = self.value
         return self._rel_value
 
     @rel_value.setter
@@ -246,11 +251,11 @@ class FontColor(UnitLabelEnum):
 
     @staticmethod
     def _normalize_hex(hex_str: str) -> str:
-        """静态方法：标准化十六进制为6位大写格式"""
+        """静态方法：标准化十六进制为6位小写格式"""
         hex_clean = hex_str.strip().lstrip("#").lower()
         if len(hex_clean) == 3:
             hex_clean = "".join([c * 2 for c in hex_clean])
-        return hex_clean.zfill(6).upper()
+        return "#" + hex_clean.zfill(6).lower()
 
     @staticmethod
     def _parse_color(color_spec: str) -> Tuple[int, int, int]:
