@@ -13,7 +13,6 @@ __pycache__
 .gitignore
 .git
 .gitlab
-.github
 .gitkeep
 test
 test/*
