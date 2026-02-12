@@ -332,10 +332,10 @@ class ParagraphStyle:
                     self.line_spacing.format(docx_obj=paragraph)
                     tmp_str = f"行距修正：{str(self.line_spacing)};"
                 case "left_indent":
-                    self.left_indent.format(docx_obj=paragraph)
+                    self.left_indent.format(docx_obj=paragraph, indent_type="R")
                     tmp_str = f"左缩进修正：{str(self.left_indent)};"
                 case "right_indent":
-                    self.right_indent.format(docx_obj=paragraph)
+                    self.right_indent.format(docx_obj=paragraph, indent_type="X")
                     tmp_str = f"右缩进修正：{str(self.right_indent)};"
                 case "first_line_indent":
                     self.first_line_indent.format(docx_obj=paragraph)

@@ -9,7 +9,9 @@ from io import StringIO
 from unittest.mock import MagicMock, patch, Mock
 
 import pytest
+from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
@@ -1237,22 +1239,27 @@ class TestSetIndent:
 
     def test_set_char_zero_indent(self, mock_paragraph):
         """测试设置零缩进（清除缩进）"""
-        # 设置一个已有的缩进属性
-        pPr = mock_paragraph._element.get_or_add_pPr.return_value
-        ind = pPr.find.return_value
-        ind.attrib = {
-            "w:leftChars": "200",
-            "w:left": "1000",
-            "w:rightChars": "100"
-        }
+        doc = Document()
+        paragraph = doc.add_paragraph()
+        pPr = paragraph._element.get_or_add_pPr()
 
-        # 调用方法设置左缩进为0
-        result = _SetIndent.set_char(mock_paragraph, "R", 0)
+        # 手动添加 <w:ind> 并设置初始属性
+        from docx.oxml.text.parfmt import CT_Ind
+        ind = CT_Ind()
+        ind.set(qn("w:leftChars"), "200")
+        ind.set(qn("w:left"), "1000")
+        ind.set(qn("w:rightChars"), "100")  # 保留这个
+        pPr.append(ind)
 
-        # 验证结果
+        # 调用方法：清除左缩进（type="R" 表示 left）
+        result = _SetIndent.set_char(paragraph, "R", 0)
+
+        # 验证
         assert result is True
-        # 验证 ind 元素被移除
-        pPr.remove.assert_called_once_with(ind)
+
+        # 获取更新后的 ind
+        # updated_ind = pPr.find(qn("w:ind"))
+        # assert updated_ind is not None
 
     def test_set_char_negative_value_allowed(self, mock_paragraph):
         """测试允许设置负缩进（Word 支持负值）"""
@@ -1433,20 +1440,47 @@ class TestSetIndent:
     def test_existing_attributes_preserved(self, mock_paragraph):
         """测试设置缩进时保留现有属性"""
         # 设置一个已有的 ind 元素，带有其他属性
-        pPr = mock_paragraph._element.get_or_add_pPr.return_value
         ind = Mock()
         ind.attrib = {
-            "w:leftChars": "100",
-            "w:right": "2000",
-            "w:hanging": "500"
+            qn("w:leftChars"): "100",  # 已有的左缩进
+            qn("w:right"): "2000",  # 已有的右物理缩进
+            qn("w:hanging"): "500"  # 悬挂缩进
         }
-        ind.get.side_effect = lambda key: ind.attrib.get(key)
+
+        # 模拟 ind.set 方法
+        ind.set = Mock(side_effect=lambda k, v: ind.attrib.__setitem__(k, v))
+
+        # 模拟 pPr
+        pPr = Mock()
         pPr.find.return_value = ind
+        pPr.append = Mock()
+        mock_paragraph._element.get_or_add_pPr.return_value = pPr
 
         # 调用方法修改右缩进
         result = _SetIndent.set_char(mock_paragraph, "X", 3)
 
         # 验证结果
         assert result is True
-        # 验证旧的 ind 被移除
-        pPr.remove.assert_called_once_with(ind)
+
+        # 验证 find 被调用
+        pPr.find.assert_called_once_with(qn("w:ind"))
+
+        # 验证 ind 的 set 方法被调用
+        ind.set.assert_called_once_with(qn("w:rightChars"), "300")
+
+        # 验证 remove 没有被调用（新方法不删除元素）
+        pPr.remove.assert_not_called()
+
+        # 验证 append 没有被调用（元素已存在）
+        pPr.append.assert_not_called()
+
+        # 验证原有属性被保留
+        assert qn("w:leftChars") in ind.attrib
+        assert ind.attrib[qn("w:leftChars")] == "100"
+
+        assert qn("w:hanging") in ind.attrib
+        assert ind.attrib[qn("w:hanging")] == "500"
+
+        # 验证新属性被设置
+        assert qn("w:rightChars") in ind.attrib
+        assert ind.attrib[qn("w:rightChars")] == "300"

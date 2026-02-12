@@ -266,13 +266,13 @@ class _SetIndent:
     """
 
     @staticmethod
-    def set_char(paragraph: Paragraph, indent_type: str, target_value: float) -> bool:
+    def set_char(paragraph: Paragraph, indent_type: str, value: float) -> bool:
         """
         使用 字符 为单位设置缩进
         Args:
             paragraph: 段落对象
             indent_type: 缩进类型（"R"=文本之前缩进，"X"=文本之后缩进）
-            target_value: 字符数值
+            value: 字符数值
         """
         try:
             if indent_type not in ("R", "X"):
@@ -284,93 +284,83 @@ class _SetIndent:
             p = paragraph._element
             pPr = p.get_or_add_pPr()
 
-            # 获取现有的 <w:ind> 节点（如果存在）
+            # 获取或创建 <w:ind> 元素
             ind = pPr.find(qn("w:ind"))
-            existing_attrs = {}
-            if ind is not None:
-                # 保存所有现有属性，避免丢失 left/right/hanging 等
-                for attr in ind.attrib:
-                    existing_attrs[attr] = ind.get(attr)
-                pPr.remove(ind)
+            if ind is None:
+                from docx.oxml.text.parfmt import CT_Ind
 
-            # 决定要设置的 XML 属性名
-            char_attr = "w:leftChars" if indent_type == "R" else "w:rightChars"
-            physical_attr = "w:left" if indent_type == "R" else "w:right"
+                ind = CT_Ind()
+                pPr.append(ind)
 
-            # 转换字符数为 Word 内部单位（1 字符 = 100 单位）
-            chars_int = int(round(float(target_value) * 100))
+            # 清除旧的字符缩进和物理缩进（根据类型）
+            char_attr = qn("w:leftChars") if indent_type == "R" else qn("w:rightChars")
+            physical_attr = qn("w:left") if indent_type == "R" else qn("w:right")
 
-            # 更新属性字典
-            if target_value == 0:
-                # 清除字符和物理缩进（双重保险）
-                existing_attrs.pop(char_attr, None)
-                existing_attrs.pop(physical_attr, None)
+            # 设置新值
+            if value == 0:
+                # 删除属性
+                if char_attr in ind.attrib:
+                    del ind.attrib[char_attr]
+                if physical_attr in ind.attrib:
+                    del ind.attrib[physical_attr]
             else:
-                existing_attrs[char_attr] = str(chars_int)
-                # 注意：不要清除物理属性（如用户同时设了 cm），但字符优先级更高
-                # Word 会优先使用 *Chars 属性（如果存在）
-
-            # 重建 <w:ind> 节点
-            if existing_attrs:
-                attr_str = " ".join(f'{k}="{v}"' for k, v in existing_attrs.items())
-                ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501
-                new_ind = parse_xml(ind_xml)
-                pPr.append(new_ind)
+                # 1 字符 = 100 单位
+                chars_int = int(round(float(value) * 100))
+                ind.set(char_attr, str(chars_int))
+                # 注意：不要设置 physical_attr，Word 会优先使用 *Chars
 
             return True
 
         except Exception as e:
-            logger.error(
-                f"设置字符缩进失败 (type={indent_type}, value={target_value}): {e}"
-            )
+            logger.error(f"设置字符缩进失败 (type={indent_type}, value={value}): {e}")
             return False
 
     @staticmethod
-    def set_pt(paragraph: Paragraph, indent_type: str, target_value: float):
+    def set_pt(paragraph: Paragraph, indent_type: str, value: float):
         """
         使用 PT/磅 为单位设置缩进
         Args:
             paragraph: 段落对象
             indent_type: 缩进类型（"R"=文本之前缩进，"X"=文本之后缩进）
-            target_value: PT/磅数值
+            value: PT/磅数值
         """
-        value = Pt(target_value)
+        value = Pt(value)
         _SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
-    def set_cm(paragraph: Paragraph, indent_type: str, target_value: float):
+    def set_cm(paragraph: Paragraph, indent_type: str, value: float):
         """
         使用 厘米(cm/CM) 为单位设置缩进
         Args:
             paragraph: 段落对象
             indent_type: 缩进类型（"R"=文本之前缩进，"X"=文本之后缩进）
-            target_value: 厘米数值
+            value: 厘米数值
         """
-        value = Cm(target_value)
+        value = Cm(value)
         _SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
-    def set_inch(paragraph: Paragraph, indent_type: str, target_value: float):
+    def set_inch(paragraph: Paragraph, indent_type: str, value: float):
         """
         使用 英寸(inch/Inches) 为单位设置缩进
         Args:
             paragraph: 段落对象
             indent_type: 缩进类型（"R"=文本之前缩进，"X"=文本之后缩进）
-            target_value: 英寸数值
+            value: 英寸数值
         """
-        value = Inches(target_value)
+        value = Inches(value)
         _SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
-    def set_mm(paragraph: Paragraph, indent_type: str, target_value: float):
+    def set_mm(paragraph: Paragraph, indent_type: str, value: float):
         """
         使用 毫米(mm/MM) 为单位设置缩进
         Args:
             paragraph: 段落对象
             indent_type: 缩进类型（"R"=文本之前缩进，"X"=文本之后缩进）
-            target_value: 毫米数值
+            value: 毫米数值
         """
-        value = Mm(target_value)
+        value = Mm(value)
         _SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
