@@ -58,6 +58,8 @@ class WarningFieldConfig(BaseModel):
     space_after: bool = Field(default=True)
     line_spacing: bool = Field(default=True)
     line_spacingrule: bool = Field(default=True)
+    left_indent: bool = Field(default=True)
+    right_indent: bool = Field(default=True)
     first_line_indent: bool = Field(default=True)
     builtin_style_name: bool = Field(default=True)
 
@@ -71,6 +73,8 @@ class GlobalFormatConfig(BaseModel):
     space_after: str = Field(default="0.5行", description="段后间距（行）")
     line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
     line_spacing: str = Field(default="1.5倍")
+    left_indent: str = Field(default="0字符")
+    right_indent: str = Field(default="0字符")
     first_line_indent: str = Field(default="2字符")
     builtin_style_name: str = Field(default="正文")
     chinese_font_name: ChineseFontType | str = Field(default="宋体")
@@ -83,28 +87,13 @@ class GlobalFormatConfig(BaseModel):
 
 
 # -------------------------- 摘要配置模型 --------------------------
-class KeywordsConfig(BaseModel):
+class KeywordsConfig(GlobalFormatConfig):
     """关键词配置模型（继承全局格式）"""
 
-    # 继承全局格式的所有字段
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(default=None, description="关键词匹配的正则表达式")
 
     # 关键词特有配置
-    kewords_bold: bool = Field(default=True, description="关键字加粗")
+    keywords_bold: bool = Field(default=True, description="关键字加粗")
     count_min: int = Field(default=4, description="最小关键字数")
     count_max: int = Field(default=4, description="最大关键字数")
     trailing_punct_forbidden: bool = Field(default=True, description="禁止最后有标点")
@@ -117,46 +106,17 @@ class KeywordsConfig(BaseModel):
         return v
 
 
-class AbstractTitleConfig(BaseModel):
+class AbstractTitleConfig(GlobalFormatConfig):
     """摘要标题配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="居中对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="无缩进")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="黑体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=True)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(description="标题正则表达式")
 
 
-class AbstractContentConfig(BaseModel):
+class AbstractContentConfig(GlobalFormatConfig):
     """摘要正文配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
 
-
-class AbstractChineseConfig(BaseModel):
+class AbstractChineseConfig(GlobalFormatConfig):
     """中文摘要配置"""
 
     chinese_title: AbstractTitleConfig = Field(default_factory=AbstractTitleConfig)
@@ -188,27 +148,13 @@ class AbstractConfig(BaseModel):
 
 
 # -------------------------- 标题配置模型 --------------------------
-class HeadingLevelConfig(BaseModel):
+class HeadingLevelConfig(GlobalFormatConfig):
     """各级标题配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="无缩进")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(description="标题正则表达式")
 
 
-class HeadingsConfig(BaseModel):
+class HeadingsConfig(GlobalFormatConfig):
     """标题总配置"""
 
     level_1: HeadingLevelConfig = Field(default_factory=HeadingLevelConfig)
@@ -217,43 +163,14 @@ class HeadingsConfig(BaseModel):
 
 
 # -------------------------- 正文配置模型 --------------------------
-class BodyTextConfig(BaseModel):
+class BodyTextConfig(GlobalFormatConfig):
     """正文配置（继承全局格式）"""
-
-    alignment: AlignmentType = Field(default="两端对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
 
 
 # -------------------------- 插图配置模型 --------------------------
-class FiguresConfig(BaseModel):
+class FiguresConfig(GlobalFormatConfig):
     """插图配置"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="无缩进")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(description="图注正则表达式")
 
     caption_position: Literal["above", "below"] = Field(
@@ -263,23 +180,9 @@ class FiguresConfig(BaseModel):
 
 
 # -------------------------- 表格配置模型 --------------------------
-class TablesConfig(BaseModel):
+class TablesConfig(GlobalFormatConfig):
     """表格配置"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="无缩进")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(description="图注正则表达式")
 
     caption_position: Literal["above", "below"] = Field(
@@ -289,46 +192,18 @@ class TablesConfig(BaseModel):
 
 
 # -------------------------- 参考文献配置模型 --------------------------
-class ReferencesTitleConfig(BaseModel):
+class ReferencesTitleConfig(GlobalFormatConfig):
     """参考文献标题配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(description="参考文献正则表达式")
     section_title: Optional[str] = Field(
         default="参考文献", description="参考文献章节标题"
     )
 
 
-class ReferencesContentConfig(BaseModel):
+class ReferencesContentConfig(GlobalFormatConfig):
     """参考文献内容配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     numbering_format: Optional[str] = Field(default=None, description="编号格式")
     entry_indent: Optional[float] = Field(default=0.0, description="条目首行缩进量")
     entry_ending_punct: Optional[str] = Field(default=None, description="条目结束标点")
@@ -342,46 +217,17 @@ class ReferencesConfig(BaseModel):
 
 
 # -------------------------- 致谢配置模型 --------------------------
-class AcknowledgementsTitleConfig(BaseModel):
+class AcknowledgementsTitleConfig(GlobalFormatConfig):
     """致谢标题配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
     section_title_re: str = Field(description="致谢标题正则表达式")
 
 
-class AcknowledgementsContentConfig(BaseModel):
+class AcknowledgementsContentConfig(GlobalFormatConfig):
     """致谢内容配置（继承全局格式）"""
 
-    alignment: AlignmentType = Field(default="左对齐")
-    space_before: str = Field(default="0.5行")
-    space_after: str = Field(default="0.5行")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
 
-
-class AcknowledgementsConfig(BaseModel):
+class AcknowledgementsConfig(GlobalFormatConfig):
     """致谢总配置"""
 
     title: AcknowledgementsTitleConfig = Field(

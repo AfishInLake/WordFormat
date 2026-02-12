@@ -5,7 +5,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
@@ -13,12 +12,6 @@ from loguru import logger
 from wordformat.config.config import get_config
 from wordformat.config.datamodel import WarningFieldConfig
 from wordformat.style.get_some import (
-    paragraph_get_alignment,
-    paragraph_get_builtin_style_name,
-    paragraph_get_first_line_indent,
-    paragraph_get_line_spacing,
-    paragraph_get_space_after,
-    paragraph_get_space_before,
     run_get_font_color,
     run_get_font_name,
     run_get_font_size_pt,
@@ -31,9 +24,12 @@ from .style_enum import (
     FontColor,
     FontName,
     FontSize,
+    LeftIndent,
     LineSpacing,
     LineSpacingRule,
-    Spacing,
+    RightIndent,
+    SpaceAfter,
+    SpaceBefore,
 )
 
 style_checks_warning: WarningFieldConfig | None = None
@@ -268,17 +264,23 @@ class CharacterStyle:
 class ParagraphStyle:
     """段落样式类，用于定义 Word 文档中 Paragraph 级别的排版格式。
 
-    该类封装了常见的段落级格式属性，包括对齐方式、段前/段后间距、行距、首行缩进等，
-    常用于格式校验、自动修复或与标准模板进行比对。所有字段均提供合理的默认值，
-    符合中文公文或学术论文的常见排版规范。
+    该类封装了常见的段落级格式属性，包括对齐方式、段前/段后间距、行距规则与值、首行缩进、左右缩进及内置样式名称等，
+    常用于文档格式校验、自动修复或与标准模板进行比对。所有字段均提供合理的默认值，
+    符合中文公文、学术论文等正式文档的常见排版规范。
 
     Attributes:
-        alignment (Alignment): 段落对齐方式。例如左对齐（LEFT）、居中（CENTER）、两端对齐（JUSTIFY）等。
-        space_before (Spacing): 段前间距，表示当前段落与上一段之间的垂直距离（单位：磅）。
-        space_after (Spacing): 段后间距，表示当前段落与下一段之间的垂直距离（单位：磅）。
-        line_spacing (LineSpacing): 行距设置，支持固定值（如单倍、1.5 倍、双倍）或精确磅值。
-        first_line_indent (FirstLineIndent): 首行缩进量，通常用于正文段落（如缩进两个汉字）。
-        builtin_style_name ():预设样式
+        alignment (Alignment): 段落对齐方式，如左对齐、居中、两端对齐等。
+        space_before (SpaceBefore): 段前间距，表示当前段落与上一段之间的垂直距离
+                                        （支持“行”或物理单位如 pt/mm/cm）。
+        space_after (SpaceAfter): 段后间距，表示当前段落与下一段之间的垂直距离（单位同上）。
+        line_spacing (LineSpacing): 行距的具体数值，可为倍数（如 "1.5倍"）或物理单位（如 "20pt"）。
+        line_spacingrule (LineSpacingRule): 行距规则类型，如单倍行距、1.5倍行距、固定值、最小值等。
+        first_line_indent (FirstLineIndent): 首行缩进量（>0）或悬挂缩进（<0），
+                                            常用于中文正文（如 "2字符"）。
+        left_indent (LeftIndent): 左侧整体缩进，控制段落左侧边界位置。
+        right_indent (RightIndent): 右侧整体缩进，控制段落右侧边界位置。
+        builtin_style_name (BuiltInStyle): Word 内置段落样式名称（如 "Normal"、"Heading 1"），
+                                            用于样式继承与识别。
     """
 
     def __init__(
@@ -289,19 +291,23 @@ class ParagraphStyle:
         line_spacing: str = "1.5倍",
         line_spacingrule: str = "单倍行距",
         first_line_indent: str = "0字符",
+        right_indent: str = "0字符",
+        left_indent: str = "0字符",
         builtin_style_name: str = "正文",
     ):
         self.alignment: Alignment = Alignment(alignment)
-        self.space_before: Spacing = Spacing(space_before)
-        self.space_after: Spacing = Spacing(space_after)
+        self.space_before: SpaceBefore = SpaceBefore(space_before)
+        self.space_after: SpaceAfter = SpaceAfter(space_after)
         self.line_spacing: LineSpacing | float = LineSpacing(line_spacing)
         self.line_spacingrule: LineSpacingRule = LineSpacingRule(line_spacingrule)
         self.first_line_indent: FirstLineIndent = FirstLineIndent(first_line_indent)
+        self.right_indent: LeftIndent = LeftIndent(right_indent)
+        self.left_indent: RightIndent = RightIndent(left_indent)
         self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
         if globals()["style_checks_warning"] is None:
             globals()["style_checks_warning"] = get_config().style_checks_warning
 
-    def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:
+    def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
         """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果"""
         # 先检测当前段落与目标样式的差异
         diffs = self.diff_from_paragraph(paragraph)
@@ -325,6 +331,12 @@ class ParagraphStyle:
                 case "line_spacing":
                     self.line_spacing.format(docx_obj=paragraph)
                     tmp_str = f"行距修正：{str(self.line_spacing)};"
+                case "left_indent":
+                    self.left_indent.format(docx_obj=paragraph)
+                    tmp_str = f"左缩进修正：{str(self.left_indent)};"
+                case "right_indent":
+                    self.right_indent.format(docx_obj=paragraph)
+                    tmp_str = f"右缩进修正：{str(self.right_indent)};"
                 case "first_line_indent":
                     self.first_line_indent.format(docx_obj=paragraph)
                     tmp_str = f"首行缩进修正;{str(self.first_line_indent)};"  # noqa E501
@@ -349,8 +361,7 @@ class ParagraphStyle:
             return []
         diffs = []
         # 对齐方式
-        alignment = paragraph_get_alignment(paragraph)
-        alignment = alignment if alignment else WD_ALIGN_PARAGRAPH.LEFT  # 默认左对齐
+        alignment = self.alignment.get_from_paragraph(paragraph)
         if self.alignment != alignment:
             diffs.append(
                 DIFFResult(
@@ -362,22 +373,8 @@ class ParagraphStyle:
                 )
             )
         # 段前间距
-        unit = self.space_before.rel_unit
-        match unit:
-            case "hang":
-                # 段前间距(行)
-                space_before = paragraph_get_space_before(paragraph)
-            case "pt":
-                space_before = paragraph.paragraph_format.space_before.pt
-            case "mm":
-                space_before = paragraph.paragraph_format.space_before.mm
-            case "cm":
-                space_before = paragraph.paragraph_format.space_before.cm
-            case "inch":
-                space_before = paragraph.paragraph_format.space_before.inches
-            case _:
-                raise ValueError(f"未知的段前间距单位: {unit}")
-        if self.space_before != Spacing(f"{space_before}{self.space_before.unit_ch}"):
+        space_before = self.space_before.get_from_paragraph(paragraph)
+        if self.space_before != space_before:
             diffs.append(
                 DIFFResult(
                     "space_before",
@@ -387,23 +384,9 @@ class ParagraphStyle:
                     1,
                 )
             )
-        # 段后间距(行)
-        unit = self.space_after.rel_unit
-        match unit:
-            case "hang":
-                # 段前间距(行)
-                space_after = paragraph_get_space_after(paragraph)
-            case "pt":
-                space_after = paragraph.paragraph_format.space_after.pt
-            case "mm":
-                space_after = paragraph.paragraph_format.space_after.mm
-            case "cm":
-                space_after = paragraph.paragraph_format.space_after.cm
-            case "inch":
-                space_after = paragraph.paragraph_format.space_after.inches
-            case _:
-                raise ValueError(f"未知的段后间距单位: {unit}")
-        if self.space_after != Spacing(f"{space_after}{self.space_after.unit_ch}"):
+        # 段后间距
+        space_after = self.space_after.get_from_paragraph(paragraph)
+        if self.space_after != space_after:
             diffs.append(
                 DIFFResult(
                     "space_after",
@@ -414,10 +397,7 @@ class ParagraphStyle:
                 )
             )
         # 行距选项
-        linespacingrule = paragraph.paragraph_format.line_spacing_rule
-        linespacingrule = (
-            linespacingrule if linespacingrule else WD_LINE_SPACING.MULTIPLE
-        )  # 默认单倍行距
+        linespacingrule = self.line_spacingrule.get_from_paragraph(paragraph)
         if self.line_spacingrule != linespacingrule:
             diffs.append(
                 DIFFResult(
@@ -429,7 +409,7 @@ class ParagraphStyle:
                 )
             )
         # 行距
-        line_spacing = paragraph_get_line_spacing(paragraph)
+        line_spacing = self.line_spacing.get_from_paragraph(paragraph)
         if self.line_spacing != line_spacing:
             diffs.append(
                 DIFFResult(
@@ -441,28 +421,7 @@ class ParagraphStyle:
                 )
             )
         # 首行缩进
-        unit = self.first_line_indent.rel_unit
-        if paragraph.paragraph_format.first_line_indent is None:
-            first_line_indent = paragraph_get_first_line_indent(paragraph)
-            if first_line_indent is None:  # 无首行缩进
-                first_line_indent = float("inf")
-        else:
-            match unit:
-                case "char":
-                    # 段前间距(行)
-                    first_line_indent = paragraph_get_first_line_indent(paragraph)
-                case "pt":
-                    first_line_indent = paragraph.paragraph_format.first_line_indent.pt
-                case "mm":
-                    first_line_indent = paragraph.paragraph_format.first_line_indent.mm
-                case "cm":
-                    first_line_indent = paragraph.paragraph_format.first_line_indent.cm
-                case "inch":
-                    first_line_indent = (
-                        paragraph.paragraph_format.first_line_indent.inches
-                    )
-                case _:
-                    raise ValueError(f"未知的段前间距单位: {unit}")
+        first_line_indent = self.first_line_indent.get_from_paragraph(paragraph)
         if self.first_line_indent != first_line_indent:
             diffs.append(
                 DIFFResult(
@@ -473,8 +432,32 @@ class ParagraphStyle:
                     1,
                 )
             )
+        # 缩进：文本之前
+        left_indent = self.left_indent.get_from_paragraph(paragraph)
+        if self.left_indent != left_indent:
+            diffs.append(
+                DIFFResult(
+                    "left_indent",
+                    self.left_indent,
+                    left_indent,
+                    f"文本之前缩进期待{str(self.left_indent)};",
+                    1,
+                )
+            )
+        # 文本之后缩进
+        right_indent = self.right_indent.get_from_paragraph(paragraph)
+        if self.right_indent != right_indent:
+            diffs.append(
+                DIFFResult(
+                    "right_indent",
+                    self.right_indent,
+                    right_indent,
+                    f"文本之后缩进期待{str(self.right_indent)};",
+                    1,
+                )
+            )
         # 样式
-        builtin_style_name = paragraph_get_builtin_style_name(paragraph)
+        builtin_style_name = self.builtin_style_name.get_from_paragraph(paragraph)
         if self.builtin_style_name != builtin_style_name:
             diffs.append(
                 DIFFResult(
@@ -490,28 +473,54 @@ class ParagraphStyle:
     @staticmethod
     def to_string(value: list[DIFFResult]):
         t = []
+        attr = [
+            "alignment",
+            "space_before",
+            "space_after",
+            "line_spacing",
+            "line_spacingrule",
+            "first_line_indent",
+            "left_indent",
+            "right_indent",
+            "builtin_style_name",
+        ]
+        warning = {}
+        for attr_name in attr:
+            warning[attr_name] = getattr(style_checks_warning, attr_name)
+
         for diff in value:
-            if style_checks_warning.alignment and diff.diff_type == "alignment":
+            type_name = diff.diff_type
+            if warning.get(type_name):
                 t.append(diff)
-            if style_checks_warning.space_before and diff.diff_type == "space_before":
-                t.append(diff)
-            if style_checks_warning.space_after and diff.diff_type == "space_after":
-                t.append(diff)
-            if style_checks_warning.line_spacing and diff.diff_type == "line_spacing":
-                t.append(diff)
-            if (
-                style_checks_warning.line_spacingrule
-                and diff.diff_type == "line_spacingrule"
-            ):
-                t.append(diff)
-            if (
-                style_checks_warning.first_line_indent
-                and diff.diff_type == "first_line_indent"
-            ):
-                t.append(diff)
-            if (
-                style_checks_warning.builtin_style_name
-                and diff.diff_type == "builtin_style_name"
-            ):
-                t.append(diff)
+
         return "\n".join([str(i) for i in t])
+
+    @classmethod
+    def from_config(cls, config: Any) -> "ParagraphStyle":
+        """
+        从任意具有兼容字段的对象（如 Pydantic 模型）自动构建 ParagraphStyle。
+        只需对象包含以下属性（可选，缺失则用默认值）：
+          alignment, space_before, space_after, line_spacing,
+          line_spacingrule, first_line_indent, left_indent,
+          right_indent, builtin_style_name
+        """
+        # 定义需要的字段名（与 __init__ 参数一致）
+        fields = [
+            "alignment",
+            "space_before",
+            "space_after",
+            "line_spacing",
+            "line_spacingrule",
+            "first_line_indent",
+            "left_indent",
+            "right_indent",
+            "builtin_style_name",
+        ]
+
+        kwargs = {}
+        for field in fields:
+            if hasattr(config, field):
+                kwargs[field] = getattr(config, field)
+            # 如果没有，则使用 __init__ 的默认值（无需处理）
+
+        return cls(**kwargs)

@@ -14,6 +14,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
 from wordformat.style.check_format import DIFFResult, CharacterStyle, ParagraphStyle
+from wordformat.style.style_enum import *
 
 
 class TestDIFFResult(unittest.TestCase):
@@ -190,29 +191,35 @@ class TestParagraphStyle(unittest.TestCase):
 
     def test_diff_from_paragraph(self):
         """测试 diff_from_paragraph 方法"""
-        # 模拟 Paragraph 对象
         paragraph = Mock()
-        paragraph.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        paragraph.paragraph_format.space_before = Mock()
-        paragraph.paragraph_format.space_before.pt = 6.0
-        paragraph.paragraph_format.space_after = Mock()
-        paragraph.paragraph_format.space_after.pt = 6.0
-        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
-        paragraph.paragraph_format.line_spacing = 1.0
-        paragraph.paragraph_format.first_line_indent = None
 
-        # 模拟获取段落属性的函数
-        with patch('wordformat.style.check_format.paragraph_get_alignment', return_value=WD_ALIGN_PARAGRAPH.LEFT):
-            with patch('wordformat.style.check_format.paragraph_get_space_before', return_value=0.5):
-                with patch('wordformat.style.check_format.paragraph_get_space_after', return_value=0.5):
-                    with patch('wordformat.style.check_format.paragraph_get_line_spacing', return_value=1.5):
-                        with patch('wordformat.style.check_format.paragraph_get_first_line_indent', return_value=0.0):
-                            with patch('wordformat.style.check_format.paragraph_get_builtin_style_name', return_value="normal"):
-                                # 模拟 Spacing 类
-                                with patch('wordformat.style.check_format.Spacing'):
-                                    diffs = self.paragraph_style.diff_from_paragraph(paragraph)
-                                    # 检查是否返回了差异列表
-                                    self.assertIsInstance(diffs, list)
+        # Patch 各个枚举类的 get_from_paragraph 方法
+        with patch.object(Alignment, 'get_from_paragraph', return_value=WD_ALIGN_PARAGRAPH.LEFT), \
+                patch.object(SpaceBefore, 'get_from_paragraph', return_value=0.5), \
+                patch.object(SpaceAfter, 'get_from_paragraph', return_value=0.5), \
+                patch.object(LineSpacingRule, 'get_from_paragraph', return_value=WD_LINE_SPACING.SINGLE), \
+                patch.object(LineSpacing, 'get_from_paragraph', return_value=1.5), \
+                patch.object(FirstLineIndent, 'get_from_paragraph', return_value=0.0), \
+                patch.object(LeftIndent, 'get_from_paragraph', return_value=0.0), \
+                patch.object(RightIndent, 'get_from_paragraph', return_value=0.0), \
+                patch.object(BuiltInStyle, 'get_from_paragraph', return_value="正文"):
+            # 创建一个 ParagraphStyle 实例（使用默认值）
+            style = ParagraphStyle(
+                alignment="左对齐",  # 对应 WD_ALIGN_PARAGRAPH.LEFT
+                space_before="0.5行",
+                space_after="0.5行",
+                line_spacing="1.5倍",
+                line_spacingrule="单倍行距",
+                first_line_indent="0字符",
+                left_indent="0字符",
+                right_indent="0字符",
+                builtin_style_name="正文"
+            )
+
+            diffs = style.diff_from_paragraph(paragraph)
+
+            # 因为所有获取值都匹配期望值，应该无差异
+            self.assertEqual(len(diffs), 0)
 
     def test_to_string(self):
         """测试 to_string 方法"""
