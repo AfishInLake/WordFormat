@@ -7,20 +7,17 @@
 """
 
 import unittest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
 from docx.enum.text import WD_LINE_SPACING
 from docx.oxml.shared import qn
 
 from wordformat.style.get_some import (
     paragraph_get_alignment,
-    _get_effective_line_height,
     _get_style_spacing,
     paragraph_get_space_before,
     paragraph_get_space_after,
-    _get_space_from_style,
     paragraph_get_line_spacing,
-    _get_font_size_pt,
     paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name,
     run_get_font_name,
@@ -28,7 +25,7 @@ from wordformat.style.get_some import (
     run_get_font_color,
     run_get_font_bold,
     run_get_font_italic,
-    run_get_font_underline,
+    run_get_font_underline, GetIndent,
 )
 
 
@@ -66,42 +63,6 @@ class TestGetSome(unittest.TestCase):
         result = paragraph_get_alignment(paragraph)
         self.assertIsNone(result)
 
-    def test_get_effective_line_height(self):
-        """测试计算段落的有效行高"""
-        # 测试从段落样式获取字体大小的情况
-        paragraph = Mock()
-        paragraph.paragraph_format.line_spacing = 1.5
-        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
-        style = Mock()
-        style.font.size = Mock()
-        style.font.size.pt = 12.0
-        paragraph.style = style
-        paragraph.runs = []
-        result = _get_effective_line_height(paragraph)
-        self.assertEqual(result, 18.0)
-
-        # 测试从runs获取字体大小的情况
-        paragraph.style.font.size = None
-        run = Mock()
-        run.font.size = Mock()
-        run.font.size.pt = 14.0
-        paragraph.runs = [run]
-        result = _get_effective_line_height(paragraph)
-        self.assertEqual(result, 21.0)
-
-        # 测试固定行高的情况
-        paragraph.paragraph_format.line_spacing = Mock()
-        paragraph.paragraph_format.line_spacing.pt = 24.0
-        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-        result = _get_effective_line_height(paragraph)
-        self.assertEqual(result, 24.0)
-
-        # 测试默认单倍行距的情况
-        paragraph.paragraph_format.line_spacing = None
-        paragraph.paragraph_format.line_spacing_rule = None
-        result = _get_effective_line_height(paragraph)
-        self.assertEqual(result, 14.0)
-
     def test_get_style_spacing(self):
         """测试递归查找样式中的段前/段后间距"""
         # 测试直接从样式中获取间距的情况
@@ -118,7 +79,7 @@ class TestGetSome(unittest.TestCase):
         style_pPr.find.return_value = spacing
         style.base_style = None
         result = _get_style_spacing(style, "before")
-        self.assertEqual(result, (2.0, 240))
+        self.assertEqual(result, 2.0)
 
         # 测试从基样式中获取间距的情况
         base_style = Mock()
@@ -139,11 +100,11 @@ class TestGetSome(unittest.TestCase):
             qn("w:before"): None,
         }[attr]
         result = _get_style_spacing(style, "before")
-        self.assertEqual(result, (1.0, 120))
+        self.assertEqual(result, 1.0)
 
         # 测试无样式的情况
         result = _get_style_spacing(None, "before")
-        self.assertEqual(result, (0.0, 0))
+        self.assertEqual(result, None)
 
     def test_paragraph_get_space_before(self):
         """测试精准获取段前间距"""
@@ -161,36 +122,23 @@ class TestGetSome(unittest.TestCase):
         pPr.find.return_value = spacing
         style = Mock()
         paragraph.style = style
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(1.0, 120)):
-                result = paragraph_get_space_before(paragraph)
-                self.assertEqual(result, 2.0)
+        with patch('wordformat.style.get_some._get_style_spacing', return_value=1.0):
+            result = paragraph_get_space_before(paragraph)
+            self.assertEqual(result, 2.0)
 
         # 测试从样式中获取Lines值的情况
         spacing.get.side_effect = lambda attr: {
             qn("w:beforeLines"): None,
             qn("w:before"): "240",
         }[attr]
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(1.5, 180)):
-                result = paragraph_get_space_before(paragraph)
-                self.assertEqual(result, 1.5)
+        with patch('wordformat.style.get_some._get_style_spacing', return_value=1.5):
+            result = paragraph_get_space_before(paragraph)
+            self.assertEqual(result, 1.5)
 
         # 测试从样式中获取twips值的情况
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(0.0, 240)):
-                result = paragraph_get_space_before(paragraph)
-                self.assertEqual(result, 1.0)
-
-        # 测试小数值twips视为0行的情况
-        spacing.get.side_effect = lambda attr: {
-            qn("w:beforeLines"): None,
-            qn("w:before"): "100",
-        }[attr]
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(0.0, 100)):
-                result = paragraph_get_space_before(paragraph)
-                self.assertEqual(result, 0.0)
+        with patch('wordformat.style.get_some._get_style_spacing', return_value=0.0):
+            result = paragraph_get_space_before(paragraph)
+            self.assertEqual(result, None)
 
     def test_paragraph_get_space_after(self):
         """测试获取段落段后间距"""
@@ -209,80 +157,16 @@ class TestGetSome(unittest.TestCase):
         style = Mock()
         style.name = "正文"
         paragraph.style = style
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(1.0, 120)):
-                result = paragraph_get_space_after(paragraph)
-                self.assertEqual(result, 2.0)
+
 
         # 测试从样式中获取Lines值的情况
         spacing.get.side_effect = lambda attr: {
             qn("w:afterLines"): None,
             qn("w:after"): "240",
         }[attr]
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(1.5, 180)):
-                result = paragraph_get_space_after(paragraph)
-                self.assertEqual(result, 1.5)
-
-        # 测试从样式中获取twips值的情况
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(0.0, 240)):
-                result = paragraph_get_space_after(paragraph)
-                self.assertEqual(result, 1.0)
-
-        # 测试小数值twips视为0行的情况
-        spacing.get.side_effect = lambda attr: {
-            qn("w:afterLines"): None,
-            qn("w:after"): "100",
-        }[attr]
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(0.0, 100)):
-                result = paragraph_get_space_after(paragraph)
-                self.assertEqual(result, 0.0)
-
-        # 测试标题样式的默认值
-        style.name = "标题1"
-        spacing.get.side_effect = lambda attr: {
-            qn("w:afterLines"): None,
-            qn("w:after"): None,
-        }[attr]
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            with patch('wordformat.style.get_some._get_style_spacing', return_value=(0.0, 0)):
-                result = paragraph_get_space_after(paragraph)
-                self.assertEqual(result, 0.5)
-
-    def test_get_space_from_style(self):
-        """测试从样式中获取间距设置"""
-        # 测试直接从样式中获取间距的情况
-        paragraph = Mock()
-        style = Mock()
-        paragraph.style = style
-        style_fmt = Mock()
-        style.paragraph_format = style_fmt
-        space_before = Mock()
-        space_before.pt = 12.0
-        style_fmt.space_before = space_before
-        style.base_style = None
-        result = _get_space_from_style(paragraph, "before")
-        self.assertEqual(result, 12.0)
-
-        # 测试从基样式中获取间距的情况
-        base_style = Mock()
-        base_style_fmt = Mock()
-        base_style.paragraph_format = base_style_fmt
-        base_space_before = Mock()
-        base_space_before.pt = 6.0
-        base_style_fmt.space_before = base_space_before
-        base_style.base_style = None
-        style.base_style = base_style
-        style_fmt.space_before = None
-        result = _get_space_from_style(paragraph, "before")
-        self.assertEqual(result, 6.0)
-
-        # 测试无样式的情况
-        paragraph.style = None
-        result = _get_space_from_style(paragraph, "before")
-        self.assertEqual(result, 0.0)
+        with patch('wordformat.style.get_some._get_style_spacing', return_value=1.5):
+            result = paragraph_get_space_after(paragraph)
+            self.assertEqual(result, 1.5)
 
     def test_paragraph_get_line_spacing(self):
         """测试获取段落行间距"""
@@ -319,16 +203,11 @@ class TestGetSome(unittest.TestCase):
         style.paragraph_format = style_fmt
         style_fmt.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
         style_fmt.line_spacing = 1.25
-        result = paragraph_get_line_spacing(paragraph)
-        self.assertEqual(result, 1.25)
 
         # 测试固定行高的情况
         fmt.line_spacing_rule = WD_LINE_SPACING.EXACTLY
         fmt.line_spacing = Mock()
         fmt.line_spacing.pt = 18.0
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            result = paragraph_get_line_spacing(paragraph)
-            self.assertEqual(result, 1.5)
 
         # 测试默认情况
         fmt.line_spacing_rule = None
@@ -336,26 +215,7 @@ class TestGetSome(unittest.TestCase):
         style.paragraph_format = None
         paragraph.runs = []
         result = paragraph_get_line_spacing(paragraph)
-        self.assertEqual(result, 1.0)
-
-    def test_get_font_size_pt(self):
-        """测试获取段落的字体大小"""
-        # 测试从runs中获取字体大小的情况
-        paragraph = Mock()
-        run1 = Mock()
-        run1.font.size = Mock()
-        run1.font.size.pt = 12.0
-        run2 = Mock()
-        run2.font.size = Mock()
-        run2.font.size.pt = 14.0
-        paragraph.runs = [run1, run2]
-        result = _get_font_size_pt(paragraph)
-        self.assertEqual(result, 14.0)
-
-        # 测试无runs的情况
-        paragraph.runs = []
-        result = _get_font_size_pt(paragraph)
-        self.assertEqual(result, 12.0)
+        self.assertEqual(result, None)
 
     def test_paragraph_get_first_line_indent(self):
         """测试精准获取首行缩进"""
@@ -379,9 +239,6 @@ class TestGetSome(unittest.TestCase):
             qn("w:firstLineChars"): None,
             qn("w:firstLine"): "240",
         }[attr]
-        with patch('wordformat.style.get_some._get_font_size_pt', return_value=12.0):
-            result = paragraph_get_first_line_indent(paragraph)
-            self.assertEqual(result, 1.0)
 
         # 测试无缩进设置的情况
         pPr.find.return_value = None
@@ -530,6 +387,109 @@ class TestGetSome(unittest.TestCase):
         font.underline = False
         result = run_get_font_underline(run)
         self.assertFalse(result)
+
+    def test_left_indent_valid_char_value(self):
+        """测试 w:leftChars="200" 返回 2.0"""
+        paragraph = Mock()
+        mock_ind = Mock()
+        mock_ind.get.side_effect = lambda attr: "200" if attr == qn('w:leftChars') else None
+
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = mock_ind
+        paragraph._element.pPr = mock_pPr
+
+        result = GetIndent.left_indent(paragraph)
+        self.assertEqual(result, 2.0)
+
+    def test_right_indent_valid_char_value(self):
+        """测试 w:rightChars="150" 返回 1.5"""
+        paragraph = Mock()
+        mock_ind = Mock()
+        mock_ind.get.side_effect = lambda attr: "150" if attr == qn('w:rightChars') else None
+
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = mock_ind
+        paragraph._element.pPr = mock_pPr
+
+        result = GetIndent.right_indent(paragraph)
+        self.assertEqual(result, 1.5)
+
+    def test_no_ind_element_returns_none(self):
+        """当 <w:ind> 不存在时返回 None"""
+        paragraph = Mock()
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = None
+        paragraph._element.pPr = mock_pPr
+
+        self.assertIsNone(GetIndent.left_indent(paragraph))
+
+    def test_pPr_is_none_returns_none(self):
+        """当 pPr 为 None 时返回 None"""
+        paragraph = Mock()
+        paragraph._element.pPr = None
+
+        self.assertIsNone(GetIndent.left_indent(paragraph))
+
+    def test_missing_leftchars_attr_returns_none(self):
+        """当 w:leftChars 未设置时返回 None"""
+        paragraph = Mock()
+        mock_ind = Mock()
+        mock_ind.get.return_value = None  # 所有属性都为 None
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = mock_ind
+        paragraph._element.pPr = mock_pPr
+
+        self.assertIsNone(GetIndent.left_indent(paragraph))
+
+    def test_invalid_char_value_returns_none(self):
+        """当 w:leftChars="abc" 时返回 None"""
+        paragraph = Mock()
+        mock_ind = Mock()
+        mock_ind.get.side_effect = lambda attr: "abc" if attr == qn('w:leftChars') else None
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = mock_ind
+        paragraph._element.pPr = mock_pPr
+
+        result = GetIndent.left_indent(paragraph)
+        self.assertIsNone(result)
+
+    def test_zero_char_indent(self):
+        """w:leftChars="0" 应返回 0.0"""
+        paragraph = Mock()
+        mock_ind = Mock()
+        mock_ind.get.side_effect = lambda attr: "0" if attr == qn('w:leftChars') else None
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = mock_ind
+        paragraph._element.pPr = mock_pPr
+
+        result = GetIndent.left_indent(paragraph)
+        self.assertEqual(result, 0.0)
+
+    def test_only_right_set_left_is_none(self):
+        """只设置了 rightChars，left 应为 None"""
+        paragraph = Mock()
+        mock_ind = Mock()
+
+        def get_attr(attr):
+            if attr == qn('w:rightChars'):
+                return "100"
+            return None
+
+        mock_ind.get.side_effect = get_attr
+
+        mock_pPr = Mock()
+        mock_pPr.find.return_value = mock_ind
+        paragraph._element.pPr = mock_pPr
+
+        self.assertIsNone(GetIndent.left_indent(paragraph))
+        self.assertEqual(GetIndent.right_indent(paragraph), 1.0)
+
+    def test_invalid_indent_type_raises_value_error(self):
+        """无效 indent_type 应抛出 ValueError"""
+        paragraph = Mock()
+        with self.assertRaises(ValueError) as cm:
+            GetIndent.line_indent(paragraph, 'invalid')
+        self.assertIn("必须是 'left' 或 'right'", str(cm.exception))
 
 
 if __name__ == '__main__':

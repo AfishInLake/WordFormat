@@ -17,15 +17,7 @@ class References(FormatNode[ReferencesTitleConfig]):
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         # 段落样式
-        ps = ParagraphStyle(
-            alignment=cfg.alignment,
-            space_before=cfg.space_before,
-            space_after=cfg.space_after,
-            line_spacing=cfg.line_spacing,
-            line_spacingrule=cfg.line_spacingrule,
-            first_line_indent=cfg.first_line_indent,
-            builtin_style_name=cfg.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             paragraph_issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -70,15 +62,7 @@ class ReferenceEntry(FormatNode[ReferencesContentConfig]):
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         # 段落样式
-        ps = ParagraphStyle(
-            alignment=cfg.alignment,
-            space_before=cfg.space_before,
-            space_after=cfg.space_after,
-            line_spacing=cfg.line_spacing,
-            line_spacingrule=cfg.line_spacingrule,
-            first_line_indent=cfg.first_line_indent,
-            builtin_style_name=cfg.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             paragraph_issues = ps.diff_from_paragraph(self.paragraph)
         else:

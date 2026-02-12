@@ -21,15 +21,7 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
-        ps = ParagraphStyle(
-            alignment=cfg.alignment,
-            space_before=cfg.space_before,
-            space_after=cfg.space_after,
-            line_spacing=cfg.line_spacing,
-            line_spacingrule=cfg.line_spacingrule,
-            first_line_indent=cfg.first_line_indent,
-            builtin_style_name=cfg.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -73,15 +65,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
         # 移除段落的意外字符
-        ps = ParagraphStyle(
-            alignment=cfg.chinese_content.alignment,
-            space_before=cfg.chinese_content.space_before,
-            space_after=cfg.chinese_content.space_after,
-            line_spacing=cfg.chinese_content.line_spacing,
-            line_spacingrule=cfg.chinese_content.line_spacingrule,
-            first_line_indent=cfg.chinese_content.first_line_indent,
-            builtin_style_name=cfg.chinese_content.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -135,15 +119,7 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config.chinese_content
-        ps = ParagraphStyle(
-            alignment=cfg.alignment,
-            space_before=cfg.space_before,
-            space_after=cfg.space_after,
-            line_spacing=cfg.line_spacing,
-            line_spacingrule=cfg.line_spacingrule,
-            first_line_indent=cfg.first_line_indent,
-            builtin_style_name=cfg.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -178,15 +154,7 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
-        ps = ParagraphStyle(
-            alignment=cfg.alignment,
-            space_before=cfg.space_before,
-            space_after=cfg.space_after,
-            line_spacing=cfg.line_spacing,
-            line_spacingrule=cfg.line_spacingrule,
-            first_line_indent=cfg.first_line_indent,
-            builtin_style_name=cfg.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -238,15 +206,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
         设置 摘要 样式
         """
         cfg = self.pydantic_config
-        ps = ParagraphStyle(
-            alignment=cfg.english_content.alignment,
-            space_before=cfg.english_content.space_before,
-            space_after=cfg.english_content.space_after,
-            line_spacing=cfg.english_content.line_spacing,
-            line_spacingrule=cfg.english_content.line_spacingrule,
-            first_line_indent=cfg.english_content.first_line_indent,
-            builtin_style_name=cfg.english_content.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -297,15 +257,7 @@ class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config.english_content
-        ps = ParagraphStyle(
-            alignment=cfg.alignment,
-            space_before=cfg.space_before,
-            space_after=cfg.space_after,
-            line_spacing=cfg.line_spacing,
-            line_spacingrule=cfg.line_spacingrule,
-            first_line_indent=cfg.first_line_indent,
-            builtin_style_name=cfg.builtin_style_name,
-        )
+        ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:

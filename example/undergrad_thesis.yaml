@@ -14,6 +14,8 @@ global_format: &global_format
   space_after: "0.5行"
   line_spacingrule: "1.5倍行距"
   line_spacing: '1.5倍'
+  left_indent: "0字符"
+  right_indent: "0字符"
   first_line_indent: '20磅'
   builtin_style_name: '正文'
   chinese_font_name: '宋体'
@@ -61,7 +63,7 @@ abstract:
       first_line_indent: '0字符'
       chinese_font_name: '黑体'
       font_size: '小四'
-      kewords_bold: true  # 规范未要求加粗，仅字体为黑体四号
+      keywords_bold: true  # 规范未要求加粗，仅字体为黑体四号
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
@@ -72,7 +74,7 @@ abstract:
       first_line_indent: '0字符'
       english_font_name: 'Times New Roman'
       font_size: '小四'
-      kewords_bold: true
+      keywords_bold: true
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
