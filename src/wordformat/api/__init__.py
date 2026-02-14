@@ -211,7 +211,7 @@ async def api_apply_format(
         final_filename = os.path.basename(actual_save_path)
         # 4. 拼接正确下载链接（仅编码文件名，避免路径错误）
         encoded_filename = quote(final_filename)
-        download_url = f"{SERVER_HOST}/download/{encoded_filename}"
+        download_url = f"/download/{encoded_filename}"
 
         # 5. 记录真实保存路径日志（与函数内部日志完全一致）
         logger.info(f"文档格式化完成，结果保存：{actual_save_path}")
