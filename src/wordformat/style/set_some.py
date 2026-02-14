@@ -23,24 +23,10 @@ def run_set_font_name(run: Run, font_name: str):
         run (docx.text.run.Run): 要设置字体的 Run 对象。
         font_name (str): 字体名称，如 "Microsoft YaHei"、"SimSun"、"Arial" 等。
     """
-    # 1. 获取 Run 对应的 XML 元素
     r = run._element
-    # 2. 检查并创建 rPr 节点（字体样式根节点，不存在则创建）
-    if r.rPr is None:
-        # 手动创建 rPr 节点（docx 原生XML结构，兼容所有版本）
-        rPr = parse_xml(
-            r'<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-        )
-        r.append(rPr)
-    # 3. 检查并创建 rFonts 节点（字体名称配置节点，不存在则创建）
-    if r.rPr.rFonts is None:
-        # 手动创建 rFonts 节点
-        rFonts = parse_xml(
-            r'<w:rFonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-        )
-        r.rPr.append(rFonts)
-    # 4. 安全设置中文字体（eastAsia 对应中文/东亚字体）
-    r.rPr.rFonts.set(qn("w:eastAsia"), font_name)
+    rPr = r.get_or_add_rPr()
+    rFonts = rPr.get_or_add_rFonts()
+    rFonts.set(qn("w:eastAsia"), font_name)
 
 
 def _paragraph_space_by_lines(

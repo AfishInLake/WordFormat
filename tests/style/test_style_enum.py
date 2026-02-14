@@ -9,7 +9,9 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
@@ -24,7 +26,6 @@ from wordformat.style.style_enum import (
     SpaceAfter,
     LineSpacingRule,
     LineSpacing,
-    Indent,
     LeftIndent,
     RightIndent,
     FirstLineIndent,
@@ -37,6 +38,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_init(self):
         """测试初始化"""
+
         # 创建一个简单的子类用于测试
         class TestEnum(UnitLabelEnum):
             pass
@@ -50,6 +52,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_rel_value_property(self):
         """测试 rel_value 属性"""
+
         # 创建一个带 LABEL_MAP 的子类用于测试
         class TestEnum(UnitLabelEnum):
             _LABEL_MAP = {
@@ -66,6 +69,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_rel_value_setter(self):
         """测试 rel_value 设置器"""
+
         class TestEnum(UnitLabelEnum):
             pass
 
@@ -75,6 +79,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_rel_unit_property(self):
         """测试 rel_unit 属性"""
+
         class TestEnum(UnitLabelEnum):
             pass
 
@@ -83,6 +88,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_base_set(self):
         """测试 base_set 方法"""
+
         class TestEnum(UnitLabelEnum):
             pass
 
@@ -93,6 +99,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_function_map(self):
         """测试 function_map 方法"""
+
         class TestEnum(UnitLabelEnum):
             class Meta:
                 pt = lambda **kwargs: None
@@ -102,6 +109,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_format(self):
         """测试 format 方法"""
+
         class TestEnum(UnitLabelEnum):
             class Meta:
                 pt = lambda **kwargs: "test_result"
@@ -124,6 +132,7 @@ class TestUnitLabelEnum(unittest.TestCase):
 
     def test_eq_method(self):
         """测试 __eq__ 方法"""
+
         class TestEnum(UnitLabelEnum):
             _LABEL_MAP = {
                 "测试": 123
@@ -156,11 +165,34 @@ class TestFontName(unittest.TestCase):
 
     def test_base_set(self):
         """测试 base_set 方法"""
-        # 测试英文字体（跳过中文字体测试，因为需要访问 _element 属性）
-        font_name_en = FontName("Times New Roman")
-        mock_run = Mock(spec=Run)
-        # 调用 base_set 应该不会抛出异常
-        font_name_en.base_set(mock_run)
+        # 1. 创建真实文档和 run
+        doc = Document()
+        paragraph = doc.add_paragraph()
+        run = paragraph.add_run("测试文本")
+
+        # 2. 应用中文字体
+        font_name = FontName("微软雅黑")
+        font_name.base_set(run)
+
+        # 3. 验证底层 XML 是否包含 eastAsia="微软雅黑"
+        r = run._element
+        rPr = r.rPr
+        self.assertIsNotNone(rPr, "rPr should exist after setting font")
+
+        rFonts = rPr.rFonts
+        self.assertIsNotNone(rFonts, "rFonts should exist")
+
+        east_asia = rFonts.get(qn("w:eastAsia"))
+        self.assertEqual(east_asia, "微软雅黑", "eastAsia font should be set correctly")
+
+        doc = Document()
+        p = doc.add_paragraph()
+        run = p.add_run("Hello")
+
+        font = FontName("Arial")
+        font.base_set(run)
+
+        self.assertEqual(run.font.name, "Arial")
 
 
 class TestFontSize(unittest.TestCase):
@@ -265,7 +297,7 @@ class TestAlignment(unittest.TestCase):
         """测试 get_from_paragraph 方法"""
         alignment = Alignment("左对齐")
         mock_paragraph = Mock(spec=Paragraph)
-        
+
         # 测试有对齐方式的情况
         with patch('wordformat.style.style_enum.paragraph_get_alignment', return_value=WD_ALIGN_PARAGRAPH.CENTER):
             result1 = alignment.get_from_paragraph(mock_paragraph)
@@ -284,7 +316,7 @@ class TestSpacing(unittest.TestCase):
         """测试 get_from_paragraph 方法"""
         spacing = Spacing("12pt")
         mock_paragraph = Mock(spec=Paragraph)
-        
+
         # 测试 hang 单位的情况
         spacing._rel_unit = "hang"
         with self.assertRaises(NotImplementedError):
@@ -300,7 +332,7 @@ class TestSpaceBefore(unittest.TestCase):
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
         mock_paragraph.paragraph_format.space_before = Mock()
-        
+
         # 测试 hang 单位的情况
         space_before._rel_unit = "hang"
         with patch('wordformat.style.style_enum.paragraph_get_space_before', return_value=0.5):
@@ -329,7 +361,7 @@ class TestSpaceAfter(unittest.TestCase):
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
         mock_paragraph.paragraph_format.space_after = Mock()
-        
+
         # 测试 hang 单位的情况
         space_after._rel_unit = "hang"
         with patch('wordformat.style.style_enum.paragraph_get_space_after', return_value=0.5):
@@ -372,7 +404,7 @@ class TestLineSpacingRule(unittest.TestCase):
         line_spacing_rule = LineSpacingRule("单倍行距")
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
-        
+
         # 测试有行距规则的情况
         mock_paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.DOUBLE
         result1 = line_spacing_rule.get_from_paragraph(mock_paragraph)
@@ -418,7 +450,7 @@ class TestLineSpacing(unittest.TestCase):
         """测试 get_from_paragraph 方法"""
         line_spacing = LineSpacing("1.5倍")
         mock_paragraph = Mock(spec=Paragraph)
-        
+
         with patch('wordformat.style.style_enum.paragraph_get_line_spacing', return_value=1.5):
             result = line_spacing.get_from_paragraph(mock_paragraph)
             self.assertEqual(result, 1.5)
@@ -438,7 +470,7 @@ class TestLeftIndent(unittest.TestCase):
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
         mock_paragraph.paragraph_format.left_indent = Mock()
-        
+
         # 测试 char 单位的情况
         left_indent._rel_unit = "char"
         with patch('wordformat.style.style_enum.GetIndent.left_indent', return_value=2):
@@ -467,7 +499,7 @@ class TestRightIndent(unittest.TestCase):
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
         mock_paragraph.paragraph_format.right_indent = Mock()
-        
+
         # 测试 char 单位的情况
         right_indent._rel_unit = "char"
         with patch('wordformat.style.style_enum.GetIndent.right_indent', return_value=2):
@@ -496,7 +528,7 @@ class TestFirstLineIndent(unittest.TestCase):
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
         mock_paragraph.paragraph_format.first_line_indent = Mock()
-        
+
         # 测试 char 单位的情况
         first_line_indent._rel_unit = "char"
         with patch('wordformat.style.style_enum.paragraph_get_first_line_indent', return_value=2):
@@ -542,7 +574,7 @@ class TestBuiltInStyle(unittest.TestCase):
         """测试 get_from_paragraph 方法"""
         built_in_style = BuiltInStyle("正文")
         mock_paragraph = Mock(spec=Paragraph)
-        
+
         with patch('wordformat.style.style_enum.paragraph_get_builtin_style_name', return_value="Normal"):
             result = built_in_style.get_from_paragraph(mock_paragraph)
             self.assertEqual(result, "Normal")
