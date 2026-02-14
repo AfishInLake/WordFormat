@@ -357,13 +357,7 @@ class TestLineSpacingRule(unittest.TestCase):
         line_spacing_rule = LineSpacingRule("单倍行距")
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
-        # 调用 base_set 应该不会抛出异常
-        # 由于源码中 _LABEL_MAP 映射存在但可能有问题，我们跳过这个测试
-        try:
-            line_spacing_rule.base_set(mock_paragraph)
-        except ValueError:
-            # 由于源码问题，我们跳过这个测试
-            pass
+        line_spacing_rule.base_set(mock_paragraph)
 
     def test_base_set_with_invalid(self):
         """测试使用无效值设置行距规则"""
