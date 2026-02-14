@@ -482,9 +482,6 @@ class LineSpacing(UnitLabelEnum):
         paragraph.paragraph_format.line_spacing = style.line_spacing
     """
 
-    # FIXME:问题描述：base_set 方法中存在类型比较问题，尝试对非数值类型使用 <= 操作符
-    #  影响测试：TestLineSpacing.test_base_set_with_none
-    #  解决方案：调整了测试，不再测试 None 值的情况，而是测试有效值的情况
     class Meta:
         pt = _SetLineSpacing.set_pt
         mm = _SetLineSpacing.set_mm
@@ -494,7 +491,12 @@ class LineSpacing(UnitLabelEnum):
     def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self.rel_value
-        if line_spacing is not None:  # 必须不为None 有可能是 0
+        if line_spacing is not None and any(
+            [
+                isinstance(line_spacing, float),
+                isinstance(line_spacing, int),
+            ]
+        ):  # 必须不为None 有可能是 0
             if line_spacing <= 0:
                 line_spacing = 1  # 行距必须大于0 否则会消失
             docx_obj.paragraph_format.line_spacing = line_spacing
