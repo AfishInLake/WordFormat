@@ -457,13 +457,10 @@ class LineSpacingRule(UnitLabelEnum):
         "多倍行距": WD_LINE_SPACING.MULTIPLE,
     }
 
-    # FIXME:问题描述：_LABEL_MAP 映射存在问题，导致无法正确映射标签到值
-    #  影响测试：TestLineSpacingRule.test_base_set_with_valid
-    #  解决方案：使用 try-except 块捕获可能的异常
     def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self._LABEL_MAP.get(self.value, None)
-        if line_spacing:
+        if line_spacing is not None:
             docx_obj.paragraph_format.line_spacing_rule = line_spacing
         else:
             raise ValueError(f"无效的行距选项: '{self.value}'")
