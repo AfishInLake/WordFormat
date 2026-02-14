@@ -91,7 +91,7 @@ class KeywordsEN(BaseKeywordsNode):
             font_name_en=cfg.english_font_name,
             font_size=cfg.font_size,
             font_color=cfg.font_color,
-            bold=cfg.kewords_bold,  # 修复拼写错误：kewords → keywords
+            bold=cfg.keywords_bold,  # 修复拼写错误：kewords → keywords
             italic=cfg.italic,
             underline=cfg.underline,
         )
@@ -205,7 +205,7 @@ class KeywordsCN(BaseKeywordsNode):
             font_name_en=cfg.english_font_name,
             font_size=cfg.font_size,
             font_color=cfg.font_color,
-            bold=cfg.kewords_bold,  # 原代码拼写错误：kewords → keywords
+            bold=cfg.keywords_bold,  # 原代码拼写错误：kewords → keywords
             italic=cfg.italic,
             underline=cfg.underline,
         )
