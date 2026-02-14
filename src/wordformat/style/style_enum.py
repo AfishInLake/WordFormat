@@ -244,15 +244,6 @@ class FontColor(UnitLabelEnum):
     3. 十六进制色值（#FF0000/#f00/FF0000）
     """
 
-    # FIXME:
-    #  问题描述：__eq__ 方法有逻辑错误，尝试对非元组对象使用 len() 函数
-    #  影响测试：TestFontColor.test_eq_method
-    #  解决方案：简化了测试，只测试了与元组和非元组的比较，
-    #  跳过了与其他 FontColor 实例的比较
-    # FIXME:
-    #  问题描述：使用了 webcolors.x11_color_name_to_hex 方法，但该方法在 webcolors 模块中不存在
-    #  影响测试：TestFontColor.test_rel_value_with_invalid
-    #  解决方案：简化了测试，只测试了无效类型的情况，跳过了无效颜色名称的测试
     # 仅保留中文→英文映射（基于webcolors标准）
     _ZH_TO_EN = {
         "黑色": "black",
@@ -319,19 +310,13 @@ class FontColor(UnitLabelEnum):
 
         # 步骤3：处理webcolors标准英文名称
         try:
-            # 优先CSS标准色，兼容X11扩展色
             rgb = webcolors.name_to_rgb(color_str.lower())
             return (rgb.red, rgb.green, rgb.blue)
-        except ValueError:
-            try:
-                hex_val = webcolors.x11_color_name_to_hex(color_str.lower())
-                rgb = webcolors.hex_to_rgb(hex_val)
-                return (rgb.red, rgb.green, rgb.blue)
-            except ValueError as e:
-                raise ValueError(
-                    f"不支持的颜色名称：{color_spec}（仅支持webcolors标准色）\n"
-                    f"常用示例：{list(FontColor._ZH_TO_EN.keys())} / {list(FontColor._ZH_TO_EN.values())}"
-                ) from e
+        except ValueError as e:
+            raise ValueError(
+                f"不支持的颜色名称：{color_spec}（仅支持webcolors标准色）\n"
+                f"常用示例：{list(FontColor._ZH_TO_EN.keys())}"
+            ) from e
 
     def base_set(self, docx_obj: Run, **kwargs):
         """
@@ -349,15 +334,15 @@ class FontColor(UnitLabelEnum):
         docx_obj.font.color.rgb = RGBColor(*rgb_tuple)
 
     def __eq__(self, other):
-        # 必须是元组，且长度必须为三，对应r,g,b
-        if not (isinstance(other, tuple) or len(other) != 3):
+        if not isinstance(other, tuple):
             return False
-        # 从rel_value 获取转化的rgb值
-        color_rgb = self.rel_value
-        for i in range(3):
-            if color_rgb[i] != other[i]:
-                return False
-        return True
+        if len(other) != 3:
+            return False
+        try:
+            color_rgb = self.rel_value
+            return color_rgb == other
+        except (TypeError, ValueError):
+            return False
 
 
 class Alignment(UnitLabelEnum):
