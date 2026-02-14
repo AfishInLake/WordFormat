@@ -12,6 +12,7 @@ on:
       - 'CHANGELOG.md'
       - '.gitignore'
       - '.github/**/*.md'
+      - '**.yml'
   pull_request:
     branches: [ "**" ]
     paths-ignore:
@@ -22,6 +23,8 @@ on:
       - 'CHANGELOG.md'
       - '.gitignore'
       - '.github/**/*.md'
+      - '**.yml'
+
 
 jobs:
   # =============== Job 1: 测试 + PR 构建 ===============
@@ -37,13 +40,31 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
+
+      - name: Cache ONNX Model
+        uses: actions/cache@v5.0.3
+        id: cache-model
         with:
-          lfs: true
+          path: src/wordformat/data
+          key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
+          enableCrossOsArchive: true
+        env:
+          # 设置模型版本号，模型更新时需修改此值
+          MODEL_VERSION: "modelv1.0"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v5.0.3
+        id: cache-python-deps
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7.3.0
@@ -59,12 +80,16 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e .[test]
+        run: uv pip install --system -e .
+
+      - name: Download Model (if not cached)
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        run: python scripts/download_model.py
 
       - name: Run tests
         run: make tests
@@ -109,13 +134,31 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
+
+      - name: Cache ONNX Model
+        uses: actions/cache@v5.0.3
+        id: cache-model
         with:
-          lfs: true
+          path: src/wordformat/data
+          key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
+          enableCrossOsArchive: true
+        env:
+          # 设置模型版本号，模型更新时需修改此值
+          MODEL_VERSION: "modelv1.0"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v5.0.3
+        id: cache-python-deps
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7.3.0
@@ -137,6 +180,10 @@ jobs:
 
       - name: Install project dependencies
         run: uv pip install --system -e .
+
+      - name: Download Model (if not cached)
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        run: python scripts/download_model.py
 
       - name: Build executable (for release)
         run: make build

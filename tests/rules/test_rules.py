@@ -128,7 +128,7 @@ class TestKeywords(TestBase):
                         "font_size": "小四",
                         "font_color": "BLACK",
                         "bold": False,
-                        "kewords_bold": True,
+                        "keywords_bold": True,
                         "italic": False,
                         "underline": False,
                         "count_min": 3,
@@ -296,7 +296,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -353,7 +353,7 @@ class TestKeywords(TestBase):
                         "font_size": 12,
                         "font_color": "000000",
                         "bold": False,
-                        "kewords_bold": True,
+                        "keywords_bold": True,
                         "italic": False,
                         "underline": False,
                         "count_min": 3,
@@ -366,7 +366,7 @@ class TestKeywords(TestBase):
                         "font_size": 12,
                         "font_color": "000000",
                         "bold": False,
-                        "kewords_bold": True,
+                        "keywords_bold": True,
                         "italic": False,
                         "underline": False,
                         "count_min": 3,
@@ -399,7 +399,7 @@ class TestKeywords(TestBase):
                         "font_size": 12,
                         "font_color": "000000",
                         "bold": False,
-                        "kewords_bold": True,
+                        "keywords_bold": True,
                         "italic": False,
                         "underline": False,
                         "count_min": 3,
@@ -487,7 +487,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -544,7 +544,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -603,7 +603,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -663,7 +663,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 2
@@ -756,7 +756,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -787,7 +787,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -884,7 +884,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -944,7 +944,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1013,7 +1013,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1078,7 +1078,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1131,7 +1131,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1261,7 +1261,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1321,7 +1321,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1414,7 +1414,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1474,7 +1474,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3
@@ -1567,7 +1567,7 @@ class TestKeywords(TestBase):
                 self.font_size = "小四"
                 self.font_color = "黑色"
                 self.bold = False
-                self.kewords_bold = True
+                self.keywords_bold = True
                 self.italic = False
                 self.underline = False
                 self.count_min = 3

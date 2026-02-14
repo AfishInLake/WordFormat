@@ -5,6 +5,7 @@ exclude: |
     tests/.* |
     dist/.* |
     build/.* |
+    scripts/.* |
     .*\.egg-info/.*
   )$
 
