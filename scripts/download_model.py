@@ -48,7 +48,7 @@ def download_with_progress(url: str, output_path: Path, max_retries: int = 3):
 
     for attempt in range(max_retries + 1):
         try:
-            print(f"📥 Attempt {attempt + 1}/{max_retries + 1} to download from: {url}")
+            print(f"Attempt {attempt + 1}/{max_retries + 1} to download from: {url}")
             response = requests.get(url, stream=True, timeout=30)
             response.raise_for_status()  # Raise HTTPError for bad responses
 
@@ -72,21 +72,21 @@ def download_with_progress(url: str, output_path: Path, max_retries: int = 3):
 
             # Verify file exists and has content
             if output_path.exists() and output_path.stat().st_size > 0:
-                print(f"✅ Successfully downloaded model to: {output_path}")
-                print(f"📦 File size: {output_path.stat().st_size} bytes")
+                print(f"Successfully downloaded model to: {output_path}")
+                print(f"File size: {output_path.stat().st_size} bytes")
                 return True
             else:
                 raise RuntimeError("Downloaded file is empty or missing")
 
         except Exception as e:
-            print(f"❌ Download failed (attempt {attempt + 1}): {e}", file=sys.stderr)
+            print(f"Download failed (attempt {attempt + 1}): {e}", file=sys.stderr)
             if attempt < max_retries:
-                print("⏳ Retrying in 5 seconds...")
+                print("Retrying in 5 seconds...")
                 import time
 
                 time.sleep(5)
             else:
-                print("💥 All retries exhausted. Exiting.", file=sys.stderr)
+                print("All retries exhausted. Exiting.", file=sys.stderr)
                 return False
 
     return False
@@ -95,10 +95,10 @@ def download_with_progress(url: str, output_path: Path, max_retries: int = 3):
 if __name__ == "__main__":
     # 检查是否需要下载
     if is_model_up_to_date():
-        print(f"✅ Model is up-to-date (version: {MODEL_VERSION}). Skipping download.")
+        print(f"Model is up-to-date (version: {MODEL_VERSION}). Skipping download.")
         sys.exit(0)
 
-    print(f"🔄 Model missing or outdated. Expected version: {MODEL_VERSION}")
+    print(f"Model missing or outdated. Expected version: {MODEL_VERSION}")
 
     # 执行下载
     success = download_with_progress(MODEL_URL, OUTPUT_FILE, MAX_RETRIES)
@@ -108,6 +108,6 @@ if __name__ == "__main__":
         VERSION_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(VERSION_FILE, "w") as f:
             f.write(MODEL_VERSION)
-        print(f"🔖 Version file written: {VERSION_FILE}")
+        print(f"Version file written: {VERSION_FILE}")
 
     sys.exit(0 if success else 1)
