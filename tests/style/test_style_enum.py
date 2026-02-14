@@ -439,12 +439,15 @@ class TestLineSpacing(unittest.TestCase):
 
     def test_base_set_with_none(self):
         """测试使用 None 设置行距"""
-        # 由于源码实现问题，我们调整测试
-        line_spacing = LineSpacing("1.5倍")
+        line_spacing = LineSpacing(None)
         mock_paragraph = Mock(spec=Paragraph)
         mock_paragraph.paragraph_format = Mock()
-        # 调用 base_set 应该不会抛出异常
-        line_spacing.base_set(mock_paragraph)
+        with self.assertRaises(ValueError) as cm:
+            line_spacing.base_set(mock_paragraph)
+
+        # 可选：检查异常信息是否包含预期内容
+        self.assertIn("无效的行距", str(cm.exception))
+
 
     def test_get_from_paragraph(self):
         """测试 get_from_paragraph 方法"""
