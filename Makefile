@@ -43,6 +43,7 @@ install:
 			echo "No requirements.txt or pyproject.toml found."; \
 		fi \
 	fi
+	@.venv/bin/python scripts/download_model.py 2>/dev/null || .venv/Scripts/python.exe scripts/download_model.py
 	@echo "Development environment ready!"
 
 ## build: Run the build script (scripts/build.bat)

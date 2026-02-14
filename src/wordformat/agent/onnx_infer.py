@@ -6,9 +6,6 @@ from typing import Dict, List, Optional
 import numpy as np
 from loguru import logger
 
-from wordformat.settings import ONNX_VERSION
-
-onnx_version = str(ONNX_VERSION)
 # ===== 全局变量（初始为 None）=====
 _tokenizer: Optional["Tokenizer"] = None  # noqa F821
 _ort_sess: Optional["ort.InferenceSession"] = None  # noqa F821
@@ -22,14 +19,10 @@ def _get_model_paths():
 
     return {
         "onnx": str(
-            files(f"wordformat.data.model.{onnx_version}").joinpath(
-                "bert_paragraph_classifier.onnx"
-            )
+            files("wordformat.data.model").joinpath("bert_paragraph_classifier.onnx")
         ),
         "tokenizer": str(files("wordformat.data.model").joinpath("tokenizer.json")),
-        "id2label": str(
-            files(f"wordformat.data.model.{onnx_version}").joinpath("id2label.json")
-        ),
+        "id2label": str(files("wordformat.data.model").joinpath("id2label.json")),
     }
 
 
