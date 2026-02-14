@@ -244,15 +244,6 @@ class FontColor(UnitLabelEnum):
     3. 十六进制色值（#FF0000/#f00/FF0000）
     """
 
-    # FIXME:
-    #  问题描述：__eq__ 方法有逻辑错误，尝试对非元组对象使用 len() 函数
-    #  影响测试：TestFontColor.test_eq_method
-    #  解决方案：简化了测试，只测试了与元组和非元组的比较，
-    #  跳过了与其他 FontColor 实例的比较
-    # FIXME:
-    #  问题描述：使用了 webcolors.x11_color_name_to_hex 方法，但该方法在 webcolors 模块中不存在
-    #  影响测试：TestFontColor.test_rel_value_with_invalid
-    #  解决方案：简化了测试，只测试了无效类型的情况，跳过了无效颜色名称的测试
     # 仅保留中文→英文映射（基于webcolors标准）
     _ZH_TO_EN = {
         "黑色": "black",
@@ -319,19 +310,13 @@ class FontColor(UnitLabelEnum):
 
         # 步骤3：处理webcolors标准英文名称
         try:
-            # 优先CSS标准色，兼容X11扩展色
             rgb = webcolors.name_to_rgb(color_str.lower())
             return (rgb.red, rgb.green, rgb.blue)
-        except ValueError:
-            try:
-                hex_val = webcolors.x11_color_name_to_hex(color_str.lower())
-                rgb = webcolors.hex_to_rgb(hex_val)
-                return (rgb.red, rgb.green, rgb.blue)
-            except ValueError as e:
-                raise ValueError(
-                    f"不支持的颜色名称：{color_spec}（仅支持webcolors标准色）\n"
-                    f"常用示例：{list(FontColor._ZH_TO_EN.keys())} / {list(FontColor._ZH_TO_EN.values())}"
-                ) from e
+        except ValueError as e:
+            raise ValueError(
+                f"不支持的颜色名称：{color_spec}（仅支持webcolors标准色）\n"
+                f"常用示例：{list(FontColor._ZH_TO_EN.keys())}"
+            ) from e
 
     def base_set(self, docx_obj: Run, **kwargs):
         """
@@ -349,15 +334,15 @@ class FontColor(UnitLabelEnum):
         docx_obj.font.color.rgb = RGBColor(*rgb_tuple)
 
     def __eq__(self, other):
-        # 必须是元组，且长度必须为三，对应r,g,b
-        if not (isinstance(other, tuple) or len(other) != 3):
+        if not isinstance(other, tuple):
             return False
-        # 从rel_value 获取转化的rgb值
-        color_rgb = self.rel_value
-        for i in range(3):
-            if color_rgb[i] != other[i]:
-                return False
-        return True
+        if len(other) != 3:
+            return False
+        try:
+            color_rgb = self.rel_value
+            return color_rgb == other
+        except (TypeError, ValueError):
+            return False
 
 
 class Alignment(UnitLabelEnum):
@@ -457,13 +442,10 @@ class LineSpacingRule(UnitLabelEnum):
         "多倍行距": WD_LINE_SPACING.MULTIPLE,
     }
 
-    # FIXME:问题描述：_LABEL_MAP 映射存在问题，导致无法正确映射标签到值
-    #  影响测试：TestLineSpacingRule.test_base_set_with_valid
-    #  解决方案：使用 try-except 块捕获可能的异常
     def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self._LABEL_MAP.get(self.value, None)
-        if line_spacing:
+        if line_spacing is not None:
             docx_obj.paragraph_format.line_spacing_rule = line_spacing
         else:
             raise ValueError(f"无效的行距选项: '{self.value}'")
@@ -485,9 +467,6 @@ class LineSpacing(UnitLabelEnum):
         paragraph.paragraph_format.line_spacing = style.line_spacing
     """
 
-    # FIXME:问题描述：base_set 方法中存在类型比较问题，尝试对非数值类型使用 <= 操作符
-    #  影响测试：TestLineSpacing.test_base_set_with_none
-    #  解决方案：调整了测试，不再测试 None 值的情况，而是测试有效值的情况
     class Meta:
         pt = _SetLineSpacing.set_pt
         mm = _SetLineSpacing.set_mm
@@ -497,7 +476,12 @@ class LineSpacing(UnitLabelEnum):
     def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
         line_spacing = self.rel_value
-        if line_spacing is not None:  # 必须不为None 有可能是 0
+        if line_spacing is not None and any(
+            [
+                isinstance(line_spacing, float),
+                isinstance(line_spacing, int),
+            ]
+        ):  # 必须不为None 有可能是 0
             if line_spacing <= 0:
                 line_spacing = 1  # 行距必须大于0 否则会消失
             docx_obj.paragraph_format.line_spacing = line_spacing
