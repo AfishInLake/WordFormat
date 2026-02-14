@@ -251,9 +251,11 @@ class TestFontColor(unittest.TestCase):
     def test_rel_value_with_invalid(self):
         """测试使用无效值解析颜色"""
         # 测试无效类型
-        font_color1 = FontColor(123)
-        with self.assertRaises(TypeError):
-            _ = font_color1.rel_value
+        font_color = FontColor("invalid_color_xyz")
+        with self.assertRaises(ValueError) as cm:
+            _ = font_color.rel_value
+        self.assertIn("不支持的颜色名称", str(cm.exception))
+        self.assertIn("invalid_color_xyz", str(cm.exception))
 
     def test_base_set(self):
         """测试 base_set 方法"""
@@ -266,12 +268,17 @@ class TestFontColor(unittest.TestCase):
 
     def test_eq_method(self):
         """测试 __eq__ 方法"""
-        font_color1 = FontColor("红色")
-
-        # 测试与元组比较
-        self.assertEqual(font_color1, (255, 0, 0))
-        # 测试与非元组比较
-        self.assertNotEqual(font_color1, "red")
+        font_color = FontColor("红色")
+        # 与合法 RGB 元组比较
+        self.assertTrue(font_color == (255, 0, 0))
+        self.assertFalse(font_color == (0, 0, 0))
+        # 与非 tuple 比较（不应崩溃）
+        self.assertFalse(font_color == "red")
+        self.assertFalse(font_color == 123)
+        self.assertFalse(font_color == None)
+        # 与长度 ≠3 的 tuple 比较
+        self.assertFalse(font_color == (255, 0))
+        self.assertFalse(font_color == (255, 0, 0, 0))
 
 
 class TestAlignment(unittest.TestCase):
