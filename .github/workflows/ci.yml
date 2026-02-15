@@ -29,6 +29,7 @@ on:
 jobs:
   # =============== Job 1: 测试 + PR 构建 ===============
   test-and-build:
+    name: Test and Build
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
