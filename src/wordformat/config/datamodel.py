@@ -45,45 +45,53 @@ FontSizeType = Union[
 
 
 class WarningFieldConfig(BaseModel):
-    """预警字段配置模型"""
+    """是否显示预警字段配置模型"""
 
-    bold: bool = Field(default=True)
-    italic: bool = Field(default=True)
-    underline: bool = Field(default=True)
-    font_size: bool = Field(default=True)
-    font_name: bool = Field(default=False)
-    font_color: bool = Field(default=False)
-    alignment: bool = Field(default=True)
-    space_before: bool = Field(default=True)
-    space_after: bool = Field(default=True)
-    line_spacing: bool = Field(default=True)
-    line_spacingrule: bool = Field(default=True)
-    left_indent: bool = Field(default=True)
-    right_indent: bool = Field(default=True)
-    first_line_indent: bool = Field(default=True)
-    builtin_style_name: bool = Field(default=True)
+    bold: bool = Field(default=True, description="加粗")
+    italic: bool = Field(default=True, description="斜体")
+    underline: bool = Field(default=True, description="下划线")
+    font_size: bool = Field(default=True, description="字号")
+    font_name: bool = Field(default=False, description="字体名称")
+    font_color: bool = Field(default=False, description="字体颜色")
+    alignment: bool = Field(default=True, description="对齐方式")
+    space_before: bool = Field(default=True, description="段前间距")
+    space_after: bool = Field(default=True, description="段后间距")
+    line_spacing: bool = Field(default=True, description="行距")
+    line_spacingrule: bool = Field(default=True, description="行距类型")
+    left_indent: bool = Field(default=True, description="文本之前")
+    right_indent: bool = Field(default=True, description="文本之后")
+    first_line_indent: bool = Field(default=True, description="段落首行缩进")
+    builtin_style_name: bool = Field(default=True, description="内置样式名称")
 
 
 # -------------------------- 基础配置模型 --------------------------
 class GlobalFormatConfig(BaseModel):
     """全局基础格式配置模型"""
 
-    alignment: AlignmentType = Field(default="左对齐")
+    alignment: AlignmentType = Field(default="左对齐", description="段落对齐方式")
     space_before: str = Field(default="0.5行", description="段前间距（行）")
     space_after: str = Field(default="0.5行", description="段后间距（行）")
-    line_spacingrule: LineSpacingRuleType = Field(default="单倍行距")
-    line_spacing: str = Field(default="1.5倍")
-    left_indent: str = Field(default="0字符")
-    right_indent: str = Field(default="0字符")
-    first_line_indent: str = Field(default="2字符")
-    builtin_style_name: str = Field(default="正文")
-    chinese_font_name: ChineseFontType | str = Field(default="宋体")
-    english_font_name: EnglishFontType | str = Field(default="Times New Roman")
-    font_size: FontSizeType = Field(default="小四")  # 修正类型和默认值
-    font_color: str = Field(default="黑色")
-    bold: bool = Field(default=False)
-    italic: bool = Field(default=False)
-    underline: bool = Field(default=False)
+    line_spacingrule: LineSpacingRuleType = Field(
+        default="单倍行距", description="行距类型"
+    )
+    line_spacing: str = Field(default="1.5倍", description="行距参数")
+    left_indent: str = Field(default="0字符", description="文本之前")
+    right_indent: str = Field(default="0字符", description="文本之后")
+    first_line_indent: str = Field(default="2字符", description="段落首行缩进")
+    builtin_style_name: str = Field(default="正文", description="内置样式名称")
+    chinese_font_name: ChineseFontType | str = Field(
+        default="宋体", description="中文字体名称"
+    )
+    english_font_name: EnglishFontType | str = Field(
+        default="Times New Roman", description="英文字体名称"
+    )
+    font_size: FontSizeType = Field(
+        default="小四", description="字号"
+    )  # 修正类型和默认值
+    font_color: str = Field(default="黑色", description="字体颜色")
+    bold: bool = Field(default=False, description="加粗")
+    italic: bool = Field(default=False, description="斜体")
+    underline: bool = Field(default=False, description="下划线")
 
 
 # -------------------------- 摘要配置模型 --------------------------
@@ -119,31 +127,42 @@ class AbstractContentConfig(GlobalFormatConfig):
 class AbstractChineseConfig(GlobalFormatConfig):
     """中文摘要配置"""
 
-    chinese_title: AbstractTitleConfig = Field(default_factory=AbstractTitleConfig)
+    chinese_title: AbstractTitleConfig = Field(
+        default_factory=AbstractTitleConfig, description="中文标题配置"
+    )
     chinese_content: AbstractContentConfig = Field(
-        default_factory=AbstractContentConfig
+        default_factory=AbstractContentConfig,
+        description="中文正文配置",
     )
 
 
 class AbstractEnglishConfig(BaseModel):
     """英文摘要配置"""
 
-    english_title: AbstractTitleConfig = Field(default_factory=AbstractTitleConfig)
+    english_title: AbstractTitleConfig = Field(
+        default_factory=AbstractTitleConfig, description="英文标题配置"
+    )
     english_content: AbstractContentConfig = Field(
-        default_factory=AbstractContentConfig
+        default_factory=AbstractContentConfig,
+        description="英文正文配置",
     )
 
 
 class AbstractConfig(BaseModel):
     """摘要总配置"""
 
-    chinese: AbstractChineseConfig = Field(default_factory=AbstractChineseConfig)
-    english: AbstractEnglishConfig = Field(default_factory=AbstractEnglishConfig)
+    chinese: AbstractChineseConfig = Field(
+        default_factory=AbstractChineseConfig, description="中文摘要配置"
+    )
+    english: AbstractEnglishConfig = Field(
+        default_factory=AbstractEnglishConfig, description="英文摘要配置"
+    )
     keywords: dict[str, KeywordsConfig] = Field(
         default_factory=lambda: {
             "english": KeywordsConfig(),
             "chinese": KeywordsConfig(),
-        }
+        },
+        description="关键词配置",
     )
 
 
@@ -157,9 +176,15 @@ class HeadingLevelConfig(GlobalFormatConfig):
 class HeadingsConfig(GlobalFormatConfig):
     """标题总配置"""
 
-    level_1: HeadingLevelConfig = Field(default_factory=HeadingLevelConfig)
-    level_2: HeadingLevelConfig = Field(default_factory=HeadingLevelConfig)
-    level_3: HeadingLevelConfig = Field(default_factory=HeadingLevelConfig)
+    level_1: HeadingLevelConfig = Field(
+        default_factory=HeadingLevelConfig, description="一级标题"
+    )
+    level_2: HeadingLevelConfig = Field(
+        default_factory=HeadingLevelConfig, description="二级标题"
+    )
+    level_3: HeadingLevelConfig = Field(
+        default_factory=HeadingLevelConfig, description="三级标题"
+    )
 
 
 # -------------------------- 正文配置模型 --------------------------
@@ -212,8 +237,12 @@ class ReferencesContentConfig(GlobalFormatConfig):
 class ReferencesConfig(BaseModel):
     """参考文献总配置"""
 
-    title: ReferencesTitleConfig = Field(default_factory=ReferencesTitleConfig)
-    content: ReferencesContentConfig = Field(default_factory=ReferencesContentConfig)
+    title: ReferencesTitleConfig = Field(
+        default_factory=ReferencesTitleConfig, description="参考文献标题配置"
+    )
+    content: ReferencesContentConfig = Field(
+        default_factory=ReferencesContentConfig, description="参考文献内容配置"
+    )
 
 
 # -------------------------- 致谢配置模型 --------------------------
@@ -227,14 +256,16 @@ class AcknowledgementsContentConfig(GlobalFormatConfig):
     """致谢内容配置（继承全局格式）"""
 
 
-class AcknowledgementsConfig(GlobalFormatConfig):
+class AcknowledgementsConfig(BaseModel):
     """致谢总配置"""
 
     title: AcknowledgementsTitleConfig = Field(
-        default_factory=AcknowledgementsTitleConfig
+        default_factory=AcknowledgementsTitleConfig,
+        description="致谢标题配置",
     )
     content: AcknowledgementsContentConfig = Field(
-        default_factory=AcknowledgementsContentConfig
+        default_factory=AcknowledgementsContentConfig,
+        description="致谢内容配置",
     )
 
 
@@ -242,14 +273,29 @@ class AcknowledgementsConfig(GlobalFormatConfig):
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
 
-    style_checks_warning: WarningFieldConfig = Field(default_factory=WarningFieldConfig)
-    global_format: GlobalFormatConfig = Field(default_factory=GlobalFormatConfig)
-    abstract: AbstractConfig = Field(default_factory=AbstractConfig)
-    headings: HeadingsConfig = Field(default_factory=HeadingsConfig)
-    body_text: BodyTextConfig = Field(default_factory=BodyTextConfig)
-    figures: FiguresConfig = Field(default_factory=FiguresConfig)
-    tables: TablesConfig = Field(default_factory=TablesConfig)
-    references: ReferencesConfig = Field(default_factory=ReferencesConfig)
+    style_checks_warning: WarningFieldConfig = Field(
+        default_factory=WarningFieldConfig, description="警告字段配置"
+    )
+    global_format: GlobalFormatConfig = Field(
+        default_factory=GlobalFormatConfig, description="默认格式配置"
+    )
+    abstract: AbstractConfig = Field(
+        default_factory=AbstractConfig, description="摘要总配置"
+    )
+    headings: HeadingsConfig = Field(
+        default_factory=HeadingsConfig, description="标题配置"
+    )
+    body_text: BodyTextConfig = Field(
+        default_factory=BodyTextConfig, description="正文配置"
+    )
+    figures: FiguresConfig = Field(
+        default_factory=FiguresConfig, description="插图配置"
+    )
+    tables: TablesConfig = Field(default_factory=TablesConfig, description="表格配置")
+    references: ReferencesConfig = Field(
+        default_factory=ReferencesConfig, description="参考文献总配置"
+    )
     acknowledgements: AcknowledgementsConfig = Field(
-        default_factory=AcknowledgementsConfig
+        default_factory=AcknowledgementsConfig,
+        description="致谢总配置",
     )
