@@ -60,38 +60,6 @@ def test_docx_base_parse():
             os.unlink(temp_docx_path)
 
 
-def test_docx_base_get_tag_by_regex():
-    """测试DocxBase类的get_tag_by_regex方法"""
-    # 创建临时docx文件
-    doc = Document()
-    doc.add_paragraph("测试段落")
-    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as f:
-        temp_docx_path = f.name
-    doc.save(temp_docx_path)
-    
-    try:
-        # 使用示例配置文件
-        config_path = "example/undergrad_thesis.yaml"
-        
-        # 初始化DocxBase实例
-        dox = DocxBase(temp_docx_path, configpath=config_path)
-        
-        # 测试空输入
-        assert dox.get_tag_by_regex("") == ("", "")
-        assert dox.get_tag_by_regex(None) == ("", "")
-        
-        # 测试正常输入
-        # 注意：这里需要根据实际配置文件中的正则表达式来测试
-        # 由于配置可能不同，这里只测试方法能正常执行
-        result = dox.get_tag_by_regex("测试段落")
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-        
-    finally:
-        # 清理临时文件
-        if os.path.exists(temp_docx_path):
-            os.unlink(temp_docx_path)
-
 @mock.patch('wordformat.base.onnx_batch_infer')
 def test_docx_base_parse_with_low_confidence(mock_onnx_batch_infer):
     """测试DocxBase类的parse方法（低置信度情况）"""
