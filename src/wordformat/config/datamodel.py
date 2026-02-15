@@ -124,7 +124,7 @@ class AbstractContentConfig(GlobalFormatConfig):
     """摘要正文配置（继承全局格式）"""
 
 
-class AbstractChineseConfig(GlobalFormatConfig):
+class AbstractChineseConfig(BaseModel):
     """中文摘要配置"""
 
     chinese_title: AbstractTitleConfig = Field(
@@ -173,7 +173,7 @@ class HeadingLevelConfig(GlobalFormatConfig):
     section_title_re: str = Field(description="标题正则表达式")
 
 
-class HeadingsConfig(GlobalFormatConfig):
+class HeadingsConfig(BaseModel):
     """标题总配置"""
 
     level_1: HeadingLevelConfig = Field(
