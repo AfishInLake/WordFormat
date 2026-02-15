@@ -4,7 +4,7 @@
 # @File    : heading.py
 
 from docx.document import Document
-from loguru import logger  # 推荐添加日志，便于调试
+from loguru import logger
 
 from wordformat.config.datamodel import HeadingLevelConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
@@ -14,7 +14,7 @@ from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
     """标题节点基类（复用1/2/3级标题的通用逻辑）"""
 
-    LEVEL: int = 0  # 标题层级（1/2/3）
+    LEVEL: int = 0
     NODE_TYPE: str = ""
     CONFIG_MODEL = HeadingLevelConfig
 
