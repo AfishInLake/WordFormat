@@ -98,8 +98,6 @@ class GlobalFormatConfig(BaseModel):
 class KeywordsConfig(GlobalFormatConfig):
     """关键词配置模型（继承全局格式）"""
 
-    section_title_re: str = Field(default=None, description="关键词匹配的正则表达式")
-
     # 关键词特有配置
     keywords_bold: bool = Field(default=True, description="关键字加粗")
     count_min: int = Field(default=4, description="最小关键字数")
@@ -116,8 +114,6 @@ class KeywordsConfig(GlobalFormatConfig):
 
 class AbstractTitleConfig(GlobalFormatConfig):
     """摘要标题配置（继承全局格式）"""
-
-    section_title_re: str = Field(description="标题正则表达式")
 
 
 class AbstractContentConfig(GlobalFormatConfig):
@@ -170,8 +166,6 @@ class AbstractConfig(BaseModel):
 class HeadingLevelConfig(GlobalFormatConfig):
     """各级标题配置（继承全局格式）"""
 
-    section_title_re: str = Field(description="标题正则表达式")
-
 
 class HeadingsConfig(BaseModel):
     """标题总配置"""
@@ -196,8 +190,6 @@ class BodyTextConfig(GlobalFormatConfig):
 class FiguresConfig(GlobalFormatConfig):
     """插图配置"""
 
-    section_title_re: str = Field(description="图注正则表达式")
-
     caption_position: Literal["above", "below"] = Field(
         default="below", description="图注位置"
     )
@@ -207,8 +199,6 @@ class FiguresConfig(GlobalFormatConfig):
 # -------------------------- 表格配置模型 --------------------------
 class TablesConfig(GlobalFormatConfig):
     """表格配置"""
-
-    section_title_re: str = Field(description="图注正则表达式")
 
     caption_position: Literal["above", "below"] = Field(
         default="above", description="表注位置"
@@ -220,7 +210,6 @@ class TablesConfig(GlobalFormatConfig):
 class ReferencesTitleConfig(GlobalFormatConfig):
     """参考文献标题配置（继承全局格式）"""
 
-    section_title_re: str = Field(description="参考文献正则表达式")
     section_title: Optional[str] = Field(
         default="参考文献", description="参考文献章节标题"
     )
@@ -248,8 +237,6 @@ class ReferencesConfig(BaseModel):
 # -------------------------- 致谢配置模型 --------------------------
 class AcknowledgementsTitleConfig(GlobalFormatConfig):
     """致谢标题配置（继承全局格式）"""
-
-    section_title_re: str = Field(description="致谢标题正则表达式")
 
 
 class AcknowledgementsContentConfig(GlobalFormatConfig):
