@@ -301,8 +301,8 @@ class ParagraphStyle:
         self.line_spacing: LineSpacing | float = LineSpacing(line_spacing)
         self.line_spacingrule: LineSpacingRule = LineSpacingRule(line_spacingrule)
         self.first_line_indent: FirstLineIndent = FirstLineIndent(first_line_indent)
-        self.right_indent: LeftIndent = LeftIndent(right_indent)
-        self.left_indent: RightIndent = RightIndent(left_indent)
+        self.left_indent: LeftIndent = LeftIndent(left_indent)
+        self.right_indent: RightIndent = RightIndent(right_indent)
         self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
         if globals()["style_checks_warning"] is None:
             globals()["style_checks_warning"] = get_config().style_checks_warning
@@ -471,7 +471,7 @@ class ParagraphStyle:
         return sorted(diffs, key=lambda x: x.level)
 
     @staticmethod
-    def to_string(value: list[DIFFResult]):
+    def to_string(value: list[DIFFResult]) -> str:
         t = []
         attr = [
             "alignment",

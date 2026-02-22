@@ -1,5 +1,5 @@
 import re
-from typing import List, Literal
+from typing import Literal
 
 from wordformat.config.datamodel import KeywordsConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
@@ -44,16 +44,18 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
                 f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"
             )
 
-    def _check_paragraph_style(self, cfg: KeywordsConfig, p: bool) -> List[str]:
+    def _check_paragraph_style(self, cfg: KeywordsConfig, p: bool) -> str:
         """通用段落样式检查（复用）"""
         ps = ParagraphStyle.from_config(cfg)
         if p:
-            return [o.comment for o in ps.diff_from_paragraph(self.paragraph)]
+            issues = ps.diff_from_paragraph(self.paragraph)
         else:
-            return [o.comment for o in ps.apply_to_paragraph(self.paragraph)]
+            issues = ps.apply_to_paragraph(self.paragraph)
+        return ParagraphStyle.to_string(issues)
+
+    # 第二步：英文关键词节点（专属逻辑）
 
 
-# 第二步：英文关键词节点（专属逻辑）
 class KeywordsEN(BaseKeywordsNode):
     """关键词节点-英文"""
 
@@ -72,16 +74,14 @@ class KeywordsEN(BaseKeywordsNode):
         - “Keywords:” 部分加粗，其余内容不加粗
         """
         cfg = self.pydantic_config
-        all_issues = []
 
         # 2. 段落样式检查
         paragraph_issues = self._check_paragraph_style(cfg, p)
         if paragraph_issues:
-            all_issues.extend(paragraph_issues)
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text=f"英文关键词段落格式错误：{''.join(str(issue) for issue in paragraph_issues)}",
+                text=paragraph_issues,
             )
 
         # 3. 字符样式检查（区分标签/内容）
@@ -118,13 +118,10 @@ class KeywordsEN(BaseKeywordsNode):
                 else:
                     diff = label_style.apply_to_run(run)
                 if diff:
-                    all_issues.append(
-                        {"run_text": run.text, "diff": diff, "type": "label"}
-                    )
                     self.add_comment(
                         doc=doc,
                         runs=run,
-                        text=f"英文关键词标签格式错误：{''.join(str(d) for d in diff)}",
+                        text=CharacterStyle.to_string(diff),
                     )
             else:
                 # 检查内容样式
@@ -133,13 +130,10 @@ class KeywordsEN(BaseKeywordsNode):
                 else:
                     diff = content_style.apply_to_run(run)
                 if diff:
-                    all_issues.append(
-                        {"run_text": run.text, "diff": diff, "type": "content"}
-                    )
                     self.add_comment(
                         doc=doc,
                         runs=run,
-                        text=f"英文关键词内容格式错误：{''.join(str(d) for d in diff)}",
+                        text=CharacterStyle.to_string(diff),
                     )
 
         # 5. 校验关键词数量（KeywordsConfig特有配置）
@@ -151,11 +145,9 @@ class KeywordsEN(BaseKeywordsNode):
         keyword_list = [k.strip() for k in keyword_list if k.strip()]
         if len(keyword_list) < cfg.count_min:
             issue = f"英文关键词数量不足（最少{cfg.count_min}个，当前{len(keyword_list)}个）"
-            all_issues.append({"type": "count", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
         if len(keyword_list) > cfg.count_max:
             issue = f"英文关键词数量超限（最多{cfg.count_max}个，当前{len(keyword_list)}个）"
-            all_issues.append({"type": "count", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
 
 
@@ -186,16 +178,14 @@ class KeywordsCN(BaseKeywordsNode):
             return [{"error": "配置未加载", "lang": "cn", "node_type": self.NODE_TYPE}]
 
         cfg = self.pydantic_config
-        all_issues = []
 
         # 2. 段落样式检查（复用基类方法）
         paragraph_issues = self._check_paragraph_style(cfg, p)
         if paragraph_issues:
-            all_issues.extend(paragraph_issues)
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text=f"中文关键词段落格式错误：{''.join(str(issue) for issue in paragraph_issues)}",
+                text=paragraph_issues,
             )
 
         # 3. 字符样式检查（区分标签/内容）
@@ -232,13 +222,10 @@ class KeywordsCN(BaseKeywordsNode):
                 else:
                     diff = label_style.apply_to_run(run)
                 if diff:
-                    all_issues.append(
-                        {"run_text": run.text, "diff": diff, "type": "label"}
-                    )
                     self.add_comment(
                         doc=doc,
                         runs=run,
-                        text=f"中文关键词标签格式错误：{''.join(str(d) for d in diff)}",
+                        text=CharacterStyle.to_string(diff),
                     )
             else:
                 # 检查内容样式
@@ -247,13 +234,10 @@ class KeywordsCN(BaseKeywordsNode):
                 else:
                     diff = content_style.apply_to_run(run)
                 if diff:
-                    all_issues.append(
-                        {"run_text": run.text, "diff": diff, "type": "content"}
-                    )
                     self.add_comment(
                         doc=doc,
                         runs=run,
-                        text=f"中文关键词内容格式错误：{''.join(str(d) for d in diff)}",
+                        text=CharacterStyle.to_string(diff),
                     )
 
         # 5. 专属校验：关键词数量 + 末尾标点（KeywordsConfig特有配置）
@@ -265,11 +249,9 @@ class KeywordsCN(BaseKeywordsNode):
         # 数量校验
         if len(keyword_list) < cfg.count_min:
             issue = f"中文关键词数量不足（最少{cfg.count_min}个，当前{len(keyword_list)}个）"
-            all_issues.append({"type": "count", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
         if len(keyword_list) > cfg.count_max:
             issue = f"中文关键词数量超限（最多{cfg.count_max}个，当前{len(keyword_list)}个）"
-            all_issues.append({"type": "count", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
 
         # 末尾标点校验
@@ -279,5 +261,4 @@ class KeywordsCN(BaseKeywordsNode):
             and keyword_text.strip()[-1] in "；，。、"
         ):
             issue = "中文关键词末尾禁止出现标点符号"
-            all_issues.append({"type": "punct", "message": issue})
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)

@@ -105,7 +105,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
                 }
                 run_issues.append(run_issue)
                 self.add_comment(
-                    doc=doc, runs=run, text=f"{''.join(str(dr) for dr in diff_result)}"
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 段落样式批注
