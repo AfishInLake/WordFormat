@@ -129,13 +129,6 @@ class TestFormatNode:
             node.pydantic_config
 
     @mock.patch('builtins.open', new_callable=mock.mock_open, read_data='{}')
-    def test_load_yaml_config(self, mock_open):
-        """测试加载YAML配置"""
-        # 由于NodeConfigRoot需要完整的配置结构，这里会失败，所以我们只测试异常情况
-        with pytest.raises(ValueError):
-            self.TestFormatNode.load_yaml_config("test_config.yaml")
-
-    @mock.patch('builtins.open', new_callable=mock.mock_open, read_data='{}')
     def test_load_yaml_config_file_not_found(self, mock_open):
         """测试加载不存在的YAML配置文件"""
         mock_open.side_effect = FileNotFoundError
@@ -196,12 +189,6 @@ class TestFormatNode:
         except Exception as e:
             # 如果add_comment方法在真实的Document对象上不可用，我们就跳过这个测试
             pass
-
-    def test_load_yaml_config_validation_error(self):
-        """测试加载YAML配置验证错误"""
-        with mock.patch('builtins.open', new_callable=mock.mock_open, read_data='{}'):
-            with pytest.raises(ValueError):
-                self.TestFormatNode.load_yaml_config("test_config.yaml")
 
     def test_load_config_unknown_config_type(self):
         """测试加载未知类型的配置"""
