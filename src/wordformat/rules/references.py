@@ -41,7 +41,7 @@ class References(FormatNode[ReferencesTitleConfig]):
                 diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 仅当有差异时添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text="".join(str(dr) for dr in diff_result)
+                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
                 )
 
         # 检查段落格式差异
@@ -49,7 +49,7 @@ class References(FormatNode[ReferencesTitleConfig]):
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text="".join(str(issue) for issue in paragraph_issues),
+                text=ParagraphStyle.to_string(paragraph_issues),
             )
         return []
 

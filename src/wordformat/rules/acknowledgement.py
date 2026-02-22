@@ -53,7 +53,7 @@ class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text="".join(str(issue) for issue in paragraph_issues),
+                text=ParagraphStyle.to_string(paragraph_issues),
             )
 
         return []

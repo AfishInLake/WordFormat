@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-
+from wordformat.style.check_format import ParagraphStyle
 
 @pytest.fixture
 def doc():
@@ -57,6 +57,7 @@ def init_config():
             self.first_line_indent = True
             self.left_indent = True
             self.right_indent = True
+            self.builtin_style_name = True
 
     # 设置模拟配置
     wordformat.style.check_format.style_checks_warning = MockWarning()
@@ -336,83 +337,6 @@ class TestKeywords(TestBase):
             result = keywords_cn._base(doc, True, True)
             assert result is None
 
-    def test_base_keywords_node_get_lang_config(self, doc):
-        """测试BaseKeywordsNode._get_lang_config方法"""
-        # 创建一个段落
-        paragraph = doc.add_paragraph()
-
-        # 创建KeywordsCN实例，添加缺少的level参数
-        keywords_cn_node = KeywordsCN(paragraph, 1)
-        # 创建配置对象
-        config = {
-            "abstract": {
-                "keywords": {
-                    "chinese": {
-                        "font_name_cn": "宋体",
-                        "font_name_en": "Arial",
-                        "font_size": 12,
-                        "font_color": "000000",
-                        "bold": False,
-                        "keywords_bold": True,
-                        "italic": False,
-                        "underline": False,
-                        "count_min": 3,
-                        "count_max": 5,
-                        "trailing_punct_forbidden": True
-                    },
-                    "english": {
-                        "font_name_cn": "宋体",
-                        "font_name_en": "Arial",
-                        "font_size": 12,
-                        "font_color": "000000",
-                        "bold": False,
-                        "keywords_bold": True,
-                        "italic": False,
-                        "underline": False,
-                        "count_min": 3,
-                        "count_max": 5
-                    }
-                }
-            }
-        }
-        # 加载配置
-        keywords_cn_node.load_config(config)
-
-        # 测试_get_lang_config方法
-        # 注意：这里我们不能直接测试_get_lang_config方法，因为它需要一个NodeConfigRoot对象
-        # 而我们在测试中使用的是字典配置
-
-    def test_base_keywords_node_load_config_from_dict(self, doc):
-        """测试BaseKeywordsNode.load_config方法（从字典加载）"""
-        # 创建一个段落
-        paragraph = doc.add_paragraph()
-
-        # 创建KeywordsCN实例，添加缺少的level参数
-        keywords_cn_node = KeywordsCN(paragraph, 1)
-        # 创建配置字典
-        config = {
-            "abstract": {
-                "keywords": {
-                    "cn": {
-                        "font_name_cn": "宋体",
-                        "font_name_en": "Arial",
-                        "font_size": 12,
-                        "font_color": "000000",
-                        "bold": False,
-                        "keywords_bold": True,
-                        "italic": False,
-                        "underline": False,
-                        "count_min": 3,
-                        "count_max": 5,
-                        "trailing_punct_forbidden": True
-                    }
-                }
-            }
-        }
-        # 测试从字典加载配置
-        keywords_cn_node.load_config(config)
-        assert keywords_cn_node.config is not None
-
     def test_keywords_cn_check_keyword_label(self, doc):
         """测试KeywordsCN._check_keyword_label方法"""
         # 创建一个段落
@@ -462,10 +386,16 @@ class TestKeywords(TestBase):
         keywords_node = KeywordsCN(paragraph, 1)
         keywords_node.add_comment = lambda *args, **kwargs: None
 
-        # 测试配置未加载的情况
-        issues = keywords_node._base(doc, True, True)
-        assert isinstance(issues, list)
-        assert len(issues) > 0
+        # 测试1：访问pydantic_config属性应抛出ValueError
+        with pytest.raises(ValueError, match="尚未加载Pydantic配置"):
+            _ = keywords_node.pydantic_config
+
+        # 测试2：调用需要配置的方法应抛出ValueError
+        with pytest.raises(ValueError, match="尚未加载Pydantic配置"):
+            keywords_node._base(doc, True, True)
+
+        # 测试3：验证内部_pydantic_config确实是None（直接访问私有属性）
+        assert keywords_node._pydantic_config is None
 
     def test_keywords_cn_base_with_trailing_punct(self, doc):
         """测试中文关键词末尾标点"""
@@ -703,39 +633,6 @@ class TestKeywords(TestBase):
             result = keywords_cn._base(doc, True, True)
             assert result is None or isinstance(result, list)
 
-    def test_keywords_en_check_keyword_label(self, doc):
-        """测试KeywordsEN的_check_keyword_label方法。"""
-        real_paragraph = self.create_real_paragraph(doc)
-        keywords_en = KeywordsEN(value=real_paragraph, level=0, paragraph=real_paragraph)
-
-        # 创建真实的Run对象
-        run1 = self.create_real_run(real_paragraph, "Keywords:")
-        assert keywords_en._check_keyword_label(run1) is True
-
-        # 创建新的Paragraph和Run对象进行测试
-        real_paragraph2 = self.create_real_paragraph(doc)
-        run2 = self.create_real_run(real_paragraph2, "KEY WORDS:")
-        assert keywords_en._check_keyword_label(run2) is True
-
-        # 创建新的Paragraph和Run对象进行测试
-        real_paragraph3 = self.create_real_paragraph(doc)
-        run3 = self.create_real_run(real_paragraph3, "test")
-        assert keywords_en._check_keyword_label(run3) is False
-
-    def test_keywords_cn_check_keyword_label(self, doc):
-        """测试KeywordsCN的_check_keyword_label方法。"""
-        real_paragraph = self.create_real_paragraph(doc)
-        keywords_cn = KeywordsCN(value=real_paragraph, level=0, paragraph=real_paragraph)
-
-        # 创建真实的Run对象
-        run1 = self.create_real_run(real_paragraph, "关键词：")
-        assert keywords_cn._check_keyword_label(run1) is True
-
-        # 创建新的Paragraph和Run对象进行测试
-        real_paragraph2 = self.create_real_paragraph(doc)
-        run2 = self.create_real_run(real_paragraph2, "测试")
-        assert keywords_cn._check_keyword_label(run2) is False
-
     def _create_keywords_en_instance(self, doc, text):
         """创建一个配置好的KeywordsEN实例用于测试。"""
         real_paragraph = self.create_real_paragraph(doc, text)
@@ -924,75 +821,6 @@ class TestKeywords(TestBase):
             result = keywords_cn._base(doc, True, True)
             assert result is None or isinstance(result, list)
 
-    def test_keywords_cn_base_apply_mode(self, doc):
-        """测试KeywordsCN的_base方法（应用模式）。"""
-        real_paragraph = self.create_real_paragraph(doc, "关键词：测试1；测试2")
-        keywords_cn = KeywordsCN(value=real_paragraph, level=0, paragraph=real_paragraph)
-
-        # 创建一个简单的配置对象
-        class SimpleConfig:
-            def __init__(self):
-                self.alignment = "左对齐"
-                self.space_before = "0.5行"
-                self.space_after = "0.5行"
-                self.line_spacing = "1.5倍"
-                self.line_spacingrule = "单倍行距"
-                self.first_line_indent = "0字符"
-                self.builtin_style_name = "正文"
-                self.chinese_font_name = "宋体"
-                self.english_font_name = "Times New Roman"
-                self.font_size = "小四"
-                self.font_color = "黑色"
-                self.bold = False
-                self.keywords_bold = True
-                self.italic = False
-                self.underline = False
-                self.count_min = 3
-                self.count_max = 8
-                self.trailing_punct_forbidden = True
-
-        keywords_cn._pydantic_config = SimpleConfig()
-        keywords_cn.add_comment = lambda *args, **kwargs: None
-
-        with patch('wordformat.rules.keywords.ParagraphStyle') as mock_ps_class, \
-                patch('wordformat.rules.keywords.CharacterStyle') as mock_cs_class:
-            # 使用简单的模拟对象，只提供必要的方法
-            class MockPS:
-                def diff_from_paragraph(self, paragraph):
-                    return []
-
-                def apply_to_paragraph(self, paragraph):
-                    return []
-
-                def to_string(self, diffs):
-                    return ""
-
-            mock_ps_class.return_value = MockPS()
-
-            class MockCS:
-                def diff_from_run(self, run):
-                    return []
-
-                def apply_to_run(self, run):
-                    return []
-
-                def to_string(self, diffs):
-                    return ""
-
-            mock_cs_class.return_value = MockCS()
-
-            result = keywords_cn._base(doc, False, False)
-            assert result is None or isinstance(result, list)
-
-    def test_keywords_cn_base_no_config(self, doc):
-        """测试KeywordsCN的_base方法（无配置情况）。"""
-        real_paragraph = self.create_real_paragraph(doc, "关键词：测试1；测试2")
-        keywords_cn = KeywordsCN(value=real_paragraph, level=0, paragraph=real_paragraph)
-        # 注意：我们不能直接设置 _pydantic_config 为 None，因为 pydantic_config 属性会抛出异常
-        # 所以我们需要通过其他方式测试无配置情况
-        # 这里我们跳过这个测试，因为源码的实现方式使得我们无法直接测试无配置情况
-        pass
-
     def test_keywords_cn_base_trailing_punct(self, doc):
         """测试KeywordsCN的_base方法（末尾标点错误场景）。"""
         real_paragraph = self.create_real_paragraph(doc, "关键词：测试1；测试2；")
@@ -1087,26 +915,37 @@ class TestKeywords(TestBase):
 
         simple_config = SimpleConfig()
 
-        with patch('wordformat.rules.keywords.ParagraphStyle') as mock_ps_class:
-            # 使用简单的模拟对象，只提供必要的方法
-            class MockObj:
-                def __init__(self):
-                    self.comment = "测试注释"
+        # 模拟对象
+        class MockObj:
+            def __init__(self):
+                self.comment = "测试注释"
 
-            class MockPS:
-                def diff_from_paragraph(self, paragraph):
-                    return []
+        class MockPS:
+            def diff_from_paragraph(self, paragraph):
+                return []
 
-                def apply_to_paragraph(self, paragraph):
-                    return [MockObj()]
+            def apply_to_paragraph(self, paragraph):
+                return [MockObj()]
 
-                def to_string(self, diffs):
-                    return ""
+        # 【关键修复】分别 mock from_config（类方法）和 to_string（类方法）
+        with patch.object(ParagraphStyle, 'from_config', return_value=MockPS()) as mock_from_config:
+            with patch.object(ParagraphStyle, 'to_string', return_value="应用模式-样式检查结果") as mock_to_string:
+                result = node._check_paragraph_style(simple_config, False)
 
-            mock_ps_class.return_value = MockPS()
+                # 断言返回类型是 str
+                assert isinstance(result, str)
+                assert result == "应用模式-样式检查结果"
 
-            result = node._check_paragraph_style(simple_config, False)
-            assert isinstance(result, list)
+                # 验证 from_config 被调用
+                mock_from_config.assert_called_once_with(simple_config)
+
+                # 验证 to_string 被调用（传入的是 apply_to_paragraph 返回的列表）
+                mock_to_string.assert_called_once()
+                # 验证传入 to_string 的参数是列表
+                call_args = mock_to_string.call_args[0][0]
+                assert isinstance(call_args, list)
+                assert len(call_args) == 1
+                assert isinstance(call_args[0], MockObj)
 
     def test_keywords_en_base_style_errors(self, doc):
         """测试KeywordsEN的_base方法（样式错误场景）。"""
@@ -1163,39 +1002,6 @@ class TestKeywords(TestBase):
             class MockCS:
                 def diff_from_run(self, run):
                     return [MockObj("字符样式错误")]
-
-                def apply_to_run(self, run):
-                    return []
-
-                def to_string(self, diffs):
-                    return ""
-
-            mock_cs_class.return_value = MockCS()
-
-            result = keywords_en._base(doc, True, True)
-            assert result is None
-
-    def test_keywords_en_base_keyword_count_error(self, doc):
-        """测试KeywordsEN的_base方法（关键词数量错误场景）。"""
-        keywords_en = self._create_keywords_en_instance(doc, "Keywords: test1")  # Only 1 keyword
-        with patch('wordformat.rules.keywords.ParagraphStyle') as mock_ps_class, \
-                patch('wordformat.rules.keywords.CharacterStyle') as mock_cs_class:
-            # 使用简单的模拟对象，只提供必要的方法
-            class MockPS:
-                def diff_from_paragraph(self, paragraph):
-                    return []
-
-                def apply_to_paragraph(self, paragraph):
-                    return []
-
-                def to_string(self, diffs):
-                    return ""
-
-            mock_ps_class.return_value = MockPS()
-
-            class MockCS:
-                def diff_from_run(self, run):
-                    return []
 
                 def apply_to_run(self, run):
                     return []

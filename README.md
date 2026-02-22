@@ -11,6 +11,7 @@
 
 **WordFormat** 是一个基于 Python 开发的 Word 文档自动化格式检查与修正工具，专为学术论文（本科/硕士/博士毕业论文、期刊论文等）的格式合规性审查设计。该工具能够智能解析 Word 文档结构，识别标题、摘要、正文、参考文献等不同段落类型，并依据自定义的格式规范自动校验文档格式，支持在违规位置添加批注或直接修正格式问题，大幅提升论文格式审核效率。
 
+点击 **[WordFormatUI](https://github.com/AfishInLake/WordFormatUI)** 查看带有GUI界面的项目
 ## 功能特性
 
 ### 核心能力
@@ -25,6 +26,10 @@
 - **格式一键修正**：支持根据规范自动修正部分常见格式问题（如标题字号、正文行距）
 - **自定义配置**：通过 YAML 配置文件灵活定义格式规范，适配不同学校/期刊的格式要求
 - **跨平台兼容**：支持 Windows/macOS/Linux 系统，基于 python-docx 实现跨平台 Word 文档处理
+
+## 普通用户请看这里
++ 如果你是普通用户，请点击[WordFormatUI](https://github.com/AfishInLake/WordFormatUI/releases)下载带有GUI界面的安装包直接使用，并参考[安装指南](https://github.com/AfishInLake/WordFormatUI/blob/master/README.md)进行安装。
++ 如果你是开发人员，请按照以下步骤进行安装和运行
 
 ## 快速开始
 
