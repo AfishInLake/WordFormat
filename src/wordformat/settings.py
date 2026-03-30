@@ -27,11 +27,7 @@ MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
 BATCH_SIZE = os.getenv("BATCH_SIZE", 64)
 ONNX_VERSION = "20260204"
-CHARACTER_STYLE_CHECKS = {
-    "bold": True,
-    "italic": True,
-    "underline": True,
-    "font_size": True,
-    "font_color": False,
-    "font_name": False,
-}
+
+VOIDNODELIST = [
+    "top"
+]

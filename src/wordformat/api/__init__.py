@@ -100,18 +100,22 @@ async def api_generate_json(
     对应原命令行generate-json模式：仅生成JSON，不执行校验/格式化
     - 上传docx和yaml配置文件，服务端自动生成JSON并返回数据
     """
+
     try:
+        filename = docx_file.filename.lower()
+        if not filename.endswith(".docx"):
+            return OperationResult(
+                code=400,
+                msg=f"上传失败：仅支持 .docx式（你当前上传的是：{docx_file.filename}），请转换为docx后重试"
+            )
+
         # 保存上传文件（仅返回路径，无需提取原名称）
         docx_path = save_upload_file(docx_file, TEMP_DIR)
         config_path = save_upload_file(config_file, TEMP_DIR)
 
-        # 基于上传文件路径生成同名JSON（保持原有逻辑）
-        json_filename = f"{os.path.splitext(os.path.basename(docx_path))[0]}.json"
-        json_path = os.path.join(TEMP_DIR, json_filename)
-
         # 执行核心逻辑生成JSON
         json_data = set_tag_main(
-            docx_path=docx_path, json_save_path=json_path, configpath=config_path
+            docx_path=docx_path, configpath=config_path
         )
 
         return OperationResult(
@@ -119,7 +123,6 @@ async def api_generate_json(
             msg="JSON文件生成成功",
             data={
                 "json_data": json_data,
-                "json_filename": json_filename,
                 "tips": "可使用该JSON数据调用check-format/apply-format接口",
             },
         )

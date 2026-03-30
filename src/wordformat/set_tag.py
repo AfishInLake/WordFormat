@@ -3,21 +3,20 @@
 # @Author  : afish
 # @File    : main.py
 import json
-
+import os
 from loguru import logger
 
 from wordformat.base import DocxBase
 
 
-def run(docx_path: str, json_save_path: str, configpath) -> list:
+
+def set_tag_main(docx_path: str,  configpath) -> list[dict]:
+    """
+    此入口用来生成段落文本标记，返回json数据
+
+    :param docx_path: 传入的docx文件路径
+    :param configpath: yaml配置文件路径
+    """
     dox = DocxBase(docx_path, configpath=configpath)
     a = dox.parse()
-
-    with open(json_save_path, "w", encoding="utf-8") as f:
-        json.dump(a, f, ensure_ascii=False, indent=4)
-    logger.info(f"保存成功：{json_save_path}")
     return a
-
-
-def set_tag_main(docx_path: str, json_save_path, configpath):
-    return run(docx_path, json_save_path, configpath)

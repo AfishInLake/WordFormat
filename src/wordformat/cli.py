@@ -3,6 +3,7 @@
 # @Author  : afish
 # @File    : cli.py
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -136,12 +137,15 @@ def main():
         logger.info(f"📋 生成的JSON路径：{json_abs_path}")  # 直接使用用户指定路径
         logger.info("=" * 60)
 
-        set_tag_main(
+        tag_json_data = set_tag_main(
             docx_path=args.docx,
-            json_save_path=json_abs_path,  # 核心：传入用户指定的路径
             configpath=args.config,
         )
-        logger.info("\n✅ JSON文件已生成完成！")
+
+        os.makedirs(os.path.dirname(json_abs_path), exist_ok=True)
+        with open(json_abs_path, "w", encoding="utf-8") as f:
+            json.dump(tag_json_data, f, ensure_ascii=False, indent=4)
+        logger.info("✅ JSON文件已生成完成！")
         logger.info(f"📝 JSON路径：{json_abs_path}")
         logger.info("💡 可使用该JSON文件配合 check-format/apply-format 模式执行操作")
 
@@ -162,7 +166,7 @@ def main():
             savepath=args.output,
             check=True,
         )
-        logger.info(f"\n✅ 格式校验完成！校验后文档已保存至：{args.output}")
+        logger.info(f"✅ 格式校验完成！校验后文档已保存至：{args.output}")
 
     elif args.mode == "apply-format":
         # 模式3：格式化 → 直接读取用户指定的json_abs_path
@@ -181,7 +185,7 @@ def main():
             savepath=args.output,
             check=False,
         )
-        logger.info(f"\n✅ 格式化完成！格式化后文档已保存至：{args.output}")
+        logger.info(f"✅ 格式化完成！格式化后文档已保存至：{args.output}")
 
 
 if __name__ == "__main__":

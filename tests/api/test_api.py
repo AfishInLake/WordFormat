@@ -118,8 +118,7 @@ def test_api_generate_json():
         assert data["code"] == 200
         assert data["msg"] == "JSON文件生成成功"
         assert "json_data" in data["data"]
-        assert "json_filename" in data["data"]
-        
+
     finally:
         if os.path.exists(temp_docx):
             os.unlink(temp_docx)

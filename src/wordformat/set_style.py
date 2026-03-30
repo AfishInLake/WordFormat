@@ -17,7 +17,8 @@ from wordformat.rules import (
     ReferenceEntry,
     References,
 )
-from wordformat.utils import get_paragraph_xml_fingerprint, remove_all_numbering
+from wordformat.settings import VOIDNODELIST
+from wordformat.utils import get_paragraph_xml_fingerprint, remove_all_numbering, ensure_directory_exists
 from wordformat.word_structure.document_builder import DocumentBuilder
 from wordformat.word_structure.utils import (
     find_and_modify_first,
@@ -26,7 +27,7 @@ from wordformat.word_structure.utils import (
 
 
 def apply_format_check_to_all_nodes(
-    root_node: FormatNode, document, config, check=True
+        root_node: FormatNode, document, config, check=True
 ):
     """
     递归遍历文档树中的所有节点，
@@ -34,16 +35,15 @@ def apply_format_check_to_all_nodes(
 
     :param root_node: 树的根节点（FormatNode 或其子类实例）
     :param document: docx文档的实例
+    :param config: 配置文件
+    :param check: 用来控制是仅检查还是仅修改
     """
 
     def traverse(node):
-        # 执行当前节点的格式检查（如果定义了）
         if hasattr(node, "check_format"):
             try:
-                # HACK: 应该使用not in list
-                if node.value.get("category") != "top":
+                if node.value.get("category") not in VOIDNODELIST:
                     node.load_config(config)
-                    # TODO: 添加判断的参数
                     logger.debug(node)
                     if node.paragraph:
                         if check:
@@ -54,7 +54,6 @@ def apply_format_check_to_all_nodes(
                 logger.warning(f"Node {node} not format, beacuse: {str(e)}")
                 raise e
 
-        # 递归处理所有子节点
         for child in node.children:
             traverse(child)
 
@@ -78,11 +77,11 @@ def xg(root_node, paragraph):
 
 
 def auto_format_thesis_document(
-    jsonpath: str | list,
-    docxpath: str,
-    configpath: str,
-    savepath: str = "output/",
-    check=True,
+        jsonpath: str | list,
+        docxpath: str,
+        configpath: str,
+        savepath: str = "output/",
+        check=True,
 ):
     """自动对学位论文文档进行格式校验与批注。
 
@@ -122,11 +121,13 @@ def auto_format_thesis_document(
 
     init_config(configpath)
     try:
-        config_model = get_config()  # 首次调用：触发load()
+        config_model = get_config()
         logger.info("配置文件验证通过")
     except Exception as e:
         logger.error(f"配置加载失败: {str(e)}")
         raise
+
+    ensure_directory_exists(savepath)
 
     filename_without_ext = get_file_name(docxpath)
     root_node = DocumentBuilder.build_from_json(jsonpath, config=config_model)
@@ -163,12 +164,10 @@ def auto_format_thesis_document(
     观察到不属于正文的内容被处理，需要剪枝
     word样式太多，需要考虑重置
     """
-    # 移除文档中的自动编号
     remove_all_numbering(document)
     # 执行格式化
     apply_format_check_to_all_nodes(root_node, document, config_model, check)
     savepath = Path(savepath)
-    savepath.mkdir(exist_ok=True)
     if check:
         docx_path = str(savepath / f"{filename_without_ext}--标注版.docx")
     else:
