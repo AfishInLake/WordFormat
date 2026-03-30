@@ -106,3 +106,23 @@ def remove_all_numbering(doc):
                     pPr.remove(outlineLvl)
 
             logger.debug(f"已解除样式 '{style_name}' 的编号绑定")
+
+
+def ensure_directory_exists(path):
+    """
+    检查路径是否存在，如果不存在则创建对应的文件夹。
+
+    参数:
+        path (str): 需要检查或创建的文件夹路径
+
+    说明:
+        - 如果路径已存在且是文件夹，则不做任何操作
+        - 如果路径不存在，则递归创建所有必需的父目录
+        - 如果路径存在但是是文件，则抛出 ValueError
+    """
+    if os.path.exists(path):
+        if not os.path.isdir(path):
+            raise ValueError(f"路径已存在但不是文件夹：'{path}'")
+    else:
+        os.makedirs(path, exist_ok=True)
+        logger.info(f"已创建文件夹：'{path}'")
