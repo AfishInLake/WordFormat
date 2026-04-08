@@ -47,6 +47,7 @@ cd "$PROJECT_ROOT"
 pyinstaller -D --noconfirm -n wordformat \
   --paths "src" \
   --add-data "src/wordformat/data:wordformat/data" \
+  --collect-all "docx" \
   --hidden-import=wordformat.api \
   --hidden-import=wordformat.data \
   --hidden-import=fastapi \
