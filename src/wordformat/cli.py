@@ -1,191 +1,132 @@
 #! /usr/bin/env python
-# @Time    : 2026/1/18 13:22
+# @Time    : 2026/4/8
 # @Author  : afish
 # @File    : cli.py
 import argparse
 import json
 import os
+import sys
+import time
 from pathlib import Path
-
 from loguru import logger
 
-# 导入核心函数
 from wordformat.set_style import auto_format_thesis_document
 from wordformat.set_tag import set_tag_main
 
 
-def validate_file(path: str, file_type: str = "文件") -> str:
-    """校验文件是否存在，且为文件类型（非文件夹）"""
+def validate_file(path: str, name: str) -> str:
+    """文件合法性校验"""
     abs_path = os.path.abspath(path)
     if not os.path.exists(abs_path):
-        raise argparse.ArgumentTypeError(f"{file_type}不存在: {abs_path}")
+        raise argparse.ArgumentTypeError(f"{name}不存在: {abs_path}")
     if not os.path.isfile(abs_path):
-        raise argparse.ArgumentTypeError(f"{file_type}路径非文件: {abs_path}")
-    return abs_path
-
-
-def create_common_parser(
-    subparser, name: str, description: str
-) -> argparse.ArgumentParser:
-    """抽离公共参数：--config（必填）、--output（可选）"""
-    parser = subparser.add_parser(name=name, description=description, help=description)
-    parser.add_argument(
-        "--config",
-        "-c",
-        required=True,
-        type=lambda x: validate_file(x, "配置文件"),
-        help="格式配置YAML路径（必填），例如：example/undergrad_thesis.yaml",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        default="output/",
-        help="校验/格式化后文档保存目录（可选，默认：output/）",
-    )
-    return parser
-
-
-# 新增：针对不同模式的JSON路径校验器（核心修复）
-def validate_json_path(path: str, mode: str) -> str:
-    """
-    按执行模式校验JSON路径：
-    - generate-json：仅校验路径合法性，不要求文件存在（自动创建）
-    - check/apply-format：强制要求文件存在（需提前生成）
-    """
-    abs_path = os.path.abspath(path)
-    # 统一校验路径是否为合法文件路径（排除文件夹）
-    if os.path.exists(abs_path) and os.path.isdir(abs_path):
-        raise argparse.ArgumentTypeError(f"JSON路径不能是文件夹: {abs_path}")
-    # 仅非生成模式，要求文件存在
-    if mode != "generate-json" and not os.path.exists(abs_path):
-        raise argparse.ArgumentTypeError(f"JSON文件不存在: {abs_path}")
+        raise argparse.ArgumentTypeError(f"{name}必须是文件: {abs_path}")
     return abs_path
 
 
 def main():
-    # 1. 创建参数解析器
-    parser = argparse.ArgumentParser(
-        description="学位论文格式自动校验工具（多模式控制）"
-    )
+    # 无参数直接展示完整帮助
+    if len(sys.argv) == 1:
+        print("""
+📝 论文格式自动工具（极简命令）
+==================================================
+【极简命令】
+wf gj    生成文档JSON结构（自动生成，无需指定json路径）
+wf cf    检查格式错误
+wf af    自动格式化论文
 
-    # 2. 全局参数（核心简化：仅保留--docx、--json，移除冗余--json-dir）
-    parser.add_argument(
-        "--docx",
-        "-d",
-        required=True,
-        type=lambda x: validate_file(x, "Word文档"),
-        help="待处理的Word文档路径（必填），例如：tmp/毕业设计说明书.docx",
-    )
-    parser.add_argument(
-        "--json",
-        "-jf",
-        required=True,
-        help="JSON文件完整路径（必填）：generate-json模式下为生成路径，check/apply模式下为读取路径",
-    )
+【一键示例】
+wf gj -d 论文.docx -c config.yaml -o output/
+wf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
 
-    # 3. 子命令解析器
-    subparsers = parser.add_subparsers(
-        dest="mode",
-        required=True,
-    )
+参数：
+-d    Word 文档路径（必填）
+-c    YAML 配置文件（必填）
+-f    JSON 文件路径（仅 cf/af 需要）
+-o    输出目录（默认 output/）
+==================================================
+""")
+        return
 
-    # 3.1 模式1：仅生成JSON
-    parser_gen = subparsers.add_parser(
-        "generate-json", help="仅生成文档结构JSON文件，不执行校验/格式化"
-    )
-    parser_gen.add_argument(
-        "--config",
-        "-c",
-        required=True,
-        type=lambda x: validate_file(x, "配置文件"),
-        help="格式配置YAML路径（必填），例如：example/undergrad_thesis.yaml",
-    )
+    parser = argparse.ArgumentParser(prog="wf", description="论文格式自动工具")
+    subparsers = parser.add_subparsers(dest="mode", required=True)
 
-    # 3.2 模式2：仅执行格式校验
-    create_common_parser(
-        subparsers,
-        name="check-format",
-        description="仅执行格式校验（需先生成JSON文件）",
-    )
+    # ------------------------------
+    # 1. gj = 生成 JSON（自动命名）
+    # ------------------------------
+    p_gj = subparsers.add_parser("gj", help="生成JSON结构（自动输出到-o目录）")
+    p_gj.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档"), help="Word文档路径")
+    p_gj.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置"), help="YAML配置路径")
+    p_gj.add_argument("-o", default="output/", help="输出目录（默认output/）")
 
-    # 3.3 模式3：仅执行格式应用
-    create_common_parser(
-        subparsers,
-        name="apply-format",
-        description="仅执行格式应用/格式化（需先生成JSON文件）",
-    )
+    # ------------------------------
+    # 2. cf = 检查格式
+    # ------------------------------
+    p_cf = subparsers.add_parser("cf", help="检查格式错误")
+    p_cf.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档"), help="Word文档路径")
+    p_cf.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置"), help="YAML配置路径")
+    p_cf.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件"), help="JSON文件路径")
+    p_cf.add_argument("-o", default="output/", help="输出目录")
 
-    # 4. 解析参数 + 按模式校验JSON路径（核心修复步骤）
+    # ------------------------------
+    # 3. af = 格式化
+    # ------------------------------
+    p_af = subparsers.add_parser("af", help="自动格式化论文")
+    p_af.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档"), help="Word文档路径")
+    p_af.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置"), help="YAML配置路径")
+    p_af.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件"), help="JSON文件路径")
+    p_af.add_argument("-o", default="output/", help="输出目录")
+
+    # 解析参数
     args = parser.parse_args()
-    docx_abs_path = os.path.abspath(args.docx)
-    # 关键：传入当前模式，动态校验JSON路径
-    json_abs_path = validate_json_path(args.json, args.mode)
-    # 提取JSON路径的目录，自动创建（生成模式必备）
-    json_dir = os.path.dirname(json_abs_path)
-    Path(json_dir).mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.o)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 自动创建输出目录（若当前模式有output参数）
-    if hasattr(args, "output"):
-        Path(args.output).mkdir(parents=True, exist_ok=True)
+    # ==============================
+    # 执行逻辑
+    # ==============================
+    if args.mode == "gj":
+        docx = Path(args.d)
+        config = args.c
+        # 自动生成 JSON 文件名：原文档名 + 10位时间戳
+        doc_name = docx.stem  # 不带后缀的文件名
+        timestamp = str(int(time.time()))  # 10位时间戳
+        json_path = output_dir / f"{doc_name}_{timestamp}.json"
 
-    # 5. 模式执行逻辑（彻底简化：所有模式统一使用json_abs_path，无任何路径推导）
-    if args.mode == "generate-json":
-        # 模式1：生成JSON → 直接使用用户指定的json_abs_path生成（自动创建目录/文件）
-        logger.info("=" * 60)
-        logger.info("📌 执行模式：仅生成JSON文件")
-        logger.info(f"📄 源Word文档：{docx_abs_path}")
-        logger.info(f"📋 生成的JSON路径：{json_abs_path}")  # 直接使用用户指定路径
-        logger.info("=" * 60)
+        logger.info("📌 开始生成文档结构JSON...")
+        logger.info(f"📄 源文档：{docx.resolve()}")
+        logger.info(f"📁 输出目录：{output_dir.resolve()}")
 
-        tag_json_data = set_tag_main(
-            docx_path=args.docx,
-            configpath=args.config,
-        )
+        # 生成并保存
+        data = set_tag_main(docx_path=str(docx), configpath=config)
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
-        os.makedirs(os.path.dirname(json_abs_path), exist_ok=True)
-        with open(json_abs_path, "w", encoding="utf-8") as f:
-            json.dump(tag_json_data, f, ensure_ascii=False, indent=4)
-        logger.info("✅ JSON文件已生成完成！")
-        logger.info(f"📝 JSON路径：{json_abs_path}")
-        logger.info("💡 可使用该JSON文件配合 check-format/apply-format 模式执行操作")
+        logger.success(f"✅ JSON 已生成：{json_path.resolve()}")
+        logger.info(f"💡 可复制此路径用于 cf/af 命令")
 
-    elif args.mode == "check-format":
-        # 模式2：校验格式 → 直接读取用户指定的json_abs_path
-        logger.info("=" * 60)
-        logger.info("📌 执行模式：仅执行格式校验")
-        logger.info(f"📄 源Word文档：{docx_abs_path}")
-        logger.info(f"📋 JSON文件：{json_abs_path}")
-        logger.info(f"⚙️  配置文件：{args.config}")
-        logger.info(f"💾 输出目录：{args.output}")
-        logger.info("=" * 60)
-
+    elif args.mode == "cf":
+        logger.info("🔍 开始格式检查...")
         auto_format_thesis_document(
-            jsonpath=json_abs_path,
-            docxpath=args.docx,
-            configpath=args.config,
-            savepath=args.output,
-            check=True,
+            jsonpath=args.f,
+            docxpath=args.d,
+            configpath=args.c,
+            savepath=args.o,
+            check=True
         )
-        logger.info(f"✅ 格式校验完成！校验后文档已保存至：{args.output}")
+        logger.success(f"✅ 检查完成！报告保存在：{args.o}")
 
-    elif args.mode == "apply-format":
-        # 模式3：格式化 → 直接读取用户指定的json_abs_path
-        logger.info("=" * 60)
-        logger.info("📌 执行模式：仅执行格式应用/格式化")
-        logger.info(f"📄 源Word文档：{docx_abs_path}")
-        logger.info(f"📋 JSON文件：{json_abs_path}")
-        logger.info(f"⚙️  配置文件：{args.config}")
-        logger.info(f"💾 输出目录：{args.output}")
-        logger.info("=" * 60)
-
+    elif args.mode == "af":
+        logger.info("✏️ 开始自动格式化...")
         auto_format_thesis_document(
-            jsonpath=json_abs_path,
-            docxpath=args.docx,
-            configpath=args.config,
-            savepath=args.output,
-            check=False,
+            jsonpath=args.f,
+            docxpath=args.d,
+            configpath=args.c,
+            savepath=args.o,
+            check=False
         )
-        logger.info(f"✅ 格式化完成！格式化后文档已保存至：{args.output}")
+        logger.success(f"✅ 格式化完成！新文件保存在：{args.o}")
 
 
 if __name__ == "__main__":
