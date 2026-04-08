@@ -53,13 +53,13 @@ pyinstaller -D --noconfirm -n wordformat ^
   --paths "src" ^
   --add-data "src/wordformat/data;wordformat/data" ^
   --hidden-import=wordformat.api ^
+  --hidden-import=wordformat.data ^
   --hidden-import=fastapi ^
   --hidden-import=uvicorn ^
   --hidden-import=pydantic ^
   --hidden-import=zoneinfo ^
   --hidden-import=tokenizers ^
-  --exclude-module onnxruntime ^
-  start_api.py
+  src/wordformat/cli.py
 
 if errorlevel 1 (
     echo ❌ 打包失败！

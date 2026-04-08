@@ -1,5 +1,5 @@
 import json
-import multiprocessing as mp
+import os
 import time
 from typing import Dict, List, Optional
 
@@ -67,19 +67,14 @@ def _load_model():
 
     # 2. 优化ONNX推理器配置
     ort_options = ort.SessionOptions()
-    # 开启全量图优化（BERT模型提速关键）
     ort_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    # CPU多核推理（拉满所有核心）
-    cpu_core_num = mp.cpu_count()
+    cpu_core_num = os.cpu_count() or 4
     ort_options.intra_op_num_threads = cpu_core_num
     ort_options.inter_op_num_threads = cpu_core_num
-    # 关闭冗余日志
     ort_options.log_severity_level = 3
-    # 内存复用（大批次推理防OOM）
     ort_options.enable_cpu_mem_arena = True
     ort_options.enable_mem_pattern = True
     ort_options.enable_mem_reuse = True
-    # 设置推理超时
     ort_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
 
     # 3. 加载ONNX模型（自动适配硬件）

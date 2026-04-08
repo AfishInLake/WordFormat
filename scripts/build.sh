@@ -54,7 +54,7 @@ pyinstaller -D --noconfirm -n wordformat \
   --hidden-import=pydantic \
   --hidden-import=zoneinfo \
   --hidden-import=tokenizers \
-  start_api.py
+  src/wordformat/cli.py
 
 if [ $? -ne 0 ]; then
     echo "❌ 打包失败！"

@@ -1,11 +1,19 @@
-style_checks_warning: # 样式检查预警设置
-  bold: true # 是否预警
-  italic: true
-  underline: true
-  font_size: true
-  font_color: true
-  font_name: false
-
+style_checks_warning:
+  bold: false
+  italic: false
+  underline: false
+  font_size: false
+  font_name: true
+  font_color: false
+  alignment: false
+  space_before: false
+  space_after: false
+  line_spacing: false
+  line_spacingrule: false
+  left_indent: false
+  right_indent: false
+  first_line_indent: false
+  builtin_style_name: false
 
 # 全局页面格式（正文通用）
 global_format: &global_format
@@ -16,7 +24,7 @@ global_format: &global_format
   line_spacing: '1.5倍'
   left_indent: "0字符"
   right_indent: "0字符"
-  first_line_indent: '20磅'
+  first_line_indent: '2字符'
   builtin_style_name: '正文'
   chinese_font_name: '宋体'
   english_font_name: 'Times New Roman'

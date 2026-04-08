@@ -34,17 +34,21 @@ def main():
 wf gj    生成文档JSON结构（自动生成，无需指定json路径）
 wf cf    检查格式错误
 wf af    自动格式化论文
+wf startapi    启动API服务
 
 【一键示例】
 wf gj -d 论文.docx -c config.yaml -o output/
 wf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
 wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wf startapi -H 127.0.0.1 -p 8000
 
 参数：
 -d    Word 文档路径（必填）
 -c    YAML 配置文件（必填）
 -f    JSON 文件路径（仅 cf/af 需要）
 -o    输出目录（默认 output/）
+-H    API服务地址（默认 127.0.0.1）
+-p    API服务端口（默认 8000）
 ==================================================
 """)
         return
@@ -78,10 +82,20 @@ wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
     p_af.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件"), help="JSON文件路径")
     p_af.add_argument("-o", default="output/", help="输出目录")
 
+    # ------------------------------
+    # 4. startapi = 启动API服务
+    # ------------------------------
+    p_startapi = subparsers.add_parser("startapi", help="启动API服务")
+    p_startapi.add_argument("-H", "--host", default="127.0.0.1", help="API服务地址（默认127.0.0.1）")
+    p_startapi.add_argument("-p", "--port", type=int, default=8000, help="API服务端口（默认8000）")
+
     # 解析参数
     args = parser.parse_args()
-    output_dir = Path(args.o)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 只在需要输出目录的命令中创建目录
+    if args.mode in ["gj", "cf", "af"]:
+        output_dir = Path(args.o)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     # ==============================
     # 执行逻辑
@@ -127,6 +141,26 @@ wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
             check=False
         )
         logger.success(f"✅ 格式化完成！新文件保存在：{args.o}")
+
+    elif args.mode == "startapi":
+        logger.info(f"🚀 启动API服务...")
+        logger.info(f"🌐 服务地址：http://{args.host}:{args.port}")
+        logger.info(f"📖 API文档：http://{args.host}:{args.port}/docs")
+        logger.info(f"💡 按 Ctrl+C 停止服务")
+        
+        # 动态导入并启动API服务
+        from wordformat.api import app
+        import uvicorn
+        
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            log_config=None,
+            access_log=True,
+            reload=False,
+            use_colors=False,
+        )
 
 
 if __name__ == "__main__":

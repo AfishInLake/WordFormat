@@ -19,6 +19,9 @@ wf cf -d 论文.docx -c 配置.yaml -f 生成的文件.json
 
 # 自动格式化论文（一键修正格式）
 wf af -d 论文.docx -c 配置.yaml -f 生成的文件.json
+
+# 启动API服务（提供Web接口）
+wf startapi
 ```
 
 ---
@@ -30,12 +33,15 @@ wf af -d 论文.docx -c 配置.yaml -f 生成的文件.json
 - `gj`：generate-json → 生成文档结构 JSON
 - `cf`：check-format → 检查格式
 - `af`：apply-format → 自动格式化
+- `startapi`：启动API服务
 
 ### 通用参数
 - `-d`：**必填**，Word 文档路径
 - `-c`：**必填**，YAML 格式配置文件路径
 - `-f`：JSON 文件路径（**仅 cf/af 需要**）
 - `-o`：输出目录（可选，默认 `output/`）
+- `-H`：API服务地址（可选，默认 `127.0.0.1`，**仅 startapi**）
+- `-p`：API服务端口（可选，默认 `8000`，**仅 startapi**）
 
 ---
 
@@ -79,6 +85,23 @@ wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 
 ---
 
+## 4. 启动API服务
+启动Web API服务，提供HTTP接口调用
+
+```bash
+# 默认启动（127.0.0.1:8000）
+wf startapi
+
+# 自定义地址和端口
+wf startapi -H 0.0.0.0 -p 8080
+```
+
+启动后访问：
+- API文档：http://127.0.0.1:8000/docs
+- 服务地址：http://127.0.0.1:8000
+
+---
+
 ## 完整测试示例
 ```bash
 # 1. 生成 JSON（自动命名）
@@ -100,13 +123,16 @@ wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f 
 | `wf gj` | generate-json | 生成文档结构 JSON | `-d`,`-c` |
 | `wf cf` | check-format | 检查格式并添加批注 | `-d`,`-c`,`-f` |
 | `wf af` | apply-format | 自动格式化论文 | `-d`,`-c`,`-f` |
+| `wf startapi` | start-api | 启动API服务 | 无 |
 
 | 参数 | 作用 | 必填 |
 |------|------|------|
-| `-d` | Word 文档路径 | 是 |
-| `-c` | YAML 配置路径 | 是 |
-| `-f` | JSON 文件路径 | 仅 cf/af |
+| `-d` | Word 文档路径 | 是（gj/cf/af） |
+| `-c` | YAML 配置路径 | 是（gj/cf/af） |
+| `-f` | JSON 文件路径 | 是（cf/af） |
 | `-o` | 输出目录 | 否（默认 output） |
+| `-H` | API服务地址 | 否（默认 127.0.0.1） |
+| `-p` | API服务端口 | 否（默认 8000） |
 
 ---
 
@@ -150,14 +176,27 @@ auto_format_thesis_document(
 
 ---
 
-## API 调用（无变化）
+## API 调用
 
-### 启动服务
+### 启动服务（命令行方式 - 推荐）
 ```bash
+# 方式1：使用 wf 命令（推荐）
+wf startapi
+
+# 方式2：自定义地址和端口
+wf startapi -H 0.0.0.0 -p 8080
+```
+
+### 启动服务（开发模式）
+```bash
+# 方式1：使用 uvicorn
 uv venv
 source venv/bin/activate
 uv sync
 uv run start_api.py
+
+# 方式2：使用 make
+make server
 ```
 
 启动服务查看接口文档：http://127.0.0.1:8000/docs
