@@ -28,7 +28,7 @@
 - **跨平台兼容**：支持 Windows/macOS/Linux 系统，基于 python-docx 实现跨平台 Word 文档处理
 
 ## 视频教程
-<iframe src="//player.bilibili.com/player.html?isOutside=true&aid=116368045247169&bvid=BV1aiDjB8Edg&cid=37332781141&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
+[点击直达B站视频](https://www.bilibili.com/video/BV1aiDjB8Edg/?spm_id_from=333.1007.top_right_bar_window_history.content.click&vd_source=490c514f59611dc0b600c1da58948e14)
 
 ## 普通用户请看这里
 + 如果你是普通用户，请点击[WordFormatUI](https://github.com/AfishInLake/WordFormatUI/releases)下载带有GUI界面的安装包直接使用，并参考[安装指南](https://github.com/AfishInLake/WordFormatUI/blob/master/README.md)进行安装。
