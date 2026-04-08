@@ -79,19 +79,13 @@
 WordFormat 提供三种核心执行模式：
 
 1. **生成文档结构 JSON**
-   ```bash
-   wordformat -d your_document.docx -jf your_document.json generate-json -c example/undergrad_thesis.yaml
-   ```
 
 2. **执行格式校验**
-   ```bash
-   wordformat -d your_document.docx -jf output/your_document.json check-format -c example/undergrad_thesis.yaml
-   ```
 
 3. **执行格式格式化**
-   ```bash
-   wordformat -d your_document.docx -jf output/your_document.json apply-format -c example/undergrad_thesis.yaml
-   ```
+
+具体请看
+- [使用指南](docs/usage.md)
 
 ## 详细文档
 

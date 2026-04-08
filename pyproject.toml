@@ -101,6 +101,8 @@ wordformat = ["data/*"]
 
 [project.scripts]
 wordformat = "wordformat.cli:main"
+wf = "wordformat.cli:main"
+
 
 [project.optional-dependencies]
 test = [
