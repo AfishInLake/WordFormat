@@ -8,10 +8,27 @@ import os
 import sys
 import time
 from pathlib import Path
+
+# 禁用 multiprocessing 的 resource_tracker
+os.environ['MULTIPROCESSING_RESOURCE_TRACKER'] = '0'
+
+# 检查是否是 multiprocessing 的子进程（resource_tracker 或 forkserver）
+# 如果是，直接退出，避免执行主程序代码
+if len(sys.argv) >= 2 and sys.argv[-2] == '-c' and (
+    sys.argv[-1].startswith('from multiprocessing.resource_tracker import main') or
+    sys.argv[-1].startswith('from multiprocessing.forkserver import main')
+):
+    # 让 PyInstaller 的 runtime hook 处理这些进程
+    sys.exit(0)
+
 from loguru import logger
 
+from wordformat.log_config import setup_logger
 from wordformat.set_style import auto_format_thesis_document
 from wordformat.set_tag import set_tag_main
+
+# 初始化日志
+setup_logger()
 
 
 def validate_file(path: str, name: str) -> str:

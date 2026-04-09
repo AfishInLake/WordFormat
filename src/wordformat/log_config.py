@@ -1,64 +1,83 @@
 #! /usr/bin/env python
-# @Time    : 2026/2/6 17:17
+# @Time    : 2026/4/8
 # @Author  : afish
 # @File    : log_config.py
-# log_config.py
-import logging  # 新增：导入原生 logging
-import os
 import sys
-
+from pathlib import Path
 from loguru import logger
 
 
-# 修复 PyInstaller -w 模式下 sys.stdout/sys.stderr 为空的问题
-def fix_std_streams():
-    if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w", encoding="utf-8")
-    if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w", encoding="utf-8")
-
-
-# 修正：继承 logging.Handler，补全 level 属性
-class InterceptHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET):  # 显式初始化 level
-        super().__init__(level)
-
-    def emit(self, record):
-        # 获取 Loguru 对应的日志级别
-        try:
-            level = logger.level(record.levelname).name
-        except ValueError:
-            level = record.levelno
-
-        # 找到调用者信息
-        frame, depth = sys._getframe(6), 6
-        while frame and frame.f_code.co_filename == logging.__file__:
-            frame = frame.f_back
-            depth += 1
-
-        # 输出到 Loguru
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
+def setup_logger():
+    """配置日志"""
+    # 确定基础目录
+    if getattr(sys, "frozen", False):
+        BASE_DIR = Path(sys.executable).parent
+    else:
+        BASE_DIR = Path(__file__).parent.parent.parent
+    
+    LOG_FILE = BASE_DIR / "api.log"
+    
+    # 移除默认输出
+    logger.remove()
+    
+    # 添加文件输出
+    logger.add(
+        LOG_FILE,  # 日志文件
+        rotation="500 MB",  # 按大小分割
+        retention="7 days",  # 保留7天
+        encoding="utf-8",
+        enqueue=True,  # 异步写入
+        backtrace=True,  # 显示完整堆栈
+        diagnose=True,  # 显示变量信息
+    )
+    
+    # 添加控制台输出（非 -w 模式）
+    if not sys.stdout.closed:
+        logger.add(
+            sys.stdout,
+            colorize=True,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
         )
 
 
-# 彻底替换 Uvicorn 的日志配置
 def setup_uvicorn_loguru():
-    # 修复标准输出
-    fix_std_streams()
-
-    # 移除 Uvicorn 所有原生 handler
-    for name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
-        uvicorn_logger = logging.getLogger(name)
-        uvicorn_logger.handlers = []
-        uvicorn_logger.propagate = False
-        uvicorn_logger.setLevel(logging.INFO)  # 显式设置级别
-
-    # 给 Uvicorn 绑定 Loguru 的 InterceptHandler
-    intercept_handler = InterceptHandler()
-    logging.getLogger("uvicorn").addHandler(intercept_handler)
-    logging.getLogger("uvicorn.error").addHandler(intercept_handler)
-    logging.getLogger("uvicorn.access").addHandler(intercept_handler)
-
-    # 禁用 Uvicorn 颜色输出
-    os.environ["UVICORN_NO_COLOR"] = "1"
+    """修复 Uvicorn 日志，使其使用 Loguru"""
+    import logging
+    import uvicorn
+    
+    # 禁用 Uvicorn 的默认日志
+    for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+        uvicorn_logger = logging.getLogger(logger_name)
+        uvicorn_logger.disabled = True
+    
+    # 配置 Uvicorn 使用 Loguru
+    uvicorn.config.LOGGING_CONFIG = {
+        "version": 1,
+        "disable_existing_loggers": True,
+        "formatters": {
+            "default": {
+                "()": "uvicorn.logging.DefaultFormatter",
+                "fmt": "%(levelprefix)s %(message)s",
+                "use_colors": None,
+            },
+            "access": {
+                "()": "uvicorn.logging.AccessFormatter",
+                "fmt": '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            },
+        },
+        "handlers": {
+            "default": {
+                "formatter": "default",
+                "class": "logging.NullHandler",
+            },
+            "access": {
+                "formatter": "access",
+                "class": "logging.NullHandler",
+            },
+        },
+        "loggers": {
+            "uvicorn": {"handlers": ["default"], "level": "INFO"},
+            "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
+            "uvicorn.access": {"handlers": ["access"], "level": "INFO"},
+        },
+    }
