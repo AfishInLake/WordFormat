@@ -12,7 +12,6 @@ on:
       - 'CHANGELOG.md'
       - '.gitignore'
       - '.github/**/*.md'
-      - '**.yml'
   pull_request:
     branches: [ "**" ]
     paths-ignore:
@@ -23,7 +22,6 @@ on:
       - 'CHANGELOG.md'
       - '.gitignore'
       - '.github/**/*.md'
-      - '**.yml'
 
 
 jobs:
@@ -86,7 +84,7 @@ jobs:
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e .
+        run: uv pip install --system -e ".[test]"
 
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
@@ -180,7 +178,7 @@ jobs:
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e .
+        run: uv pip install --system -e ".[test]"
 
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
