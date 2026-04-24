@@ -240,6 +240,8 @@ class CharacterStyle:
         Returns:
 
         """
+        if style_checks_warning is None:
+            return "\n".join([str(i) for i in value])
         t = []
         for diff in value:
             if style_checks_warning.bold and diff.diff_type == "bold":
@@ -472,6 +474,8 @@ class ParagraphStyle:
 
     @staticmethod
     def to_string(value: list[DIFFResult]) -> str:
+        if style_checks_warning is None:
+            return "\n".join([str(i) for i in value])
         t = []
         attr = [
             "alignment",

@@ -57,8 +57,8 @@ class DocxBase:
             for _j, (text, para_obj, pred) in enumerate(
                     zip(batch_texts, batch_paras, batch_results, strict=False)
             ):
-                tag = pred["预测标签"]
-                score = pred["预测概率"]
+                tag = pred["label"]
+                score = pred["score"]
 
                 response = {
                     "category": tag,

@@ -257,7 +257,7 @@ class TestONNXInfer:
         results = onnx_batch_infer(texts)
         assert isinstance(results, list)
         assert len(results) == 2
-        assert all(["原始文本" in result for result in results])
+        assert all(["text" in result for result in results])
     
     @mock.patch('wordformat.agent.onnx_infer.onnx_batch_infer')
     def test_safe_batch_infer(self, mock_onnx_batch_infer):

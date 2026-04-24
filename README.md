@@ -103,7 +103,7 @@ WordFormat 提供三种核心执行模式：
 
 ## 许可证
 
-[MIT License](LICENSE) - 允许自由使用、修改和分发，需保留原作者声明。
+[Apache License 2.0](LICENSE) - 允许自由使用、修改和分发，需保留原作者声明。
 
 ## 联系方式
 

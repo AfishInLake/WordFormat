@@ -12,7 +12,6 @@ on:
       - 'CHANGELOG.md'
       - '.gitignore'
       - '.github/**/*.md'
-      - '**.yml'
   pull_request:
     branches: [ "**" ]
     paths-ignore:
@@ -23,7 +22,6 @@ on:
       - 'CHANGELOG.md'
       - '.gitignore'
       - '.github/**/*.md'
-      - '**.yml'
 
 
 jobs:
@@ -50,7 +48,6 @@ jobs:
           key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
           enableCrossOsArchive: true
         env:
-          # 设置模型版本号，模型更新时需修改此值
           MODEL_VERSION: "modelv1.0"
 
       - name: Set up Python 3.11
@@ -86,7 +83,7 @@ jobs:
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e .
+        run: uv pip install --system -e ".[dev]"
 
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
@@ -122,7 +119,7 @@ jobs:
 
   # =============== Job 2: 合并到 master 后发布正式版 ===============
   release:
-    needs: test-and-build  # 必须等 test-and-build 成功
+    needs: test-and-build
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ${{ matrix.os }}
     permissions:
@@ -144,7 +141,6 @@ jobs:
           key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
           enableCrossOsArchive: true
         env:
-          # 设置模型版本号，模型更新时需修改此值
           MODEL_VERSION: "modelv1.0"
 
       - name: Set up Python 3.11
@@ -180,7 +176,7 @@ jobs:
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e .
+        run: uv pip install --system -e ".[dev]"
 
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
