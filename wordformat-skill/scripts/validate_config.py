@@ -78,6 +78,10 @@ REF_CONTENT_FIELDS = GLOBAL_FORMAT_FIELDS | {
 # acknowledgements.title / content 合法字段
 ACK_FIELDS = GLOBAL_FORMAT_FIELDS
 
+# numbering 合法字段
+NUMBERING_FIELDS = {"enabled", "level_1", "level_2", "level_3"}
+NUMBERING_LEVEL_FIELDS = {"enabled", "template", "strip_pattern"}
+
 # 值范围校验
 ALIGNMENT_VALUES = {"左对齐", "居中对齐", "右对齐", "两端对齐", "分散对齐"}
 LINE_SPACINGRULE_VALUES = {"单倍行距", "1.5倍行距", "2倍行距", "最小值", "固定值", "多倍行距"}
@@ -120,7 +124,8 @@ def validate_config(config: dict) -> list[str]:
     missing = required_top_keys - actual_top_keys
     if missing:
         errors.append(f"  缺少顶层节点: {missing}")
-    extra = actual_top_keys - required_top_keys
+    # numbering 是可选的，不检查缺失
+    extra = actual_top_keys - required_top_keys - {"numbering"}
     if extra:
         errors.append(f"  非法顶层节点: {extra}")
 
@@ -179,6 +184,15 @@ def validate_config(config: dict) -> list[str]:
             for section in ["title", "content"]:
                 if section in ack:
                     errors.extend(check_fields(ack[section], ACK_FIELDS, f"acknowledgements.{section}"))
+
+    # 11. numbering（可选）
+    if "numbering" in config:
+        num = config["numbering"]
+        if isinstance(num, dict):
+            errors.extend(check_fields(num, NUMBERING_FIELDS, "numbering"))
+            for level in ["level_1", "level_2", "level_3"]:
+                if level in num and isinstance(num[level], dict):
+                    errors.extend(check_fields(num[level], NUMBERING_LEVEL_FIELDS, f"numbering.{level}"))
 
     return errors
 

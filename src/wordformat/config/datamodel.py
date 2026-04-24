@@ -256,6 +256,51 @@ class AcknowledgementsConfig(BaseModel):
     )
 
 
+# -------------------------- 编号配置模型 --------------------------
+class NumberingLevelConfig(BaseModel):
+    """单级标题编号配置"""
+
+    enabled: bool = Field(default=False, description="是否启用该级别自动编号")
+    # 编号模板，%1=本级序号，%2=上级序号，%3=上上级序号
+    # 例如："第%1章"、"%1.%2"、"%1.%2.%3"、"%1)"
+    template: Optional[str] = Field(default=None, description="编号模板")
+    # 清除手动编号的正则表达式，仅作用于该级别标题段落的开头
+    # 例如："^第[一二三四五六七八九十百千零]+章\\s*"
+    strip_pattern: Optional[str] = Field(
+        default=None, description="清除手动编号的正则表达式"
+    )
+
+
+class NumberingConfig(BaseModel):
+    """标题自动编号配置"""
+
+    enabled: bool = Field(default=False, description="是否启用自动编号功能")
+    level_1: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=False,
+            template="第%1章",
+            strip_pattern="^第[一二三四五六七八九十百千零]+章\\s*",
+        ),
+        description="一级标题编号配置",
+    )
+    level_2: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=False,
+            template="%1.%2",
+            strip_pattern="^\\d+(\\.\\d+)\\s+",
+        ),
+        description="二级标题编号配置",
+    )
+    level_3: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=False,
+            template="%1.%2.%3",
+            strip_pattern="^\\d+(\\.\\d+){2}\\s+",
+        ),
+        description="三级标题编号配置",
+    )
+
+
 # -------------------------- 根配置模型 --------------------------
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
@@ -285,4 +330,7 @@ class NodeConfigRoot(BaseModel):
     acknowledgements: AcknowledgementsConfig = Field(
         default_factory=AcknowledgementsConfig,
         description="致谢总配置",
+    )
+    numbering: NumberingConfig = Field(
+        default_factory=NumberingConfig, description="标题自动编号配置"
     )

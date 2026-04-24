@@ -187,3 +187,19 @@ acknowledgements:
     <<: *global_format
     alignment: '两端对齐'
     first_line_indent: '2字符'
+
+# 标题自动编号（默认关闭，按需启用）
+numbering:
+  enabled: false
+  level_1:
+    enabled: false
+    template: '第%1章'
+    strip_pattern: '^第[一二三四五六七八九十百千零]+章\s*'
+  level_2:
+    enabled: false
+    template: '%1.%2'
+    strip_pattern: '^\d+(\.\d+)\s+'
+  level_3:
+    enabled: false
+    template: '%1.%2.%3'
+    strip_pattern: '^\d+(\.\d+){2}\s+'

@@ -8,7 +8,7 @@ from loguru import logger
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
 # from wordformat.config.config import get_config, init_config
 from wordformat.settings import BATCH_SIZE
-from wordformat.utils import get_paragraph_xml_fingerprint
+from wordformat.utils import get_paragraph_xml_fingerprint, get_paragraph_numbering_text
 from docx import Document
 
 
@@ -38,7 +38,13 @@ class DocxBase:
         for para in self.document.paragraphs:
             text = para.text.strip()
             if text:
-                paragraphs.append(para.text)
+                # 拼接自动编号文字（para.text 不包含编号）
+                numbering_text = get_paragraph_numbering_text(para)
+                if numbering_text:
+                    full_text = f"{numbering_text} {text}"
+                else:
+                    full_text = para.text
+                paragraphs.append(full_text)
                 paragraph_objects.append(para)
 
         # 按批次BATCH_SIZE进行批量推理
