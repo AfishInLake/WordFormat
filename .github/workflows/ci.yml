@@ -94,6 +94,10 @@ jobs:
         run: make tests
 
       # === 仅在 PR 时构建可执行文件（供审查）===
+      - name: Install build dependencies (PR only)
+        if: github.event_name == 'pull_request'
+        run: uv pip install --system pyinstaller
+
       - name: Build executable (PR only)
         if: github.event_name == 'pull_request'
         run: make build
@@ -183,6 +187,9 @@ jobs:
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
         run: python scripts/download_model.py
+
+      - name: Install build dependencies
+        run: uv pip install --system pyinstaller
 
       - name: Build executable (for release)
         run: make build
