@@ -84,7 +84,7 @@ jobs:
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e ".[test]"
+        run: uv pip install --system -e ".[test,api]"
 
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
@@ -178,7 +178,7 @@ jobs:
             xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
-        run: uv pip install --system -e ".[test]"
+        run: uv pip install --system -e ".[test,api]"
 
       - name: Download Model (if not cached)
         if: steps.cache-model.outputs.cache-hit != 'true'
