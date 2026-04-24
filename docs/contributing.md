@@ -86,8 +86,9 @@
 
 4. **安装依赖**
    ```bash
-   make install
-   # 或
+   # 安装完整开发环境（包含测试、构建、API 等所有依赖）
+   uv pip install -e ".[dev]"
+   # 或仅安装核心依赖
    pip install -e .
    ```
 
@@ -116,7 +117,7 @@
 4. **检查代码质量**
    ```bash
    # 检查代码风格
-   flake8
+   ruff check src/
    # 检查类型注解
    mypy src/
    ```
