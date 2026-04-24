@@ -21,12 +21,13 @@ def setup_logger():
     logger.remove()
     
     # 添加文件输出
+    # 注意：不使用 enqueue=True，因为在沙箱环境中 multiprocessing.SimpleQueue()
+    # 会因缺少 /dev/shm 而失败（FileNotFoundError）
     logger.add(
         LOG_FILE,  # 日志文件
         rotation="500 MB",  # 按大小分割
         retention="7 days",  # 保留7天
         encoding="utf-8",
-        enqueue=True,  # 异步写入
         backtrace=True,  # 显示完整堆栈
         diagnose=True,  # 显示变量信息
     )

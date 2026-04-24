@@ -202,48 +202,48 @@ class _SetLineSpacing:
     """
 
     @staticmethod
-    def set_pt(paragraph: Paragraph, target_value: float):
+    def set_pt(paragraph: Paragraph, value: float):
         """
         使用 PT/磅 为单位设置行距
         Args:
             paragraph: 段落对象
-            target_value: PT/磅数值
+            value: PT/磅数值
         """
         paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-        paragraph.paragraph_format.line_spacing = Pt(target_value)
+        paragraph.paragraph_format.line_spacing = Pt(value)
 
     @staticmethod
-    def set_cm(paragraph: Paragraph, target_value: float):
+    def set_cm(paragraph: Paragraph, value: float):
         """
         使用 厘米(cm/CM) 为单位设置行距
         Args:
             paragraph: 段落对象
-            target_value: 厘米数值
+            value: 厘米数值
         """
         paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-        paragraph.paragraph_format.line_spacing = Cm(target_value)
+        paragraph.paragraph_format.line_spacing = Cm(value)
 
     @staticmethod
-    def set_inch(paragraph: Paragraph, target_value: float):
+    def set_inch(paragraph: Paragraph, value: float):
         """
         使用 英寸(inch/Inches) 为单位设置行距
         Args:
             paragraph: 段落对象
-            target_value: 英寸数值
+            value: 英寸数值
         """
         paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-        paragraph.paragraph_format.line_spacing = Inches(target_value)
+        paragraph.paragraph_format.line_spacing = Inches(value)
 
     @staticmethod
-    def set_mm(paragraph: Paragraph, target_value: float):
+    def set_mm(paragraph: Paragraph, value: float):
         """
         使用 毫米(mm/MM) 为单位设置行距
         Args:
             paragraph: 段落对象
-            target_value: 毫米数值
+            value: 毫米数值
         """
         paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-        paragraph.paragraph_format.line_spacing = Mm(target_value)
+        paragraph.paragraph_format.line_spacing = Mm(value)
 
 
 class _SetIndent:

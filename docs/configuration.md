@@ -256,7 +256,7 @@ acknowledgements:
 |-------|------|--------|
 | chinese_font_name | 中文字体 | 宋体、黑体、楷体、仿宋、微软雅黑、汉仪小标宋 |
 | english_font_name | 英文字体 | Times New Roman、Arial、Calibri、Courier New、Helvetica |
-| font_size | 字号 | 一号~七号、小四、小五、数值（12、14等） |
+| font_size | 字号 | 一号、小一、二号、小二、三号、小三、四号、小四、五号、小五、六号、七号，或数值（如 12、14） |
 | font_color | 字体颜色 | 黑色、红色、十六进制色值 |
 | bold | 是否加粗 | true/false |
 | italic | 是否斜体 | true/false |
@@ -281,7 +281,7 @@ acknowledgements:
 |-------|------|------|
 | section_title | 章节标题 | 参考文献 |
 | entry_indent | 条目缩进 | 0.0、0.5 |
-| entry_ending_punct | 条目结尾标点 | . 、空 |
+| entry_ending_punct | 条目结尾标点（null 表示不限制） | . 、null |
 | numbering_format | 编号格式 | [1]、1. |
 
 ## 配置继承机制
