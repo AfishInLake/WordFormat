@@ -30,15 +30,17 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
     def load_config(self, root_config: dict | NodeConfigRoot):
         """重载加载配置，自动匹配对应语言的关键词配置"""
         if isinstance(root_config, dict):
-            # 从字典中提取对应语言的配置
-            self.__config = (
+            # 从字典中提取对应语言的配置，通过父类方法设置 __config
+            lang_config = (
                 root_config.get("abstract", {}).get("keywords", {}).get(self.LANG, {})
             )
+            # 直接设置父类的 __config（避免名称修饰问题）
+            self._TreeNode__config = lang_config
             self._pydantic_config = self.CONFIG_MODEL(**self.config)
         elif isinstance(root_config, NodeConfigRoot):
             # 从Pydantic模型提取对应语言的配置
             self._pydantic_config = self._get_lang_config(root_config)
-            self.__config = self._pydantic_config.model_dump()
+            self._TreeNode__config = self._pydantic_config.model_dump()
         else:
             raise TypeError(
                 f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"

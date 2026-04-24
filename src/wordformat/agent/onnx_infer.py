@@ -203,7 +203,7 @@ def onnx_batch_infer(texts: list[str]) -> list[dict]:
         logger.error(f"批量推理失败：{e}")
         # 兜底：返回空结果，避免整体崩溃
         return [
-            {"原始文本": text, "预测标签": "", "预测ID": -1, "预测概率": 0.0}
+            {"text": text, "label": "", "pred_id": -1, "score": 0.0}
             for text in texts
         ]
 
@@ -223,10 +223,10 @@ def onnx_batch_infer(texts: list[str]) -> list[dict]:
         pred_id = pred_ids[idx]
         results.append(
             {
-                "原始文本": text,
-                "预测标签": _id2label.get(pred_id, ""),
-                "预测ID": pred_id,
-                "预测概率": float(pred_probs[idx]),
+                "text": text,
+                "label": _id2label.get(pred_id, ""),
+                "pred_id": pred_id,
+                "score": float(pred_probs[idx]),
             }
         )
 

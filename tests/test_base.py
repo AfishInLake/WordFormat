@@ -73,7 +73,7 @@ def test_docx_base_parse_with_low_confidence(mock_onnx_batch_infer):
 
     try:
         # 模拟低置信度的推理结果
-        mock_onnx_batch_infer.return_value = [{"预测标签": "test", "预测概率": 0.5}]
+        mock_onnx_batch_infer.return_value = [{"label": "test", "score": 0.5}]
 
         # 使用示例配置文件
         config_path = "example/undergrad_thesis.yaml"
@@ -107,8 +107,8 @@ def test_docx_base_parse_with_heading_fulu(mock_onnx_batch_infer):
     try:
         # 模拟包含heading_fulu的推理结果
         mock_onnx_batch_infer.return_value = [
-            {"预测标签": "heading_fulu", "预测概率": 0.9},
-            {"预测标签": "body_text", "预测概率": 0.9}
+            {"label": "heading_fulu", "score": 0.9},
+            {"label": "body_text", "score": 0.9}
         ]
 
         # 使用示例配置文件
@@ -144,7 +144,7 @@ def test_docx_base_parse_with_batch_error(mock_onnx_single_infer, mock_onnx_batc
         # 模拟批量推理失败
         mock_onnx_batch_infer.side_effect = Exception("Batch inference error")
         # 模拟单条推理成功，返回与批量推理一致的格式
-        mock_onnx_single_infer.return_value = {"预测标签": "body_text", "预测概率": 0.9}
+        mock_onnx_single_infer.return_value = {"label": "body_text", "score": 0.9}
 
         # 使用示例配置文件
         config_path = "example/undergrad_thesis.yaml"

@@ -3,29 +3,45 @@ name = "wordformat"
 version = "0.1.0"
 description = "论文格式自动化处理工具"
 readme = "README.md"
-requires-python = ">=3.11"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    {name = "afish", email = "1593699665@qq.com"},
+]
+keywords = ["word", "docx", "thesis", "format", "论文", "格式", "校验", "自动化"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "fastapi>=0.128.1",
     "loguru>=0.7.3",
-    "numpy>=2.4.2",
-    "onnxruntime>=1.24.1",
-    "pre-commit>=4.5.1",
+    "numpy>=1.24.0",
+    "onnxruntime>=1.17.0",
     "pydantic>=2.12.5",
-    "pyinstaller>=6.18.0",
-    "pytest>=9.0.2",
-    "pytest-asyncio>=1.3.0",
-    "pytest-cov>=7.0.0",
     "python-docx>=1.2.0",
     "python-dotenv>=1.2.1",
-    "python-multipart>=0.0.22",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
-    "ruff>=0.14.14",
     "tenacity>=9.1.2",
     "tokenizers>=0.22.2",
-    "uvicorn>=0.40.0",
     "webcolors>=25.10.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/AfishInLake/WordFormat"
+Repository = "https://github.com/AfishInLake/WordFormat"
+"Bug Tracker" = "https://github.com/AfishInLake/WordFormat/issues"
+
 [tool.ruff.lint]
 select = [
     "E", # pycodestyle errors
@@ -97,7 +113,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-wordformat = ["data/*"]
+wordformat = ["data/**/*"]
 
 [project.scripts]
 wordformat = "wordformat.cli:main"
@@ -105,8 +121,19 @@ wf = "wordformat.cli:main"
 
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.128.1",
+    "uvicorn>=0.40.0",
+    "python-multipart>=0.0.22",
+]
 test = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
+]
+dev = [
+    "wordformat[test,api]",
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.14",
+    "pyinstaller>=6.18.0",
 ]
