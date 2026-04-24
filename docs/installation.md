@@ -4,24 +4,44 @@
 
 ## 环境要求
 
-- **Python 3.11+**（推荐 3.11 及以上版本）
+- **Python 3.10+**（推荐 3.11 及以上版本）
 - **依赖管理工具**：uv（推荐）或 pip
 
-## 安装步骤
+## 安装方式
 
-### 1. 克隆项目
+### 方式一：从 PyPI 安装（推荐普通用户）
+
+```bash
+# 使用 pip
+pip install wordformat
+
+# 使用 uv
+uv pip install wordformat
+```
+
+安装完成后即可使用 `wf` 和 `wordformat` 命令。
+
+如需 API 服务功能，安装 api 可选依赖：
+
+```bash
+pip install wordformat[api]
+```
+
+### 方式二：从源码安装（推荐开发者）
+
+1. **克隆项目**
 
 ```bash
 git clone https://github.com/AfishInLake/WordFormat.git
 cd WordFormat
 ```
 
-### 2. 安装依赖
+2. **安装依赖**
 
 使用 uv（推荐）：
 
 ```bash
-make install
+uv pip install -e .
 ```
 
 或使用 pip：
@@ -30,28 +50,10 @@ make install
 pip install -e .
 ```
 
-### 3. 配置环境变量
-
-创建 `.env` 文件，配置 HOST、PORT 等必要参数：
-
-```env
-HOST="127.0.0.1"
-# 配置服务端口
-PORT="8000"
-```
-
-### 4. 启动API服务
+如需完整开发环境（测试、构建、API 等）：
 
 ```bash
-# 在虚拟环境下运行
-make server
-```
-
-### 5. 构建.exe程序
-
-```bash
-# 在虚拟环境下运行
-make build
+uv pip install -e ".[dev]"
 ```
 
 ## 验证安装
@@ -60,15 +62,25 @@ make build
 
 ```bash
 wordformat --help
+# 或
+wf --help
 ```
 
 如果输出了命令行帮助信息，则说明安装成功。
+
+## 可选依赖说明
+
+| 依赖组 | 安装命令 | 包含内容 |
+|--------|----------|----------|
+| `api` | `pip install wordformat[api]` | FastAPI、uvicorn（API 服务） |
+| `test` | `pip install wordformat[test]` | pytest（测试框架） |
+| `dev` | `pip install wordformat[dev]` | 以上全部 + ruff、pre-commit、pyinstaller |
 
 ## 故障排查
 
 ### 依赖安装失败
 
-- 确保 Python 版本为 3.11+
+- 确保 Python 版本为 3.10+
 - 尝试更新 pip 到最新版本：`pip install --upgrade pip`
 - 检查网络连接，确保能够访问 PyPI
 
@@ -80,5 +92,5 @@ wordformat --help
 
 ### API 服务启动失败
 
-- 检查 `.env` 文件中的配置是否正确
-- 确保端口未被其他服务占用
+- 确保已安装 api 可选依赖：`pip install wordformat[api]`
+- 检查端口未被其他服务占用

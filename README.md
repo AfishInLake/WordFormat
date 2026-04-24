@@ -1,10 +1,10 @@
-# WordFormat 项目（目前项目还在快速迭代中）
+# WordFormat
 
 > 论文格式自动化处理工具
 
 ![License](https://img.shields.io/github/license/AfishInLake/WordFormat?color=blue)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Status](https://img.shields.io/badge/status-开发中-orange)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![PyPI](https://img.shields.io/pypi/v/wordformat?color=blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 ## 项目简介
@@ -37,7 +37,7 @@
 ## 快速开始
 
 ### 环境要求
-- Python 3.11+（推荐 3.11 及以上版本）
+- Python 3.10+（推荐 3.11 及以上版本）
 - 依赖管理工具：uv（推荐）或 pip
 
 ### 安装步骤
