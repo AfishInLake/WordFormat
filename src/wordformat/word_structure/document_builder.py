@@ -35,4 +35,5 @@ class DocumentBuilder:
         check_duplicate_fingerprints(paragraphs)  # 检查重复的指纹
         DocumentTreeBuilder.CONFIG = config
         builder = DocumentTreeBuilder()
+        builder._config = config
         return builder.build_tree(paragraphs)

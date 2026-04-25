@@ -201,11 +201,14 @@ def onnx_batch_infer(texts: list[str]) -> list[dict]:
         )
     except Exception as e:
         logger.error(f"批量推理失败：{e}")
-        # 兜底：返回空结果，避免整体崩溃
-        return [
-            {"text": text, "label": "", "pred_id": -1, "score": 0.0}
-            for text in texts
-        ]
+        # 兜底：逐条降级推理，保持返回格式一致
+        results = []
+        for text in texts:
+            try:
+                results.append(onnx_single_infer(text))
+            except Exception:
+                results.append({"label": "", "score": 0.0})
+        return results
 
     # ===== 向量化计算概率（替代循环）=====
     # 数值稳定化（避免exp溢出）

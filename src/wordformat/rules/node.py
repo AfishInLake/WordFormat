@@ -60,6 +60,7 @@ class TreeNode:
             self.__config = {}
 
     def __set_fingerprint(self):
+        self.fingerprint = None  # 初始化为 None
         if self.value and isinstance(self.value, dict):
             if self.value.get("category") == "top":
                 return

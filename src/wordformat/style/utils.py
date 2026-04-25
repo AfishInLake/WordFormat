@@ -33,7 +33,7 @@ class UnitResult:
         # 非合法格式 或 非国际标准单位 → 返回None
         if not self.is_valid or self.value is None or self.standard_unit is None:
             return None
-        if self.standard_unit in ["行", "字符"]:
+        if self.standard_unit in ["行", "字符", "hang"]:
             return None
 
         # EMU换算规则（1英寸=914400 EMU）

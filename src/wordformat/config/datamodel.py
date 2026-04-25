@@ -5,7 +5,7 @@
 
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型
@@ -39,6 +39,15 @@ FontSizeType = Union[
     float,
     int,
 ]
+
+
+@field_validator("font_size")
+@classmethod
+def validate_font_size(cls, v):
+    """验证字号为正数"""
+    if isinstance(v, (int, float)) and v <= 0:
+        raise ValueError(f"字号 {v} 必须大于0")
+    return v
 
 
 # -------------------------- 预警字段配置模型 --------------------------
@@ -89,6 +98,14 @@ class GlobalFormatConfig(BaseModel):
         default="小四", description="字号"
     )  # 修正类型和默认值
     font_color: str = Field(default="黑色", description="字体颜色")
+
+    @field_validator("font_color")
+    @classmethod
+    def validate_font_color(cls, v):
+        """验证字体颜色为合法值"""
+        if not v or not isinstance(v, str):
+            raise ValueError(f"字体颜色不能为空")
+        return v
     bold: bool = Field(default=False, description="加粗")
     italic: bool = Field(default=False, description="斜体")
     underline: bool = Field(default=False, description="下划线")
@@ -105,11 +122,21 @@ class KeywordsConfig(GlobalFormatConfig):
     trailing_punct_forbidden: bool = Field(default=True, description="禁止最后有标点")
 
     @field_validator("count_min", "count_max")
-    def validate_keyword_count(cls, v):
+    @classmethod
+    def validate_keyword_count(cls, v, info):
         """验证关键词数量为正整数"""
         if v <= 0:
             raise ValueError(f"关键词数量 {v} 必须大于0")
         return v
+
+    @model_validator(mode="after")
+    def validate_count_range(self) -> "KeywordsConfig":
+        """验证 count_min <= count_max"""
+        if self.count_min > self.count_max:
+            raise ValueError(
+                f"count_min({self.count_min}) 不能大于 count_max({self.count_max})"
+            )
+        return self
 
 
 class AbstractTitleConfig(GlobalFormatConfig):

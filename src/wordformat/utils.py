@@ -119,7 +119,11 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
     numbering_elm = numbering_part._element
 
     # 查找 num -> abstractNum -> lvl -> lvlText
-    num_elem = numbering_elm.find(qn(f"w:num[@w:numId='{num_id}']"))
+    num_elem = None
+    for el in numbering_elm.findall(qn("w:num")):
+        if el.get(qn("w:numId")) == num_id:
+            num_elem = el
+            break
     if num_elem is None:
         return ""
 
@@ -129,13 +133,19 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
 
     abstract_num_id = abstract_num_id_ref.get(qn("w:val"))
 
-    abstract_num = numbering_elm.find(
-        qn(f"w:abstractNum[@w:abstractNumId='{abstract_num_id}']")
-    )
+    abstract_num = None
+    for el in numbering_elm.findall(qn("w:abstractNum")):
+        if el.get(qn("w:abstractNumId")) == abstract_num_id:
+            abstract_num = el
+            break
     if abstract_num is None:
         return ""
 
-    lvl = abstract_num.find(qn(f"w:lvl[@w:ilvl='{ilvl}']"))
+    lvl = None
+    for el in abstract_num.findall(qn("w:lvl")):
+        if el.get(qn("w:ilvl")) == str(ilvl):
+            lvl = el
+            break
     if lvl is None:
         return ""
 
@@ -188,7 +198,7 @@ def _count_numbering_levels(numbering_elm, abstract_num_id: str, target_paragrap
         return counters
 
     # 遍历文档 body 中的所有段落
-    body = target_paragraph.part._element.getparent()  # body element
+    body = target_paragraph._element.getparent()  # body element
     if body is None:
         return counters
 
@@ -251,7 +261,11 @@ def _format_number(num: int, num_fmt: str) -> str:
 
 def _get_level_fmt(abstract_num, ilvl: int) -> str:
     """获取指定级别的 numFmt"""
-    lvl = abstract_num.find(qn(f"w:lvl[@w:ilvl='{ilvl}']"))
+    lvl = None
+    for el in abstract_num.findall(qn("w:lvl")):
+        if el.get(qn("w:ilvl")) == str(ilvl):
+            lvl = el
+            break
     if lvl is not None:
         num_fmt_elem = lvl.find(qn("w:numFmt"))
         if num_fmt_elem is not None:
@@ -291,6 +305,8 @@ def _to_chinese_num(num: int) -> str:
         if ones > 0:
             result += digits[ones]
         return result
+    if num == 100:
+        return "一百"
     return str(num)
 
 

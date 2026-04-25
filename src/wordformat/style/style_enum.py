@@ -483,7 +483,7 @@ class LineSpacing(UnitLabelEnum):
             ]
         ):  # 必须不为None 有可能是 0
             if line_spacing <= 0:
-                line_spacing = 1  # 行距必须大于0 否则会消失
+                raise ValueError(f"行距必须大于0，但得到: {line_spacing}")
             docx_obj.paragraph_format.line_spacing = line_spacing
         else:
             raise ValueError(f"无效的行距: '{self.value}'")
@@ -589,15 +589,9 @@ class BuiltInStyle(UnitLabelEnum):
     def base_set(self, docx_obj: Paragraph, **kwargs):
         style = self._LABEL_MAP.get(self.value, None)
         if style:
-            try:
-                docx_obj.style = style
-            except ValueError as e:
-                raise ValueError(f"未使用的样式: '{self.value}'") from e
+            docx_obj.style = style
         else:
-            try:
-                docx_obj.style = self.value
-            except ValueError as e:
-                raise ValueError(f"未使用的样式: '{self.value}'") from e
+            docx_obj.style = self.value
 
     def get_from_paragraph(self, paragraph: Paragraph):
         return paragraph_get_builtin_style_name(paragraph)

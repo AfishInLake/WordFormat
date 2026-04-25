@@ -66,7 +66,7 @@ server:
 ## tests: Run the tests using pytest
 tests:
 	@echo "Running tests..."
-	@pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85
+	@pytest tests/ --cov=wordformat --cov-report=term-missing --cov-fail-under=85
 
 ## export-requirements: Export requirements files from pyproject.toml
 export-requirements:

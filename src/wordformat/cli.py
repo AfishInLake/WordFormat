@@ -20,13 +20,19 @@ from wordformat.set_tag import set_tag_main
 setup_logger()
 
 
-def validate_file(path: str, name: str) -> str:
+def validate_file(path: str, name: str, allowed_extensions: list[str] | None = None) -> str:
     """文件合法性校验"""
     abs_path = os.path.abspath(path)
     if not os.path.exists(abs_path):
         raise argparse.ArgumentTypeError(f"{name}不存在: {abs_path}")
     if not os.path.isfile(abs_path):
         raise argparse.ArgumentTypeError(f"{name}必须是文件: {abs_path}")
+    if allowed_extensions:
+        ext = os.path.splitext(abs_path)[1].lower()
+        if ext not in allowed_extensions:
+            raise argparse.ArgumentTypeError(
+                f"{name}必须是以下格式之一: {', '.join(allowed_extensions)}，但得到: {ext or '(无扩展名)'}"
+            )
     return abs_path
 
 
@@ -66,26 +72,26 @@ wf startapi -H 127.0.0.1 -p 8000
     # 1. gj = 生成 JSON（自动命名）
     # ------------------------------
     p_gj = subparsers.add_parser("gj", help="生成JSON结构（自动输出到-o目录）")
-    p_gj.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档"), help="Word文档路径")
-    p_gj.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置"), help="YAML配置路径")
+    p_gj.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档", [".docx"]), help="Word文档路径")
+    p_gj.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]), help="YAML配置路径")
     p_gj.add_argument("-o", default="output/", help="输出目录（默认output/）")
 
     # ------------------------------
     # 2. cf = 检查格式
     # ------------------------------
     p_cf = subparsers.add_parser("cf", help="检查格式错误")
-    p_cf.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档"), help="Word文档路径")
-    p_cf.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置"), help="YAML配置路径")
-    p_cf.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件"), help="JSON文件路径")
+    p_cf.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档", [".docx"]), help="Word文档路径")
+    p_cf.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]), help="YAML配置路径")
+    p_cf.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件", [".json"]), help="JSON文件路径")
     p_cf.add_argument("-o", default="output/", help="输出目录")
 
     # ------------------------------
     # 3. af = 格式化
     # ------------------------------
     p_af = subparsers.add_parser("af", help="自动格式化论文")
-    p_af.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档"), help="Word文档路径")
-    p_af.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置"), help="YAML配置路径")
-    p_af.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件"), help="JSON文件路径")
+    p_af.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档", [".docx"]), help="Word文档路径")
+    p_af.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]), help="YAML配置路径")
+    p_af.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件", [".json"]), help="JSON文件路径")
     p_af.add_argument("-o", default="output/", help="输出目录")
 
     # ------------------------------
@@ -93,7 +99,13 @@ wf startapi -H 127.0.0.1 -p 8000
     # ------------------------------
     p_startapi = subparsers.add_parser("startapi", help="启动API服务")
     p_startapi.add_argument("-H", "--host", default="127.0.0.1", help="API服务地址（默认127.0.0.1）")
-    p_startapi.add_argument("-p", "--port", type=int, default=8000, help="API服务端口（默认8000）")
+    def _validate_port(x):
+        v = int(x)
+        if v < 1 or v > 65535:
+            raise argparse.ArgumentTypeError(f"端口号必须在1-65535之间，但得到: {v}")
+        return v
+
+    p_startapi.add_argument("-p", "--port", type=_validate_port, default=8000, help="API服务端口（默认8000）")
 
     # 解析参数
     args = parser.parse_args()

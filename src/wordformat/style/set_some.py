@@ -273,9 +273,9 @@ class _SetIndent:
             # 获取或创建 <w:ind> 元素
             ind = pPr.find(qn("w:ind"))
             if ind is None:
-                from docx.oxml.text.parfmt import CT_Ind
+                from docx.oxml import OxmlElement
 
-                ind = CT_Ind()
+                ind = OxmlElement("w:ind")
                 pPr.append(ind)
 
             # 清除旧的字符缩进和物理缩进（根据类型）
