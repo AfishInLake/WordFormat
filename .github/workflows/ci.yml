@@ -25,12 +25,10 @@ on:
 
 
 jobs:
-  # =============== Job 1: 测试 + PR 构建 ===============
-  test-and-build:
-    name: Test and Build
+  # =============== Job 1: 测试 ===============
+  test:
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
@@ -55,15 +53,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache Python dependencies
-        uses: actions/cache@v5.0.3
-        id: cache-python-deps
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7.3.0
         with:
@@ -73,14 +62,6 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install make --no-progress
         shell: bash
-
-      - name: Install system dependencies (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
-            xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
 
       - name: Install project dependencies
         run: uv pip install --system -e ".[dev]"
@@ -92,121 +73,28 @@ jobs:
       - name: Run tests
         run: make tests
 
-      # === 仅在 PR 时构建可执行文件（供审查）===
-      - name: Build executable (PR only)
-        if: github.event_name == 'pull_request'
-        run: make build
-        shell: bash
-
-      - name: Package and upload build (PR only)
-        if: github.event_name == 'pull_request'
-        run: |
-          cd dist
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            7z a ../wordformat-pr-${{ runner.os }}.zip wordformat
-          else
-            zip -r ../wordformat-pr-${{ runner.os }}.zip wordformat
-          fi
-        shell: bash
-
-      - name: Upload PR build artifact
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: wordformat-pr-${{ runner.os }}
-          path: wordformat-pr-${{ runner.os }}.zip
-          retention-days: 7
-
-  # =============== Job 2: 合并到 master 后发布正式版 ===============
+  # =============== Job 2: 打包 Skill 并发布 ===============
   release:
-    needs: test-and-build
+    needs: test
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
-      fail-fast: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
-      - name: Cache ONNX Model
-        uses: actions/cache@v5.0.3
-        id: cache-model
-        with:
-          path: src/wordformat/data
-          key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
-          enableCrossOsArchive: true
-        env:
-          MODEL_VERSION: "modelv1.0"
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6.2.0
-        with:
-          python-version: "3.11"
-
-      - name: Cache Python dependencies
-        uses: actions/cache@v5.0.3
-        id: cache-python-deps
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7.3.0
-        with:
-          enable-cache: true
-
-      - name: Install GNU Make on Windows
-        if: runner.os == 'Windows'
-        run: choco install make --no-progress
-        shell: bash
-
-      - name: Install system dependencies (Linux only)
-        if: runner.os == 'Linux'
+      - name: Package skill folder as ZIP
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
-            xdg-utils libatspi2.0-0 libuuid1 libappindicator3-1 libsecret-1-0
-
-      - name: Install project dependencies
-        run: uv pip install --system -e ".[dev]"
-
-      - name: Download Model (if not cached)
-        if: steps.cache-model.outputs.cache-hit != 'true'
-        run: python scripts/download_model.py
-
-      - name: Build executable (for release)
-        run: make build
-        shell: bash
-
-      - name: Package as ZIP
-        run: |
-          cd dist
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            7z a ../wordformat-${{ runner.os }}.zip wordformat
-          else
-            zip -r ../wordformat-${{ runner.os }}.zip wordformat
-          fi
-        shell: bash
-
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v6.0.0
-        with:
-          name: wordformat-release-${{ runner.os }}
-          path: wordformat-${{ runner.os }}.zip
-          retention-days: 30
+          zip -r wordformat-skill.zip wordformat-skill/ \
+            -x "wordformat-skill/scripts/__pycache__/*" \
+            -x "wordformat-skill/data/__pycache__/*"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2.5.0
         with:
-          files: wordformat-*.zip
+          files: wordformat-skill.zip
           draft: false
           prerelease: false
         env:
@@ -215,7 +103,7 @@ jobs:
   # =============== Job 3: 发布到 PyPI ===============
   publish-pypi:
     name: Publish to PyPI
-    needs: test-and-build
+    needs: test
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

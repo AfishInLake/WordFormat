@@ -1,6 +1,6 @@
 [project]
 name = "wordformat"
-version = "1.0.1"
+version = "1.1.0"
 description = "论文格式自动化处理工具"
 readme = "README.md"
 license = "Apache-2.0"

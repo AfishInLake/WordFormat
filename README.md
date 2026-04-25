@@ -11,7 +11,6 @@
 
 **WordFormat** 是一个基于 Python 开发的 Word 文档自动化格式检查与修正工具，专为学术论文（本科/硕士/博士毕业论文、期刊论文等）的格式合规性审查设计。该工具能够智能解析 Word 文档结构，识别标题、摘要、正文、参考文献等不同段落类型，并依据自定义的格式规范自动校验文档格式，支持在违规位置添加批注或直接修正格式问题，大幅提升论文格式审核效率。
 
-点击 **[WordFormatUI](https://github.com/AfishInLake/WordFormatUI)** 查看带有GUI界面的项目
 ## 功能特性
 
 ### 核心能力
@@ -31,10 +30,6 @@
 ## 视频教程
 [点击直达B站视频](https://www.bilibili.com/video/BV1aiDjB8Edg/?spm_id_from=333.1007.top_right_bar_window_history.content.click&vd_source=490c514f59611dc0b600c1da58948e14)
 
-## 普通用户请看这里
-+ 如果你是普通用户，请点击[WordFormatUI](https://github.com/AfishInLake/WordFormatUI/releases)下载带有GUI界面的安装包直接使用，并参考[安装指南](https://github.com/AfishInLake/WordFormatUI/blob/master/README.md)进行安装。
-+ 如果你是开发人员，请按照以下步骤进行安装和运行
-
 ## 快速开始
 
 ### 环境要求
@@ -42,6 +37,20 @@
 - 依赖管理工具：uv（推荐）或 pip
 
 ### 安装步骤
+
+**方式一：从 PyPI 安装（推荐普通用户）**
+
+```bash
+# 使用 pip
+pip install wordformat
+
+# 或使用 uv
+uv add wordformat
+```
+
+安装完成后即可使用 `wf` 和 `wordformat` 命令。
+
+**方式二：从源码安装（开发者）**
 
 1. **克隆项目**
    ```bash
@@ -56,24 +65,9 @@
    pip install -e .
    ```
 
-3. **配置环境变量**
-   创建 `.env` 文件，配置 HOST、PORT 等必要参数：
-   ```env
-   HOST="127.0.0.1"
-   # 配置服务端口
-   PORT="8000"
-   ```
-
-4. **启动API服务**
+3. **下载模型**
    ```bash
-   # 在虚拟环境下运行
-   make server
-   ```
-
-5. **构建.exe程序**
-   ```bash
-   # 在虚拟环境下运行
-   make build
+   python scripts/download_model.py
    ```
 
 ## 核心使用方法
@@ -82,14 +76,52 @@
 
 WordFormat 提供三种核心执行模式：
 
-1. **生成文档结构 JSON**
+```bash
+# 1. 生成文档结构 JSON
+wf gj -d 论文.docx -c 配置.yaml
 
-2. **执行格式校验**
+# 2. 执行格式校验（添加批注，不修改原文）
+wf cf -d 论文.docx -c 配置.yaml -f 结构文件.json
 
-3. **执行格式格式化**
+# 3. 执行自动格式化（一键修正格式）
+wf af -d 论文.docx -c 配置.yaml -f 结构文件.json
+```
 
-具体请看
-- [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md)
+更多详细用法请查看 [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md)
+
+## AI Skill 集成
+
+WordFormat 提供了 **SOLO Skill**，可在 SOLO 等 AI 助手平台中直接调用，实现对话式论文格式化。
+
+### Skill 工作流程
+
+Skill 包含两个独立任务，可分步执行：
+
+| 任务 | 说明 | 产物 |
+|------|------|------|
+| **任务一：准备配置文件** | 根据格式要求生成/编辑 config.yaml | `config.yaml` |
+| **任务二：执行格式化** | 使用配置文件对论文进行格式检查或修正 | `--标注版.docx` 或 `--修改版.docx` |
+
+### Skill 目录结构
+
+```
+wordformat-skill/
+├── SKILL.md                    # Skill 定义文件
+├── scripts/
+│   ├── setup_config.py         # 配置文件生成/验证脚本
+│   ├── validate_json.py        # JSON 标签校验脚本
+│   └── validate_config.py      # 配置文件验证脚本
+└── data/
+    ├── config.yaml             # 默认配置模板
+    ├── config_spec.md          # 配置文件完整字段规范
+    ├── config_editing_guide.md # 配置编辑指南
+    ├── category_reference.md   # 段落分类参考
+    └── font_size_table.md      # 字号对照表
+```
+
+### 预设配置库
+
+项目内置了多所高校的论文格式预设，保存在 `presets/` 目录下，命名格式为 `{学校}_{学院/专业}_{论文类型}.yaml`，可直接使用或在此基础上修改。
 
 ## 详细文档
 
