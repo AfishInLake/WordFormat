@@ -165,7 +165,7 @@ def auto_format_thesis_document(
     # 处理标题自动编号（仅在格式化模式下执行，检查模式不修改编号）
     if not check and hasattr(config_model, "numbering") and config_model.numbering.enabled:
         from wordformat.numbering import process_heading_numbering
-        process_heading_numbering(root_node, document, config_model.numbering)
+        process_heading_numbering(root_node, document, config_model.numbering, config_model.headings)
     savepath = Path(savepath)
     if check:
         docx_path = str(savepath / f"{filename_without_ext}--标注版.docx")

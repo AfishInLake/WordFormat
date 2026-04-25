@@ -83,6 +83,8 @@ wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json -o final_output/
 ```
 
+> **标题自动编号**：如果配置文件中启用了 `numbering.enabled: true`，格式化时会自动清除标题的手动编号并应用 Word 自动编号。编号样式（字体/字号/加粗）会自动跟随标题配置。此功能仅在 `wf af` 模式下生效。
+
 ---
 
 ## 4. 启动API服务

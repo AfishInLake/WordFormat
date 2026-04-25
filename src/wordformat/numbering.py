@@ -14,7 +14,159 @@ import re
 from copy import deepcopy
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from docx.shared import Cm, Mm, Inches, Pt
+from wordformat.style.utils import extract_unit_from_string
 from loguru import logger
+
+
+# EMU 到 twips 的换算系数
+# docx.shared 的 Cm/Mm/Inches/Pt 返回 EMU，w:ind 需要 twips
+# 1 twip = 635 EMU（即 914400 EMU/inch ÷ 1440 twips/inch）
+_EMU_PER_TWIP = 635
+
+
+def _convert_to_twips(value_str: str) -> int:
+    """
+    将带单位的缩进值转换为 twips（Word 内部单位）。
+    使用 docx.shared 官方 API 进行单位换算，确保精度。
+
+    仅用于物理单位（厘米、毫米、英寸、磅），不处理字符单位。
+    例如："0.75cm" → 425, "12磅" → 240
+    """
+    result = extract_unit_from_string(value_str)
+    if not result.is_valid or result.value is None:
+        logger.warning(f"无法解析缩进值: {value_str}，使用默认值 0")
+        return 0
+
+    unit = result.standard_unit
+    val = result.value
+
+    try:
+        if unit == "cm":
+            emu = int(Cm(val))
+        elif unit == "mm":
+            emu = int(Mm(val))
+        elif unit == "inch":
+            emu = int(Inches(val))
+        elif unit == "pt":
+            emu = int(Pt(val))
+        else:
+            logger.warning(f"不支持的物理单位: {unit}（{value_str}），使用默认值 0")
+            return 0
+    except Exception as e:
+        logger.warning(f"单位换算失败: {value_str}，错误: {e}，使用默认值 0")
+        return 0
+
+    # EMU → twips（使用 round 避免整数除法精度损失）
+    return round(emu / _EMU_PER_TWIP)
+
+
+def _set_indent_value(ind_element, indent_type: str, value_str: str):
+    """
+    设置 w:ind 元素的缩进值，自动区分字符单位和物理单位。
+
+    字符单位：使用 w:leftChars / w:hangingChars（1字符=100单位）
+    物理单位：使用 w:left / w:hanging（twips）
+
+    Args:
+        ind_element: w:ind OxmlElement
+        indent_type: "left" 或 "hanging"
+        value_str: 带单位的值，如 "0字符"、"0.75cm"、"420磅"
+    """
+    result = extract_unit_from_string(value_str)
+    if not result.is_valid or result.value is None:
+        logger.warning(f"无法解析缩进值: {value_str}，跳过设置")
+        return
+
+    unit = result.standard_unit
+    val = result.value
+
+    if unit in ("字符", "char"):
+        # 字符单位：使用专用 *Chars 属性（1字符 = 100 单位）
+        chars_int = int(round(float(val) * 100))
+        attr_name = qn(f"w:{indent_type}Chars")
+        ind_element.set(attr_name, str(chars_int))
+        # 不设置物理属性，Word 会优先使用 *Chars
+    elif unit in ("cm", "mm", "inch", "pt"):
+        # 物理单位：使用 twips 属性
+        twips = _convert_to_twips(value_str)
+        ind_element.set(qn(f"w:{indent_type}"), str(twips))
+    else:
+        logger.warning(f"不支持的缩进单位: {unit}（{value_str}），跳过设置")
+
+
+# 中文字号到半磅值（half-points）的映射
+# Word 内部字号单位为 half-points（半磅），如 12pt = 24 half-points
+_FONT_SIZE_HALF_PT_MAP = {
+    "一号": 52, "小一": 48, "二号": 44, "小二": 36,
+    "三号": 32, "小三": 30, "四号": 28, "小四": 24,
+    "五号": 21, "小五": 18, "六号": 15, "七号": 11,
+}
+
+
+def _build_numbering_rPr(headings_config, level_key: str):
+    """
+    为编号构建 w:rPr 元素，使编号的字体/字号跟随标题样式。
+
+    Args:
+        headings_config: 标题配置对象（config.headings）
+        level_key: "level_1" / "level_2" / "level_3"
+
+    Returns:
+        w:rPr OxmlElement 或 None
+    """
+    level_cfg = getattr(headings_config, level_key, None)
+    if level_cfg is None:
+        return None
+
+    # 获取字体和字号
+    chinese_font = getattr(level_cfg, "chinese_font_name", None)
+    english_font = getattr(level_cfg, "english_font_name", None)
+    font_size = getattr(level_cfg, "font_size", None)
+    bold = getattr(level_cfg, "bold", None)
+
+    if not chinese_font and not english_font and not font_size and bold is None:
+        return None
+
+    rPr = OxmlElement("w:rPr")
+
+    # 设置字体
+    rFonts = OxmlElement("w:rFonts")
+    has_font = False
+    if chinese_font:
+        rFonts.set(qn("w:eastAsia"), chinese_font)
+        has_font = True
+    if english_font:
+        rFonts.set(qn("w:ascii"), english_font)
+        rFonts.set(qn("w:hAnsi"), english_font)
+        has_font = True
+    if has_font:
+        rPr.append(rFonts)
+
+    # 设置字号（Word 内部单位为 half-points）
+    if font_size:
+        half_pt = _FONT_SIZE_HALF_PT_MAP.get(font_size)
+        if half_pt is None:
+            try:
+                half_pt = int(float(font_size) * 2)
+            except (ValueError, TypeError):
+                half_pt = None
+        if half_pt is not None:
+            sz = OxmlElement("w:sz")
+            sz.set(qn("w:val"), str(half_pt))
+            rPr.append(sz)
+            szCs = OxmlElement("w:szCs")
+            szCs.set(qn("w:val"), str(half_pt))
+            rPr.append(szCs)
+
+    # 设置加粗
+    if bold is True:
+        b = OxmlElement("w:b")
+        rPr.append(b)
+        bCs = OxmlElement("w:bCs")
+        rPr.append(bCs)
+
+    return rPr
 
 
 def strip_manual_numbering(paragraph, pattern: str) -> bool:
@@ -100,7 +252,7 @@ def apply_auto_numbering(paragraph, num_id: str, ilvl: str = "0"):
     logger.debug(f"已应用自动编号: numId={num_id}, ilvl={ilvl}")
 
 
-def create_numbering_definition(document, config) -> dict[str, str]:
+def create_numbering_definition(document, config, headings_config=None) -> dict[str, str]:
     """
     在文档中创建自动编号定义（如果不存在）。
 
@@ -110,6 +262,7 @@ def create_numbering_definition(document, config) -> dict[str, str]:
     Args:
         document: docx Document 对象
         config: NumberingConfig 配置对象
+        headings_config: 标题配置（用于设置编号字体/字号跟随标题样式）
 
     Returns:
         dict: {"level_1": "100", "level_2": "101", "level_3": "102"}
@@ -196,17 +349,41 @@ def create_numbering_definition(document, config) -> dict[str, str]:
                 lvlText.set(qn("w:val"), f"%{lvl_i + 1}")
             lvl.append(lvlText)
 
+            # 编号后缀：tab（制表符）、space（空格）、nothing（无）
+            suff = OxmlElement("w:suff")
+            suff_val = level_config.suffix or "space"
+            suff.set(qn("w:val"), suff_val)
+            lvl.append(suff)
+
             lvlJc = OxmlElement("w:lvlJc")
             lvlJc.set(qn("w:val"), "left")
             lvl.append(lvlJc)
 
-            # pPr
+            # pPr - 缩进设置
             pPr = OxmlElement("w:pPr")
             ind = OxmlElement("w:ind")
-            ind.set(qn("w:left"), "0")
-            ind.set(qn("w:hanging"), str((lvl_i + 1) * 420))  # 每级缩进约 0.3cm
+
+            # 计算编号缩进（left）：编号起始位置距左边距
+            if level_config.numbering_indent:
+                _set_indent_value(ind, "left", level_config.numbering_indent)
+            else:
+                ind.set(qn("w:left"), "0")
+
+            # 计算文本缩进（hanging）：文本相对于编号起始位置的偏移量
+            if level_config.text_indent:
+                _set_indent_value(ind, "hanging", level_config.text_indent)
+            else:
+                # 默认：每级缩进约 0.3cm（210 twips）
+                ind.set(qn("w:hanging"), str((lvl_i + 1) * 210))
+
             pPr.append(ind)
             lvl.append(pPr)
+
+            # rPr - 编号的字体/字号跟随标题样式
+            if headings_config and lvl_i == ilvl:
+                rPr = _build_numbering_rPr(headings_config, level_key)
+                if rPr is not None:
+                    lvl.append(rPr)
 
             abstract_num.append(lvl)
 
@@ -226,7 +403,7 @@ def create_numbering_definition(document, config) -> dict[str, str]:
     return result
 
 
-def process_heading_numbering(root_node, document, config):
+def process_heading_numbering(root_node, document, config, headings_config=None):
     """
     处理所有标题节点的编号：清除手动编号 + 应用自动编号。
 
@@ -234,12 +411,13 @@ def process_heading_numbering(root_node, document, config):
         root_node: 文档树根节点
         document: docx Document 对象
         config: NumberingConfig 配置对象
+        headings_config: 标题配置（用于编号字体/字号跟随标题样式）
     """
     if not config.enabled:
         return
 
-    # 创建编号定义
-    num_id_map = create_numbering_definition(document, config)
+    # 创建编号定义（传入标题配置以同步编号样式）
+    num_id_map = create_numbering_definition(document, config, headings_config)
     if not num_id_map:
         return
 

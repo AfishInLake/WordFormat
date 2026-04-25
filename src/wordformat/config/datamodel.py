@@ -296,6 +296,21 @@ class NumberingLevelConfig(BaseModel):
     strip_pattern: Optional[str] = Field(
         default=None, description="清除手动编号的正则表达式"
     )
+    # 编号之后：tab（制表符）、space（空格）、nothing（无）
+    suffix: Optional[str] = Field(
+        default="space",
+        description="编号之后的分隔符：tab/space/nothing",
+    )
+    # 编号缩进：编号距左边距的距离，如 "0.75cm"、"420磅"、"0字符"
+    numbering_indent: Optional[str] = Field(
+        default=None,
+        description="编号缩进，如 '0.75cm'、'420磅'、'0字符'",
+    )
+    # 文本缩进：文本距左边距的距离（即悬挂缩进量），如 "0.75cm"、"420磅"、"0字符"
+    text_indent: Optional[str] = Field(
+        default=None,
+        description="文本缩进（悬挂缩进），如 '0.75cm'、'420磅'、'0字符'",
+    )
 
 
 class NumberingConfig(BaseModel):

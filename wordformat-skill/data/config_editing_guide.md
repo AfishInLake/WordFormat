@@ -46,7 +46,8 @@ cp data/config.yaml config.yaml
 6. `tables` — 修改表注格式
 7. `references` — 修改参考文献格式
 8. `acknowledgements` — 修改致谢格式
-9. `style_checks_warning` — 根据需要调整警告开关
+9. `numbering` — 配置标题自动编号（按需启用）
+10. `style_checks_warning` — 根据需要调整警告开关
 
 ### 步骤 4：验证
 
@@ -130,6 +131,21 @@ python scripts/validate_config.py --config config.yaml
 | `left_indent` | 字符/磅/厘米/毫米/英寸 | `"0字符"` `"2字符"` `"20磅"` |
 | `right_indent` | 同上 | `"0字符"` `"2字符"` |
 | `first_line_indent` | 同上 | `"0字符"` `"2字符"` `"20磅"` |
+
+### 标题自动编号（numbering）
+
+| 字段 | 类型 | 可选值 | 说明 |
+|------|------|--------|------|
+| `enabled` | bool | `true` / `false` | 是否启用自动编号（总开关） |
+| `template` | string | `'%1'` `'%1.%2'` `'%1.%2.%3'` `'第%1章'` 等 | 编号模板，`%1`=本级序号 |
+| `strip_pattern` | string | 正则表达式 | 清除手动编号，如 `'^\d+\s+'` |
+| `suffix` | string | `tab` / `space` / `nothing` | 编号之后的分隔符 |
+| `numbering_indent` | string | 带单位的值 | 编号缩进，如 `'0字符'` `'0.75cm'` |
+| `text_indent` | string | 带单位的值 | 文本悬挂缩进，如 `'0字符'` `'0.75cm'` |
+
+> **编号样式自动跟随标题**：编号的字体/字号/加粗会自动跟随 `headings` 配置，无需单独设置。
+>
+> **仅格式化模式生效**：自动编号仅在 `wf af`（格式化模式）下生效，`wf cf`（检查模式）不会修改编号。
 
 ### 关键词专用字段
 
@@ -232,6 +248,55 @@ references:
     numbering_format: '[1], [2], ...'
 ```
 
+### 示例 7：启用标题自动编号（阿拉伯数字 + 空格分隔）
+
+```yaml
+numbering:
+  enabled: true
+  level_1:
+    enabled: true
+    template: '%1'
+    strip_pattern: '^\d+\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+  level_2:
+    enabled: true
+    template: '%1.%2'
+    strip_pattern: '^\d+(\.\d+)\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+  level_3:
+    enabled: true
+    template: '%1.%2.%3'
+    strip_pattern: '^\d+(\.\d+){2}\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+```
+
+### 示例 8：启用标题自动编号（中文"第X章" + 制表符分隔 + 缩进）
+
+```yaml
+numbering:
+  enabled: true
+  level_1:
+    enabled: true
+    template: '第%1章'
+    strip_pattern: '^第[一二三四五六七八九十百千零]+章\s*'
+    suffix: 'tab'
+    numbering_indent: '0.75cm'
+    text_indent: '0.75cm'
+  level_2:
+    enabled: true
+    template: '%1.%2'
+    strip_pattern: '^\d+(\.\d+)\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+```
+
 ---
 
 ## 五、禁止事项
@@ -245,3 +310,5 @@ references:
 - ❌ **修改 headings 下的子节点名称**（level_1、level_2、level_3 固定不可改）
 - ❌ **修改 references 下的子节点名称**（title、content 固定不可改）
 - ❌ **修改 acknowledgements 下的子节点名称**（title、content 固定不可改）
+- ❌ **修改 numbering 下的子节点名称**（level_1、level_2、level_3 固定不可改）
+- ❌ **在 numbering 的 template 中使用无效占位符**（只支持 `%1`、`%2`、`%3`）
