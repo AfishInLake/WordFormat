@@ -675,6 +675,9 @@ class TestCreateNumberingDefinition:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -695,6 +698,9 @@ class TestCreateNumberingDefinition:
             lvl = MagicMock()
             lvl.enabled = True
             lvl.template = f"template_{key}"
+            lvl.suffix = "space"
+            lvl.numbering_indent = None
+            lvl.text_indent = None
             setattr(config, key, lvl)
 
         result = create_numbering_definition(doc, config)
@@ -1362,6 +1368,9 @@ class TestCreateNumberingDefinitionXML:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "%1."
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -1390,6 +1399,9 @@ class TestCreateNumberingDefinitionXML:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -1415,6 +1427,9 @@ class TestCreateNumberingDefinitionXML:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "%1."
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -1469,6 +1484,9 @@ class TestCreateNumberingDefinitionXML:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "%1."
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -1502,11 +1520,17 @@ class TestProcessHeadingNumberingEnabled:
         level_1.enabled = True
         level_1.template = "第%1章"
         level_1.strip_pattern = r"^第[一二三四五六七八九十百千零]+章\s*"
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
 
         level_2 = MagicMock()
         level_2.enabled = True
         level_2.template = "%1.%2"
         level_2.strip_pattern = r"^\d+\.\d+\s+"
+        level_2.suffix = "space"
+        level_2.numbering_indent = None
+        level_2.text_indent = None
 
         level_3 = MagicMock()
         level_3.enabled = False
@@ -1558,6 +1582,9 @@ class TestProcessHeadingNumberingEnabled:
         level_1.enabled = True
         level_1.template = "第%1章"
         level_1.strip_pattern = r"^第.+章\s*"
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -1609,6 +1636,9 @@ class TestProcessHeadingNumberingEnabled:
         level_1.enabled = True
         level_1.template = "第%1章"
         level_1.strip_pattern = ""  # 空 strip_pattern
+        level_1.suffix = "space"
+        level_1.numbering_indent = None
+        level_1.text_indent = None
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
