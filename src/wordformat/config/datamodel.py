@@ -5,7 +5,7 @@
 
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型
@@ -39,6 +39,15 @@ FontSizeType = Union[
     float,
     int,
 ]
+
+
+@field_validator("font_size")
+@classmethod
+def validate_font_size(cls, v):
+    """验证字号为正数"""
+    if isinstance(v, (int, float)) and v <= 0:
+        raise ValueError(f"字号 {v} 必须大于0")
+    return v
 
 
 # -------------------------- 预警字段配置模型 --------------------------
@@ -89,6 +98,14 @@ class GlobalFormatConfig(BaseModel):
         default="小四", description="字号"
     )  # 修正类型和默认值
     font_color: str = Field(default="黑色", description="字体颜色")
+
+    @field_validator("font_color")
+    @classmethod
+    def validate_font_color(cls, v):
+        """验证字体颜色为合法值"""
+        if not v or not isinstance(v, str):
+            raise ValueError(f"字体颜色不能为空")
+        return v
     bold: bool = Field(default=False, description="加粗")
     italic: bool = Field(default=False, description="斜体")
     underline: bool = Field(default=False, description="下划线")
@@ -105,11 +122,21 @@ class KeywordsConfig(GlobalFormatConfig):
     trailing_punct_forbidden: bool = Field(default=True, description="禁止最后有标点")
 
     @field_validator("count_min", "count_max")
-    def validate_keyword_count(cls, v):
+    @classmethod
+    def validate_keyword_count(cls, v, info):
         """验证关键词数量为正整数"""
         if v <= 0:
             raise ValueError(f"关键词数量 {v} 必须大于0")
         return v
+
+    @model_validator(mode="after")
+    def validate_count_range(self) -> "KeywordsConfig":
+        """验证 count_min <= count_max"""
+        if self.count_min > self.count_max:
+            raise ValueError(
+                f"count_min({self.count_min}) 不能大于 count_max({self.count_max})"
+            )
+        return self
 
 
 class AbstractTitleConfig(GlobalFormatConfig):
@@ -256,6 +283,66 @@ class AcknowledgementsConfig(BaseModel):
     )
 
 
+# -------------------------- 编号配置模型 --------------------------
+class NumberingLevelConfig(BaseModel):
+    """单级标题编号配置"""
+
+    enabled: bool = Field(default=False, description="是否启用该级别自动编号")
+    # 编号模板，%1=本级序号，%2=上级序号，%3=上上级序号
+    # 例如："第%1章"、"%1.%2"、"%1.%2.%3"、"%1)"
+    template: Optional[str] = Field(default=None, description="编号模板")
+    # 清除手动编号的正则表达式，仅作用于该级别标题段落的开头
+    # 例如："^第[一二三四五六七八九十百千零]+章\\s*"
+    strip_pattern: Optional[str] = Field(
+        default=None, description="清除手动编号的正则表达式"
+    )
+    # 编号之后：tab（制表符）、space（空格）、nothing（无）
+    suffix: Optional[str] = Field(
+        default="space",
+        description="编号之后的分隔符：tab/space/nothing",
+    )
+    # 编号缩进：编号距左边距的距离，如 "0.75cm"、"420磅"、"0字符"
+    numbering_indent: Optional[str] = Field(
+        default=None,
+        description="编号缩进，如 '0.75cm'、'420磅'、'0字符'",
+    )
+    # 文本缩进：文本距左边距的距离（即悬挂缩进量），如 "0.75cm"、"420磅"、"0字符"
+    text_indent: Optional[str] = Field(
+        default=None,
+        description="文本缩进（悬挂缩进），如 '0.75cm'、'420磅'、'0字符'",
+    )
+
+
+class NumberingConfig(BaseModel):
+    """标题自动编号配置"""
+
+    enabled: bool = Field(default=False, description="是否启用自动编号功能")
+    level_1: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=False,
+            template="第%1章",
+            strip_pattern="^第[一二三四五六七八九十百千零]+章\\s*",
+        ),
+        description="一级标题编号配置",
+    )
+    level_2: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=False,
+            template="%1.%2",
+            strip_pattern="^\\d+(\\.\\d+)\\s+",
+        ),
+        description="二级标题编号配置",
+    )
+    level_3: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=False,
+            template="%1.%2.%3",
+            strip_pattern="^\\d+(\\.\\d+){2}\\s+",
+        ),
+        description="三级标题编号配置",
+    )
+
+
 # -------------------------- 根配置模型 --------------------------
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
@@ -285,4 +372,7 @@ class NodeConfigRoot(BaseModel):
     acknowledgements: AcknowledgementsConfig = Field(
         default_factory=AcknowledgementsConfig,
         description="致谢总配置",
+    )
+    numbering: NumberingConfig = Field(
+        default_factory=NumberingConfig, description="标题自动编号配置"
     )

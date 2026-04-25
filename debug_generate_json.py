@@ -6,8 +6,8 @@ import json
 from wordformat.set_tag import set_tag_main
 from loguru import logger
 
-docx_path = r'word/校园二手交易平台4.docx'
-json_path = r'output/校园二手交易平台4.json'
+docx_path = r'word/毕业设计说明书.docx'
+json_path = r'output/毕业设计说明书.json'
 config_path = r'example/undergrad_thesis.yaml'
 
 if __name__ == '__main__':

@@ -24,6 +24,7 @@
 ### 实用功能
 - **自动批注生成**：在格式违规位置自动添加 Word 批注，标注问题类型和修正建议
 - **格式一键修正**：支持根据规范自动修正部分常见格式问题（如标题字号、正文行距）
+- **标题自动编号**：支持自动清除手动编号并应用 Word 自动编号，可自定义编号模板（如"第X章"、"1.1.1"）、编号后缀（制表符/空格/无）和缩进设置
 - **自定义配置**：通过 YAML 配置文件灵活定义格式规范，适配不同学校/期刊的格式要求
 - **跨平台兼容**：支持 Windows/macOS/Linux 系统，基于 python-docx 实现跨平台 Word 文档处理
 
@@ -88,18 +89,18 @@ WordFormat 提供三种核心执行模式：
 3. **执行格式格式化**
 
 具体请看
-- [使用指南](docs/usage.md)
+- [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md)
 
 ## 详细文档
 
 更多详细文档请查看 `docs/` 目录：
 
-- [安装指南](docs/installation.md) - 环境要求和安装步骤
-- [使用指南](docs/usage.md) - 命令行、Python编程和API调用的详细使用方法
-- [配置文件说明](docs/configuration.md) - 格式规范配置项和自定义配置方法
-- [常见问题](docs/faq.md) - 常见问题及解决方案
-- [贡献指南](docs/contributing.md) - 如何为项目贡献代码和文档
-- [技术架构](docs/architecture.md) - 项目的技术架构和实现原理
+- [安装指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/installation.md) - 环境要求和安装步骤
+- [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md) - 命令行、Python编程和API调用的详细使用方法
+- [配置文件说明](https://github.com/AfishInLake/WordFormat/blob/master/docs/configuration.md) - 格式规范配置项和自定义配置方法
+- [常见问题](https://github.com/AfishInLake/WordFormat/blob/master/docs/faq.md) - 常见问题及解决方案
+- [贡献指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/contributing.md) - 如何为项目贡献代码和文档
+- [技术架构](https://github.com/AfishInLake/WordFormat/blob/master/docs/architecture.md) - 项目的技术架构和实现原理
 
 ## 许可证
 

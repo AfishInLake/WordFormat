@@ -66,18 +66,25 @@ JSON 会**自动生成**在 `-o` 目录，文件名 = 文档名 + 10位时间戳
 2. 可手动打开 JSON 修改 `category` 字段修正
 3. 更换适配的配置文件（本专科/硕士/期刊等）
 
+### Q10：标题自动编号不生效？
+**排查方向**
+1. 确认 `numbering.enabled` 设为 `true`
+2. 确认对应级别的 `level_1/2/3.enabled` 也设为 `true`
+3. 自动编号仅在 `wf af`（格式化模式）下生效，`wf cf`（检查模式）不会修改编号
+4. 检查 `strip_pattern` 正则是否能匹配文档中的手动编号
+
 ---
 
 ## 环境配置问题
 
-### Q10：依赖安装失败？
+### Q11：依赖安装失败？
 **解决方法**
 1. Python >= 3.10
 2. 更新 pip：`pip install --upgrade pip`
 3. 使用 uv 安装：`uv sync`
 4. 检查网络
 
-### Q11：API 服务启动失败？
+### Q12：API 服务启动失败？
 **排查方向**
 1. 端口 8000 未被占用
 2. 依赖完整安装
@@ -87,7 +94,7 @@ JSON 会**自动生成**在 `-o` 目录，文件名 = 文档名 + 10位时间戳
 
 ## Git 相关问题（保持不变）
 
-### Q12：SSH 推送 Git LFS 卡住/失败
+### Q13：SSH 推送 Git LFS 卡住/失败
 **原因**：GitHub 不支持 SSH 上传 LFS
 
 **解决**
@@ -95,19 +102,19 @@ JSON 会**自动生成**在 `-o` 目录，文件名 = 文档名 + 10位时间戳
 git remote set-url origin https://github.com/AfishInLake/WordFormat.git
 ```
 
-### Q13：Git 出现大量变更文件
+### Q14：Git 出现大量变更文件
 **解决**：确保 `.gitignore` 忽略 `output/`、`tmp/`、`__pycache__/` 等目录
 
 ---
 
 ## 性能问题
 
-### Q14：大文档处理慢
+### Q15：大文档处理慢
 1. 属于正常现象
 2. 确保内存 ≥ 8G
 3. 关闭其他占用资源程序
 
-### Q15：内存过高崩溃
+### Q16：内存过高崩溃
 1. 拆分文档处理
 2. 重启程序
 3. 清理后台程序
@@ -116,22 +123,22 @@ git remote set-url origin https://github.com/AfishInLake/WordFormat.git
 
 ## 其他问题
 
-### Q16：支持哪些 Word 格式？
+### Q17：支持哪些 Word 格式？
 - 支持：`.docx`
 - 不支持：`.doc`
 
-### Q17：支持哪些系统？
+### Q18：支持哪些系统？
 - Windows / macOS / Linux
 
-### Q18：如何获取帮助？
+### Q19：如何获取帮助？
 - 查看 `docs/` 文档
 - GitHub Issue
 - 邮箱：1593699665@qq.com
 
-### Q19：如何报告 bug？
+### Q20：如何报告 bug？
 提供：系统版本 + Python 版本 + 命令 + 报错信息 + 示例文档
 
-### Q20：工具是否收费？
+### Q21：工具是否收费？
 完全免费、开源（Apache-2.0 协议），可随意使用与修改。
 
 ---

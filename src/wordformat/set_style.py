@@ -18,7 +18,7 @@ from wordformat.rules import (
     References,
 )
 from wordformat.settings import VOIDNODELIST
-from wordformat.utils import get_paragraph_xml_fingerprint, remove_all_numbering, ensure_directory_exists
+from wordformat.utils import get_paragraph_xml_fingerprint, ensure_directory_exists
 from wordformat.word_structure.document_builder import DocumentBuilder
 from wordformat.word_structure.utils import (
     find_and_modify_first,
@@ -159,14 +159,13 @@ def auto_format_thesis_document(
         promote_bodytext_in_subtrees_of_type(
             root_node, parent_type=key, target_type=value
         )
-    # FIXME: 临时解决
-    """
-    观察到不属于正文的内容被处理，需要剪枝
-    word样式太多，需要考虑重置
-    """
-    remove_all_numbering(document)
     # 执行格式化
     apply_format_check_to_all_nodes(root_node, document, config_model, check)
+
+    # 处理标题自动编号（仅在格式化模式下执行，检查模式不修改编号）
+    if not check and hasattr(config_model, "numbering") and config_model.numbering.enabled:
+        from wordformat.numbering import process_heading_numbering
+        process_heading_numbering(root_node, document, config_model.numbering, config_model.headings)
     savepath = Path(savepath)
     if check:
         docx_path = str(savepath / f"{filename_without_ext}--标注版.docx")

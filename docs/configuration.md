@@ -217,6 +217,45 @@ acknowledgements:
     first_line_indent: '2字符'
 ```
 
+### 10. 标题自动编号（numbering）
+控制标题的自动编号功能，包括编号格式、编号与文字的间距、缩进等。仅在格式化模式（`wf af`）下生效。
+
+```yaml
+numbering:
+  enabled: true
+  level_1:
+    enabled: true
+    template: '%1'
+    strip_pattern: '^\d+\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+  level_2:
+    enabled: true
+    template: '%1.%2'
+    strip_pattern: '^\d+(\.\d+)\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+  level_3:
+    enabled: true
+    template: '%1.%2.%3'
+    strip_pattern: '^\d+(\.\d+){2}\s+'
+    suffix: 'space'
+    numbering_indent: '0字符'
+    text_indent: '0字符'
+```
+
+**编号模板（template）**：使用 `%1`、`%2`、`%3` 占位符表示各级序号，常用格式如 `'%1'`（1 绪论）、`'%1.%2'`（1.1 研究背景）、`'第%1章'`（第一章 绪论）。
+
+**清除手动编号（strip_pattern）**：正则表达式，用于清除标题段落开头的手动编号文字。
+
+**编号之后（suffix）**：控制编号与标题文字之间的分隔符，可选 `tab`（制表符）、`space`（空格）、`nothing`（无）。
+
+**缩进设置**：`numbering_indent`（编号缩进）和 `text_indent`（文本悬挂缩进）支持厘米、毫米、英寸、磅、字符等多种单位。
+
+> 编号的字体、字号、加粗等样式会自动跟随对应级别标题的 `headings` 配置，无需单独设置。
+
 ## 字段详细说明
 
 ### 格式警告控制字段（style_checks_warning）
@@ -256,7 +295,7 @@ acknowledgements:
 |-------|------|--------|
 | chinese_font_name | 中文字体 | 宋体、黑体、楷体、仿宋、微软雅黑、汉仪小标宋 |
 | english_font_name | 英文字体 | Times New Roman、Arial、Calibri、Courier New、Helvetica |
-| font_size | 字号 | 一号~七号、小四、小五、数值（12、14等） |
+| font_size | 字号 | 一号、小一、二号、小二、三号、小三、四号、小四、五号、小五、六号、七号，或数值（如 12、14） |
 | font_color | 字体颜色 | 黑色、红色、十六进制色值 |
 | bold | 是否加粗 | true/false |
 | italic | 是否斜体 | true/false |
@@ -281,8 +320,18 @@ acknowledgements:
 |-------|------|------|
 | section_title | 章节标题 | 参考文献 |
 | entry_indent | 条目缩进 | 0.0、0.5 |
-| entry_ending_punct | 条目结尾标点 | . 、空 |
+| entry_ending_punct | 条目结尾标点（null 表示不限制） | . 、null |
 | numbering_format | 编号格式 | [1]、1. |
+
+### 编号专用字段
+| 配置项 | 说明 | 可选值 |
+|-------|------|--------|
+| enabled | 是否启用自动编号 | true/false |
+| template | 编号模板 | '%1'、'%1.%2'、'%1.%2.%3'、'第%1章' 等 |
+| strip_pattern | 清除手动编号的正则 | 如 '^\d+\s+' |
+| suffix | 编号后分隔符 | tab、space、nothing |
+| numbering_indent | 编号缩进 | 带单位的值，如 '0字符'、'0.75cm' |
+| text_indent | 文本悬挂缩进 | 带单位的值，如 '0字符'、'0.75cm' |
 
 ## 配置继承机制
 使用 YAML 锚点 `&` 与引用 `<<:` 实现样式复用：

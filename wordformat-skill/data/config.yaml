@@ -1,0 +1,205 @@
+style_checks_warning:
+  bold: false
+  italic: false
+  underline: false
+  font_size: false
+  font_name: false
+  font_color: false
+  alignment: false
+  space_before: false
+  space_after: false
+  line_spacing: false
+  line_spacingrule: false
+  left_indent: false
+  right_indent: false
+  first_line_indent: false
+  builtin_style_name: false
+
+# 全局页面格式（正文通用）
+global_format: &global_format
+  alignment: '两端对齐'
+  space_before: "0.5行"
+  space_after: "0.5行"
+  line_spacingrule: "1.5倍行距"
+  line_spacing: '1.5倍'
+  left_indent: "0字符"
+  right_indent: "0字符"
+  first_line_indent: '2字符'
+  builtin_style_name: '正文'
+  chinese_font_name: '宋体'
+  english_font_name: 'Times New Roman'
+  font_size: '小四'
+  font_color: '黑色'
+  bold: false
+  italic: false
+  underline: false
+
+# 摘要部分（中英文）
+abstract:
+  chinese:
+    chinese_title:
+      <<: *global_format
+      alignment: '居中对齐'
+      first_line_indent: '0字符'
+      chinese_font_name: '黑体'
+      font_size: '小二'
+      bold: true
+    chinese_content:
+      <<: *global_format
+      alignment: '两端对齐'
+  english:
+    english_title:
+      <<: *global_format
+      alignment: '居中对齐'
+      first_line_indent: '0字符'
+      english_font_name: 'Times New Roman'
+      font_size: '四号'
+      bold: true
+      line_spacing: "0倍"
+    english_content:
+      <<: *global_format
+      alignment: '两端对齐'
+      english_font_name: 'Times New Roman'
+      font_size: '小四'
+      line_spacing: "0倍"
+  keywords:
+    chinese:
+      <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '0字符'
+      chinese_font_name: '黑体'
+      font_size: '小四'
+      keywords_bold: true
+      count_min: 3
+      count_max: 5
+      trailing_punct_forbidden: true
+    english:
+      <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '0字符'
+      english_font_name: 'Times New Roman'
+      font_size: '小四'
+      keywords_bold: true
+      count_min: 3
+      count_max: 5
+      trailing_punct_forbidden: true
+
+# 各级标题格式（章、节、小节）
+headings:
+  level_1:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
+    font_size: '小二'
+    bold: false
+    space_before: "0.5行"
+    space_after: "0.5行"
+    line_spacingrule: "1.5倍行距"
+    line_spacing: '1.5倍'
+    builtin_style_name: 'Heading 1'
+
+  level_2:
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
+    font_size: '三号'
+    bold: false
+    space_before: "0.5行"
+    space_after: "0.5行"
+    line_spacingrule: "1.5倍行距"
+    line_spacing: '1.5倍'
+    builtin_style_name: 'Heading 2'
+
+  level_3:
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
+    font_size: '小四'
+    bold: false
+    space_before: "0.5行"
+    space_after: "0.5行"
+    builtin_style_name: 'Heading 3'
+    line_spacingrule: "1.5倍行距"
+    line_spacing: '1.5倍'
+
+# 正文段落格式
+body_text:
+  <<: *global_format
+
+# 插图（Figure）格式
+figures:
+  <<: *global_format
+  caption_position: 'below'
+  caption_prefix: '图'
+  font_size: '五号'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '0字符'
+
+# 表格（Table）格式
+tables:
+  <<: *global_format
+  caption_position: 'above'
+  caption_prefix: '表'
+  chinese_font_name: '宋体'
+  font_size: '五号'
+  english_font_name: 'Times New Roman'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '0字符'
+
+# 参考文献（References）
+references:
+  title:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '三号'
+    bold: true
+  content:
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '五号'
+    entry_indent: 0.0
+    entry_ending_punct: '.'
+    numbering_format: '[1], [2], ...'
+
+# 致谢（Acknowledgements）
+acknowledgements:
+  title:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '小二'
+    bold: true
+  content:
+    <<: *global_format
+    alignment: '两端对齐'
+    first_line_indent: '2字符'
+
+# 标题自动编号（默认关闭，按需启用）
+numbering:
+  enabled: false
+  level_1:
+    enabled: false
+    template: '第%1章'
+    strip_pattern: '^第[一二三四五六七八九十百千零]+章\s*'
+  level_2:
+    enabled: false
+    template: '%1.%2'
+    strip_pattern: '^\d+(\.\d+)\s+'
+  level_3:
+    enabled: false
+    template: '%1.%2.%3'
+    strip_pattern: '^\d+(\.\d+){2}\s+'

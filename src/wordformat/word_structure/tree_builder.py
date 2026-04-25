@@ -12,11 +12,15 @@ from wordformat.word_structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 class DocumentTreeBuilder:
     """负责将扁平列表构建成层级树结构"""
 
-    HEADING_CATEGORIES = CATEGORY_TO_CLASS
+    HEADING_CATEGORIES = {
+        k: v for k, v in CATEGORY_TO_CLASS.items()
+        if k != "body_text"
+    }
     CONFIG = {}
 
     def __init__(self):
         self.stack = Stack()
+        self._config = {}
 
     def build_tree(self, items: list[dict]) -> FormatNode:
         """
@@ -47,7 +51,7 @@ class DocumentTreeBuilder:
         from wordformat.word_structure.node_factory import create_node
 
         level = self._determine_level(item["category"])
-        return create_node(item=item, level=level, config=self.CONFIG)
+        return create_node(item=item, level=level, config=self._config)
 
     def _determine_level(self, category: str) -> int:
         """根据 category 映射到逻辑层级"""

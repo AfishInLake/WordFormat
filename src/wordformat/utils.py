@@ -78,6 +78,238 @@ def get_file_name(file_name: str) -> str:
     return filename_without_ext
 
 
+def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
+    """
+    提取段落的自动编号文字（如"第一章"、"1.1"、"1."等）。
+
+    Word 的自动编号存储在 numbering.xml 中，para.text 不包含编号文字。
+    本函数从段落的 XML 中读取 numId 和 ilvl，查找对应的 lvlText 模板，
+    然后根据当前编号计数器替换占位符，生成实际的编号文字。
+
+    Args:
+        paragraph: docx 段落对象
+
+    Returns:
+        编号文字字符串，无编号时返回空字符串
+    """
+    pPr = paragraph._element.find(qn("w:pPr"))
+    if pPr is None:
+        return ""
+    numPr = pPr.find(qn("w:numPr"))
+    if numPr is None:
+        return ""
+
+    numId_elem = numPr.find(qn("w:numId"))
+    ilvl_elem = numPr.find(qn("w:ilvl"))
+    if numId_elem is None:
+        return ""
+
+    num_id = numId_elem.get(qn("w:val"))
+    ilvl = int(ilvl_elem.get(qn("w:val"))) if ilvl_elem is not None else 0
+
+    if num_id is None or num_id == "0":
+        return ""
+
+    # 获取 numbering part
+    try:
+        numbering_part = paragraph.part.numbering_part
+    except (AttributeError, KeyError):
+        return ""
+
+    numbering_elm = numbering_part._element
+
+    # 查找 num -> abstractNum -> lvl -> lvlText
+    num_elem = None
+    for el in numbering_elm.findall(qn("w:num")):
+        if el.get(qn("w:numId")) == num_id:
+            num_elem = el
+            break
+    if num_elem is None:
+        return ""
+
+    abstract_num_id_ref = num_elem.find(qn("w:abstractNumId"))
+    if abstract_num_id_ref is None:
+        return ""
+
+    abstract_num_id = abstract_num_id_ref.get(qn("w:val"))
+
+    abstract_num = None
+    for el in numbering_elm.findall(qn("w:abstractNum")):
+        if el.get(qn("w:abstractNumId")) == abstract_num_id:
+            abstract_num = el
+            break
+    if abstract_num is None:
+        return ""
+
+    lvl = None
+    for el in abstract_num.findall(qn("w:lvl")):
+        if el.get(qn("w:ilvl")) == str(ilvl):
+            lvl = el
+            break
+    if lvl is None:
+        return ""
+
+    lvl_text_elem = lvl.find(qn("w:lvlText"))
+    if lvl_text_elem is None:
+        return ""
+
+    lvl_text = lvl_text_elem.get(qn("w:val"), "")
+    num_fmt_elem = lvl.find(qn("w:numFmt"))
+    num_fmt = num_fmt_elem.get(qn("w:val"), "decimal") if num_fmt_elem is not None else "decimal"
+
+    # 计算当前级别的编号值
+    # 需要遍历文档中所有使用同一 abstractNum 的段落来计数
+    level_counters = _count_numbering_levels(numbering_elm, abstract_num_id, paragraph)
+
+    current_num = level_counters.get(ilvl, 1)
+
+    # 根据格式化类型转换数字
+    formatted_num = _format_number(current_num, num_fmt)
+
+    # 替换 lvlText 中的占位符
+    # %1 -> 当前级别, %2 -> 下一级别, etc.
+    result = lvl_text
+    for lvl_idx, lvl_val in sorted(level_counters.items()):
+        placeholder = f"%{lvl_idx + 1}"
+        if placeholder in result:
+            fmt_for_level = _get_level_fmt(abstract_num, lvl_idx)
+            result = result.replace(placeholder, _format_number(lvl_val, fmt_for_level))
+
+    return result
+
+
+def _count_numbering_levels(numbering_elm, abstract_num_id: str, target_paragraph: Paragraph) -> dict[int, int]:
+    """
+    遍历文档段落，计算目标段落所在编号链的各级计数器值。
+
+    返回 {ilvl: count} 字典，如 {0: 1, 1: 2} 表示一级编号为1，二级编号为2
+    """
+    counters = {}
+    target_element = target_paragraph._element
+
+    # 找到所有引用同一 abstractNum 的 numId
+    num_ids = set()
+    for num_elem in numbering_elm.findall(qn("w:num")):
+        abstract_num_id_ref = num_elem.find(qn("w:abstractNumId"))
+        if abstract_num_id_ref is not None and abstract_num_id_ref.get(qn("w:val")) == abstract_num_id:
+            num_ids.add(num_elem.get(qn("w:numId")))
+
+    if not num_ids:
+        return counters
+
+    # 遍历文档 body 中的所有段落
+    body = target_paragraph._element.getparent()  # body element
+    if body is None:
+        return counters
+
+    # 获取 isRestart 标志
+    def get_is_restart(lvl_element):
+        """检查该级别是否在每个上级编号重启"""
+        if lvl_element is None:
+            return True
+        restart = lvl_element.find(qn("w:isLgl") if False else qn("w:lvlRestart"))
+        # lvlRestart 不存在时默认行为：下级在上级重启
+        return restart is None
+
+    for para_elm in body.findall(qn("w:p")):
+        pPr = para_elm.find(qn("w:pPr"))
+        if pPr is None:
+            continue
+        numPr = pPr.find(qn("w:numPr"))
+        if numPr is None:
+            continue
+        numId_elem = numPr.find(qn("w:numId"))
+        if numId_elem is None:
+            continue
+        para_num_id = numId_elem.get(qn("w:val"))
+        if para_num_id not in num_ids:
+            continue
+
+        ilvl_elem = numPr.find(qn("w:ilvl"))
+        para_ilvl = int(ilvl_elem.get(qn("w:val"))) if ilvl_elem is not None else 0
+
+        # 增加当前级别计数
+        counters[para_ilvl] = counters.get(para_ilvl, 0) + 1
+
+        # 重置下级计数
+        for key in list(counters.keys()):
+            if key > para_ilvl:
+                del counters[key]
+
+        # 检查是否到达目标段落
+        if para_elm is target_element:
+            break
+
+    return counters
+
+
+def _format_number(num: int, num_fmt: str) -> str:
+    """根据 numFmt 将数字格式化为对应字符串"""
+    format_map = {
+        "decimal": str,
+        "upperRoman": lambda n: _to_roman(n).upper(),
+        "lowerRoman": lambda n: _to_roman(n).lower(),
+        "upperLetter": lambda n: chr(ord("A") + n - 1) if 1 <= n <= 26 else str(n),
+        "lowerLetter": lambda n: chr(ord("a") + n - 1) if 1 <= n <= 26 else str(n),
+        "chineseCountingThousand": lambda n: _to_chinese_num(n),
+        "ideographTraditional": lambda n: _to_chinese_num(n),
+        "chineseCounting": lambda n: _to_chinese_num(n),
+    }
+    formatter = format_map.get(num_fmt, str)
+    return formatter(num)
+
+
+def _get_level_fmt(abstract_num, ilvl: int) -> str:
+    """获取指定级别的 numFmt"""
+    lvl = None
+    for el in abstract_num.findall(qn("w:lvl")):
+        if el.get(qn("w:ilvl")) == str(ilvl):
+            lvl = el
+            break
+    if lvl is not None:
+        num_fmt_elem = lvl.find(qn("w:numFmt"))
+        if num_fmt_elem is not None:
+            return num_fmt_elem.get(qn("w:val"), "decimal")
+    return "decimal"
+
+
+def _to_roman(num: int) -> str:
+    """将整数转换为罗马数字"""
+    val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
+    syms = ["m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"]
+    roman = ""
+    i = 0
+    while num > 0:
+        for _ in range(num // val[i]):
+            roman += syms[i]
+            num -= val[i]
+        i += 1
+    return roman
+
+
+def _to_chinese_num(num: int) -> str:
+    """将整数转换为中文数字（一到一百）"""
+    if num <= 0:
+        return str(num)
+    digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+    units = ["", "十", "百", "千"]
+    if num < 10:
+        return digits[num]
+    if num < 100:
+        tens = num // 10
+        ones = num % 10
+        if tens == 1:
+            result = "十"
+        else:
+            result = digits[tens] + "十"
+        if ones > 0:
+            result += digits[ones]
+        return result
+    if num == 100:
+        return "一百"
+    return str(num)
+
+
 def remove_all_numbering(doc):
     """
     强制解除样式与列表的绑定
