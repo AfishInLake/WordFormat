@@ -13,6 +13,7 @@ class References(FormatNode[ReferencesTitleConfig]):
 
     NODE_TYPE = "references"
     CONFIG_MODEL = ReferencesTitleConfig
+    CONFIG_PATH = "references.title"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -58,6 +59,7 @@ class ReferenceEntry(FormatNode[ReferencesContentConfig]):
     """参考文献条目节点"""
 
     CONFIG_MODEL = ReferencesContentConfig
+    CONFIG_PATH = "references.content"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config

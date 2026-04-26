@@ -1579,7 +1579,7 @@ class TestFormatNodeAdditional:
             FormatNode.load_yaml_config(str(bad_yaml))
 
     def test_load_config_unknown_type_raises(self):
-        """load_config with unknown CONFIG_MODEL raises ValueError (line 145)"""
+        """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
         from wordformat.rules.node import FormatNode
         from wordformat.config.datamodel import BaseModel
 
@@ -1594,8 +1594,8 @@ class TestFormatNodeAdditional:
             level=1,
         )
         mock_config = mock.MagicMock()
-        with pytest.raises(ValueError, match="未知的配置类型"):
-            node.load_config(mock_config)
+        node.load_config(mock_config)
+        assert node._pydantic_config is None
 
 
 # ==================== (r) tree.py 额外覆盖测试 ====================

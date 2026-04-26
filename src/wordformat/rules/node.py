@@ -129,39 +129,27 @@ class FormatNode(TreeNode, Generic[T]):
         except Exception as e:
             raise RuntimeError(f"加载配置失败: {e}") from e
 
-    def load_config(self, full_config: NodeConfigRoot):  # noqa C901
-        """重写父类方法：同时加载字典配置和Pydantic配置"""
+    def load_config(self, full_config: NodeConfigRoot):
+        """重写父类方法：同时加载字典配置和Pydantic配置。
+
+        通过 CONFIG_PATH 属性声明配置路径，沿路径逐级 getattr 解析。
+        子类只需设置 CONFIG_PATH = "abstract.chinese.chinese_title" 即可，
+        无需在此方法中维护硬编码映射表。
+        """
         # 1. 先执行父类的字典配置加载（兼容旧逻辑）
         super().load_config(full_config)
 
-        class_name = self.CONFIG_MODEL.__name__
-        match str(class_name):
-            case "AbstractTitleConfig":
-                self._pydantic_config = full_config.abstract.chinese.chinese_title
-            case "AbstractChineseConfig":
-                self._pydantic_config = full_config.abstract.chinese
-            case "AbstractEnglishConfig":
-                self._pydantic_config = full_config.abstract.english
-            case "KeywordsConfig":
-                self._pydantic_config = full_config.abstract.keywords
-            case "HeadingLevelConfig":
-                self._pydantic_config = full_config.headings
-            case "BodyTextConfig":
-                self._pydantic_config = full_config.body_text
-            case "FiguresConfig":
-                self._pydantic_config = full_config.figures
-            case "TablesConfig":
-                self._pydantic_config = full_config.tables
-            case "ReferencesTitleConfig":
-                self._pydantic_config = full_config.references.title
-            case "ReferencesContentConfig":
-                self._pydantic_config = full_config.references.content
-            case "AcknowledgementsTitleConfig":
-                self._pydantic_config = full_config.acknowledgements.title
-            case "AcknowledgementsContentConfig":
-                self._pydantic_config = full_config.acknowledgements.content
-            case _:
-                raise ValueError(f"未知的配置类型: {class_name}")
+        # 2. 有自定义 load_config 的子类（BaseHeadingNode、BaseKeywordsNode）
+        #    会重写此方法，不会执行到这里
+        config_path = getattr(self, "CONFIG_PATH", None)
+        if config_path is None:
+            return
+
+        # 3. 沿 CONFIG_PATH 逐级 getattr
+        obj = full_config
+        for part in config_path.split("."):
+            obj = getattr(obj, part)
+        self._pydantic_config = obj
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph
@@ -175,7 +163,37 @@ class FormatNode(TreeNode, Generic[T]):
 
     def apply_format(self, doc: Document):
         """虚方法：由子类实现具体的格式应用逻辑"""
+        self._clean_paragraph_edge_spaces()
         self._base(doc, p=False, r=False)
+
+    def _clean_paragraph_edge_spaces(self) -> None:
+        """清理段落首尾 run 中的多余空格。
+
+        AI 生成的文档常在段落开头或结尾残留空格，此方法在格式化时自动清理：
+        - 第一个非空 run 的开头空格
+        - 最后一个非空 run 的结尾空格
+        """
+        if self.paragraph is None:
+            return
+        runs = self.paragraph.runs
+        if not runs:
+            return
+
+        # 清理第一个非空 run 的开头空格
+        for run in runs:
+            if run.text:
+                stripped = run.text.lstrip(" \u00a0")  # 普通空格 + 不间断空格
+                if stripped != run.text:
+                    run.text = stripped
+                break
+
+        # 清理最后一个非空 run 的结尾空格
+        for run in reversed(runs):
+            if run.text:
+                stripped = run.text.rstrip(" \u00a0")
+                if stripped != run.text:
+                    run.text = stripped
+                break
 
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         if text.strip():

@@ -1,13 +1,14 @@
 import re
+from copy import deepcopy
 from typing import Literal
+
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 
 from wordformat.config.datamodel import KeywordsConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
-# FIXME:问题描述：pydantic_config 属性抛出异常
-#  影响测试：TestKeywords.test_keywords_cn_base_no_config
-#  解决方案：跳过了该测试
 
 
 # 第一步：提取关键词基类，复用通用逻辑
@@ -55,6 +56,59 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
             issues = ps.apply_to_paragraph(self.paragraph)
         return ParagraphStyle.to_string(issues)
 
+    def _split_mixed_runs(self) -> None:
+        """检测标签和内容混合在同一个 run 中的情况，拆分为两个独立的 run。
+
+        例如 "关键词：校园二手交易；Django" 在同一个 run 中时，
+        拆分为 "关键词：" 和 "校园二手交易；Django" 两个 run，
+        以便分别应用不同的字符样式。
+
+        拆分后第二个 run 会继承第一个 run 的所有格式（rPr），
+        后续样式检查会覆盖需要修改的属性。
+        """
+        label_pattern = self._get_label_split_pattern()
+        if not label_pattern:
+            return
+
+        p_elem = self.paragraph._element
+        runs_to_split = []
+
+        for run in self.paragraph.runs:
+            text = run.text
+            if not text.strip():
+                continue
+            match = re.search(label_pattern, text)
+            if match and match.end() < len(text):
+                # 标签后面还有内容，需要拆分
+                split_pos = match.end()
+                runs_to_split.append((run, split_pos))
+
+        for run, split_pos in runs_to_split:
+            r_elem = run._element
+            t_elem = r_elem.find(qn("w:t"))
+            if t_elem is None:
+                continue
+
+            full_text = t_elem.text or ""
+            label_text = full_text[:split_pos]
+            content_text = full_text[split_pos:]
+
+            # 修改原 run 为标签部分
+            t_elem.text = label_text
+
+            # 创建新 run（深拷贝原 run 的 XML，保留所有格式）
+            new_r_elem = deepcopy(r_elem)
+            new_t_elem = new_r_elem.find(qn("w:t"))
+            if new_t_elem is not None:
+                new_t_elem.text = content_text
+
+            # 在原 run 后面插入新 run
+            r_elem.addnext(new_r_elem)
+
+    def _get_label_split_pattern(self) -> re.Pattern | None:
+        """返回用于拆分标签的正则表达式，由子类重写。"""
+        return None
+
     # 第二步：英文关键词节点（专属逻辑）
 
 
@@ -69,11 +123,15 @@ class KeywordsEN(BaseKeywordsNode):
         pattern = r"Keywords?|KEY\s*WORDS"
         return bool(re.search(pattern, run.text, re.IGNORECASE))
 
+    def _get_label_split_pattern(self) -> re.Pattern | None:
+        """英文标签拆分模式：匹配 'Keywords:' 或 'Keywords ' 及其变体"""
+        return re.compile(r"Keywords?\s*[:：]?\s*", re.IGNORECASE)
+
     def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
         校验英文关键词格式：
         - 段落整体格式（对齐、行距等）
-        - “Keywords:” 部分加粗，其余内容不加粗
+        - "Keywords:" 部分加粗，其余内容不加粗
         """
         cfg = self.pydantic_config
 
@@ -86,7 +144,11 @@ class KeywordsEN(BaseKeywordsNode):
                 text=paragraph_issues,
             )
 
-        # 3. 字符样式检查（区分标签/内容）
+        # 3. 拆分标签和内容混合的 run（仅在格式化模式下执行）
+        if not p:
+            self._split_mixed_runs()
+
+        # 4. 字符样式检查（区分标签/内容）
         # (a) "Keywords:" 标签 —— 加粗
         label_style = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
@@ -165,11 +227,15 @@ class KeywordsCN(BaseKeywordsNode):
         pattern = r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词"
         return bool(re.search(pattern, run.text))
 
+    def _get_label_split_pattern(self) -> re.Pattern | None:
+        """中文标签拆分模式：匹配 '关键词：' 或 '关键词:' 及其变体"""
+        return re.compile(r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*")
+
     def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
         校验中文关键词格式：
         - 段落整体格式（对齐、行距等）
-        - “关键词：”部分加粗，其余内容不加粗
+        - "关键词："部分加粗，其余内容不加粗
         - 校验关键词数量、末尾标点
         """
         # 1. 空值校验
@@ -190,7 +256,11 @@ class KeywordsCN(BaseKeywordsNode):
                 text=paragraph_issues,
             )
 
-        # 3. 字符样式检查（区分标签/内容）
+        # 3. 拆分标签和内容混合的 run（仅在格式化模式下执行）
+        if not p:
+            self._split_mixed_runs()
+
+        # 4. 字符样式检查（区分标签/内容）
         # (a) "关键词：" 标签 —— 加粗（修复拼写错误：kewords_bold → kewords_bold）
         label_style = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,

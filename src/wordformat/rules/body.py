@@ -13,6 +13,7 @@ class BodyText(FormatNode[BodyTextConfig]):
 
     NODE_TYPE = "body_text"
     CONFIG_MODEL = BodyTextConfig
+    CONFIG_PATH = "body_text"
 
     def _base(self, doc, p: bool, r: bool):
         """

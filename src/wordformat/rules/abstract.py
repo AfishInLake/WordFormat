@@ -18,6 +18,7 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
 
     NODE_TYPE = "abstract.chinese.chinese_title"
     CONFIG_MODEL = AbstractTitleConfig
+    CONFIG_PATH = "abstract.chinese.chinese_title"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -54,6 +55,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
 
     NODE_TYPE = "abstract.chinese"
     CONFIG_MODEL = AbstractChineseConfig
+    CONFIG_PATH = "abstract.chinese"
 
     def check_title(self, run) -> bool:
         """检查标题是否包含在正文中"""
@@ -116,6 +118,7 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
 
     NODE_TYPE = "abstract.chinese.chinese_content"
     CONFIG_MODEL = AbstractChineseConfig
+    CONFIG_PATH = "abstract.chinese"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config.chinese_content
@@ -151,6 +154,7 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
 
     NODE_TYPE = "abstract.english.english_title"
     CONFIG_MODEL = AbstractTitleConfig
+    CONFIG_PATH = "abstract.english.english_title"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -192,6 +196,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
 
     NODE_TYPE = "abstract.english"
     CONFIG_MODEL = AbstractEnglishConfig
+    CONFIG_PATH = "abstract.english"
 
     def check_title(self, run) -> bool:
         """检查标题是否包含在正文中"""
@@ -254,6 +259,7 @@ class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
 
     NODE_TYPE = "abstract.english.english_content"
     CONFIG_MODEL = AbstractEnglishConfig
+    CONFIG_PATH = "abstract.english"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config.english_content

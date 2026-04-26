@@ -13,6 +13,7 @@ class CaptionFigure(FormatNode[FiguresConfig]):
 
     NODE_TYPE = "figures"
     CONFIG_MODEL = FiguresConfig
+    CONFIG_PATH = "figures"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -59,6 +60,7 @@ class CaptionTable(FormatNode[TablesConfig]):
 
     NODE_TYPE = "tables"
     CONFIG_MODEL = TablesConfig
+    CONFIG_PATH = "tables"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config

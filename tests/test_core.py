@@ -574,7 +574,8 @@ class TestFormatNode:
         node.add_comment(doc, run, "   ")
 
     def test_load_config_heading_level_bug(self):
-        """HeadingLevelConfig 映射到 full_config.headings 而非具体级别"""
+        """Heading 节点没有 CONFIG_PATH，由 BaseHeadingNode 自定义 load_config 处理。
+        通过 FormatNode 基类 load_config 加载时 _pydantic_config 应为 None。"""
         from wordformat.config.datamodel import HeadingLevelConfig, NodeConfigRoot
 
         class TestFormatNode(FormatNode[HeadingLevelConfig]):
@@ -583,10 +584,8 @@ class TestFormatNode:
 
         node = TestFormatNode(value="test", level=1)
         root_config = NodeConfigRoot()
-        # load_config 应为 level_1 分配配置，但 BUG 将整个 headings 赋值
         node.load_config(root_config)
-        # BUG: pydantic_config 是 HeadingsConfig 而非 HeadingLevelConfig
-        assert node.pydantic_config is not None
+        assert node._pydantic_config is None
 
 
 # ============================================================

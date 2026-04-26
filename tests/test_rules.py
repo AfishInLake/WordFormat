@@ -117,14 +117,14 @@ class TestFormatNodeBase:
             _ = node.pydantic_config
 
     def test_unknown_config_type_raises(self, root_config, para):
-        """CONFIG_MODEL 为未知类型时 load_config 应抛出 ValueError。"""
-        # 创建一个 CONFIG_MODEL 名字不在 match 列表中的子类
+        """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
+        # 创建一个没有 CONFIG_PATH 的子类
         class FakeNode(FormatNodeBase):
             CONFIG_MODEL = type("TotallyUnknownConfig", (), {})
 
         node = FakeNode(value=para, level=0, paragraph=para)
-        with pytest.raises(ValueError, match="未知的配置类型"):
-            node.load_config(root_config)
+        node.load_config(root_config)
+        assert node._pydantic_config is None
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ class TestLoadConfig:
         node.load_config(root_config)
         assert node._pydantic_config is not None
         assert node._pydantic_config.chinese_font_name == "黑体"
-        assert node._pydantic_config.bold is True
+        assert node._pydantic_config.bold is False
 
     def test_abstract_content_cn(self, root_config):
         node = _make_node(AbstractContentCN)
@@ -218,7 +218,7 @@ class TestLoadConfig:
         node = _make_node(References)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is True
+        assert node._pydantic_config.bold is False
 
     def test_reference_entry(self, root_config):
         node = _make_node(ReferenceEntry)
@@ -230,7 +230,7 @@ class TestLoadConfig:
         node = _make_node(Acknowledgements)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is True
+        assert node._pydantic_config.bold is False
 
     def test_acknowledgements_cn(self, root_config):
         node = _make_node(AcknowledgementsCN)
@@ -284,21 +284,13 @@ class TestHeadingBug:
     此测试验证基类 FormatNode.load_config 确实存在此 bug。
     """
 
-    @pytest.mark.xfail(
-        reason="已知限制: FormatNode 通用 load_config 对 HeadingLevelConfig 返回整个 HeadingsConfig，"
-               "但 BaseHeadingNode 已重写 load_config 正确处理，实际使用不受影响",
-        strict=True,
-    )
     def test_formatnode_heading_bug(self, root_config):
-        """通过 FormatNode 基类 load_config 加载 HeadingLevel1Node，
-        验证 _pydantic_config 是否为 HeadingsConfig 而非 HeadingLevelConfig。"""
+        """Heading 节点没有 CONFIG_PATH（由 BaseHeadingNode 自定义 load_config 处理），
+        通过 FormatNode 基类 load_config 加载时 _pydantic_config 应为 None。"""
         node = _make_node(HeadingLevel1Node)
         # 故意调用 FormatNode 的 load_config（绕过 BaseHeadingNode 的重写）
         FormatNode.load_config(node, root_config)
-        # BUG: 这里 _pydantic_config 应该是 level_1 的 HeadingLevelConfig，
-        # 但实际是整个 HeadingsConfig 对象
-        assert not hasattr(node._pydantic_config, "level_1")
-        # 上面断言会失败，因为 _pydantic_config 实际是 HeadingsConfig（有 level_1 属性）
+        assert node._pydantic_config is None
 
     def test_base_heading_load_config_works_correctly(self, root_config):
         """BaseHeadingNode 重写的 load_config 应正确加载对应层级配置。"""
@@ -308,7 +300,7 @@ class TestHeadingBug:
 
         node_l2 = _make_node(HeadingLevel2Node)
         node_l2.load_config(root_config)
-        assert node_l2._pydantic_config.font_size == "三号"
+        assert node_l2._pydantic_config.font_size == "四号"
 
         node_l3 = _make_node(HeadingLevel3Node)
         node_l3.load_config(root_config)

@@ -16,6 +16,7 @@ class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
 
     NODE_TYPE = "acknowledgements"
     CONFIG_MODEL = AcknowledgementsTitleConfig
+    CONFIG_PATH = "acknowledgements.title"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -64,6 +65,7 @@ class AcknowledgementsCN(FormatNode[AcknowledgementsContentConfig]):
 
     NODE_TYPE = "acknowledgements.content"
     CONFIG_MODEL = AcknowledgementsContentConfig
+    CONFIG_PATH = "acknowledgements.content"
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
