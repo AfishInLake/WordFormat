@@ -12,9 +12,19 @@ load_dotenv()
 
 # 设置工作目录
 if getattr(sys, "frozen", False):
+    # 打包为可执行文件时，使用可执行文件所在目录
     BASE_DIR = Path(sys.executable).parent
+elif os.getenv("WORDFORMAT_BASE_DIR"):
+    # 支持通过环境变量自定义工作目录
+    BASE_DIR = Path(os.getenv("WORDFORMAT_BASE_DIR")).resolve()
 else:
-    BASE_DIR = Path(__file__).parent.parent.parent
+    # 开发模式：从 settings.py 位置向上查找项目根目录
+    # （包含 pyproject.toml 或 .git 的目录）
+    _candidate = Path(__file__).resolve().parent.parent.parent
+    if (_candidate / "pyproject.toml").exists() or (_candidate / ".git").exists():
+        BASE_DIR = _candidate
+    else:
+        BASE_DIR = Path.cwd()
 
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
