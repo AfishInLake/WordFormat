@@ -3,7 +3,7 @@ style_checks_warning:
   italic: false
   underline: false
   font_size: false
-  font_name: true
+  font_name: false
   font_color: false
   alignment: false
   space_before: false
@@ -18,10 +18,10 @@ style_checks_warning:
 # 全局页面格式（正文通用）
 global_format: &global_format
   alignment: '两端对齐'
-  space_before: "0.5行"
-  space_after: "0.5行"
-  line_spacingrule: "1.5倍行距"
-  line_spacing: '1.5倍'
+  space_before: "0行"
+  space_after: "0行"
+  line_spacingrule: "固定值"
+  line_spacing: '20磅'
   left_indent: "0字符"
   right_indent: "0字符"
   first_line_indent: '2字符'
@@ -43,7 +43,7 @@ abstract:
       first_line_indent: '0字符'
       chinese_font_name: '黑体'
       font_size: '小二'
-      bold: true
+      bold: false
     chinese_content:
       <<: *global_format
       alignment: '两端对齐'
@@ -53,23 +53,21 @@ abstract:
       alignment: '居中对齐'
       first_line_indent: '0字符'
       english_font_name: 'Times New Roman'
-      font_size: '四号'
+      font_size: '小四'
       bold: true
-      line_spacing: "0倍"
     english_content:
       <<: *global_format
       alignment: '两端对齐'
       english_font_name: 'Times New Roman'
       font_size: '小四'
-      line_spacing: "0倍"
   keywords:
     chinese:
       <<: *global_format
       alignment: '左对齐'
       first_line_indent: '0字符'
       chinese_font_name: '黑体'
-      font_size: '小四'
-      keywords_bold: true  # 规范未要求加粗，仅字体为黑体四号
+      font_size: '四号'
+      keywords_bold: true
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
@@ -78,7 +76,7 @@ abstract:
       alignment: '左对齐'
       first_line_indent: '0字符'
       english_font_name: 'Times New Roman'
-      font_size: '小四'
+      font_size: '四号'
       keywords_bold: true
       count_min: 3
       count_max: 5
@@ -86,7 +84,7 @@ abstract:
 
 # 各级标题格式（章、节、小节）
 headings:
-  level_1: # 一级标题（如“第一章 绪论”）
+  level_1:
     <<: *global_format
     alignment: '居中对齐'
     first_line_indent: '0字符'
@@ -97,16 +95,16 @@ headings:
     space_before: "0.5行"
     space_after: "0.5行"
     line_spacingrule: "1.5倍行距"
-    line_spacing: '1.5倍'  # 标题通常单倍行距
+    line_spacing: '1.5倍'
     builtin_style_name: 'Heading 1'
 
-  level_2: # 二级标题（如“1.1 研究背景”）
+  level_2:
     <<: *global_format
     alignment: '左对齐'
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
     english_font_name: 'Times New Roman'
-    font_size: '三号'
+    font_size: '四号'
     bold: false
     space_before: "0.5行"
     space_after: "0.5行"
@@ -114,7 +112,7 @@ headings:
     line_spacing: '1.5倍'
     builtin_style_name: 'Heading 2'
 
-  level_3: # 三级标题（如“1.1.1 国内现状”）
+  level_3:
     <<: *global_format
     alignment: '左对齐'
     first_line_indent: '0字符'
@@ -124,39 +122,35 @@ headings:
     bold: false
     space_before: "0.5行"
     space_after: "0.5行"
-    builtin_style_name: 'Heading 3'
     line_spacingrule: "1.5倍行距"
     line_spacing: '1.5倍'
+    builtin_style_name: 'Heading 3'
 
 # 正文段落格式
 body_text:
   <<: *global_format
-  # 已在 global_format 中定义，此处可省略或保留以强调
 
 # 插图（Figure）格式
 figures:
   <<: *global_format
-  caption_position: 'below'          # 图名置于图之下（规范明确要求）
-  caption_prefix: '图'               # 如“图2.1”
+  caption_position: 'below'
+  caption_prefix: '图'
   font_size: '五号'
   builtin_style_name: '题注'
   alignment: '居中对齐'
   first_line_indent: '0字符'
-
 
 # 表格（Table）格式
 tables:
   <<: *global_format
-  caption_position: 'above'          # 表名置于表之上（规范明确要求）
-  caption_prefix: '表'               # 如“表5.1”
-  caption_numbering: 'per_chapter'   # 分章编号
+  caption_position: 'above'
+  caption_prefix: '表'
   chinese_font_name: '宋体'
   font_size: '五号'
-  english_font_name: 'Times New Roman'    # 表格内英文用 Times New Roman 五号
+  english_font_name: 'Times New Roman'
   builtin_style_name: '题注'
   alignment: '居中对齐'
   first_line_indent: '0字符'
-
 
 # 参考文献（References）
 references:
@@ -165,17 +159,17 @@ references:
     alignment: '居中对齐'
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
-    font_size: '三号'
-    bold: true
+    font_size: '小二'
+    bold: false
   content:
     <<: *global_format
     alignment: '左对齐'
     first_line_indent: '0字符'
-    chinese_font_name: '宋体'
+    chinese_font_name: '黑体'
     english_font_name: 'Times New Roman'
     font_size: '五号'
-    entry_indent: 0.0                # 顶格（序号[1]顶格）
-    entry_ending_punct: '.'          # 每条以句号结束
+    entry_indent: 0.0
+    entry_ending_punct: '.'
     numbering_format: '[1], [2], ...'
 
 # 致谢（Acknowledgements）
@@ -186,8 +180,25 @@ acknowledgements:
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
     font_size: '小二'
-    bold: true
+    bold: false
   content:
     <<: *global_format
     alignment: '两端对齐'
     first_line_indent: '2字符'
+    font_size: '五号'
+
+# 标题自动编号（已启用）
+numbering:
+  enabled: true
+  level_1:
+    enabled: true
+    template: '%1'
+    strip_pattern: '^\d\s+'
+  level_2:
+    enabled: true
+    template: '%1.%2'
+    strip_pattern: '^\d+(\.\d+)\s+'
+  level_3:
+    enabled: true
+    template: '%1.%2.%3'
+    strip_pattern: '^\d+(\.\d+){2}\s+'

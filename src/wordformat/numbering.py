@@ -259,13 +259,17 @@ def create_numbering_definition(document, config, headings_config=None) -> dict[
     根据配置中的 template 生成 abstractNum 和 num 定义，
     返回 {level_key: num_id} 映射。
 
+    关键设计：所有级别共用同一个 abstractNum，确保多级编号的计数器
+    正确联动（例如三级标题的 %1、%2 能正确反映父级编号）。
+
     Args:
         document: docx Document 对象
         config: NumberingConfig 配置对象
         headings_config: 标题配置（用于设置编号字体/字号跟随标题样式）
 
     Returns:
-        dict: {"level_1": "100", "level_2": "101", "level_3": "102"}
+        dict: {"level_1": "100", "level_2": "100", "level_3": "100"}
+              （所有级别共享同一个 numId）
     """
     if not config.enabled:
         return {}
@@ -302,105 +306,96 @@ def create_numbering_definition(document, config, headings_config=None) -> dict[
         num_id = int(elem.get(qn("w:numId"), "0"))
         max_num_id = max(max_num_id, num_id)
 
-    result = {}
+    # 收集所有启用的级别配置，按 ilvl 排序
     level_configs = [
         ("level_1", config.level_1, 0),
         ("level_2", config.level_2, 1),
         ("level_3", config.level_3, 2),
     ]
+    enabled_levels = [
+        (key, lcfg, ilvl) for key, lcfg, ilvl in level_configs
+        if lcfg.enabled and lcfg.template
+    ]
 
-    for level_key, level_config, ilvl in level_configs:
-        if not level_config.enabled or not level_config.template:
-            continue
+    if not enabled_levels:
+        return {}
 
-        abstract_num_id = max_abstract_num_id + 1
-        max_abstract_num_id += 1
-        num_id = max_num_id + 1
-        max_num_id += 1
+    # 所有级别共用一个 abstractNum，确保计数器正确联动
+    abstract_num_id = max_abstract_num_id + 1
+    num_id = max_num_id + 1
 
-        # 创建 abstractNum
-        abstract_num = OxmlElement("w:abstractNum")
-        abstract_num.set(qn("w:abstractNumId"), str(abstract_num_id))
+    abstract_num = OxmlElement("w:abstractNum")
+    abstract_num.set(qn("w:abstractNumId"), str(abstract_num_id))
 
-        # 创建多级 lvl（需要创建所有上级级别才能正确计数）
-        for lvl_i in range(ilvl + 1):
-            lvl = OxmlElement("w:lvl")
-            lvl.set(qn("w:ilvl"), str(lvl_i))
+    for level_key, level_config, ilvl in enabled_levels:
+        lvl = OxmlElement("w:lvl")
+        lvl.set(qn("w:ilvl"), str(ilvl))
 
-            start = OxmlElement("w:start")
-            start.set(qn("w:val"), "1")
-            lvl.append(start)
+        start = OxmlElement("w:start")
+        start.set(qn("w:val"), "1")
+        lvl.append(start)
 
-            numFmt = OxmlElement("w:numFmt")
-            # 根据模板判断格式
-            template = level_config.template
-            if "第" in template and "章" in template:
-                numFmt.set(qn("w:val"), "chineseCountingThousand")
-            else:
-                numFmt.set(qn("w:val"), "decimal")
-            lvl.append(numFmt)
+        numFmt = OxmlElement("w:numFmt")
+        template = level_config.template
+        if "第" in template and "章" in template:
+            numFmt.set(qn("w:val"), "chineseCountingThousand")
+        else:
+            numFmt.set(qn("w:val"), "decimal")
+        lvl.append(numFmt)
 
-            lvlText = OxmlElement("w:lvlText")
-            # 根据级别生成 lvlText
-            if lvl_i == ilvl:
-                lvlText.set(qn("w:val"), level_config.template)
-            else:
-                # 上级级别使用简单的 %N 格式
-                lvlText.set(qn("w:val"), f"%{lvl_i + 1}")
-            lvl.append(lvlText)
+        lvlText = OxmlElement("w:lvlText")
+        lvlText.set(qn("w:val"), template)
+        lvl.append(lvlText)
 
-            # 编号后缀：tab（制表符）、space（空格）、nothing（无）
-            suff = OxmlElement("w:suff")
-            suff_val = level_config.suffix or "space"
-            suff.set(qn("w:val"), suff_val)
-            lvl.append(suff)
+        # 编号后缀：tab（制表符）、space（空格）、nothing（无）
+        suff = OxmlElement("w:suff")
+        suff_val = level_config.suffix or "space"
+        suff.set(qn("w:val"), suff_val)
+        lvl.append(suff)
 
-            lvlJc = OxmlElement("w:lvlJc")
-            lvlJc.set(qn("w:val"), "left")
-            lvl.append(lvlJc)
+        lvlJc = OxmlElement("w:lvlJc")
+        lvlJc.set(qn("w:val"), "left")
+        lvl.append(lvlJc)
 
-            # pPr - 缩进设置
-            pPr = OxmlElement("w:pPr")
-            ind = OxmlElement("w:ind")
+        # pPr - 缩进设置
+        pPr = OxmlElement("w:pPr")
+        ind = OxmlElement("w:ind")
 
-            # 计算编号缩进（left）：编号起始位置距左边距
-            if level_config.numbering_indent:
-                _set_indent_value(ind, "left", level_config.numbering_indent)
-            else:
-                ind.set(qn("w:left"), "0")
+        if level_config.numbering_indent:
+            _set_indent_value(ind, "left", level_config.numbering_indent)
+        else:
+            ind.set(qn("w:left"), "0")
 
-            # 计算文本缩进（hanging）：文本相对于编号起始位置的偏移量
-            if level_config.text_indent:
-                _set_indent_value(ind, "hanging", level_config.text_indent)
-            else:
-                # 默认：每级缩进约 0.3cm（210 twips）
-                ind.set(qn("w:hanging"), str((lvl_i + 1) * 210))
+        if level_config.text_indent:
+            _set_indent_value(ind, "hanging", level_config.text_indent)
+        else:
+            ind.set(qn("w:hanging"), str((ilvl + 1) * 210))
 
-            pPr.append(ind)
-            lvl.append(pPr)
+        pPr.append(ind)
+        lvl.append(pPr)
 
-            # rPr - 编号的字体/字号跟随标题样式
-            if headings_config and lvl_i == ilvl:
-                rPr = _build_numbering_rPr(headings_config, level_key)
-                if rPr is not None:
-                    lvl.append(rPr)
+        # rPr - 编号的字体/字号跟随标题样式
+        if headings_config:
+            rPr = _build_numbering_rPr(headings_config, level_key)
+            if rPr is not None:
+                lvl.append(rPr)
 
-            abstract_num.append(lvl)
+        abstract_num.append(lvl)
 
-        numbering_elm.append(abstract_num)
+    numbering_elm.append(abstract_num)
 
-        # 创建 num 引用
-        num = OxmlElement("w:num")
-        num.set(qn("w:numId"), str(num_id))
-        abstract_num_id_ref = OxmlElement("w:abstractNumId")
-        abstract_num_id_ref.set(qn("w:val"), str(abstract_num_id))
-        num.append(abstract_num_id_ref)
-        numbering_elm.append(num)
+    # 创建 num 引用
+    num = OxmlElement("w:num")
+    num.set(qn("w:numId"), str(num_id))
+    abstract_num_id_ref = OxmlElement("w:abstractNumId")
+    abstract_num_id_ref.set(qn("w:val"), str(abstract_num_id))
+    num.append(abstract_num_id_ref)
+    numbering_elm.append(num)
 
-        result[level_key] = str(num_id)
-        logger.debug(f"创建编号定义: {level_key} → numId={num_id}, template={level_config.template}")
+    logger.debug(f"创建编号定义: 共用 abstractNumId={abstract_num_id}, numId={num_id}")
 
-    return result
+    # 所有启用的级别共享同一个 numId
+    return {key: str(num_id) for key, _, _ in enabled_levels}
 
 
 def process_heading_numbering(root_node, document, config, headings_config=None):
