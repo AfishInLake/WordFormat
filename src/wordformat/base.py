@@ -84,8 +84,4 @@ class DocxBase:
                 logger.info(response)
                 result.append(response)
 
-                # 遇到 heading_fulu 则提前终止整个解析
-                if response["category"] == "heading_fulu":
-                    return result
-
         return result

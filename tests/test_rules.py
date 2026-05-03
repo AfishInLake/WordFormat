@@ -300,7 +300,7 @@ class TestHeadingBug:
 
         node_l2 = _make_node(HeadingLevel2Node)
         node_l2.load_config(root_config)
-        assert node_l2._pydantic_config.font_size == "四号"
+        assert node_l2._pydantic_config.font_size == "小二"
 
         node_l3 = _make_node(HeadingLevel3Node)
         node_l3.load_config(root_config)

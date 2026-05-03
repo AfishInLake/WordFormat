@@ -29,6 +29,19 @@ JSON 会**自动生成**在 `-o` 目录，文件名 = 文档名 + 10位时间戳
 2. 确认 `-f` 后面是**完整的 JSON 文件路径**，不是文件夹
 3. 检查路径是否正确（可直接复制终端打印的 JSON 路径）
 
+### Q4.5：如何快速检查 JSON 中的分类是否正确？
+**回答**：使用 `wf tree` 命令查看文档结构树：
+```bash
+# 查看完整结构
+wf tree -f output/论文_1234567890.json
+
+# 仅看标题
+wf tree -f output/论文_1234567890.json --filter heading_level_1,heading_level_2
+
+# 显示置信度（低于 80% 的需要重点检查）
+wf tree -f output/论文_1234567890.json --confidence
+```
+
 ### Q5：`wf` 或 `wordformat` 命令未找到？
 **排查方向**
 1. 确认进入了虚拟环境

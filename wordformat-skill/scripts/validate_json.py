@@ -22,6 +22,7 @@ import sys
 from collections import Counter
 
 # 模型实际输出的所有合法 category（来源于 id2label.json）
+# 以及人工修正时使用的辅助 category
 VALID_CATEGORIES = {
     "abstract_chinese_title",
     "abstract_chinese_title_content",
@@ -32,12 +33,14 @@ VALID_CATEGORIES = {
     "heading_level_1",
     "heading_level_2",
     "heading_level_3",
+    "heading_mulu",
     "heading_fulu",
     "references_title",
     "acknowledgements_title",
     "caption_figure",
     "caption_table",
     "body_text",
+    "other",
 }
 
 # category 中文说明
@@ -51,12 +54,14 @@ CATEGORY_LABELS = {
     "heading_level_1": "一级标题（章）",
     "heading_level_2": "二级标题（节）",
     "heading_level_3": "三级标题（小节）",
+    "heading_mulu": "目录标题",
     "heading_fulu": "附录标题",
     "references_title": "参考文献标题",
     "acknowledgements_title": "致谢标题",
     "caption_figure": "图题注",
     "caption_table": "表题注",
     "body_text": "正文",
+    "other": "其他（跳过格式化）",
 }
 
 

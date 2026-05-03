@@ -582,16 +582,80 @@ class BuiltInStyle(UnitLabelEnum):
         "题注": CAPTION,
     }
 
-    # FIXME:问题描述：base_set 方法的实现存在问题，无法正确处理无效样式
-    #  影响测试：TestBuiltInStyle.test_base_set_with_invalid
-    #  解决方案：使用 try-except 块捕获可能的异常，接受任何异常
-
     def base_set(self, docx_obj: Paragraph, **kwargs):
         style = self._LABEL_MAP.get(self.value, None)
-        if style:
-            docx_obj.style = style
-        else:
-            docx_obj.style = self.value
+        style_name = style if style else self.value
+
+        try:
+            docx_obj.style = style_name
+        except KeyError:
+            # 样式不存在，创建新样式
+            doc = docx_obj.part.document
+            _ensure_style_exists(doc, style_name)
+            docx_obj.style = style_name
 
     def get_from_paragraph(self, paragraph: Paragraph):
         return paragraph_get_builtin_style_name(paragraph)
+
+
+# 内置样式名称到基础样式的映射，用于创建新样式时指定基础样式
+_BUILTIN_STYLE_BASE_MAP = {
+    "Heading 1": "Normal",
+    "Heading 2": "Normal",
+    "Heading 3": "Normal",
+    "Heading 4": "Normal",
+    "Normal": None,
+    "Title": "Normal",
+    "Subtitle": "Normal",
+    "Caption": "Normal",
+    "List Paragraph": "Normal",
+}
+
+# 内置样式名称到 outlineLvl 的映射（标题样式需要设置大纲级别）
+_BUILTIN_STYLE_OUTLINE_LVL = {
+    "Heading 1": 0,
+    "Heading 2": 1,
+    "Heading 3": 2,
+    "Heading 4": 3,
+}
+
+
+def _ensure_style_exists(doc, style_name: str):
+    """
+    确保文档中存在指定名称的样式，不存在则创建。
+
+    创建的样式会继承自合适的基础样式（如 Normal），
+    标题样式会额外设置大纲级别（outlineLvl）。
+    """
+    try:
+        doc.styles[style_name]
+        return  # 样式已存在
+    except KeyError:
+        pass
+
+    base_style_name = _BUILTIN_STYLE_BASE_MAP.get(style_name, "Normal")
+    try:
+        if base_style_name:
+            base_style = doc.styles[base_style_name]
+        else:
+            base_style = None
+        new_style = doc.styles.add_style(style_name, 1)  # WD_STYLE_TYPE.PARAGRAPH = 1
+        if base_style:
+            new_style.base_style = base_style
+
+        # 标题样式设置大纲级别
+        outline_lvl = _BUILTIN_STYLE_OUTLINE_LVL.get(style_name)
+        if outline_lvl is not None:
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            pPr = new_style.element.find(qn("w:pPr"))
+            if pPr is None:
+                pPr = OxmlElement("w:pPr")
+                new_style.element.insert(0, pPr)
+            outlineLvl = OxmlElement("w:outlineLvl")
+            outlineLvl.set(qn("w:val"), str(outline_lvl))
+            pPr.append(outlineLvl)
+
+        logger.debug(f"已创建样式: {style_name} (基础样式: {base_style_name or '无'})")
+    except Exception as e:
+        logger.warning(f"创建样式 '{style_name}' 失败: {e}")

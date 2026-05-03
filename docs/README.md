@@ -24,8 +24,9 @@
 
 ### 常用命令
 - [生成文档结构 JSON](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#1-生成文档结构-json)
-- [执行格式校验](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#2-执行格式校验)
-- [执行格式格式化](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#3-执行格式格式化)
+- [查看文档结构树](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#2-查看文档结构树)
+- [执行格式校验](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#3-执行格式校验)
+- [执行格式格式化](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#4-执行格式格式化)
 
 ### 配置指南
 - [配置文件格式](https://github.com/AfishInLake/WordFormat/blob/master/docs/configuration.md#配置文件格式)

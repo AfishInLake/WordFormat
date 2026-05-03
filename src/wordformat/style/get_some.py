@@ -326,10 +326,20 @@ def run_get_font_color(run: Run) -> tuple[int, int, int] | None:
 
     Return:
         tuple or None: (r, g, b) 元组，每个分量为 0-255 的整数。
-                       若未设置颜色或使用主题色，返回 (0, 0, 0)。
+                       若未设置颜色，返回 (0, 0, 0)。
+                       若使用主题色（themeColor），返回 None，表示颜色不确定
+                       （主题色在渲染时由 Word 根据主题动态解析，rgb 只是猜测值）。
     """
     color = run.font.color
-    if color is None or color.rgb is None:
+    if color is None:
+        return 0, 0, 0
+
+    # 检测主题色类型：themeColor 优先级高于 rgb，rgb 只是猜测值
+    from docx.enum.dml import MSO_COLOR_TYPE
+    if color.type == MSO_COLOR_TYPE.THEME:
+        return None
+
+    if color.rgb is None:
         return 0, 0, 0
 
     rgb_hex = color.rgb  # 如 'FF0000'

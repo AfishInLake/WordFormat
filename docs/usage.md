@@ -14,6 +14,9 @@ WordFormat 现已支持**超短命令**，输入更快捷、不易出错。
 # 生成文档结构 JSON（自动保存，无需指定json路径）
 wf gj -d 论文.docx -c 配置.yaml
 
+# 查看文档结构树（检查分类是否正确）
+wf tree -f 生成的文件.json
+
 # 检查格式错误（添加批注，不修改原文）
 wf cf -d 论文.docx -c 配置.yaml -f 生成的文件.json
 
@@ -31,6 +34,7 @@ wf startapi
 ### 命令说明
 - `wf` 或 `wordformat`：工具主命令
 - `gj`：generate-json → 生成文档结构 JSON
+- `tree`：查看文档结构树
 - `cf`：check-format → 检查格式
 - `af`：apply-format → 自动格式化
 - `startapi`：启动API服务
@@ -38,7 +42,7 @@ wf startapi
 ### 通用参数
 - `-d`：**必填**，Word 文档路径
 - `-c`：**必填**，YAML 格式配置文件路径
-- `-f`：JSON 文件路径（**仅 cf/af 需要**）
+- `-f`：JSON 文件路径（**仅 cf/af/tree 需要**）
 - `-o`：输出目录（可选，默认 `output/`）
 - `-H`：API服务地址（可选，默认 `127.0.0.1`，**仅 startapi**）
 - `-p`：API服务端口（可选，默认 `8000`，**仅 startapi**）
@@ -59,7 +63,51 @@ wf gj -d your_document.docx -c example/undergrad_thesis.yaml -o output/
 
 ---
 
-## 2. 执行格式校验
+## 2. 查看文档结构树
+**可视化展示文档的段落分类和层级结构**，用于快速检查 AI 识别结果是否正确。
+
+```bash
+# 查看完整结构（含各类别统计）
+wf tree -f output/论文_1744123456.json
+
+# 仅查看标题结构
+wf tree -f output/论文_1744123456.json --filter heading_level_1,heading_level_2
+
+# 显示节点序号
+wf tree -f output/论文_1744123456.json --index
+
+# 显示分类置信度
+wf tree -f output/论文_1744123456.json --confidence
+```
+
+**tree 专属参数：**
+
+| 参数 | 作用 | 示例 |
+|------|------|------|
+| `--filter` | 仅显示指定类别（逗号分隔） | `--filter heading_level_1,body_text` |
+| `--index` | 显示节点序号 | `--index` |
+| `--confidence` | 显示分类置信度 | `--confidence` |
+
+**输出示例：**
+```
+📄 文档结构树 (414 个段落)
+============================================================
+  body_text                       302
+  heading_level_3                  47
+  heading_level_2                  23
+  heading_level_1                   6
+============================================================
+└── 【heading_level_1】 1 绪论
+    ├── 【heading_level_2】 1.1 研究背景与意义
+    └── 【heading_level_2】 1.2 国内外发展现状
+└── 【heading_level_1】 2 系统相关理论与技术
+    ├── 【heading_level_2】 2.1 B/S架构理论
+    └── 【heading_level_2】 2.2 Django Web框架技术
+```
+
+---
+
+## 3. 执行格式校验
 仅检查错误、添加 Word 批注，**不修改原文**
 
 ```bash
@@ -72,7 +120,7 @@ wf cf -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 
 ---
 
-## 3. 执行自动格式化
+## 4. 执行自动格式化
 一键自动修正论文格式，生成新的规范文档
 
 ```bash
@@ -87,7 +135,7 @@ wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 
 ---
 
-## 4. 启动API服务
+## 5. 启动API服务
 启动Web API服务，提供HTTP接口调用
 
 ```bash
@@ -109,10 +157,13 @@ wf startapi -H 0.0.0.0 -p 8080
 # 1. 生成 JSON（自动命名）
 wf gj -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml"
 
-# 2. 格式检查
+# 2. 查看文档结构（检查分类）
+wf tree -f "output/毕业设计说明书_1744123456.json"
+
+# 3. 格式检查
 wf cf -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f "output/毕业设计说明书_1744123456.json"
 
-# 3. 自动格式化
+# 4. 自动格式化
 wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f "output/毕业设计说明书_1744123456.json"
 ```
 
@@ -123,6 +174,7 @@ wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f 
 | 命令 | 全称 | 作用 | 必填参数 |
 |------|------|------|----------|
 | `wf gj` | generate-json | 生成文档结构 JSON | `-d`,`-c` |
+| `wf tree` | tree | 查看文档结构树 | `-f` |
 | `wf cf` | check-format | 检查格式并添加批注 | `-d`,`-c`,`-f` |
 | `wf af` | apply-format | 自动格式化论文 | `-d`,`-c`,`-f` |
 | `wf startapi` | start-api | 启动API服务 | 无 |
@@ -131,7 +183,7 @@ wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f 
 |------|------|------|
 | `-d` | Word 文档路径 | 是（gj/cf/af） |
 | `-c` | YAML 配置路径 | 是（gj/cf/af） |
-| `-f` | JSON 文件路径 | 是（cf/af） |
+| `-f` | JSON 文件路径 | 是（cf/af/tree） |
 | `-o` | 输出目录 | 否（默认 output） |
 | `-H` | API服务地址 | 否（默认 127.0.0.1） |
 | `-p` | API服务端口 | 否（默认 8000） |

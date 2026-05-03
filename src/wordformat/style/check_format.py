@@ -54,7 +54,7 @@ class DIFFResult:
     level: int = 0
 
     def __str__(self):
-        return self.comment
+        return self.comment or ""
 
 
 class CharacterStyle:
@@ -154,12 +154,14 @@ class CharacterStyle:
         # 5. 字体颜色
         current_color = run_get_font_color(run)
         if self.font_color != current_color:
+            # current_color 为 None 表示使用了主题色（themeColor），rgb 只是猜测值
+            color_display = "主题色(不确定)" if current_color is None else str(current_color)
             diffs.append(
                 DIFFResult(
                     "font_color",
                     self.font_color,
                     current_color,
-                    f"期待字体颜色{str(self.font_color)};",
+                    f"期待字体颜色{str(self.font_color)}，当前:{color_display};",
                     1,
                 )
             )
@@ -314,8 +316,22 @@ class ParagraphStyle:
         # 先检测当前段落与目标样式的差异
         diffs = self.diff_from_paragraph(paragraph)
         result = []
-        # 遍历差异项，逐一项修正并记录修正日志
+
+        # 第一步：先应用 builtin_style_name（样式赋值会重置对齐、缩进等，
+        # 必须在设置其他格式之前执行，否则后续显式设置会被样式覆盖）
         for diff in diffs:
+            if diff.diff_type == "builtin_style_name":
+                self.builtin_style_name.format(docx_obj=paragraph)
+                result.append(DIFFResult(
+                     diff_type="builtin_style_name",
+                     expected_value=str(self.builtin_style_name),
+                     current_value="已应用",
+                 ))
+
+        # 第二步：应用其他段落格式（对齐、缩进、间距等）
+        for diff in diffs:
+            if diff.diff_type == "builtin_style_name":
+                continue
             tmp_str = ""
             match diff.diff_type:
                 case "alignment":
@@ -342,9 +358,6 @@ class ParagraphStyle:
                 case "first_line_indent":
                     self.first_line_indent.format(docx_obj=paragraph)
                     tmp_str = f"首行缩进修正;{str(self.first_line_indent)};"  # noqa E501
-                case "builtin_style_name":
-                    self.builtin_style_name.format(docx_obj=paragraph)
-                    tmp_str = f"内置样式修正：{str(self.builtin_style_name)};"
                 case _:
                     # 替换原异常抛出，改用日志记录未知类型，避免程序中断
                     logger.warning(

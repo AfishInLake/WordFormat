@@ -20,8 +20,8 @@ global_format: &global_format
   alignment: '两端对齐'
   space_before: "0行"
   space_after: "0行"
-  line_spacingrule: "固定值"
-  line_spacing: '20磅'
+  line_spacingrule: "1.5倍行距"
+  line_spacing: '1.5倍'
   left_indent: "0字符"
   right_indent: "0字符"
   first_line_indent: '2字符'
@@ -104,7 +104,8 @@ headings:
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
     english_font_name: 'Times New Roman'
-    font_size: '四号'
+    font_size: '小二'
+    font_color: '黑色'
     bold: false
     space_before: "0.5行"
     space_after: "0.5行"
@@ -119,6 +120,7 @@ headings:
     chinese_font_name: '黑体'
     english_font_name: 'Times New Roman'
     font_size: '小四'
+    font_color: '黑色'
     bold: false
     space_before: "0.5行"
     space_after: "0.5行"
@@ -159,13 +161,13 @@ references:
     alignment: '居中对齐'
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
-    font_size: '小二'
+    font_size: '三号'
     bold: false
   content:
     <<: *global_format
     alignment: '左对齐'
     first_line_indent: '0字符'
-    chinese_font_name: '黑体'
+    chinese_font_name: '宋体'
     english_font_name: 'Times New Roman'
     font_size: '五号'
     entry_indent: 0.0
@@ -193,12 +195,15 @@ numbering:
   level_1:
     enabled: true
     template: '%1'
-    strip_pattern: '^\d\s+'
+    strip_pattern: '^\d+\s*'
+    suffix: 'space'
   level_2:
     enabled: true
     template: '%1.%2'
-    strip_pattern: '^\d+(\.\d+)\s+'
+    strip_pattern: '^\d+(\.\d+)\s*'
+    suffix: 'space'
   level_3:
     enabled: true
     template: '%1.%2.%3'
-    strip_pattern: '^\d+(\.\d+){2}\s+'
+    strip_pattern: '^\d+(\.\d+){2}\s*'
+    suffix: 'space'

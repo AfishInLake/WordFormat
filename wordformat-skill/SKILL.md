@@ -122,7 +122,23 @@ wf gj -d $ARGUMENTS -c config.yaml
 
 记住输出的 JSON 文件路径。
 
-### 步骤 2.2 校验并检查 JSON 标签
+### 步骤 2.2 查看文档结构树
+
+```bash
+wf tree -f <JSON文件路径>
+```
+
+输出文档的段落分类统计和树形结构图，快速检查分类是否正确。
+
+```bash
+# 仅查看标题结构
+wf tree -f <JSON文件路径> --filter heading_level_1,heading_level_2
+
+# 显示分类置信度（低置信度的段落需要重点检查）
+wf tree -f <JSON文件路径> --confidence
+```
+
+### 步骤 2.3 校验并检查 JSON 标签
 
 > **开始本步骤前，阅读 [data/category_reference.md](data/category_reference.md) 了解 category 判定规则、自动类型提升机制、以及 `"other"` 标记规则。**
 
@@ -154,7 +170,7 @@ python ${CLAUDE_SKILL_DIR}/scripts/validate_json.py --json <JSON文件路径> --
 
 发现错误时直接编辑 JSON 文件修改 `category` 字段，修正后重新运行校验脚本。
 
-### 步骤 2.3 执行格式检查或格式化
+### 步骤 2.4 执行格式检查或格式化
 
 **检查格式（不修改原文档）：**
 ```bash
@@ -171,7 +187,7 @@ wf af -d 论文.docx -c config.yaml -f <JSON文件路径>
 > 2. 应用 Word 自动编号（编号由 Word 渲染，不会丢失）
 > 此功能仅在格式化模式（`wf af`）下生效，检查模式（`wf cf`）不会修改编号。
 
-### 步骤 2.4 交付产物
+### 步骤 2.5 交付产物
 
 **⚠️ 必须将输出文件复制到用户工作目录（workspace），作为任务产物交付给用户。**
 

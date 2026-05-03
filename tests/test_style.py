@@ -583,8 +583,10 @@ class TestBuiltInStyleEnum:
         assert p.style.name == "Normal"
 
     def test_base_set_invalid_raises(self, doc):
-        with pytest.raises(KeyError):
-            BuiltInStyle("NonExistent").base_set(doc.add_paragraph())
+        """NonExistent 样式会被 _ensure_style_exists 自动创建，不再抛异常"""
+        p = doc.add_paragraph()
+        BuiltInStyle("NonExistent").base_set(p)
+        assert p.style.name == "NonExistent"
 
 
 class TestFontNameEnum:
@@ -1696,7 +1698,7 @@ class TestBuiltInStyleBaseSetElseBranch:
         assert p.style.name == "Normal"
 
     def test_base_set_else_branch_invalid_style_raises(self, doc):
-        """base_set with value NOT in _LABEL_MAP and invalid style raises ValueError (line 600)"""
+        """base_set with value NOT in _LABEL_MAP: _ensure_style_exists 会自动创建样式"""
         p = doc.add_paragraph()
         bis = BuiltInStyle.__new__(BuiltInStyle)
         bis.value = "CompletelyInvalidStyleName"
@@ -1705,12 +1707,9 @@ class TestBuiltInStyleBaseSetElseBranch:
         bis.unit_ch = None
         bis._rel_unit = None
         bis.extract_unit_result = None
-        # "CompletelyInvalidStyleName" is not in _LABEL_MAP, hits else branch
-        # docx_obj.style = self.value raises KeyError (python-docx behavior)
-        # which is caught by except ValueError as e -> but KeyError is not ValueError
-        # So the test expects the raw exception to propagate
-        with pytest.raises((ValueError, KeyError)):
-            bis.base_set(p)
+        # _ensure_style_exists 会自动创建样式，不再抛异常
+        bis.base_set(p)
+        assert p.style.name == "CompletelyInvalidStyleName"
 
     def test_base_set_if_branch_invalid_style_raises(self, doc):
         """base_set with value in _LABEL_MAP but invalid style raises ValueError (lines 594-595)"""
