@@ -15,6 +15,7 @@ from loguru import logger
 from wordformat.log_config import setup_logger
 from wordformat.set_style import auto_format_thesis_document
 from wordformat.set_tag import set_tag_main
+from wordformat.tree import print_tree
 
 # 初始化日志
 setup_logger()
@@ -46,18 +47,20 @@ def main():
 wf gj    生成文档JSON结构（自动生成，无需指定json路径）
 wf cf    检查格式错误
 wf af    自动格式化论文
+wf tree  查看文档结构树
 wf startapi    启动API服务
 
 【一键示例】
 wf gj -d 论文.docx -c config.yaml -o output/
 wf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
 wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wf tree -f output/xxx.json
 wf startapi -H 127.0.0.1 -p 8000
 
 参数：
 -d    Word 文档路径（必填）
 -c    YAML 配置文件（必填）
--f    JSON 文件路径（仅 cf/af 需要）
+-f    JSON 文件路径（仅 cf/af/tree 需要）
 -o    输出目录（默认 output/）
 -H    API服务地址（默认 127.0.0.1）
 -p    API服务端口（默认 8000）
@@ -95,7 +98,16 @@ wf startapi -H 127.0.0.1 -p 8000
     p_af.add_argument("-o", default="output/", help="输出目录")
 
     # ------------------------------
-    # 4. startapi = 启动API服务
+    # 4. tree = 查看文档结构
+    # ------------------------------
+    p_tree = subparsers.add_parser("tree", help="查看文档结构树")
+    p_tree.add_argument("-f", required=True, type=lambda x: validate_file(x, "JSON文件", [".json"]), help="JSON文件路径")
+    p_tree.add_argument("--confidence", action="store_true", help="显示置信度")
+    p_tree.add_argument("--index", action="store_true", help="显示节点序号")
+    p_tree.add_argument("--filter", default=None, help="仅显示指定类别（逗号分隔，如 heading_level_1,body_text）")
+
+    # ------------------------------
+    # 5. startapi = 启动API服务
     # ------------------------------
     p_startapi = subparsers.add_parser("startapi", help="启动API服务")
     p_startapi.add_argument("-H", "--host", default="127.0.0.1", help="API服务地址（默认127.0.0.1）")
@@ -159,6 +171,18 @@ wf startapi -H 127.0.0.1 -p 8000
             check=False
         )
         logger.success(f"✅ 格式化完成！新文件保存在：{args.o}")
+
+    elif args.mode == "tree":
+        logger.info("🌳 开始展示文档结构树...")
+        filter_categories = None
+        if args.filter:
+            filter_categories = [c.strip() for c in args.filter.split(",")]
+        print_tree(
+            node_or_jsonpath=args.f,
+            show_confidence=args.confidence,
+            show_index=args.index,
+            filter_categories=filter_categories,
+        )
 
     elif args.mode == "startapi":
         logger.info(f"🚀 启动API服务...")

@@ -113,12 +113,17 @@ def apply_format_check_to_all_nodes(
     :param check: 用来控制是仅检查还是仅修改
     """
 
-    def traverse(node):
+    def traverse(node, parent_category=""):
         category = node.value.get("category", "") if isinstance(node.value, dict) else ""
 
         if hasattr(node, "check_format"):
             try:
-                if category not in VOIDNODELIST:
+                # top 节点直接关联的 body_text 不参与格式化（如封面页、原创性声明等）
+                # 但间接关联的 body_text（作为 heading 子节点）正常格式化
+                is_top_direct_body_text = (
+                    parent_category == "top" and category == "body_text"
+                )
+                if category not in VOIDNODELIST and not is_top_direct_body_text:
                     node.load_config(config)
                     logger.debug(node)
                     if node.paragraph:
@@ -134,7 +139,7 @@ def apply_format_check_to_all_nodes(
         SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu"}
         if category not in SKIP_CHILDREN_CATEGORIES:
             for child in node.children:
-                traverse(child)
+                traverse(child, parent_category=category)
 
     traverse(root_node)
 
