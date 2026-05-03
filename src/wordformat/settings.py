@@ -39,5 +39,7 @@ BATCH_SIZE = os.getenv("BATCH_SIZE", 64)
 ONNX_VERSION = "20260204"
 
 VOIDNODELIST = [
-    "top"
+    "top",
+    "heading_mulu",
+    "heading_fulu",
 ]

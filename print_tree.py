@@ -6,7 +6,7 @@ from wordformat.config.config import get_config, init_config
 from wordformat.tree import print_tree
 from wordformat.word_structure.document_builder import DocumentBuilder
 
-JSON_PATH = "output/毕业设计说明书.json"
+JSON_PATH = "output/成人教育移动学习平台设计_1777795150.json"
 YAML_PATH = "example/undergrad_thesis.yaml"
 
 

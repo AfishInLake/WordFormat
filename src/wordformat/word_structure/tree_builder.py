@@ -57,8 +57,11 @@ class DocumentTreeBuilder:
         """根据 category 映射到逻辑层级"""
         return LEVEL_MAP.get(category, 999)
 
+    # 目录和附录：作为标题节点挂载，隔离子树，但不参与格式化
+    TERMINAL_CATEGORIES = {"heading_mulu", "heading_fulu"}
+
     def _is_heading_category(self, category: str) -> bool:
-        return category in self.HEADING_CATEGORIES
+        return category in self.HEADING_CATEGORIES or category in self.TERMINAL_CATEGORIES
 
     def _attach_heading_node(self, node: FormatNode):
         """处理标题类节点：维护栈层级"""

@@ -6,6 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![PyPI](https://img.shields.io/pypi/v/wordformat?color=blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+![Downloads](https://static.pepy.tech/personalized-badge/wordformat?period=total&units=ABBREVIATION&left_color=BLACK&right_color=GREEN&left_text=downloads)
 
 ## 项目简介
 

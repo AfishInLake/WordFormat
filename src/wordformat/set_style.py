@@ -26,6 +26,80 @@ from wordformat.word_structure.utils import (
 )
 
 
+def _fix_all_heading_style_definitions(document: Document, config_model):
+    """在格式化开始前，统一修正所有 heading 样式定义。
+
+    修正内容：
+    1. 清除样式定义中的主题色引用（themeColor），替换为配置指定的颜色
+    2. 确保样式定义存在（不存在则创建）
+
+    这样做的原因：Word 的样式继承机制下，如果样式定义使用了主题色，
+    段落内的 run 即使没有显式设置颜色，也会继承样式中的主题色。
+    仅修改 run 级别的颜色不够，必须同时修正样式定义本身。
+    """
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    from wordformat.style.style_enum import FontColor, _ensure_style_exists
+
+    heading_config = getattr(config_model, "headings", None)
+    if not heading_config:
+        return
+
+    # 收集所有 heading 级别的配置
+    level_map = {
+        "level_1": getattr(heading_config, "level_1", None),
+        "level_2": getattr(heading_config, "level_2", None),
+        "level_3": getattr(heading_config, "level_3", None),
+    }
+
+    for level_key, level_cfg in level_map.items():
+        if level_cfg is None:
+            continue
+
+        style_name = getattr(level_cfg, "builtin_style_name", None)
+        if not style_name:
+            continue
+
+        # 确保样式存在
+        _ensure_style_exists(document, style_name)
+
+        try:
+            style = document.styles[style_name]
+        except KeyError:
+            logger.warning(f"样式 '{style_name}' 创建失败，跳过修正")
+            continue
+
+        style_element = style.element
+        rPr = style_element.find(qn("w:rPr"))
+
+        # 修正字体颜色：清除主题色，设置为配置指定的颜色
+        if rPr is not None:
+            color_elem = rPr.find(qn("w:color"))
+            has_theme = False
+            if color_elem is not None:
+                has_theme = (
+                    color_elem.get(qn("w:themeColor")) is not None
+                    or color_elem.get(qn("w:themeTint")) is not None
+                    or color_elem.get(qn("w:themeShade")) is not None
+                )
+
+            if has_theme:
+                font_color_str = getattr(level_cfg, "font_color", "黑色") or "黑色"
+                try:
+                    fc = FontColor(font_color_str)
+                    rgb_tuple = fc.rel_value
+                    hex_color = f"{rgb_tuple[0]:02X}{rgb_tuple[1]:02X}{rgb_tuple[2]:02X}"
+
+                    rPr.remove(color_elem)
+                    new_color = OxmlElement("w:color")
+                    new_color.set(qn("w:val"), hex_color)
+                    rPr.append(new_color)
+
+                    logger.info(f"已修正样式 '{style_name}' 主题色 → #{hex_color}")
+                except Exception as e:
+                    logger.warning(f"修正样式 '{style_name}' 颜色失败: {e}")
+
+
 def apply_format_check_to_all_nodes(
         root_node: FormatNode, document, config, check=True
 ):
@@ -40,9 +114,11 @@ def apply_format_check_to_all_nodes(
     """
 
     def traverse(node):
+        category = node.value.get("category", "") if isinstance(node.value, dict) else ""
+
         if hasattr(node, "check_format"):
             try:
-                if node.value.get("category") not in VOIDNODELIST:
+                if category not in VOIDNODELIST:
                     node.load_config(config)
                     logger.debug(node)
                     if node.paragraph:
@@ -54,8 +130,11 @@ def apply_format_check_to_all_nodes(
                 logger.warning(f"Node {node} not format, beacuse: {str(e)}")
                 raise e
 
-        for child in node.children:
-            traverse(child)
+        # 目录和附录的子节点跳过格式化（top 节点本身跳过格式化，但子节点需要遍历）
+        SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu"}
+        if category not in SKIP_CHILDREN_CATEGORIES:
+            for child in node.children:
+                traverse(child)
 
     traverse(root_node)
 
@@ -159,6 +238,10 @@ def auto_format_thesis_document(
         promote_bodytext_in_subtrees_of_type(
             root_node, parent_type=key, target_type=value
         )
+    # 执行格式化前，先统一修正样式定义（清除主题色、设置字体等）
+    if not check:
+        _fix_all_heading_style_definitions(document, config_model)
+
     # 执行格式化
     apply_format_check_to_all_nodes(root_node, document, config_model, check)
 

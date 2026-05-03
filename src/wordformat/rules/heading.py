@@ -4,11 +4,14 @@
 # @File    : heading.py
 
 from docx.document import Document
+from docx.enum.dml import MSO_COLOR_TYPE
+from docx.oxml import OxmlElement
 from loguru import logger  # 推荐添加日志，便于调试
 
 from wordformat.config.datamodel import HeadingLevelConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.style.style_enum import FontColor
 
 
 class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
@@ -70,6 +73,33 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
 
         # 类型断言（读取@property的 pydantic_config，本质是 _pydantic_config）
         cfg = self.pydantic_config
+
+        # 格式化模式下：先强制应用 builtin_style_name，清除段落级别的显式格式覆盖
+        # （如显式设置的 jc=both 会覆盖样式中的居中对齐）
+        # 直接操作 XML 设置 pStyle，同时移除显式的 jc 等段落格式覆盖
+        if not p:
+            builtin_name = getattr(cfg, "builtin_style_name", None)
+            if builtin_name:
+                from docx.oxml.ns import qn
+                pPr = self.paragraph._element.find(qn("w:pPr"))
+                if pPr is None:
+                    pPr = OxmlElement("w:pPr")
+                    self.paragraph._element.insert(0, pPr)
+
+                # 移除显式的对齐方式（让段落继承样式中的对齐）
+                jc = pPr.find(qn("w:jc"))
+                if jc is not None:
+                    pPr.remove(jc)
+
+                # 设置 pStyle
+                pStyle = pPr.find(qn("w:pStyle"))
+                if pStyle is not None:
+                    pStyle.set(qn("w:val"), builtin_name)
+                else:
+                    pStyle = OxmlElement("w:pStyle")
+                    pStyle.set(qn("w:val"), builtin_name)
+                    pPr.insert(0, pStyle)
+
         # 段落样式检查（完整使用所有配置字段）
         ps = ParagraphStyle.from_config(cfg)
         if p:
@@ -130,6 +160,66 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             all_issues.extend(run_issues)
 
         return all_issues
+
+    @staticmethod
+    def _fix_style_definition_color(doc: Document, cfg: HeadingLevelConfig):
+        """修正样式定义级别的字体颜色，清除主题色引用。
+
+        当 Word 样式定义（如 Heading 1）使用了 themeColor 时，
+        段落内的 run 即使没有显式设置颜色，也会继承样式中的主题色。
+        仅修改 run 级别的颜色不够，必须同时修正样式定义本身。
+
+        直接操作底层 XML 元素，确保 themeColor 属性被彻底移除。
+        """
+        style_name = getattr(cfg, "builtin_style_name", None)
+        if not style_name:
+            return
+
+        try:
+            style = doc.styles[style_name]
+        except KeyError:
+            logger.info(f"样式 '{style_name}' 不存在，跳过样式级别颜色修正")
+            return
+
+        # 直接操作样式定义的 XML 元素
+        from docx.oxml.ns import qn
+        style_element = style.element
+        rPr = style_element.find(qn("w:rPr"))
+        if rPr is None:
+            logger.info(f"样式 '{style_name}' 无 rPr，跳过样式级别颜色修正")
+            return
+
+        color_elem = rPr.find(qn("w:color"))
+        if color_elem is None:
+            logger.info(f"样式 '{style_name}' 无 color 元素，跳过样式级别颜色修正")
+            return
+
+        # 检查是否有主题色属性
+        has_theme = (
+            color_elem.get(qn("w:themeColor")) is not None
+            or color_elem.get(qn("w:themeTint")) is not None
+            or color_elem.get(qn("w:themeShade")) is not None
+        )
+        if not has_theme:
+            return
+
+        font_color_str = getattr(cfg, "font_color", "黑色") or "黑色"
+        try:
+            fc = FontColor(font_color_str)
+            rgb_tuple = fc.rel_value
+            hex_color = f"{rgb_tuple[0]:02X}{rgb_tuple[1]:02X}{rgb_tuple[2]:02X}"
+
+            # 移除旧 color 元素，创建新的干净 color 元素（无主题属性）
+            rPr.remove(color_elem)
+            new_color = OxmlElement("w:color")
+            new_color.set(qn("w:val"), hex_color)
+            rPr.append(new_color)
+
+            logger.debug(
+                f"已修正样式 '{style_name}' 的主题色 → #{hex_color}"
+            )
+        except Exception as e:
+            logger.warning(f"修正样式 '{style_name}' 颜色失败: {e}")
 
 
 # 各层级标题节点（无需重写check_format，直接复用基类逻辑）

@@ -73,7 +73,7 @@ wf startapi -H 127.0.0.1 -p 8000
     # ------------------------------
     p_gj = subparsers.add_parser("gj", help="生成JSON结构（自动输出到-o目录）")
     p_gj.add_argument("-d", required=True, type=lambda x: validate_file(x, "文档", [".docx"]), help="Word文档路径")
-    p_gj.add_argument("-c", required=True, type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]), help="YAML配置路径")
+    p_gj.add_argument("-c", default=None, type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]), help="YAML配置路径（可选）")
     p_gj.add_argument("-o", default="output/", help="输出目录（默认output/）")
 
     # ------------------------------

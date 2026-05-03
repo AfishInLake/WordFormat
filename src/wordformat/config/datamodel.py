@@ -329,7 +329,7 @@ class NumberingConfig(BaseModel):
         default_factory=lambda: NumberingLevelConfig(
             enabled=False,
             template="%1.%2",
-            strip_pattern="^\\d+(\\.\\d+)\\s+",
+            strip_pattern="^\\d+(\\.\\d+)\\s*",
         ),
         description="二级标题编号配置",
     )
@@ -337,7 +337,7 @@ class NumberingConfig(BaseModel):
         default_factory=lambda: NumberingLevelConfig(
             enabled=False,
             template="%1.%2.%3",
-            strip_pattern="^\\d+(\\.\\d+){2}\\s+",
+            strip_pattern="^\\d+(\\.\\d+){2}\\s*",
         ),
         description="三级标题编号配置",
     )
