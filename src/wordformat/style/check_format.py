@@ -54,7 +54,7 @@ class DIFFResult:
     level: int = 0
 
     def __str__(self):
-        return self.comment
+        return self.comment or ""
 
 
 class CharacterStyle:

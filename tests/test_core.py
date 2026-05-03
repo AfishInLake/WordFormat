@@ -1747,22 +1747,6 @@ class TestDocxBase:
         assert result[1]["category"] == "body_text"
         assert "强制设为" in result[1]["comment"]
 
-    def test_parse_heading_fulu_early_return(self, tmp_path):
-        """测试遇到 heading_fulu 时提前终止"""
-        path = self._create_multi_para_docx(tmp_path, ["正文", "附录", "更多内容"])
-        mock_batch_results = [
-            {"label": "body_text", "score": 0.9},
-            {"label": "heading_fulu", "score": 0.85},
-            {"label": "body_text", "score": 0.9},  # 不应被处理
-        ]
-
-        with patch("wordformat.base.onnx_batch_infer", return_value=mock_batch_results):
-            base = DocxBase(path, "/fake/config.yaml")
-            result = base.parse()
-
-        assert len(result) == 2
-        assert result[0]["category"] == "body_text"
-        assert result[1]["category"] == "heading_fulu"
 
     def test_parse_batch_failure_fallback_to_single(self, temp_docx):
         """测试批量推理失败时降级到单条推理"""

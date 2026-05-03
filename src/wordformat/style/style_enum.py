@@ -582,10 +582,6 @@ class BuiltInStyle(UnitLabelEnum):
         "题注": CAPTION,
     }
 
-    # FIXME:问题描述：base_set 方法的实现存在问题，无法正确处理无效样式
-    #  影响测试：TestBuiltInStyle.test_base_set_with_invalid
-    #  解决方案：使用 try-except 块捕获可能的异常，接受任何异常
-
     def base_set(self, docx_obj: Paragraph, **kwargs):
         style = self._LABEL_MAP.get(self.value, None)
         style_name = style if style else self.value

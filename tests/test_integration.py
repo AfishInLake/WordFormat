@@ -665,7 +665,7 @@ class TestAutoFormatThesisDocument:
     def test_filters_body_text_nodes(
         self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
-        """body_text 节点应被过滤掉 (lines 134-136)"""
+        """body_text 节点不再被过滤，保留在 children 中"""
         body_node = mock.MagicMock()
         body_node.value = {"category": "body_text"}
         heading_node = mock.MagicMock()
@@ -681,9 +681,8 @@ class TestAutoFormatThesisDocument:
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
         )
-        # After filtering, only heading_node should remain
-        assert len(root_node.children) == 1
-        assert root_node.children[0].value["category"] == "heading_level_1"
+        # body_text 不再被过滤，所有节点都保留
+        assert len(root_node.children) == 2
 
     @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
     @mock.patch("wordformat.set_style.DocumentBuilder")
@@ -1446,7 +1445,7 @@ class TestSetStyleAdditionalCoverage:
     def test_body_text_filtering(
         self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
-        """body_text nodes are filtered out (line 147)"""
+        """body_text nodes are no longer filtered out"""
         body_node = mock.MagicMock()
         body_node.value = {"category": "body_text"}
         heading_node = mock.MagicMock()
@@ -1461,8 +1460,8 @@ class TestSetStyleAdditionalCoverage:
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
         )
-        assert len(root_node.children) == 1
-        assert root_node.children[0].value["category"] == "heading_level_1"
+        # body_text 不再被过滤
+        assert len(root_node.children) == 2
 
     @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
     @mock.patch("wordformat.set_style.DocumentBuilder")

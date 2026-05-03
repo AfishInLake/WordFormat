@@ -170,8 +170,7 @@ def auto_format_thesis_document(
 
     流程说明：
         1. 从 JSON 文件加载文档逻辑结构树；
-        2. 过滤掉类别为 'body_text' 的节点（保留标题、摘要、参考文献等结构节点）；
-        3. 加载 Word 文档，并将每个非空段落匹配到对应的结构节点；
+        2. 加载 Word 文档，并将每个非空段落匹配到对应的结构节点；
         4. 对特定子树（如中英文摘要、参考文献）执行节点提升操作，确保内容节点正确挂载；
         5. 遍历所有结构节点，依据配置文件中的格式规则进行校验，并在文档中添加批注；
         6. 保存带批注的文档到指定路径。
@@ -210,9 +209,7 @@ def auto_format_thesis_document(
 
     filename_without_ext = get_file_name(docxpath)
     root_node = DocumentBuilder.build_from_json(jsonpath, config=config_model)
-    root_node.children = [
-        node for node in root_node.children if node.value.get("category") != "body_text"
-    ]
+    # 注意：不再过滤 body_text 节点，body_text 也需要格式化（首行缩进、字体等）
     document = Document(docxpath)
 
     if not check:
