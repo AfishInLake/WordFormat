@@ -17,12 +17,21 @@ import argparse
 import sys
 from pathlib import Path
 
+def _get_pip_mirror() -> list[str]:
+    """根据用户地区自动选择 pip 镜像源"""
+    import locale
+    lang = locale.getdefaultlocale()[0] or ""
+    # 中文环境优先使用清华镜像
+    if lang.startswith("zh"):
+        return [sys.executable, "-m", "pip", "install", "pyyaml", "--break-system-packages", "-q",
+                "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"]
+    return [sys.executable, "-m", "pip", "install", "pyyaml", "--break-system-packages", "-q"]
+
 try:
     import yaml
 except ImportError:
-    # 如果没有 yaml 模块，尝试安装
     import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml", "--break-system-packages", "-q"])
+    subprocess.check_call(_get_pip_mirror())
     import yaml
 
 
@@ -80,7 +89,7 @@ ACK_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # numbering 合法字段
 NUMBERING_FIELDS = {"enabled", "level_1", "level_2", "level_3"}
-NUMBERING_LEVEL_FIELDS = {"enabled", "template", "strip_pattern"}
+NUMBERING_LEVEL_FIELDS = {"enabled", "template", "strip_pattern", "suffix", "numbering_indent", "text_indent"}
 
 # 值范围校验
 ALIGNMENT_VALUES = {"左对齐", "居中对齐", "右对齐", "两端对齐", "分散对齐"}
