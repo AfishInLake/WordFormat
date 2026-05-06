@@ -104,7 +104,7 @@ headings:
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
     english_font_name: 'Times New Roman'
-    font_size: '小二'
+    font_size: '三号'
     font_color: '黑色'
     bold: false
     space_before: "0.5行"
