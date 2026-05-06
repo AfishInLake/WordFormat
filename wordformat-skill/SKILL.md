@@ -11,6 +11,9 @@ argument-hint: "[docx文件路径]"
 ## 安装
 
 ```bash
+# 国内用户优先使用镜像源
+pip install wordformat -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 海外用户
 pip install wordformat
 ```
 
@@ -35,7 +38,33 @@ pip install wordformat
 
 严格按照以下步骤执行。**每个步骤开始前，先阅读该步骤引用的参考文档，不要提前阅读后续步骤的文档。**
 
-### 步骤 1.0 查找已有预设
+### 步骤 1.0 检查已有配置
+
+**优先级顺序**：工作目录已有 .yaml 配置 > 预设库 > 新建配置
+
+**⚠️ 关键：配置文件名称不固定（如 `config.yaml`、`清华大学_本科.yaml` 等），必须扫描工作目录下所有 .yaml 文件，绝不能只查找 `config.yaml`。**
+
+#### 1.0.1 扫描工作目录下所有 .yaml 配置文件
+
+```bash
+# 列出工作目录下所有 .yaml 文件
+ls *.yaml 2>/dev/null || echo "工作目录无 .yaml 文件"
+```
+
+**如果工作目录存在 .yaml 文件**：
+1. 逐个验证，找出合法的 wordformat 配置文件：
+   ```bash
+   for f in *.yaml; do
+     echo "--- 验证: $f ---"
+     python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --validate --config "$f" 2>&1 && echo "✅ 合法" || echo "❌ 非配置文件"
+   done
+   ```
+2. 找到合法配置文件后，**询问用户**：已检测到以下配置文件 `{文件名列表}`，请确认使用哪一个？如需修改格式参数请告知具体内容。
+3. 用户确认后，将选中的配置文件作为本次任务的 config.yaml 使用（复制或直接引用），跳到步骤 1.4。
+
+**如果工作目录没有任何 .yaml 文件，或所有 .yaml 文件验证均不通过**，继续 1.0.2。
+
+#### 1.0.2 查找预设库
 
 预设保存在**项目工作目录**下 `presets/` 目录，命名格式 `{学校}_{学院/专业}_{论文类型}.yaml`。
 
@@ -43,7 +72,7 @@ pip install wordformat
 python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --list-presets
 ```
 
-找到匹配预设时直接使用，跳到 1.3：
+找到匹配预设时直接使用，跳到步骤 1.2 验证：
 ```bash
 python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --use "清华大学_计算机学院_本科" --output config.yaml
 ```
