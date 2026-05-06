@@ -66,8 +66,10 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
-        # 移除段落的意外字符
-        ps = ParagraphStyle.from_config(cfg)
+        # 混合节点的cfg有两个值，遂需要重新组装
+        # 段落样式选择content样式
+        # 字体样式"摘要"选择title，"正文"选择content
+        ps = ParagraphStyle.from_config(cfg.chinese_content)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -210,8 +212,11 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
         """
         设置 摘要 样式
         """
+        # 混合节点的cfg有两个值，遂需要重新组装
+        # 段落样式选择content样式
+        # 字体样式"摘要"选择title，"正文"选择content
         cfg = self.pydantic_config
-        ps = ParagraphStyle.from_config(cfg)
+        ps = ParagraphStyle.from_config(cfg.english_content)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
