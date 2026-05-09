@@ -199,6 +199,32 @@ python ${CLAUDE_SKILL_DIR}/scripts/validate_json.py --json <JSON文件路径> --
 
 发现错误时直接编辑 JSON 文件修改 `category` 字段，修正后重新运行校验脚本。
 
+#### 可选：添加 `replace` 字段替换段落内容
+
+每个段落条目可以**可选**添加 `"replace"` 字段，格式化时会将原段落文本替换为 `replace` 中指定的内容。
+
+**典型场景**：
+- 修正 AI 识别错误的标题文字
+- 替换摘要或关键词中的错别字
+- 统一修正特定短语
+
+**JSON 示例**：
+```json
+{
+    "category": "abstract_chinese_title",
+    "score": 0.9982,
+    "comment": "置信度：0.9982",
+    "paragraph": "摘    要",
+    "fingerprint": "abc123...",
+    "replace": "摘  要"
+}
+```
+
+**注意事项**：
+- `replace` 字段是可选的，不需要时不用添加
+- 替换在格式校验/修正之前执行，替换后的文本会按配置文件规范进行格式化
+- 检查模式和格式化模式均会执行替换
+
 ### 步骤 2.4 执行格式检查或格式化
 
 **检查格式（不修改原文档）：**

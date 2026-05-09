@@ -10,6 +10,7 @@ import yaml
 from docx.document import Document
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+from loguru import logger
 from pydantic import ValidationError
 
 from wordformat.config.datamodel import BaseModel, NodeConfigRoot
@@ -165,6 +166,47 @@ class FormatNode(TreeNode, Generic[T]):
         """虚方法：由子类实现具体的格式应用逻辑"""
         self._clean_paragraph_edge_spaces()
         self._base(doc, p=False, r=False)
+
+    def apply_replace(self, doc: Document = None) -> bool:
+        """替换段落文本内容（由 JSON 的 replace 字段驱动）。
+
+        仅当 self.value 为 dict 且包含非空 "replace" 字段时执行替换。
+        基类默认策略：多 run 时按原字符数分配，保持 run 边界语义。
+        子类可覆写此方法实现特定类型的替换逻辑（如保留关键词标签 run、引用标记 run 等）。
+
+        Returns:
+            True 表示执行了替换，False 表示无需替换
+        """
+        value = self.value
+        if not isinstance(value, dict):
+            return False
+        replace_text = value.get("replace")
+        if not replace_text or not isinstance(replace_text, str):
+            return False
+        replace_text = replace_text.strip().replace(" ", "")
+        if not replace_text:
+            return False
+        if self.paragraph is None:
+            return False
+
+        runs = self.paragraph.runs
+        if not runs:
+            return False
+
+        if len(runs) == 1:
+            runs[0].text = replace_text
+        else:
+            pos = 0
+            for i, run in enumerate(runs):
+                if i == len(runs) - 1:
+                    run.text = replace_text[pos:]
+                else:
+                    n = min(len(run.text), len(replace_text) - pos)
+                    run.text = replace_text[pos:pos + n] if n > 0 else ""
+                    pos += n
+
+        logger.debug(f"已替换段落文本 → {replace_text[:50]}...")
+        return True
 
     def _clean_paragraph_edge_spaces(self) -> None:
         """清理段落首尾 run 中的多余空格。

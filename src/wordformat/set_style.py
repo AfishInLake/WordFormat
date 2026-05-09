@@ -127,12 +127,14 @@ def apply_format_check_to_all_nodes(
                     node.load_config(config)
                     logger.debug(node)
                     if node.paragraph:
+                        # 先执行内容替换（check/format 两种模式均执行）
+                        node.apply_replace(document)
                         if check:
                             node.check_format(document)
                         else:
                             node.apply_format(document)
             except Exception as e:
-                logger.warning(f"Node {node} not format, beacuse: {str(e)}")
+                logger.warning(f"Node {node} not format, because: {str(e)}")
                 raise e
 
         # 目录和附录的子节点跳过格式化（top 节点本身跳过格式化，但子节点需要遍历）
