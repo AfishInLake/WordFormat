@@ -3,6 +3,8 @@
 # @Author  : afish
 # @File    : body.py
 
+from docx.oxml.ns import qn
+
 from wordformat.config.datamodel import BodyTextConfig
 from wordformat.rules.node import FormatNode
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
@@ -14,6 +16,26 @@ class BodyText(FormatNode[BodyTextConfig]):
     NODE_TYPE = "body_text"
     CONFIG_MODEL = BodyTextConfig
     CONFIG_PATH = "body_text"
+
+    def apply_replace(self, doc=None) -> bool:
+        """文本替换后清除引用标记格式。
+
+        正文段落中的引用标记（如 [1]）通常带有上标/下标格式，
+        替换文本按字符数分配后，非引用位置的字符不应保留这些特殊格式。
+        """
+        replaced = super().apply_replace(doc)
+        if not replaced or self.paragraph is None:
+            return replaced
+
+        # 清除所有 run 中的上标/下标属性（vertAlign）
+        for run in self.paragraph.runs:
+            rPr = run._element.find(qn("w:rPr"))
+            if rPr is not None:
+                vertAlign = rPr.find(qn("w:vertAlign"))
+                if vertAlign is not None:
+                    rPr.remove(vertAlign)
+
+        return replaced
 
     def _base(self, doc, p: bool, r: bool):
         """
