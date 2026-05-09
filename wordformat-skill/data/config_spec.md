@@ -290,21 +290,18 @@ numbering:
   level_1:                           # 一级标题编号
     enabled: true
     template: '%1'                   # 编号模板
-    strip_pattern: '^\d+\s+'         # 清除手动编号的正则
     suffix: 'space'                  # 编号之后的分隔符
     numbering_indent: '0字符'         # 编号缩进
     text_indent: '0字符'             # 文本缩进（悬挂缩进）
   level_2:                           # 二级标题编号
     enabled: true
     template: '%1.%2'
-    strip_pattern: '^\d+(\.\d+)\s+'
     suffix: 'space'
     numbering_indent: '0字符'
     text_indent: '0字符'
   level_3:                           # 三级标题编号
     enabled: true
     template: '%1.%2.%3'
-    strip_pattern: '^\d+(\.\d+){2}\s+'
     suffix: 'space'
     numbering_indent: '0字符'
     text_indent: '0字符'
@@ -322,7 +319,6 @@ numbering:
 |------|------|--------|------|
 | `enabled` | bool | `false` | 是否启用该级别自动编号 |
 | `template` | string / null | `null` | 编号模板，`%1`=本级序号，`%2`=上级序号，`%3`=上上级序号 |
-| `strip_pattern` | string / null | `null` | 清除手动编号的正则表达式，作用于标题段落开头 |
 | `suffix` | string | `"space"` | 编号之后的分隔符：`tab`（制表符）、`space`（空格）、`nothing`（无） |
 | `numbering_indent` | string / null | `null` | 编号缩进（编号距左边距的距离） |
 | `text_indent` | string / null | `null` | 文本缩进（文本相对于编号的悬挂缩进量） |
@@ -342,17 +338,17 @@ numbering:
 
 > **注意**：`template` 中包含 `第` 和 `章` 时，编号格式自动使用中文计数（`chineseCountingThousand`），否则使用阿拉伯数字（`decimal`）。
 
-#### 清除手动编号（strip_pattern）说明
+#### 自动清除手动编号
 
-`strip_pattern` 是正则表达式，用于清除标题段落开头的手动编号文字。格式化时会自动清除匹配的内容，然后应用 Word 自动编号。
+格式化时会根据标题级别自动识别并清除段落开头的手动编号文字，无需配置正则表达式。
 
-| strip_pattern | 清除内容示例 | 说明 |
-|---------------|-------------|------|
-| `'^\d+\s+'` | `1 绪论` → `绪论` | 阿拉伯数字 + 空格 |
-| `'^第[一二三四五六七八九十百千零]+章\s*'` | `第一章 绪论` → `绪论` | 中文"第X章" |
-| `'^\d+(\.\d+)\s+'` | `1.1 研究背景` → `研究背景` | 数字.数字 + 空格 |
-| `'^\d+(\.\d+){2}\s+'` | `1.1.1 背景` → `背景` | 数字.数字.数字 + 空格 |
-| `'^\d+\)\s*'` | `1) 研究` → `研究` | 数字) + 空格 |
+支持的常见编号格式（按标题级别）：
+
+**一级标题**：`第一章`、`第1章`、`第一节`、`（一）`、`(1)`、`一、`、`一.`、`1)`、`I.`
+**二级标题**：`1.1`、`1.1 `、`一.1`
+**三级标题**：`1.1.1`、`1.1.1 `
+
+> 清除手动编号后会自动应用 `template` 指定的新编号样式。
 
 #### 编号之后（suffix）说明
 

@@ -195,15 +195,12 @@ numbering:
   level_1:
     enabled: true
     template: '%1'
-    strip_pattern: '^\d+\s*'
     suffix: 'space'
   level_2:
     enabled: true
     template: '%1.%2'
-    strip_pattern: '^\d+(\.\d+)\s*'
     suffix: 'space'
   level_3:
     enabled: true
     template: '%1.%2.%3'
-    strip_pattern: '^\d+(\.\d+){2}\s*'
     suffix: 'space'

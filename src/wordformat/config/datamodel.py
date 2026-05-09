@@ -291,11 +291,6 @@ class NumberingLevelConfig(BaseModel):
     # 编号模板，%1=本级序号，%2=上级序号，%3=上上级序号
     # 例如："第%1章"、"%1.%2"、"%1.%2.%3"、"%1)"
     template: Optional[str] = Field(default=None, description="编号模板")
-    # 清除手动编号的正则表达式，仅作用于该级别标题段落的开头
-    # 例如："^第[一二三四五六七八九十百千零]+章\\s*"
-    strip_pattern: Optional[str] = Field(
-        default=None, description="清除手动编号的正则表达式"
-    )
     # 编号之后：tab（制表符）、space（空格）、nothing（无）
     suffix: Optional[str] = Field(
         default="space",
@@ -321,7 +316,6 @@ class NumberingConfig(BaseModel):
         default_factory=lambda: NumberingLevelConfig(
             enabled=False,
             template="第%1章",
-            strip_pattern="^第[一二三四五六七八九十百千零]+章\\s*",
         ),
         description="一级标题编号配置",
     )
@@ -329,7 +323,6 @@ class NumberingConfig(BaseModel):
         default_factory=lambda: NumberingLevelConfig(
             enabled=False,
             template="%1.%2",
-            strip_pattern="^\\d+(\\.\\d+)\\s*",
         ),
         description="二级标题编号配置",
     )
@@ -337,7 +330,6 @@ class NumberingConfig(BaseModel):
         default_factory=lambda: NumberingLevelConfig(
             enabled=False,
             template="%1.%2.%3",
-            strip_pattern="^\\d+(\\.\\d+){2}\\s*",
         ),
         description="三级标题编号配置",
     )

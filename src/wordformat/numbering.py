@@ -20,9 +20,98 @@ from loguru import logger
 
 
 # EMU 到 twips 的换算系数
-# docx.shared 的 Cm/Mm/Inches/Pt 返回 EMU，w:ind 需要 twips
-# 1 twip = 635 EMU（即 914400 EMU/inch ÷ 1440 twips/inch）
 _EMU_PER_TWIP = 635
+
+
+def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
+    """自动检测并清除段落开头的手动编号文本。
+
+    根据标题级别 'ilvl' 构建匹配列表，按优先级依次尝试。
+    无需用户编写正则表达式。
+
+    支持：
+    - 中文编号：第一章、第一节、一、二／1. 、1.1.1、1.1.2
+    - 英文编号：1. / 1.1 / 1.1.1 / I. / A.
+    - 括号编号：（一）、(1)、（1）、1)
+    - 带空格或标点后缀：1.1   、 一、
+    """
+    if not paragraph.runs:
+        return False
+
+    text = paragraph.text.lstrip("\u3000 ")  # 全角/半角空格
+    if not text:
+        return False
+
+    # ---------- 公共原子 ----------
+    _CH = "[一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖拾佰仟]"
+    _CHN = "(?:一|二|三|四|五|六|七|八|九|十|百|千|零|壹|贰|叁|肆|伍|陆|柒|捌|玖|拾|佰|仟)"
+    _NUM = r"\d+"
+    _ROMAN = "[IVXLCDM]+"
+
+    # 中文数字/阿拉伯数字 混合组
+    _CHD = f"(?:{_CHN}|[0-9])"
+    _CHDM = f"(?:{_CHN}|[0-9])+"
+
+    # 按 ilvl 构建模式列表（优先级从高到低）
+    patterns: list[str] = []
+
+    if ilvl == 0:  # 一级标题
+        patterns = [
+            rf"^第{_CHDM}章\s*",                              # 第一章、第1章
+            rf"^第{_CHDM}节\s*",                              # 第一节
+            rf"^第{_CHDM}部分\s*",                            # 第一部分
+            rf"^（{_CHDM}）\s*",                              # （一）、（1）
+            rf"^\({_CHDM}\)\s*",                              # (一)、(1)
+            rf"^{_CHDM}\)\s*",                                # 一)、1)
+            rf"^{_ROMAN}\.\s+",                               # I.  / V.
+            rf"^{_CH}\s*[、，,\.]?\s*",                       # 一、 / 一 / 一.
+        ]
+    elif ilvl == 1:  # 二级标题
+        patterns = [
+            rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",                  # 1.1.1 (先匹配更长的)
+            rf"^{_NUM}\.{_NUM}\s+",                          # 1.1   (带空格)
+            rf"^{_NUM}\.{_NUM}\s*",                          # 1.1
+            rf"^{_CH}\.{_NUM}\s*",                           # 一.1
+            rf"^{_CH}\s*[、，,\.]?\s*",                      # 一、/ 一.
+        ]
+    else:  # 三级及以上
+        patterns = [
+            rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",                  # 1.1.1
+            rf"^{_NUM}\.{_NUM}\.{_NUM}\s+",                  # 1.1.1 
+            rf"^{_NUM}\.{_NUM}\s*",                          # 1.1
+            rf"^{_NUM}\s*[、，,\.]?\s*",                     # 1. / 1、
+        ]
+
+    # 去除所有尾部空格和零宽断言
+    for pattern in patterns:
+        match = re.match(pattern, text)
+        if not match:
+            continue
+        stripped_len = len(match.group())
+        _remove_chars(paragraph, stripped_len)
+        return True
+
+    return False
+
+
+def _remove_chars(paragraph, count: int) -> None:
+    """从段落开头删除指定数量的字符，跨 run 操作。"""
+    remaining = count
+    for run in paragraph.runs:
+        if remaining <= 0:
+            break
+        rt = run.text
+        if len(rt) <= remaining:
+            remaining -= len(rt)
+            run.text = ""
+        else:
+            run.text = rt[remaining:]
+            remaining = 0
+    # 清除第一个非空 run 开头的空白
+    for run in paragraph.runs:
+        if run.text:
+            run.text = run.text.lstrip("\u3000 ")
+            break
 
 
 def _convert_to_twips(value_str: str) -> int:
@@ -169,52 +258,60 @@ def _build_numbering_rPr(headings_config, level_key: str):
     return rPr
 
 
-def strip_manual_numbering(paragraph, pattern: str) -> bool:
+def process_heading_numbering(root_node, document, config, headings_config=None):
     """
-    清除段落开头的手动编号文本。
-
-    仅修改第一个 run 的文本，保留其余 run 的格式不变。
-    如果段落文本不匹配正则，不做任何修改。
+    处理所有标题节点的编号：自动清除手动编号 + 应用自动编号。
 
     Args:
-        paragraph: docx 段落对象
-        pattern: 正则表达式，用于匹配段落开头的编号
-
-    Returns:
-        bool: 是否成功清除了编号
+        root_node: 文档树根节点
+        document: docx Document 对象
+        config: NumberingConfig 配置对象
+        headings_config: 标题配置（用于编号字体/字号跟随标题样式）
     """
-    if not pattern or not paragraph.runs:
-        return False
+    if not config.enabled:
+        return
 
-    full_text = paragraph.text
-    match = re.match(pattern, full_text)
-    if not match:
-        return False
+    # 创建编号定义（传入标题配置以同步编号样式）
+    num_id_map = create_numbering_definition(document, config, headings_config)
+    if not num_id_map:
+        return
 
-    # 计算需要删除的字符数
-    stripped_len = match.end()
+    # 标题节点类型到配置级别和 ilvl 的映射
+    heading_map = {
+        "level_1": ("0", "level_1"),
+        "level_2": ("1", "level_2"),
+        "level_3": ("2", "level_3"),
+    }
 
-    # 从第一个 run 开始逐字符删除
-    remaining = stripped_len
-    for run in paragraph.runs:
-        if remaining <= 0:
-            break
-        run_text = run.text
-        if len(run_text) <= remaining:
-            # 整个 run 都要删除
-            remaining -= len(run_text)
-            run.text = ""
-        else:
-            # 只删除 run 的前 remaining 个字符
-            run.text = run_text[remaining:]
-            remaining = 0
+    def traverse(node):
+        category = node.value.get("category", "") if isinstance(node.value, dict) else ""
 
-    # 清除第一个 run 开头可能残留的空白
-    if paragraph.runs and paragraph.runs[0].text:
-        paragraph.runs[0].text = paragraph.runs[0].text.lstrip()
+        for level_key, (ilvl_str, config_key) in heading_map.items():
+            if category == f"heading_{level_key}":
+                level_config = getattr(config, config_key, None)
+                if not level_config or not level_config.enabled:
+                    break
 
-    logger.debug(f"已清除手动编号: '{match.group()}' → 段落剩余: '{paragraph.text[:30]}...'")
-    return True
+                paragraph = getattr(node, "paragraph", None)
+                if not paragraph:
+                    break
+
+                # 1. 自动检测并清除手动编号
+                ilvl_int = int(ilvl_str)
+                _auto_strip_numbering(paragraph, ilvl_int)
+
+                # 2. 应用 Word 自动编号
+                num_id = num_id_map.get(config_key)
+                if num_id:
+                    apply_auto_numbering(paragraph, num_id, ilvl_str)
+
+                break
+
+        for child in node.children:
+            traverse(child)
+
+    traverse(root_node)
+    logger.info("标题自动编号处理完成")
 
 
 def apply_auto_numbering(paragraph, num_id: str, ilvl: str = "0"):
@@ -396,61 +493,3 @@ def create_numbering_definition(document, config, headings_config=None) -> dict[
 
     # 所有启用的级别共享同一个 numId
     return {key: str(num_id) for key, _, _ in enabled_levels}
-
-
-def process_heading_numbering(root_node, document, config, headings_config=None):
-    """
-    处理所有标题节点的编号：清除手动编号 + 应用自动编号。
-
-    Args:
-        root_node: 文档树根节点
-        document: docx Document 对象
-        config: NumberingConfig 配置对象
-        headings_config: 标题配置（用于编号字体/字号跟随标题样式）
-    """
-    if not config.enabled:
-        return
-
-    # 创建编号定义（传入标题配置以同步编号样式）
-    num_id_map = create_numbering_definition(document, config, headings_config)
-    if not num_id_map:
-        return
-
-    # 标题节点类型到配置级别的映射
-    heading_map = {
-        "level_1": ("level_1", "0"),
-        "level_2": ("level_2", "1"),
-        "level_3": ("level_3", "2"),
-    }
-
-    def traverse(node):
-        """递归遍历文档树"""
-        # 获取节点的 category
-        category = node.value.get("category", "") if isinstance(node.value, dict) else ""
-
-        for level_key, (config_key, ilvl) in heading_map.items():
-            if category == f"heading_{level_key}":
-                level_config = getattr(config, config_key, None)
-                if not level_config or not level_config.enabled:
-                    break
-
-                paragraph = getattr(node, "paragraph", None)
-                if not paragraph:
-                    break
-
-                # 1. 清除手动编号
-                if level_config.strip_pattern:
-                    strip_manual_numbering(paragraph, level_config.strip_pattern)
-
-                # 2. 应用自动编号
-                num_id = num_id_map.get(config_key)
-                if num_id:
-                    apply_auto_numbering(paragraph, num_id, ilvl)
-
-                break
-
-        for child in node.children:
-            traverse(child)
-
-    traverse(root_node)
-    logger.info("标题自动编号处理完成")

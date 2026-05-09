@@ -14,7 +14,7 @@ from docx.oxml.ns import qn
 from wordformat.tree import Tree, Stack, print_tree
 from wordformat.rules.node import TreeNode, FormatNode
 from wordformat.numbering import (
-    strip_manual_numbering,
+    _auto_strip_numbering,
     apply_auto_numbering,
     create_numbering_definition,
     process_heading_numbering,
@@ -589,39 +589,46 @@ class TestFormatNode:
 
 
 # ============================================================
-# numbering.py — strip_manual_numbering
+# numbering.py — auto_strip_numbering
 # ============================================================
 
 
-class TestStripManualNumbering:
-    def test_matching_pattern_strips(self, doc):
+class TestAutoStripNumbering:
+    def test_level0_chinese_chapter_strips(self, doc):
+        """一级标题：第一章 → 绪论"""
         p = doc.add_paragraph()
         run = p.add_run("第一章 绪论")
-        result = strip_manual_numbering(p, r"^第[一二三四五六七八九十百千零]+章\s*")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is True
         assert p.text == "绪论"
 
-    def test_non_matching_pattern_returns_false(self, doc):
+    def test_non_numbered_text_returns_false(self, doc):
+        """无编号文本不匹配任何模式"""
         p = doc.add_paragraph()
         p.add_run("绪论")
-        result = strip_manual_numbering(p, r"^\d+\.\d+\s+")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is False
         assert p.text == "绪论"
 
-    def test_empty_pattern_returns_false(self, doc):
+    def test_level1_pattern_not_matched_at_level0(self, doc):
+        """二级编号 '1.1 背景' 对一级标题不匹配"""
         p = doc.add_paragraph()
         p.add_run("1.1 背景")
-        assert strip_manual_numbering(p, "") is False
+        # ilvl=0 不匹配二级编号格式 → _auto_strip_numbering 会尝试所有模式但找不到匹配
+        result = _auto_strip_numbering(p, ilvl=0)
+        assert result is False
 
     def test_no_runs_returns_false(self, doc):
+        """无 run 的段落 → 返回 False"""
         p = doc.add_paragraph()
-        assert strip_manual_numbering(p, r"^第.+章\s*") is False
+        assert _auto_strip_numbering(p, ilvl=0) is False
 
-    def test_multi_run_strips_correctly(self, doc):
+    def test_multi_run_level0_strips_correctly(self, doc):
+        """多 run 一级标题：第一章 + 绪论 → 绪论"""
         p = doc.add_paragraph()
         r1 = p.add_run("第一章")
         r2 = p.add_run(" 绪论")
-        result = strip_manual_numbering(p, r"^第[一二三四五六七八九十百千零]+章\s*")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is True
         assert p.text == "绪论"
 
@@ -1327,27 +1334,26 @@ class TestGetStyleSpacing:
 
 
 # ============================================================
-# numbering.py — strip_manual_numbering (empty result)
+# numbering.py — auto_strip_numbering (empty result)
 # ============================================================
 
 
-class TestStripManualNumberingEmptyResult:
-    """测试 strip_manual_numbering 在文本变空时的行为"""
+class TestAutoStripNumberingEmptyResult:
+    """测试 _auto_strip_numbering 在文本变空时的行为"""
 
     def test_text_becomes_empty_after_strip(self, doc):
         """匹配整个文本后，段落文本变为空"""
         p = doc.add_paragraph()
         run = p.add_run("1.1 ")
-        result = strip_manual_numbering(p, r"^1\.1\s*")
+        result = _auto_strip_numbering(p, ilvl=1)
         assert result is True
-        # 整个文本被清除后，段落文本为空
         assert p.text == ""
 
     def test_single_run_fully_consumed(self, doc):
         """单个 run 的文本完全被匹配清除"""
         p = doc.add_paragraph()
         run = p.add_run("第一章")
-        result = strip_manual_numbering(p, r"^第[一二三四五六七八九十百千零]+章")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is True
         assert p.text == ""
 
@@ -1518,7 +1524,6 @@ class TestProcessHeadingNumberingEnabled:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
-        level_1.strip_pattern = r"^第[一二三四五六七八九十百千零]+章\s*"
         level_1.suffix = "space"
         level_1.numbering_indent = None
         level_1.text_indent = None
@@ -1526,7 +1531,6 @@ class TestProcessHeadingNumberingEnabled:
         level_2 = MagicMock()
         level_2.enabled = True
         level_2.template = "%1.%2"
-        level_2.strip_pattern = r"^\d+\.\d+\s+"
         level_2.suffix = "space"
         level_2.numbering_indent = None
         level_2.text_indent = None
@@ -1534,7 +1538,6 @@ class TestProcessHeadingNumberingEnabled:
         level_3 = MagicMock()
         level_3.enabled = False
         level_3.template = ""
-        level_3.strip_pattern = ""
 
         config.level_1 = level_1
         config.level_2 = level_2
@@ -1580,7 +1583,6 @@ class TestProcessHeadingNumberingEnabled:
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
-        level_1.strip_pattern = r"^第.+章\s*"
         level_1.suffix = "space"
         level_1.numbering_indent = None
         level_1.text_indent = None
@@ -1607,7 +1609,6 @@ class TestProcessHeadingNumberingEnabled:
         level_1 = MagicMock()
         level_1.enabled = False
         level_1.template = ""
-        level_1.strip_pattern = ""
         level_2 = MagicMock()
         level_2.enabled = False
         level_3 = MagicMock()
@@ -1627,14 +1628,13 @@ class TestProcessHeadingNumberingEnabled:
         # 文本不应被修改
         assert p1.text == "第一章 绪论"
 
-    def test_no_strip_pattern_skips_strip(self, doc):
-        """没有 strip_pattern 时跳过手动编号清除"""
+    def test_enabled_level_auto_strips_and_numbers(self, doc):
+        """启用编号后自动清除手动编号并应用自动编号"""
         config = MagicMock()
         config.enabled = True
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
-        level_1.strip_pattern = ""  # 空 strip_pattern
         level_1.suffix = "space"
         level_1.numbering_indent = None
         level_1.text_indent = None
@@ -1654,9 +1654,9 @@ class TestProcessHeadingNumberingEnabled:
 
         process_heading_numbering(root, doc, config)
 
-        # 文本不应被修改（因为没有 strip_pattern）
-        assert p1.text == "第一章 绪论"
-        # 但自动编号应该被应用
+        # 自动清除手动编号
+        assert p1.text == "绪论"
+        # 自动编号应被应用
         pPr = p1._element.find(qn("w:pPr"))
         numPr = pPr.find(qn("w:numPr"))
         assert numPr is not None
