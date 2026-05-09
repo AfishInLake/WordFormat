@@ -59,7 +59,7 @@ wf startapi -H 127.0.0.1 -p 8000
 
 参数：
 -d    Word 文档路径（必填）
--c    YAML 配置文件（必填）
+-c    YAML 配置文件（gj/cf/af 命令需要，startapi 不需要）
 -f    JSON 文件路径（仅 cf/af/tree 需要）
 -o    输出目录（默认 output/）
 -H    API服务地址（默认 127.0.0.1）
