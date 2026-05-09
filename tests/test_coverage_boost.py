@@ -26,7 +26,7 @@ from wordformat.numbering import (
     _convert_to_twips,
     _set_indent_value,
     _build_numbering_rPr,
-    strip_manual_numbering,
+    _auto_strip_numbering,
 )
 from wordformat.style.style_enum import (
     BuiltInStyle,
@@ -622,46 +622,46 @@ class TestNumberingCoverageBoost:
         # sz 不应被添加（half_pt 为 None）
         assert result.find(qn("w:sz")) is None
 
-    def test_strip_manual_numbering_success(self):
-        """覆盖行 186-217: strip_manual_numbering 成功清除编号。"""
+    def test_auto_strip_numbering_success(self):
+        """覆盖 _auto_strip_numbering 成功清除编号。"""
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("1.1 研究背景")
-        result = strip_manual_numbering(p, r"^\d+(\.\d+)\s*")
+        result = _auto_strip_numbering(p, ilvl=1)
         assert result is True
         assert not p.text.startswith("1.1")
 
-    def test_strip_manual_numbering_no_match(self):
-        """覆盖行 191-192: 不匹配正则时返回 False。"""
+    def test_auto_strip_numbering_no_match(self):
+        """无编号文本返回 False。"""
         doc = Document()
         p = doc.add_paragraph()
         p.add_run("研究背景")
-        result = strip_manual_numbering(p, r"^\d+\s*")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is False
 
-    def test_strip_manual_numbering_empty_pattern(self):
-        """覆盖行 186-187: 空正则返回 False。"""
+    def test_auto_strip_numbering_no_match_at_wrong_ilvl(self):
+        """编号格式对应级别不匹配时返回 False。"""
         doc = Document()
         p = doc.add_paragraph()
         p.add_run("1 测试")
-        result = strip_manual_numbering(p, "")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is False
 
-    def test_strip_manual_numbering_no_runs(self):
-        """覆盖行 186-187: 无 run 时返回 False。"""
+    def test_auto_strip_numbering_no_runs(self):
+        """无 run 时返回 False。"""
         doc = Document()
         p = doc.add_paragraph()
-        result = strip_manual_numbering(p, r"^\d+\s*")
+        result = _auto_strip_numbering(p, ilvl=0)
         assert result is False
 
-    def test_strip_manual_numbering_multi_run(self):
-        """覆盖行 198-210: 多 run 逐字符删除。"""
+    def test_auto_strip_numbering_multi_run(self):
+        """多 run 逐字符删除。"""
         doc = Document()
         p = doc.add_paragraph()
         r1 = p.add_run("1.")
         r2 = p.add_run("1 ")
         r3 = p.add_run("研究背景")
-        result = strip_manual_numbering(p, r"^\d+(\.\d+)\s*")
+        result = _auto_strip_numbering(p, ilvl=1)
         assert result is True
         assert p.text.strip() == "研究背景"
 

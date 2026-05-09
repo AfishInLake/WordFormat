@@ -1974,12 +1974,12 @@ class TestCLIStartApiMode:
 class TestNumberingAdditionalCoverage:
     """覆盖 numbering.py 剩余行 (49, 262)"""
 
-    def test_strip_manual_numbering_empty_run_text(self, doc):
+    def test_auto_strip_numbering_empty_run_text(self, doc):
         """run 文本被完全清空后仍保留空 run"""
-        from wordformat.numbering import strip_manual_numbering
+        from wordformat.numbering import _auto_strip_numbering
         p = doc.add_paragraph()
         run = p.add_run("1.1 ")
-        strip_manual_numbering(p, r"^1\.1\s*")
+        _auto_strip_numbering(p, ilvl=1)
         # run 文本被清空但 run 仍存在
         assert run.text == ""
 

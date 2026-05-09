@@ -89,7 +89,7 @@ ACK_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # numbering 合法字段
 NUMBERING_FIELDS = {"enabled", "level_1", "level_2", "level_3"}
-NUMBERING_LEVEL_FIELDS = {"enabled", "template", "strip_pattern", "suffix", "numbering_indent", "text_indent"}
+NUMBERING_LEVEL_FIELDS = {"enabled", "template", "suffix", "numbering_indent", "text_indent"}
 
 # 值范围校验
 ALIGNMENT_VALUES = {"左对齐", "居中对齐", "右对齐", "两端对齐", "分散对齐"}
