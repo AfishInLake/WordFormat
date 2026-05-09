@@ -3,11 +3,13 @@
 # @Author  : afish
 # @File    : set_style.py
 from pathlib import Path
+from typing import Optional
 
 from docx import Document
 from loguru import logger
 
 from wordformat.config.config import get_config, init_config
+from wordformat.config.datamodel import NodeConfigRoot
 from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -165,7 +167,7 @@ def xg(root_node, paragraph):
 def auto_format_thesis_document(
         jsonpath: str | list,
         docxpath: str,
-        configpath: str,
+        configpath: Optional[str] = None,
         savepath: str = "output/",
         check=True,
 ):
@@ -187,7 +189,8 @@ def auto_format_thesis_document(
         jsonpath (str): 文档逻辑结构的 JSON 文件路径 或 json 数据，描述各章节/段落的语义类型。
         docxpath (str): 待处理的原始 Word (.docx) 文档路径。
         savepath (str): 处理完成后带批注的文档保存路径。
-        configpath (str): 格式规范配置文件（YAML）路径，支持继承与合并。
+        configpath (Optional[str]): 格式规范配置文件（YAML）路径，支持继承与合并。
+                                 为 None 时使用内置默认配置。
 
     Side Effects:
         - 读取 jsonpath、docxpath 和 configpath 指定的文件；
@@ -204,13 +207,17 @@ def auto_format_thesis_document(
     """
     from wordformat.utils import get_file_name
 
-    init_config(configpath)
-    try:
-        config_model = get_config()
-        logger.info("配置文件验证通过")
-    except Exception as e:
-        logger.error(f"配置加载失败: {str(e)}")
-        raise
+    if configpath:
+        init_config(configpath)
+        try:
+            config_model = get_config()
+            logger.info("配置文件验证通过")
+        except Exception as e:
+            logger.error(f"配置加载失败: {str(e)}")
+            raise
+    else:
+        config_model = NodeConfigRoot()
+        logger.info("未提供配置文件，使用默认配置")
 
     ensure_directory_exists(savepath)
 

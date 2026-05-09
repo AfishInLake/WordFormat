@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 from fastapi import Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from pydantic import BaseModel
 from starlette.responses import FileResponse
@@ -94,7 +95,7 @@ def save_upload_file(upload_file: UploadFile, save_dir: Path) -> str:
 )
 async def api_generate_json(
     docx_file: UploadFile = File(..., description="待处理的Word文档（.docx格式）"),  # noqa B008
-    config_file: UploadFile = File(..., description="格式配置YAML文件（必填）"),  # noqa B008
+    config_file: Optional[UploadFile] = File(None, description="格式配置YAML文件（可选）"),  # noqa B008
 ):
     """
     对应原命令行generate-json模式：仅生成JSON，不执行校验/格式化
@@ -111,9 +112,9 @@ async def api_generate_json(
 
         # 保存上传文件（仅返回路径，无需提取原名称）
         docx_path = save_upload_file(docx_file, TEMP_DIR)
-        config_path = save_upload_file(config_file, TEMP_DIR)
+        config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
 
-        # 执行核心逻辑生成JSON
+        # 执行核心逻辑生成JSON（configpath 可选）
         json_data = set_tag_main(
             docx_path=docx_path, configpath=config_path
         )
@@ -138,7 +139,7 @@ async def api_generate_json(
 )
 async def api_check_format(
     docx_file: UploadFile = File(..., description="待校验的Word文档（.docx格式）"),  # noqa B008
-    config_file: UploadFile = File(..., description="格式配置YAML文件（必填）"),  # noqa B008
+    config_file: Optional[UploadFile] = File(None, description="格式配置YAML文件（可选）"),  # noqa B008
     json_data: str = Body(..., description="从/generate-json获取的文档结构JSON数据"),
 ):
     """
@@ -148,7 +149,7 @@ async def api_check_format(
     try:
         # 1. 保存上传文件（仅返回实际路径）
         docx_path = save_upload_file(docx_file, TEMP_DIR)
-        config_path = save_upload_file(config_file, TEMP_DIR)
+        config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
 
         # 2. 执行校验逻辑，获取【函数返回的实际保存文件路径】（核心！）
         actual_save_path = auto_format_thesis_document(
@@ -189,7 +190,7 @@ async def api_check_format(
 )
 async def api_apply_format(
     docx_file: UploadFile = File(..., description="待格式化的Word文档（.docx格式）"),  # noqa B008
-    config_file: UploadFile = File(..., description="格式配置YAML文件（必填）"),  # noqa B008
+    config_file: Optional[UploadFile] = File(None, description="格式配置YAML文件（可选）"),  # noqa B008
     json_data: str = Body(..., description="从/generate-json获取的文档结构JSON数据"),
 ):
     """
@@ -199,7 +200,7 @@ async def api_apply_format(
     try:
         # 1. 保存上传文件（仅返回实际路径）
         docx_path = save_upload_file(docx_file, TEMP_DIR)
-        config_path = save_upload_file(config_file, TEMP_DIR)
+        config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
 
         # 2. 执行格式化逻辑，获取【函数返回的实际保存文件路径】（核心！）
         actual_save_path = auto_format_thesis_document(
@@ -267,3 +268,14 @@ def download_file(filename: str):
     except Exception as e:
         logger.error(f"文件下载失败：{filename} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"文件下载失败：{str(e)}") from e
+
+
+# ---------------------- 前端静态文件（Vue SPA）---------------------
+# 路由优先级：API 路由（已定义）> 静态文件
+# html=True 会自动将 / 映射到 index.html
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.is_dir() and any(_STATIC_DIR.iterdir()):
+    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="frontend")
+    logger.info(f"前端静态文件已挂载：{_STATIC_DIR}")
+else:
+    logger.info("未找到前端静态文件，仅提供 API 服务")
