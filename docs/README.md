@@ -27,6 +27,7 @@
 - [查看文档结构树](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#2-查看文档结构树)
 - [执行格式校验](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#3-执行格式校验)
 - [执行格式格式化](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#4-执行格式格式化)
+- [启动 Web 可视化界面](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md#5-启动-web-可视化界面startapi)
 
 ### 配置指南
 - [配置文件格式](https://github.com/AfishInLake/WordFormat/blob/master/docs/configuration.md#配置文件格式)
