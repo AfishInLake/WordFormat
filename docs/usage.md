@@ -41,7 +41,7 @@ wf startapi
 
 ### 通用参数
 - `-d`：**必填**，Word 文档路径
-- `-c`：**必填**，YAML 格式配置文件路径
+- `-c`：YAML 格式配置文件路径（推荐提供，不传则使用内置默认配置）
 - `-f`：JSON 文件路径（**仅 cf/af/tree 需要**）
 - `-o`：输出目录（可选，默认 `output/`）
 - `-H`：API服务地址（可选，默认 `127.0.0.1`，**仅 startapi**）
@@ -54,8 +54,11 @@ wf startapi
 **文件名 = 文档名 + 10位时间戳**，永不重复
 
 ```bash
-# 最简用法
+# 最简用法（带配置文件）
 wf gj -d your_document.docx -c example/undergrad_thesis.yaml
+
+# 不带配置文件（使用内置默认配置）
+wf gj -d your_document.docx
 
 # 自定义输出目录
 wf gj -d your_document.docx -c example/undergrad_thesis.yaml -o output/
@@ -135,20 +138,90 @@ wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 
 ---
 
-## 5. 启动API服务
-启动Web API服务，提供HTTP接口调用
+## 5. 启动 Web 可视化界面（startapi）
+
+`wf startapi` 会启动一个完整的 Web 服务，提供以下能力：
+
+| 能力 | 说明 |
+|------|------|
+| **可视化操作界面** | 内置 Vue SPA 前端，浏览器中直接上传文档、一键执行校验/格式化 |
+| **RESTful API** | 提供 HTTP 接口，方便其他程序/脚本调用 |
+| **Swagger 文档** | 自动生成的交互式 API 文档（`/docs`），可在浏览器中直接调试接口 |
+| **文件下载服务** | 校验/格式化后的结果文件可直接下载 |
+
+### 启动方式
 
 ```bash
-# 默认启动（127.0.0.1:8000）
+# 使用 pip 安装时带上 api 依赖
+pip install "wordformat[api]"
+
+# 默认启动（127.0.0.1:8000，仅本机可访问）
 wf startapi
 
-# 自定义地址和端口
+# 监听所有网络接口（局域网内其他设备也可访问）
 wf startapi -H 0.0.0.0 -p 8080
 ```
 
-启动后访问：
-- API文档：http://127.0.0.1:8000/docs
-- 服务地址：http://127.0.0.1:8000
+### 访问地址
+
+| 地址 | 说明 |
+|------|------|
+| `http://127.0.0.1:8000` | 前端可视化操作界面 |
+| `http://127.0.0.1:8000/docs` | Swagger API 交互式文档 |
+| `http://127.0.0.1:8000/redoc` | ReDoc API 文档 |
+
+### 前端界面功能
+
+启动后在浏览器打开 `http://127.0.0.1:8000`，可以看到完整的图形化操作面板：
+
+1. **上传文档**：选择 `.docx` 文件
+2. **上传配置**（可选）：选择 `.yaml` 格式配置文件，不传则使用内置默认配置
+3. **一键生成 JSON**：调用 `/generate-json` 接口，解析文档结构
+4. **格式校验**：调用 `/check-format` 接口，生成带批注的标注版文档
+5. **格式修正**：调用 `/apply-format` 接口，生成修正后的新版文档
+6. **下载结果**：校验/修正完成后直接下载 `.docx` 结果文件
+
+前端使用 `fetch` 直接请求后端 API，前后端一体化部署，无需额外配置代理。
+
+### API 端点一览
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/generate-json` | 上传 docx + 可选 yaml，返回文档结构 JSON |
+| `POST` | `/check-format` | 上传 docx + json_data + 可选 yaml，返回标注版文档下载链接 |
+| `POST` | `/apply-format` | 上传 docx + json_data + 可选 yaml，返回修改版文档下载链接 |
+| `GET` | `/download/{filename}` | 下载处理后的结果文档 |
+| `GET` | `/docs` | Swagger UI 接口文档 |
+| `GET` | `/redoc` | ReDoc 接口文档 |
+
+#### 配置界面
+![配置界面预览](./image/config.png)
+
+#### 格式化操作界面
+![格式化操作界面预览](./image/format.png)
+### 通过 API 编程调用示例
+
+```python
+import requests
+
+# 1. 生成文档结构 JSON
+with open("论文.docx", "rb") as f:
+    resp = requests.post(
+        "http://127.0.0.1:8000/generate-json",
+        files={"docx_file": f}
+    )
+json_data = resp.json()["data"]["json_data"]
+
+# 2. 执行格式校验
+with open("论文.docx", "rb") as f:
+    resp = requests.post(
+        "http://127.0.0.1:8000/check-format",
+        files={"docx_file": f},
+        data={"json_data": str(json_data)}
+    )
+download_url = resp.json()["data"]["download_url"]
+print(f"校验结果: http://127.0.0.1:8000{download_url}")
+```
 
 ---
 
@@ -173,16 +246,16 @@ wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f 
 
 | 命令 | 全称 | 作用 | 必填参数 |
 |------|------|------|----------|
-| `wf gj` | generate-json | 生成文档结构 JSON | `-d`,`-c` |
+| `wf gj` | generate-json | 生成文档结构 JSON | `-d`（`-c` 推荐） |
 | `wf tree` | tree | 查看文档结构树 | `-f` |
 | `wf cf` | check-format | 检查格式并添加批注 | `-d`,`-c`,`-f` |
 | `wf af` | apply-format | 自动格式化论文 | `-d`,`-c`,`-f` |
-| `wf startapi` | start-api | 启动API服务 | 无 |
+| `wf startapi` | start-api | 启动Web可视化界面 | 无 |
 
 | 参数 | 作用 | 必填 |
 |------|------|------|
 | `-d` | Word 文档路径 | 是（gj/cf/af） |
-| `-c` | YAML 配置路径 | 是（gj/cf/af） |
+| `-c` | YAML 配置路径 | 推荐（gj）/ 是（cf/af），不传使用默认配置 |
 | `-f` | JSON 文件路径 | 是（cf/af/tree） |
 | `-o` | 输出目录 | 否（默认 output） |
 | `-H` | API服务地址 | 否（默认 127.0.0.1） |
@@ -196,6 +269,7 @@ wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f 
 ```python
 from wordformat.set_tag import set_tag_main
 
+# configpath 可选，不传使用默认配置
 set_tag_main(
     docx_path="your_document.docx",
     configpath="example/undergrad_thesis.yaml"
@@ -206,6 +280,7 @@ set_tag_main(
 ```python
 from wordformat.set_style import auto_format_thesis_document
 
+# configpath 可选，不传使用默认配置
 auto_format_thesis_document(
     jsonpath="output/论文_1744123456.json",
     docxpath="your_document.docx",
@@ -219,6 +294,7 @@ auto_format_thesis_document(
 ```python
 from wordformat.set_style import auto_format_thesis_document
 
+# configpath 可选，不传使用默认配置
 auto_format_thesis_document(
     jsonpath="output/论文_1744123456.json",
     docxpath="your_document.docx",
@@ -230,29 +306,21 @@ auto_format_thesis_document(
 
 ---
 
-## API 调用
+## API 调用 & 开发模式
 
-### 启动服务（命令行方式 - 推荐）
+> 详细的 API 使用说明（端点、前端界面、编程调用示例）已整合到上方 [5. 启动 Web 可视化界面](#5-启动-web-可视化界面startapi) 章节。
+
+### 开发者本地启动（不安装 PyPI 包）
+
 ```bash
-# 方式1：使用 wf 命令（推荐）
-wf startapi
-
-# 方式2：自定义地址和端口
-wf startapi -H 0.0.0.0 -p 8080
-```
-
-### 启动服务（开发模式）
-```bash
-# 方式1：使用 uvicorn
-uv venv
-source venv/bin/activate
-uv sync
-uv run start_api.py
-
-# 方式2：使用 make
+# 使用 make
 make server
+
+# 或直接使用 uvicorn
+pip install -e ".[api]"
+python start_api.py
 ```
 
-启动服务查看接口文档：http://127.0.0.1:8000/docs
+启动后访问：http://127.0.0.1:8000/docs
 
 ---

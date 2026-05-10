@@ -26,6 +26,7 @@
 - **文档结构可视化**：通过 `wf tree` 命令以树形结构展示文档段落分类和层级关系，支持按类别过滤、显示置信度
 - **格式一键修正**：支持根据规范自动修正部分常见格式问题（如标题字号、正文行距）
 - **标题自动编号**：支持自动清除手动编号并应用 Word 自动编号，可自定义编号模板（如"第X章"、"1.1.1"）、编号后缀（制表符/空格/无）和缩进设置
+- **Web 可视化界面**：内置 Vue 前端界面，通过 `wf startapi` 一键启动图形化操作面板，告别命令行
 - **自定义配置**：通过 YAML 配置文件灵活定义格式规范，适配不同学校/期刊的格式要求
 - **跨平台兼容**：支持 Windows/macOS/Linux 系统，基于 python-docx 实现跨平台 Word 文档处理
 
@@ -45,6 +46,9 @@
 ```bash
 # 使用 pip
 pip install wordformat
+
+# 如果需要 Web 可视化界面（startapi），安装时带上 api 依赖
+pip install "wordformat[api]"
 
 # 或使用 uv
 uv add wordformat
@@ -90,7 +94,34 @@ wf cf -d 论文.docx -c 配置.yaml -f 结构文件.json
 
 # 4. 执行自动格式化（一键修正格式）
 wf af -d 论文.docx -c 配置.yaml -f 结构文件.json
+
+# 5. 启动 Web 可视化界面
+wf startapi
+# 然后在浏览器打开 http://127.0.0.1:8000
 ```
+### startapi命令行预览（推荐使用）
+
+```bash
+# 下载api版
+pip install "wordformat[api]"
+#启动 Web 可视化界面
+wf startapi
+# 访问 http://127.0.0.1:8000
+
+# 若提示无法找到wf命令，请执行以下命令
+python -m wordformat.cli startapi
+```
+
+- 推荐使用.bat实现快速启动
+在桌面创建`start.txt`文件，写入下列命令（点击复制即可），修改后缀为`.bat`(完整文件名称`start.bat`)，双击即可启动
+```bash
+python -m wordformat.cli startapi
+```
+#### 配置界面
+![配置界面预览](./docs/image/config.png)
+
+#### 格式化操作界面
+![格式化操作界面预览](./docs/image/format.png)
 
 更多详细用法请查看 [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md)
 
