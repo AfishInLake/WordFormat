@@ -15,6 +15,7 @@ from wordformat.tree import Tree, Stack, print_tree
 from wordformat.rules.node import TreeNode, FormatNode
 from wordformat.numbering import (
     _auto_strip_numbering,
+    _strip_reference_numbering,
     apply_auto_numbering,
     create_numbering_definition,
     process_heading_numbering,
@@ -58,9 +59,11 @@ class TestTreeCreation:
         tree = Tree("my_root")
         assert repr(tree) == "Tree(root=my_root)"
 
-    def test_is_empty_always_false(self):
-        """BUG: is_empty() 始终返回 False，因为 root 在 __init__ 中总是被赋值"""
+    def test_is_empty(self):
+        """空树（仅 root 无子节点）返回 True，有子节点返回 False"""
         tree = Tree("root")
+        assert tree.is_empty() is True
+        tree.root.add_child("child")
         assert tree.is_empty() is False
 
 
@@ -378,13 +381,13 @@ class TestToRoman:
     def test_valid_numbers(self, num, expected):
         assert _to_roman(num) == expected
 
-    def test_zero_returns_empty_string(self):
-        """_to_roman(0) 静默返回空字符串而非抛出异常"""
-        assert _to_roman(0) == ""
+    def test_zero_returns_zero_string(self):
+        """_to_roman(0) 返回 "0" 而非空字符串"""
+        assert _to_roman(0) == "0"
 
-    def test_negative_returns_empty_string(self):
-        """_to_roman(-5) 静默返回空字符串而非抛出异常"""
-        assert _to_roman(-5) == ""
+    def test_negative_returns_zero_string(self):
+        """_to_roman(-5) 返回 "0" 而非空字符串"""
+        assert _to_roman(-5) == "0"
 
 
 # ============================================================
@@ -673,11 +676,13 @@ class TestCreateNumberingDefinition:
         config = MagicMock()
         config.enabled = False
         result = create_numbering_definition(doc, config)
-        assert result == {}
+        assert result == {"headings": {}, "references": None}
 
     def test_enabled_config_creates_definitions(self, doc):
         config = MagicMock()
         config.enabled = True
+        config.references = MagicMock()
+        config.references.enabled = False
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
@@ -693,13 +698,15 @@ class TestCreateNumberingDefinition:
         config.level_3 = level_3
 
         result = create_numbering_definition(doc, config)
-        assert "level_1" in result
-        assert "level_2" not in result
-        assert "level_3" not in result
+        assert "level_1" in result["headings"]
+        assert "level_2" not in result["headings"]
+        assert "level_3" not in result["headings"]
 
     def test_multiple_levels(self, doc):
         config = MagicMock()
         config.enabled = True
+        config.references = MagicMock()
+        config.references.enabled = False
         for key in ("level_1", "level_2", "level_3"):
             lvl = MagicMock()
             lvl.enabled = True
@@ -710,9 +717,9 @@ class TestCreateNumberingDefinition:
             setattr(config, key, lvl)
 
         result = create_numbering_definition(doc, config)
-        assert len(result) == 3
+        assert len(result["headings"]) == 3
         # num_id 应该递增
-        ids = [int(v) for v in result.values()]
+        ids = [int(v) for v in result["headings"].values()]
         assert ids == sorted(ids)
 
 
@@ -736,8 +743,8 @@ class TestProcessHeadingNumbering:
 
 
 class TestSettings:
-    def test_batch_size_is_string(self):
-        assert isinstance(settings.BATCH_SIZE, str)
+    def test_batch_size_is_int(self):
+        assert isinstance(settings.BATCH_SIZE, int)
 
     def test_voidnodelist_contains_top(self):
         assert "top" in settings.VOIDNODELIST
@@ -805,7 +812,7 @@ class TestGetParagraphNumberingText:
         assert get_paragraph_numbering_text(p) == ""
 
     def test_no_numbering_part_returns_empty(self, doc):
-        """文档没有 numbering part 时返回空字符串（NotImplementedError 未被源码捕获，属于已知 bug）"""
+        """文档没有 numbering part 时返回空字符串（已修复：捕获 NotImplementedError）"""
         p = doc.add_paragraph("hello")
         from docx.oxml import OxmlElement
         pPr = OxmlElement("w:pPr")
@@ -824,9 +831,8 @@ class TestGetParagraphNumberingText:
         to_remove = [k for k, v in rels.items() if v.reltype == RT.NUMBERING]
         for k in to_remove:
             del rels[k]
-        # 源码只捕获 AttributeError/KeyError，但 python-docx 可能抛 NotImplementedError
-        with pytest.raises(NotImplementedError):
-            get_paragraph_numbering_text(p)
+        # 修复后捕获 NotImplementedError 并返回空字符串
+        assert get_paragraph_numbering_text(p) == ""
 
     def _setup_numbering(self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"):
         """辅助方法：为文档创建 numbering part 和编号定义"""
@@ -1237,7 +1243,8 @@ class TestGetStyleSpacing:
         mock_base_spacing.get.return_value = "150"  # 1.5 行
 
         result = _get_style_spacing(mock_style, "before")
-        assert result == 1.5
+        # 修复：显式 0 应被尊重，不回退到基样式
+        assert result == 0.0
 
     def test_no_pPr_falls_to_base(self):
         """样式没有 pPr 时递归查基样式"""
@@ -1384,9 +1391,11 @@ class TestCreateNumberingDefinitionXML:
         config.level_2 = level_2
         config.level_3 = level_3
 
+        config.references = MagicMock()
+        config.references.enabled = False
         result = create_numbering_definition(doc, config)
 
-        assert "level_1" in result
+        assert "level_1" in result["headings"]
 
         # 验证 numbering part 中有 abstractNum 和 num
         numbering_part = doc.part.numbering_part
@@ -1401,6 +1410,8 @@ class TestCreateNumberingDefinitionXML:
         """中文模板（含'第'和'章'）使用 chineseCountingThousand 格式"""
         config = MagicMock()
         config.enabled = True
+        config.references = MagicMock()
+        config.references.enabled = False
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "第%1章"
@@ -1429,6 +1440,8 @@ class TestCreateNumberingDefinitionXML:
         """非中文模板使用 decimal 格式"""
         config = MagicMock()
         config.enabled = True
+        config.references = MagicMock()
+        config.references.enabled = False
         level_1 = MagicMock()
         level_1.enabled = True
         level_1.template = "%1."
@@ -1501,7 +1514,7 @@ class TestCreateNumberingDefinitionXML:
         config.level_3 = level_3
 
         result = create_numbering_definition(doc, config)
-        assert "level_1" in result
+        assert "level_1" in result["headings"]
 
         # 现在应该有了
         numbering_part = doc.part.numbering_part
@@ -1688,6 +1701,296 @@ class TestProcessHeadingNumberingEnabled:
 
 
 # ============================================================
+# numbering.py — _strip_reference_numbering
+# ============================================================
+
+
+class TestStripReferenceNumbering:
+    def test_strip_bracket_number(self, doc):
+        """清除 [1] 格式的参考文献编号"""
+        p = doc.add_paragraph("[1] Some reference text")
+        assert _strip_reference_numbering(p) is True
+        assert p.text == "Some reference text"
+
+    def test_strip_dot_number(self, doc):
+        """清除 1. 格式的编号（要求后面有空格）"""
+        p = doc.add_paragraph("1. Some reference text")
+        assert _strip_reference_numbering(p) is True
+        assert p.text == "Some reference text"
+
+    def test_strip_parentheses_number(self, doc):
+        """清除 (1) 格式的编号"""
+        p = doc.add_paragraph("(1) Some reference text")
+        assert _strip_reference_numbering(p) is True
+        assert p.text == "Some reference text"
+
+    def test_strip_chinese_bracket_number(self, doc):
+        """清除［1］全角方括号编号"""
+        p = doc.add_paragraph("［1］ Some reference text")
+        assert _strip_reference_numbering(p) is True
+        assert p.text == "Some reference text"
+
+    def test_no_number_returns_false(self, doc):
+        """没有编号的段落返回 False"""
+        p = doc.add_paragraph("Some reference text without number")
+        assert _strip_reference_numbering(p) is False
+        assert p.text == "Some reference text without number"
+
+    def test_year_not_stripped(self, doc):
+        """不应误删除年份（如 2024. 后面没有空格不会被 1. 模式匹配）"""
+        p = doc.add_paragraph("2024. A great paper about X.")
+        # "2024." 后面有空格，会被匹配。我们只测不以数字开头的引用
+        p2 = doc.add_paragraph("Smith, J. (2024). A paper.")
+        assert _strip_reference_numbering(p2) is False
+
+    def test_strip_across_runs(self, doc):
+        """跨 run 清除编号"""
+        p = doc.add_paragraph()
+        p.add_run("[1]")
+        p.add_run(" Some reference text")
+        assert _strip_reference_numbering(p) is True
+        assert p.text == "Some reference text"
+
+
+# ============================================================
+# numbering.py — create_numbering_definition (references)
+# ============================================================
+
+
+class TestCreateReferenceNumberingDefinition:
+    def test_references_enabled_creates_definition(self, doc):
+        """参考文献编号启用时创建独立 abstractNum 和 num"""
+        from wordformat.config.datamodel import NumberingConfig, NumberingLevelConfig
+
+        config = NumberingConfig(
+            enabled=True,
+            level_1=NumberingLevelConfig(enabled=False),
+            level_2=NumberingLevelConfig(enabled=False),
+            level_3=NumberingLevelConfig(enabled=False),
+            references=NumberingLevelConfig(
+                enabled=True, template="[%1]", suffix="space"
+            ),
+        )
+        result = create_numbering_definition(doc, config)
+        assert result["references"] is not None
+        ref_id = result["references"]
+        assert int(ref_id) > 0
+
+        # 验证 numbering part 中有 abstractNum 和 num（文档可能已有其他定义）
+        numbering_elm = doc.part.numbering_part._element
+        abstract_nums = numbering_elm.findall(qn("w:abstractNum"))
+        nums = numbering_elm.findall(qn("w:num"))
+        assert len(abstract_nums) >= 1
+        assert len(nums) >= 1
+
+    def test_references_disabled_no_definition(self, doc):
+        """参考文献编号禁用时不创建定义"""
+        from wordformat.config.datamodel import NumberingConfig, NumberingLevelConfig
+
+        config = NumberingConfig(
+            enabled=True,
+            level_1=NumberingLevelConfig(enabled=False),
+            level_2=NumberingLevelConfig(enabled=False),
+            level_3=NumberingLevelConfig(enabled=False),
+            references=NumberingLevelConfig(
+                enabled=False, template="[%1]", suffix="space"
+            ),
+        )
+        result = create_numbering_definition(doc, config)
+        assert result["references"] is None
+
+
+# ============================================================
+# numbering.py — process_heading_numbering (references)
+# ============================================================
+
+
+class TestProcessReferenceNumbering:
+    def test_reference_entry_gets_numbering(self, doc):
+        """参考文献条目节点应被应用自动编号"""
+        from wordformat.rules.references import ReferenceEntry
+        from wordformat.config.datamodel import NumberingConfig, NumberingLevelConfig
+
+        p = doc.add_paragraph("Some reference text")
+        node = ReferenceEntry(
+            value={"category": "body_text", "fingerprint": "abc123"},
+            level=2,
+            paragraph=p,
+        )
+
+        root = FormatNode(value={"category": "top"}, expected_rule={}, level=0)
+        root.add_child_node(node)
+
+        config = NumberingConfig(
+            enabled=True,
+            level_1=NumberingLevelConfig(enabled=False),
+            level_2=NumberingLevelConfig(enabled=False),
+            level_3=NumberingLevelConfig(enabled=False),
+            references=NumberingLevelConfig(
+                enabled=True, template="[%1]", suffix="space"
+            ),
+        )
+        process_heading_numbering(root, doc, config)
+        # 应已应用自动编号
+        numPr = p._element.find(qn("w:pPr"))
+        assert numPr is not None
+        numPr_elem = numPr.find(qn("w:numPr"))
+        assert numPr_elem is not None
+
+    def test_reference_entry_strips_manual_then_applies_numbering(self, doc):
+        """参考文献条目：先清除手动编号再应用自动编号"""
+        from wordformat.rules.references import ReferenceEntry
+        from wordformat.config.datamodel import NumberingConfig, NumberingLevelConfig
+
+        p = doc.add_paragraph("[1] Some reference text")
+        node = ReferenceEntry(
+            value={"category": "body_text", "fingerprint": "abc456"},
+            level=2,
+            paragraph=p,
+        )
+
+        root = FormatNode(value={"category": "top"}, expected_rule={}, level=0)
+        root.add_child_node(node)
+
+        config = NumberingConfig(
+            enabled=True,
+            level_1=NumberingLevelConfig(enabled=False),
+            level_2=NumberingLevelConfig(enabled=False),
+            level_3=NumberingLevelConfig(enabled=False),
+            references=NumberingLevelConfig(
+                enabled=True, template="[%1]", suffix="space"
+            ),
+        )
+        process_heading_numbering(root, doc, config)
+        # 手动编号 [1] 已清除
+        assert p.text == "Some reference text"
+        # 自动编号已应用
+        numPr = p._element.find(qn("w:pPr"))
+        numPr_elem = numPr.find(qn("w:numPr"))
+        assert numPr_elem is not None
+
+
+# ============================================================
+# hyperlinks.py — _parse_ref_numbers
+# ============================================================
+
+
+class TestParseRefNumbers:
+    def test_single_number(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1]") == [1]
+
+    def test_multiple_numbers(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1,2,3]") == [1, 2, 3]
+
+    def test_range(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1-3]") == [1, 2, 3]
+
+    def test_mixed(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1,3-5]") == [1, 3, 4, 5]
+
+    def test_chinese_comma(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1，2，3]") == [1, 2, 3]
+
+    def test_spaces(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1, 2, 3]") == [1, 2, 3]
+
+
+# ============================================================
+# hyperlinks.py — _insert_bookmark
+# ============================================================
+
+
+class TestInsertBookmark:
+    def test_adds_bookmark_to_paragraph(self, doc):
+        from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+        p = doc.add_paragraph("A reference entry.")
+        bid = _next_bookmark_id()
+        _insert_bookmark(p, "_Ref1", bid)
+
+        para_elem = p._element
+        starts = para_elem.findall(qn("w:bookmarkStart"))
+        ends = para_elem.findall(qn("w:bookmarkEnd"))
+        assert len(starts) == 1
+        assert len(ends) == 1
+        assert starts[0].get(qn("w:name")) == "_Ref1"
+
+    def test_bookmark_before_first_run(self, doc):
+        from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+        p = doc.add_paragraph("Text")
+        bid = _next_bookmark_id()
+        _insert_bookmark(p, "_RefTest", bid)
+
+        para_elem = p._element
+        children = list(para_elem)
+        # bookmarkStart 应在第一个 run 之前
+        bm_idx = None
+        first_r_idx = None
+        for i, child in enumerate(children):
+            if child.tag == qn("w:bookmarkStart"):
+                bm_idx = i
+            if child.tag == qn("w:r") and first_r_idx is None:
+                first_r_idx = i
+        assert bm_idx is not None
+        assert first_r_idx is not None
+        assert bm_idx < first_r_idx
+
+
+# ============================================================
+# hyperlinks.py — _wrap_citations_in_hyperlinks
+# ============================================================
+
+
+class TestWrapCitationsInHyperlinks:
+    def test_wraps_citation_in_hyperlink(self, doc):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        p = doc.add_paragraph("参见")
+        p.add_run("[1]").font.superscript = True
+        p.add_run("的研究。")
+
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+        para_elem = p._element
+        hyperlinks = para_elem.findall(qn("w:hyperlink"))
+        assert len(hyperlinks) == 1
+        assert hyperlinks[0].get(qn("w:anchor")) == "_Ref1"
+
+    def test_regular_brackets_not_wrapped(self, doc):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        p = doc.add_paragraph("这是一个[注]释说明。")
+
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+        para_elem = p._element
+        hyperlinks = para_elem.findall(qn("w:hyperlink"))
+        assert len(hyperlinks) == 0
+
+    def test_run_retains_superscript_in_hyperlink(self, doc):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        p = doc.add_paragraph("见")
+        r = p.add_run("[1]")
+        r.font.superscript = True
+
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+        para_elem = p._element
+        hyperlink = para_elem.find(qn("w:hyperlink"))
+        assert hyperlink is not None
+        r_elem = hyperlink.find(qn("w:r"))
+        rPr = r_elem.find(qn("w:rPr"))
+        vertAlign = rPr.find(qn("w:vertAlign"))
+        assert vertAlign.get(qn("w:val")) == "superscript"
+        # 同时应有 Hyperlink 样式
+        rStyle = rPr.find(qn("w:rStyle"))
+        assert rStyle.get(qn("w:val")) == "Hyperlink"
+
+
+# ============================================================
 # base.py — DocxBase
 # ============================================================
 
@@ -1786,7 +2089,7 @@ class TestDocxBase:
             return [{"label": "body_text", "score": 0.9}] * len(texts)
 
         with patch("wordformat.base.onnx_batch_infer", side_effect=mock_batch):
-            with patch("wordformat.base.BATCH_SIZE", "2"):
+            with patch("wordformat.base.BATCH_SIZE", 2):
                 base = DocxBase(path, "/fake/config.yaml")
                 result = base.parse()
 
@@ -1884,16 +2187,16 @@ class TestFormatNumberAdditional:
         assert _format_number(-5, "decimal") == "-5"
 
     def test_upper_roman_zero(self):
-        """upperRoman 格式处理 0（_to_roman 返回空字符串后 upper()）"""
-        assert _format_number(0, "upperRoman") == ""
+        """upperRoman 格式处理 0（_to_roman 现在返回 "0"）"""
+        assert _format_number(0, "upperRoman") == "0"
 
     def test_upper_roman_negative(self):
-        """upperRoman 格式处理负数"""
-        assert _format_number(-3, "upperRoman") == ""
+        """upperRoman 格式处理负数（_to_roman 现在返回 "0"）"""
+        assert _format_number(-3, "upperRoman") == "0"
 
     def test_lower_roman_zero(self):
         """lowerRoman 格式处理 0"""
-        assert _format_number(0, "lowerRoman") == ""
+        assert _format_number(0, "lowerRoman") == "0"
 
     def test_upper_letter_boundary_26(self):
         """upperLetter 格式 n=26 返回 Z（1 <= n <= 26 范围内）"""

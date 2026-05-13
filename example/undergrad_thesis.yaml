@@ -204,3 +204,7 @@ numbering:
     enabled: true
     template: '%1.%2.%3'
     suffix: 'space'
+  references:
+    enabled: true
+    template: '[%1]'
+    suffix: 'space'

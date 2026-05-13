@@ -130,15 +130,14 @@ class TestDataModelValidation:
             KeywordsConfig(count_min=10, count_max=3)
 
     def test_font_size_range_validation(self):
-        """字号数值验证：负数当前可通过（validator 未生效）"""
-        # validate_font_size 定义在模块级别，未绑定到 GlobalFormatConfig
-        cfg = GlobalFormatConfig(font_size=-5.0)
-        assert cfg.font_size == -5.0
+        """字号数值验证：负数应触发 ValidationError"""
+        with pytest.raises(ValidationError):
+            GlobalFormatConfig(font_size=-5.0)
 
     def test_font_size_accepts_any_number(self):
-        """当前行为：任意数值均可通过（记录此行为）"""
-        cfg = GlobalFormatConfig(font_size=-999.0)
-        assert cfg.font_size == -999.0
+        """负数字号应触发 ValidationError"""
+        with pytest.raises(ValidationError):
+            GlobalFormatConfig(font_size=-999.0)
 
     def test_font_color_validation(self):
         """font_color 空字符串应验证失败"""
@@ -1875,9 +1874,8 @@ class TestAPIEndpoints:
         client, temp_dir, output_dir = api_client
 
         response = client.get("/download/nonexistent.docx")
-        # BUG: download_file 捕获了 HTTPException(404) 但仅记录日志，
-        # 导致 FastAPI 返回 200 而非 404
-        assert response.status_code == 200
+        # 已修复：重新抛出 HTTPException，正确返回 404
+        assert response.status_code == 404
 
     def test_generate_json_exception_returns_500(self, api_client):
         """POST /generate-json 异常时返回 500"""

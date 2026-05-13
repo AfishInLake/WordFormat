@@ -487,9 +487,10 @@ class TestFontColor:
         assert FontColor("red") == (255, 0, 0)
         assert FontColor("red") != (0, 0, 0)
 
-    def test_eq_non_tuple(self):
-        assert FontColor("red") != "red"
-        assert FontColor("red") != (255, 0)  # wrong length
+    def test_eq_string(self):
+        """字符串比较应与解析后的RGB比较"""
+        assert FontColor("red") == "red"
+        assert FontColor("red") != "blue"
 
     def test_base_set(self, doc):
         run = doc.add_paragraph().add_run("x")
@@ -776,8 +777,8 @@ class TestGetStyleSpacingExtended:
         mock_style.element = elem
         assert _get_style_spacing(mock_style, "before") == 0.5
 
-    def test_lines_attr_zero_falls_to_base(self):
-        """Lines value is 0 -> falls to base_style (lines 114-124)"""
+    def test_lines_attr_zero_returns_zero(self):
+        """显式 Lines=0 应返回 0.0，不回退到基样式。"""
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
         mock_base = MagicMock()
@@ -792,7 +793,7 @@ class TestGetStyleSpacingExtended:
         elem.append(pPr)
         mock_style.element = elem
         mock_style.base_style = mock_base
-        assert _get_style_spacing(mock_style, "before") is None
+        assert _get_style_spacing(mock_style, "before") == 0.0
 
     def test_mock_detection_in_lines_attr(self):
         """Lines attr is a Mock object -> detect and handle (lines 100-106)"""
@@ -1405,11 +1406,11 @@ class TestFontColorEqEdgeCases:
     """Cover lines 344-345: FontColor.__eq__ with non-tuple or wrong length tuple"""
 
     def test_eq_non_tuple_returns_false(self):
-        """__eq__ with non-tuple returns False (line 337-338)"""
+        """__eq__ with non-color values returns False"""
         fc = FontColor("red")
-        assert fc != "red"
-        assert fc != 42
-        assert fc != None
+        assert fc == "red"          # 字符串颜色名现在被正确比较
+        assert fc != 42             # 非颜色应返回 False
+        assert fc != None           # None 应返回 False
 
     def test_eq_wrong_length_tuple_returns_false(self):
         """__eq__ with tuple of wrong length returns False (line 339-340)"""
@@ -1907,11 +1908,10 @@ class TestGetStyleSpacingRecursionAndBaseLines:
     """Cover lines 117-118, 122: _get_style_spacing recursion and base_lines paths"""
 
     def test_recursion_returns_base_value(self):
-        """Recursion: base_style returns valid value (lines 117-118)"""
+        """当前样式 Lines 有效（非0）时返回自身值，不回退基样式。"""
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
 
-        # Create base style with valid spacing
         mock_base = MagicMock()
         base_elem = OxmlElement("w:style")
         base_pPr = OxmlElement("w:pPr")
@@ -1922,7 +1922,35 @@ class TestGetStyleSpacingRecursionAndBaseLines:
         mock_base.element = base_elem
         mock_base.base_style = None
 
-        # Create child style with zero lines (should fall to base)
+        # 子样式显式设置 beforeLines=200，应使用自身值
+        mock_style = MagicMock()
+        elem = OxmlElement("w:style")
+        pPr = OxmlElement("w:pPr")
+        spacing = OxmlElement("w:spacing")
+        spacing.set(qn("w:beforeLines"), "200")
+        pPr.append(spacing)
+        elem.append(pPr)
+        mock_style.element = elem
+        mock_style.base_style = mock_base
+
+        result = _get_style_spacing(mock_style, "before")
+        assert result == 2.0  # 自身值，不回退基样式
+
+    def test_explicit_zero_not_falls_to_base(self):
+        """显式 Lines=0 返回 0.0，不回退基样式。"""
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        mock_base = MagicMock()
+        base_elem = OxmlElement("w:style")
+        base_pPr = OxmlElement("w:pPr")
+        base_spacing = OxmlElement("w:spacing")
+        base_spacing.set(qn("w:beforeLines"), "100")
+        base_pPr.append(base_spacing)
+        base_elem.append(base_pPr)
+        mock_base.element = base_elem
+        mock_base.base_style = None
+
         mock_style = MagicMock()
         elem = OxmlElement("w:style")
         pPr = OxmlElement("w:pPr")
@@ -1934,7 +1962,7 @@ class TestGetStyleSpacingRecursionAndBaseLines:
         mock_style.base_style = mock_base
 
         result = _get_style_spacing(mock_style, "before")
-        assert result == 1.0  # from base style
+        assert result == 0.0  # 显式 0，不回退
 
     def test_recursion_base_style_attr_error(self):
         """Recursion: base_style raises AttributeError (line 117-118)"""
@@ -1952,14 +1980,14 @@ class TestGetStyleSpacingRecursionAndBaseLines:
         del mock_style.base_style
 
         result = _get_style_spacing(mock_style, "before")
-        assert result is None
+        # 修复：显式 0 不再回退，返回 0.0
+        assert result == 0.0
 
     def test_returns_base_lines_when_zero(self):
-        """lines_val is 0 -> returns base_lines (line 122)"""
+        """显式 Lines=0 返回 0.0，不回退基样式。"""
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
 
-        # Base style with valid spacing
         mock_base = MagicMock()
         base_elem = OxmlElement("w:style")
         base_pPr = OxmlElement("w:pPr")
@@ -1970,7 +1998,6 @@ class TestGetStyleSpacingRecursionAndBaseLines:
         mock_base.element = base_elem
         mock_base.base_style = None
 
-        # Child style with zero lines
         mock_style = MagicMock()
         elem = OxmlElement("w:style")
         pPr = OxmlElement("w:pPr")
@@ -1982,10 +2009,10 @@ class TestGetStyleSpacingRecursionAndBaseLines:
         mock_style.base_style = mock_base
 
         result = _get_style_spacing(mock_style, "before")
-        assert result == 0.5  # from base style
+        assert result == 0.0  # 显式 0
 
     def test_returns_base_lines_when_negative(self):
-        """lines_val is negative -> returns base_lines (line 122)"""
+        """显式负值返回自身，不回退基样式。"""
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
 
@@ -2010,7 +2037,7 @@ class TestGetStyleSpacingRecursionAndBaseLines:
         mock_style.base_style = mock_base
 
         result = _get_style_spacing(mock_style, "before")
-        assert result == 2.0  # from base style
+        assert result == -0.5  # 显式负值
 
 
 class TestParagraphGetSpaceBeforeWithValidLines:

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from docx import Document
+from docx.oxml.ns import qn
 from docx.shared import Pt
 
 from wordformat.config.datamodel import NodeConfigRoot
@@ -474,7 +475,114 @@ class TestBaseImplementation:
 
 
 # ---------------------------------------------------------------------------
-# 7. load_yaml_config 静态方法
+# 7. BodyText._apply_citation_superscript
+# ---------------------------------------------------------------------------
+
+
+class TestBodyTextCitationSuperscript:
+    """测试 BodyText.apply_format 中的引用上标自动设置。"""
+
+    @staticmethod
+    def _get_vertAlign(run):
+        """返回 run 的 w:vertAlign 值，无则返回 None。"""
+        rPr = run._element.find(qn("w:rPr"))
+        if rPr is None:
+            return None
+        va = rPr.find(qn("w:vertAlign"))
+        return va.get(qn("w:val")) if va is not None else None
+
+    def test_single_citation_gets_superscript(self):
+        """单引用 [1] 应被设为上标。"""
+        doc = Document()
+        p = doc.add_paragraph("这是一篇论文[1]的引用。")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp1"},
+                        level=0, paragraph=p)
+        # 直接调用 apply_format（跳过 load_config，不依赖完整配置）
+        node._apply_citation_superscript()
+        # "[1]" 应在独立的上标 run 中
+        runs = p.runs
+        superscript_texts = [
+            r.text for r in runs if self._get_vertAlign(r) == "superscript"
+        ]
+        assert "[1]" in superscript_texts
+
+    def test_multiple_citations(self):
+        """多个引用 [1] 和 [2,3] 都应被设为上标。"""
+        doc = Document()
+        p = doc.add_paragraph("参见文献[1]和[2,3]的讨论。")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp2"},
+                        level=0, paragraph=p)
+        node._apply_citation_superscript()
+        superscript_texts = [
+            r.text for r in p.runs if self._get_vertAlign(r) == "superscript"
+        ]
+        assert "[1]" in superscript_texts
+        assert "[2,3]" in superscript_texts
+
+    def test_range_citation(self):
+        """范围引用 [1-3] 应被设为上标。"""
+        doc = Document()
+        p = doc.add_paragraph("文献[1-3]提供了详细分析。")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp3"},
+                        level=0, paragraph=p)
+        node._apply_citation_superscript()
+        superscript_texts = [
+            r.text for r in p.runs if self._get_vertAlign(r) == "superscript"
+        ]
+        assert "[1-3]" in superscript_texts
+
+    def test_chinese_comma_citation(self):
+        """中文逗号分隔的引用 [1，2] 应被设为上标。"""
+        doc = Document()
+        p = doc.add_paragraph("见[1，2，3]的研究。")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp4"},
+                        level=0, paragraph=p)
+        node._apply_citation_superscript()
+        superscript_texts = [
+            r.text for r in p.runs if self._get_vertAlign(r) == "superscript"
+        ]
+        assert any("[1，2，3]" in t for t in superscript_texts)
+
+    def test_no_citation_leaves_runs_unchanged(self):
+        """无引用的段落应保持原样。"""
+        doc = Document()
+        p = doc.add_paragraph("这是一段没有引用的正文。")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp5"},
+                        level=0, paragraph=p)
+        original_text = p.text
+        node._apply_citation_superscript()
+        # 文本不变，且无上标 run
+        assert p.text == original_text
+        assert all(self._get_vertAlign(r) is None for r in p.runs)
+
+    def test_non_citation_brackets_not_affected(self):
+        """非数字方括号如 [注] 不应被设为上标。"""
+        doc = Document()
+        p = doc.add_paragraph("这是一个[注]释说明。")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp6"},
+                        level=0, paragraph=p)
+        node._apply_citation_superscript()
+        assert all(self._get_vertAlign(r) is None for r in p.runs)
+
+    def test_citation_split_across_runs(self):
+        """引用跨 run 时先分割再设上标。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        p.add_run("前面文字[1")
+        p.add_run("2]后面文字")
+        node = BodyText(value={"category": "body_text", "fingerprint": "fp7"},
+                        level=0, paragraph=p)
+        node._apply_citation_superscript()
+        superscript_texts = [
+            r.text for r in p.runs if self._get_vertAlign(r) == "superscript"
+        ]
+        # 分割后 [1 和 2] 分别在两个 run 中，但都是上标
+        assert "[1" in superscript_texts
+        assert "2]" in superscript_texts
+
+
+# ---------------------------------------------------------------------------
+# 8. load_yaml_config 静态方法
 # ---------------------------------------------------------------------------
 
 
@@ -587,17 +695,18 @@ class TestAbstractTitleContentCNBase:
             node._base(doc, p=False, r=False)
         assert mock_comment.call_count >= 3
 
-    def test_check_title_removes_cr_lf(self, root_config):
-        """_base 应移除 run.text 中的 \\r 和 \\n。"""
+    def test_check_mode_does_not_mutate_run_text(self, root_config):
+        """_base 在检查模式下不应修改 run.text（修复：移除了破坏性 replace）。"""
         doc = Document()
         p = doc.add_paragraph()
-        r = p.add_run("摘\r要\n")
+        original_text = "摘 要"
+        r = p.add_run(original_text)
         r.font.size = Pt(10)
         node = AbstractTitleContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         node._base(doc, p=True, r=True)
-        assert "\r" not in r.text
-        assert "\n" not in r.text
+        # 修复后：检查模式不应改变 run.text
+        assert r.text == original_text
 
 
 # ---------------------------------------------------------------------------
@@ -740,6 +849,62 @@ class TestAbstractTitleContentENBase:
         with patch.object(node, "add_comment") as mock_comment:
             node._base(doc, p=False, r=False)
         assert mock_comment.call_count >= 3
+
+    def test_check_title_normalizes_case_lower(self, root_config):
+        """小写 'abstract' 应匹配并自动修正为 'Abstract'。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r = p.add_run("abstract: some content")
+        r.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        assert r.text.startswith("Abstract")
+
+    def test_check_title_normalizes_case_upper(self, root_config):
+        """全大写 'ABSTRACT' 应匹配并自动修正为 'Abstract'。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r = p.add_run("ABSTRACT\n\nbody text")
+        r.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        assert r.text.startswith("Abstract")
+
+    def test_split_abstract_across_runs(self, root_config):
+        """"Abstract" 被拆分到两个 run 时仍能正确识别标题部分。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r1 = p.add_run("Abst")
+        r1.font.size = Pt(10)
+        r2 = p.add_run("ract: body text")
+        r2.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        # r1 开头被修正为 "Abstract"，r2 保持 "body text" 部分
+        assert r1.text.startswith("Abstract")
+        assert "body text" in r2.text
+
+    def test_split_abstract_across_three_runs(self, root_config):
+        """"Abstract" 被拆分到三个 run 时仍能正确识别。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r1 = p.add_run("Abs")
+        r1.font.size = Pt(10)
+        r2 = p.add_run("tra")
+        r2.font.size = Pt(10)
+        r3 = p.add_run("ct: content")
+        r3.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        # r1 应被修正为 "Abstract"
+        assert r1.text.startswith("Abstract")
+        # r2 和 r3 开头部分属于标题前缀，应被清空
+        assert r2.text == ""
+        assert "content" in r3.text
 
 
 # ---------------------------------------------------------------------------

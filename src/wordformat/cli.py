@@ -12,13 +12,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from wordformat.log_config import setup_logger
 from wordformat.set_style import auto_format_thesis_document
 from wordformat.set_tag import set_tag_main
 from wordformat.tree import print_tree
-
-# 初始化日志
-setup_logger()
 
 
 def validate_file(path: str, name: str, allowed_extensions: list[str] | None = None) -> str:
@@ -38,6 +34,9 @@ def validate_file(path: str, name: str, allowed_extensions: list[str] | None = N
 
 
 def main():
+    from wordformat.log_config import setup_logger
+    setup_logger()
+
     # 无参数直接展示完整帮助
     if len(sys.argv) == 1:
         print("""

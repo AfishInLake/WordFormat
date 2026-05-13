@@ -263,8 +263,8 @@ def download_file(filename: str):
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers=headers,
         )
-    except HTTPException as e:
-        logger.error(str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"文件下载失败：{filename} -> {str(e)}")
         raise HTTPException(status_code=500, detail=f"文件下载失败：{str(e)}") from e

@@ -93,6 +93,26 @@ class _SetSpacing:
     """设置间距距函数"""
 
     @staticmethod
+    def _clear_conflicting_attrs(paragraph: Paragraph, spacing_type: str) -> None:
+        """清除与 spacing 冲突的 XML 属性（Autospacing 和 Lines）。
+
+        当通过物理单位（pt/cm/mm/inch）设置间距时，需清除自动间距标志
+        和行单位属性，否则 Word 会优先读取它们而忽略新设置的 twips 值。
+        """
+        pPr = paragraph._element.find(qn("w:pPr"))
+        if pPr is None:
+            return
+        spacing = pPr.find(qn("w:spacing"))
+        if spacing is None:
+            return
+        autospacing_key = qn(f"w:{spacing_type}Autospacing")
+        if spacing.get(autospacing_key) is not None:
+            spacing.attrib.pop(autospacing_key)
+        lines_key = qn(f"w:{spacing_type}Lines")
+        if spacing.get(lines_key) is not None:
+            spacing.attrib.pop(lines_key)
+
+    @staticmethod
     def set_hang(paragraph: Paragraph, spacing_type: str, value: float):
         """
         核心通用设置逻辑：段前/段后间距统一处理（行→Lines属性×100）
@@ -132,9 +152,14 @@ class _SetSpacing:
             # 步骤3：设置核心属性w:XXLines（优先级最高，与获取函数对应）
             spacing.set(qn(f"w:{spacing_type}Lines"), str(lines_100unit))
 
-            # 步骤4：清除兜底的w:XX twips属性，避免冲突（Word会优先读取Lines，清除后更纯净）
+            # 步骤4：清除冲突属性，确保新值生效
+            # 4a. 清除 w:XX twips属性（避免与Lines属性冲突）
             if spacing.get(qn(f"w:{spacing_type}")) is not None:
                 spacing.attrib.pop(qn(f"w:{spacing_type}"))
+            # 4b. 清除 w:XXAutospacing 属性（自动间距会覆盖 Lines，导致设置无效）
+            autospacing_key = qn(f"w:{spacing_type}Autospacing")
+            if spacing.get(autospacing_key) is not None:
+                spacing.attrib.pop(autospacing_key)
 
         except Exception as e:
             logger.error(f"设置段落{spacing_type}间距{value}行失败: {e}")
@@ -148,6 +173,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: PT/磅数值
         """
+        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Pt(target_value)
         else:
@@ -162,6 +188,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: 厘米数值
         """
+        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Cm(target_value)
         else:
@@ -176,6 +203,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: 英寸数值
         """
+        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Inches(target_value)
         else:
@@ -190,6 +218,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: 毫米数值
         """
+        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Mm(target_value)
         else:

@@ -334,15 +334,17 @@ class FontColor(UnitLabelEnum):
         docx_obj.font.color.rgb = RGBColor(*rgb_tuple)
 
     def __eq__(self, other):
-        if not isinstance(other, tuple):
-            return False
-        if len(other) != 3:
-            return False
-        try:
-            color_rgb = self.rel_value
-            return color_rgb == other
-        except (TypeError, ValueError):
-            return False
+        if isinstance(other, str):
+            try:
+                other = self._parse_color(other)
+            except (TypeError, ValueError):
+                return False
+        if isinstance(other, tuple) and len(other) == 3:
+            try:
+                return self.rel_value == other
+            except (TypeError, ValueError):
+                return False
+        return False
 
 
 class Alignment(UnitLabelEnum):

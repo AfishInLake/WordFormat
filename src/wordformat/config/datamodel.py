@@ -41,15 +41,6 @@ FontSizeType = Union[
 ]
 
 
-@field_validator("font_size")
-@classmethod
-def validate_font_size(cls, v):
-    """验证字号为正数"""
-    if isinstance(v, (int, float)) and v <= 0:
-        raise ValueError(f"字号 {v} 必须大于0")
-    return v
-
-
 # -------------------------- 预警字段配置模型 --------------------------
 
 
@@ -98,6 +89,14 @@ class GlobalFormatConfig(BaseModel):
         default="小四", description="字号"
     )  # 修正类型和默认值
     font_color: str = Field(default="黑色", description="字体颜色")
+
+    @field_validator("font_size")
+    @classmethod
+    def validate_font_size(cls, v):
+        """验证字号为正数"""
+        if isinstance(v, (int, float)) and v <= 0:
+            raise ValueError(f"字号 {v} 必须大于0")
+        return v
 
     @field_validator("font_color")
     @classmethod
@@ -332,6 +331,14 @@ class NumberingConfig(BaseModel):
             template="%1.%2.%3",
         ),
         description="三级标题编号配置",
+    )
+    references: NumberingLevelConfig = Field(
+        default_factory=lambda: NumberingLevelConfig(
+            enabled=True,
+            template="[%1]",
+            suffix="space",
+        ),
+        description="参考文献条目编号配置",
     )
 
 

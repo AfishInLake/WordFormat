@@ -48,10 +48,9 @@ class DocxBase:
                 paragraph_objects.append(para)
 
         # 按批次BATCH_SIZE进行批量推理
-        batch_size = int(BATCH_SIZE)
-        for i in range(0, len(paragraphs), batch_size):
-            batch_texts = paragraphs[i: i + batch_size]
-            batch_paras = paragraph_objects[i: i + batch_size]
+        for i in range(0, len(paragraphs), BATCH_SIZE):
+            batch_texts = paragraphs[i: i + BATCH_SIZE]
+            batch_paras = paragraph_objects[i: i + BATCH_SIZE]
 
             try:
                 batch_results = onnx_batch_infer(batch_texts)

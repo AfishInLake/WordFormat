@@ -200,13 +200,15 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
     CONFIG_MODEL = AbstractEnglishConfig
     CONFIG_PATH = "abstract.english"
 
-    def check_title(self, run) -> bool:
-        """检查标题是否包含在正文中"""
-        pattern = r"Abstract"
-        if re.search(pattern, run.text):
-            return True
+    def _check_title_in_full_text(self, runs) -> int:
+        """拼接全部 run 文本，返回 "Abstract" 前缀在 clean 文本中的结束位置。
 
-        return False
+        若全文不以 "abstract"（大小写不敏感）开头，返回 0。
+        """
+        full_text = "".join(run.text for run in runs)
+        full_text = full_text.replace("\r", "").replace("\n", "")
+        m = re.match(r"abstract", full_text, re.IGNORECASE)
+        return m.end() if m else 0
 
     def _base(self, doc, p: bool, r: bool):
         """
@@ -222,10 +224,36 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
         else:
             issues = ps.apply_to_paragraph(self.paragraph)
 
-        for run in self.paragraph.runs:
-            # 检查标题是否包含在正文中
-            if self.check_title(run):
-                # 对run对象设置样式
+        runs = self.paragraph.runs
+        # 段落级别判断：即使 "Abstract" 被拆分到多个 run 也能正确识别
+        title_end = self._check_title_in_full_text(runs)
+
+        cum = 0  # 在 clean 全文中的累积位置
+        for run in runs:
+            text_clean = run.text.replace("\r", "").replace("\n", "")
+            run_len = len(text_clean)
+            run_start = cum
+            run_end = cum + run_len
+            in_title = run_start < title_end
+
+            if in_title:
+                if run_start == 0:
+                    # 首个 run：修正 Abstract 大小写
+                    if run_len >= title_end:
+                        # "abstract" 完整在此 run 内 → 直接修正
+                        m = re.match(r"abstract", text_clean, re.IGNORECASE)
+                        if m:
+                            run.text = "Abstract" + text_clean[m.end():]
+                    else:
+                        # "Abstract" 被拆分到多个 run → 第一个 run 替换为 "Abstract"
+                        run.text = "Abstract"
+                elif run_end <= title_end:
+                    # 后续 run 完全在标题前缀内 → 清除
+                    run.text = ""
+                else:
+                    # 后续 run 部分在标题前缀内 → 裁掉标题部分
+                    run.text = text_clean[title_end - run_start:]
+
                 c = CharacterStyle(
                     font_name_cn=cfg.english_title.chinese_font_name,
                     font_name_en=cfg.english_title.english_font_name,
@@ -235,9 +263,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
                     italic=cfg.english_title.italic,
                     underline=cfg.english_title.underline,
                 )
-
             else:
-                # 对剩余部分的run设置样式
                 c = CharacterStyle(
                     font_name_cn=cfg.english_content.chinese_font_name,
                     font_name_en=cfg.english_content.english_font_name,
@@ -254,6 +280,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
             self.add_comment(
                 doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
             )
+            cum += len(text_clean)
         self.add_comment(
             doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
         )
