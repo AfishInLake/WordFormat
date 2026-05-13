@@ -7,6 +7,8 @@ from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from wordformat.style.style_enum import ChineseFontType, FontSizeLabel
+
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型
 AlignmentType = Literal["左对齐", "居中对齐", "右对齐", "两端对齐", "分散对齐"]
@@ -14,31 +16,12 @@ AlignmentType = Literal["左对齐", "居中对齐", "右对齐", "两端对齐"
 LineSpacingRuleType = Literal[
     "单倍行距", "1.5倍行距", "2倍行距", "最小值", "固定值", "多倍行距"
 ]
-# 中文字体类型
-ChineseFontType = Literal["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]
 # 英文字体类型
 EnglishFontType = Literal[
     "Times New Roman", "Arial", "Calibri", "Courier New", "Helvetica"
 ]
-# 字号类型（兼容字符串和数值）
-FontSizeType = Union[
-    Literal[
-        "一号",
-        "小一",
-        "二号",
-        "小二",
-        "三号",
-        "小三",
-        "四号",
-        "小四",
-        "五号",
-        "小五",
-        "六号",
-        "七号",
-    ],
-    float,
-    int,
-]
+# 字号类型（兼容字符串字号标签和数值磅值）
+FontSizeType = FontSizeLabel | float | int
 
 
 # -------------------------- 预警字段配置模型 --------------------------
