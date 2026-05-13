@@ -43,6 +43,8 @@ install:
 		fi \
 	fi
 	@.venv/bin/python scripts/download_model.py 2>/dev/null || .venv/Scripts/python.exe scripts/download_model.py
+	@echo "Installing pre-commit hooks..."
+	@.venv/bin/pre-commit install 2>/dev/null || .venv/Scripts/pre-commit.exe install 2>/dev/null || echo "pre-commit install skipped (not found)"
 	@echo "Development environment ready!"
 
 ## build: Run the build script (scripts/build.bat)
@@ -63,8 +65,16 @@ build: install
 server:
 	uvicorn wordformat.api:app --host 0.0.0.0 --port 8000
 
-## tests: Run the tests using pytest
-tests:
+## lint: Run code quality checks
+lint:
+	@echo "Running ruff check..."
+	@ruff check src/
+	@echo "Running ruff format check..."
+	@ruff format --check src/
+	@echo "All checks passed!"
+
+## tests: Run lint then tests
+tests: lint
 	@echo "Running tests..."
 	@pytest tests/ --cov=wordformat --cov-report=term-missing --cov-fail-under=85
 

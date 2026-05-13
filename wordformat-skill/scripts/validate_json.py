@@ -68,7 +68,7 @@ CATEGORY_LABELS = {
 def validate_json(json_path: str, threshold: float = 0.0) -> list[dict]:
     """校验 JSON 文件，返回问题列表"""
     try:
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         return [{"index": -1, "error": f"JSON 语法错误: {e}"}]
@@ -81,41 +81,53 @@ def validate_json(json_path: str, threshold: float = 0.0) -> list[dict]:
     issues = []
     for i, item in enumerate(data):
         if not isinstance(item, dict):
-            issues.append({"index": i, "error": f"第 {i} 项不是字典: {type(item).__name__}"})
+            issues.append(
+                {"index": i, "error": f"第 {i} 项不是字典: {type(item).__name__}"}
+            )
             continue
 
         # 检查 category 字段
         category = item.get("category", "")
         if not category:
-            issues.append({"index": i, "error": "缺少 category 字段", "paragraph": item.get("paragraph", "")[:50]})
+            issues.append(
+                {
+                    "index": i,
+                    "error": "缺少 category 字段",
+                    "paragraph": item.get("paragraph", "")[:50],
+                }
+            )
             continue
 
         if category not in VALID_CATEGORIES:
-            issues.append({
-                "index": i,
-                "error": f"非法 category: '{category}'",
-                "paragraph": item.get("paragraph", "")[:50],
-                "hint": f"合法值: {sorted(VALID_CATEGORIES)}"
-            })
+            issues.append(
+                {
+                    "index": i,
+                    "error": f"非法 category: '{category}'",
+                    "paragraph": item.get("paragraph", "")[:50],
+                    "hint": f"合法值: {sorted(VALID_CATEGORIES)}",
+                }
+            )
 
         # 检查置信度
         score = item.get("score", 0)
         if isinstance(score, (int, float)) and score < threshold:
-            issues.append({
-                "index": i,
-                "warning": f"低置信度: {score}",
-                "category": category,
-                "paragraph": item.get("paragraph", "")[:80]
-            })
+            issues.append(
+                {
+                    "index": i,
+                    "warning": f"低置信度: {score}",
+                    "category": category,
+                    "paragraph": item.get("paragraph", "")[:80],
+                }
+            )
 
     return issues
 
 
 def print_results(data: list, threshold: float = 0.0):
     """打印分类结果供人工检查"""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  JSON 标签检查结果（共 {len(data)} 个段落）")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     for i, item in enumerate(data):
         category = item.get("category", "???")
@@ -137,18 +149,20 @@ def print_results(data: list, threshold: float = 0.0):
 
 def print_stats(data: list):
     """打印分类统计"""
-    categories = [item.get("category", "unknown") for item in data if isinstance(item, dict)]
+    categories = [
+        item.get("category", "unknown") for item in data if isinstance(item, dict)
+    ]
     counter = Counter(categories)
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"  分类统计（共 {len(data)} 个段落）")
-    print(f"{'='*50}\n")
+    print(f"{'=' * 50}\n")
     print(f"  {'类型':<35s} {'数量':>5s}")
-    print(f"  {'-'*42}")
+    print(f"  {'-' * 42}")
     for cat, count in counter.most_common():
         label = CATEGORY_LABELS.get(cat, cat)
         print(f"  {label:<35s} {count:>5d}")
-    print(f"  {'-'*42}")
+    print(f"  {'-' * 42}")
     print(f"  {'合计':<35s} {len(data):>5d}")
 
 
@@ -156,14 +170,21 @@ def main():
     parser = argparse.ArgumentParser(description="WordFormat JSON 标签校验工具")
     parser.add_argument("--json", "-j", required=True, help="JSON 文件路径")
     parser.add_argument("--stats", "-s", action="store_true", help="输出分类统计")
-    parser.add_argument("--threshold", "-t", type=float, default=0.0,
-                        help="低置信度阈值（默认 0.0，即不标记）")
-    parser.add_argument("--show-all", action="store_true", help="显示所有段落的分类结果")
+    parser.add_argument(
+        "--threshold",
+        "-t",
+        type=float,
+        default=0.0,
+        help="低置信度阈值（默认 0.0，即不标记）",
+    )
+    parser.add_argument(
+        "--show-all", action="store_true", help="显示所有段落的分类结果"
+    )
     args = parser.parse_args()
 
     # 加载 JSON
     try:
-        with open(args.json, "r", encoding="utf-8") as f:
+        with open(args.json, encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError) as e:
         print(f"错误: {e}")
@@ -190,7 +211,9 @@ def main():
         print(f"⚠️  发现 {len(warnings)} 个低置信度分类:")
         for item in warnings:
             idx = item["index"]
-            print(f"  [{idx}] {item['warning']} | {item.get('category', '')} | {item.get('paragraph', '')}")
+            print(
+                f"  [{idx}] {item['warning']} | {item.get('category', '')} | {item.get('paragraph', '')}"
+            )
         print()
 
     if not errors and not warnings:

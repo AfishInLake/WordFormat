@@ -20,7 +20,7 @@ from wordformat.rules import (
     References,
 )
 from wordformat.settings import VOIDNODELIST
-from wordformat.utils import get_paragraph_xml_fingerprint, ensure_directory_exists
+from wordformat.utils import ensure_directory_exists, get_paragraph_xml_fingerprint
 from wordformat.word_structure.document_builder import DocumentBuilder
 from wordformat.word_structure.utils import (
     find_and_modify_first,
@@ -39,8 +39,9 @@ def _fix_all_heading_style_definitions(document: Document, config_model):
     段落内的 run 即使没有显式设置颜色，也会继承样式中的主题色。
     仅修改 run 级别的颜色不够，必须同时修正样式定义本身。
     """
-    from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
     from wordformat.style.style_enum import FontColor, _ensure_style_exists
 
     heading_config = getattr(config_model, "headings", None)
@@ -54,7 +55,7 @@ def _fix_all_heading_style_definitions(document: Document, config_model):
         "level_3": getattr(heading_config, "level_3", None),
     }
 
-    for level_key, level_cfg in level_map.items():
+    for _level_key, level_cfg in level_map.items():
         if level_cfg is None:
             continue
 
@@ -90,7 +91,9 @@ def _fix_all_heading_style_definitions(document: Document, config_model):
                 try:
                     fc = FontColor(font_color_str)
                     rgb_tuple = fc.rel_value
-                    hex_color = f"{rgb_tuple[0]:02X}{rgb_tuple[1]:02X}{rgb_tuple[2]:02X}"
+                    hex_color = (
+                        f"{rgb_tuple[0]:02X}{rgb_tuple[1]:02X}{rgb_tuple[2]:02X}"
+                    )
 
                     rPr.remove(color_elem)
                     new_color = OxmlElement("w:color")
@@ -103,7 +106,7 @@ def _fix_all_heading_style_definitions(document: Document, config_model):
 
 
 def apply_format_check_to_all_nodes(
-        root_node: FormatNode, document, config, check=True
+    root_node: FormatNode, document, config, check=True
 ):
     """
     递归遍历文档树中的所有节点，
@@ -116,7 +119,9 @@ def apply_format_check_to_all_nodes(
     """
 
     def traverse(node, parent_category=""):
-        category = node.value.get("category", "") if isinstance(node.value, dict) else ""
+        category = (
+            node.value.get("category", "") if isinstance(node.value, dict) else ""
+        )
 
         if hasattr(node, "check_format"):
             try:
@@ -165,11 +170,11 @@ def xg(root_node, paragraph):
 
 
 def auto_format_thesis_document(
-        jsonpath: str | list,
-        docxpath: str,
-        configpath: Optional[str] = None,
-        savepath: str = "output/",
-        check=True,
+    jsonpath: str | list,
+    docxpath: str,
+    configpath: Optional[str] = None,
+    savepath: str = "output/",
+    check=True,
 ):
     """自动对学位论文文档进行格式校验与批注。
 
@@ -257,13 +262,21 @@ def auto_format_thesis_document(
     apply_format_check_to_all_nodes(root_node, document, config_model, check)
 
     # 处理标题自动编号（仅在格式化模式下执行，检查模式不修改编号）
-    if not check and hasattr(config_model, "numbering") and config_model.numbering.enabled:
+    if (
+        not check
+        and hasattr(config_model, "numbering")
+        and config_model.numbering.enabled
+    ):
         from wordformat.numbering import process_heading_numbering
-        process_heading_numbering(root_node, document, config_model.numbering, config_model.headings)
+
+        process_heading_numbering(
+            root_node, document, config_model.numbering, config_model.headings
+        )
 
     # 创建引用超链接（仅在格式化模式下执行）
     if not check:
         from wordformat.hyperlinks import create_citation_hyperlinks
+
         create_citation_hyperlinks(root_node, document)
 
     savepath = Path(savepath)

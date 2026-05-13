@@ -3,9 +3,11 @@
 # @Author  : afish
 # @File    : datamodel.py
 
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from wordformat.style.style_enum import ChineseFontType, FontSizeLabel
 
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型
@@ -14,31 +16,12 @@ AlignmentType = Literal["左对齐", "居中对齐", "右对齐", "两端对齐"
 LineSpacingRuleType = Literal[
     "单倍行距", "1.5倍行距", "2倍行距", "最小值", "固定值", "多倍行距"
 ]
-# 中文字体类型
-ChineseFontType = Literal["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]
 # 英文字体类型
 EnglishFontType = Literal[
     "Times New Roman", "Arial", "Calibri", "Courier New", "Helvetica"
 ]
-# 字号类型（兼容字符串和数值）
-FontSizeType = Union[
-    Literal[
-        "一号",
-        "小一",
-        "二号",
-        "小二",
-        "三号",
-        "小三",
-        "四号",
-        "小四",
-        "五号",
-        "小五",
-        "六号",
-        "七号",
-    ],
-    float,
-    int,
-]
+# 字号类型（兼容字符串字号标签和数值磅值）
+FontSizeType = FontSizeLabel | float | int
 
 
 # -------------------------- 预警字段配置模型 --------------------------
@@ -103,8 +86,9 @@ class GlobalFormatConfig(BaseModel):
     def validate_font_color(cls, v):
         """验证字体颜色为合法值"""
         if not v or not isinstance(v, str):
-            raise ValueError(f"字体颜色不能为空")
+            raise ValueError("字体颜色不能为空")
         return v
+
     bold: bool = Field(default=False, description="加粗")
     italic: bool = Field(default=False, description="斜体")
     underline: bool = Field(default=False, description="下划线")

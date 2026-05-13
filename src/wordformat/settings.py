@@ -8,6 +8,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from wordformat._version import __version__ as VERSION  # noqa: F401
+
 load_dotenv()
 
 # 设置工作目录

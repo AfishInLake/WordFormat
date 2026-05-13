@@ -5,6 +5,7 @@
 # from src.settings import CHARACTER_STYLE_CHECKS
 import re
 from abc import abstractmethod
+from enum import Enum
 from typing import Callable, Optional, Tuple
 
 import webcolors
@@ -173,6 +174,20 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         return self.rel_value == other
 
 
+class ChineseFontType(str, Enum):
+    """中文字体枚举，可在 Pydantic 模型和运行时代码中统一使用。"""
+
+    SONG_TI = "宋体"
+    HEI_TI = "黑体"
+    KAI_TI = "楷体"
+    FANG_SONG = "仿宋"
+    WEI_RUAN_YA_HEI = "微软雅黑"
+    HAN_YI_XIAO_BIAO_SONG = "汉仪小标宋"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class FontName(UnitLabelEnum):
     """
     常用中英文字体枚举。
@@ -182,10 +197,7 @@ class FontName(UnitLabelEnum):
     """
 
     def is_chinese(self, value: str):
-        if value in ["宋体", "黑体", "楷体", "仿宋", "微软雅黑", "汉仪小标宋"]:
-            return True
-        else:
-            return False
+        return value in [member.value for member in ChineseFontType]
 
     def base_set(self, docx_obj: Run, **kwargs):
         """设置无单位属性"""
@@ -195,15 +207,47 @@ class FontName(UnitLabelEnum):
             docx_obj.font.name = self.value
 
 
+class FontSizeLabel(str, Enum):
+    """中文字号枚举，可在 Pydantic 模型和运行时代码中统一使用。"""
+
+    YI_HAO = "一号"
+    XIAO_YI = "小一"
+    ER_HAO = "二号"
+    XIAO_ER = "小二"
+    SAN_HAO = "三号"
+    XIAO_SAN = "小三"
+    SI_HAO = "四号"
+    XIAO_SI = "小四"
+    WU_HAO = "五号"
+    XIAO_WU = "小五"
+    LIU_HAO = "六号"
+    QI_HAO = "七号"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class FontSize(UnitLabelEnum):
     """
     常用中文字档字号（单位：磅 / pt）。
-    继承 IntEnum 以便直接用于数值比较或传递给 Pt()。
 
     示例：
         size = FontSize.XIAO_SI  # 12
         run.font.size = Pt(size)
     """
+
+    YI_HAO = "一号"
+    XIAO_YI = "小一"
+    ER_HAO = "二号"
+    XIAO_ER = "小二"
+    SAN_HAO = "三号"
+    XIAO_SAN = "小三"
+    SI_HAO = "四号"
+    XIAO_SI = "小四"
+    WU_HAO = "五号"
+    XIAO_WU = "小五"
+    LIU_HAO = "六号"
+    QI_HAO = "七号"
 
     _LABEL_MAP = {
         "一号": 26,
@@ -648,8 +692,9 @@ def _ensure_style_exists(doc, style_name: str):
         # 标题样式设置大纲级别
         outline_lvl = _BUILTIN_STYLE_OUTLINE_LVL.get(style_name)
         if outline_lvl is not None:
-            from docx.oxml.ns import qn
             from docx.oxml import OxmlElement
+            from docx.oxml.ns import qn
+
             pPr = new_style.element.find(qn("w:pPr"))
             if pPr is None:
                 pPr = OxmlElement("w:pPr")

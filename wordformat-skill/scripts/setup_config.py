@@ -31,20 +31,41 @@ import shutil
 import sys
 from pathlib import Path
 
+
 def _get_pip_mirror() -> list[str]:
     """根据用户地区自动选择 pip 镜像源"""
     import locale
+
     lang = locale.getdefaultlocale()[0] or ""
     # 中文环境优先使用清华镜像
     if lang.startswith("zh"):
-        return [sys.executable, "-m", "pip", "install", "pyyaml", "--break-system-packages", "-q",
-                "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"]
-    return [sys.executable, "-m", "pip", "install", "pyyaml", "--break-system-packages", "-q"]
+        return [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "pyyaml",
+            "--break-system-packages",
+            "-q",
+            "-i",
+            "https://pypi.tuna.tsinghua.edu.cn/simple",
+        ]
+    return [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "pyyaml",
+        "--break-system-packages",
+        "-q",
+    ]
+
 
 try:
     import yaml
 except ImportError:
     import subprocess
+
     subprocess.check_call(_get_pip_mirror())
     import yaml
 
@@ -87,12 +108,14 @@ def use_preset(name: str, output: str):
 
     if not preset_path.exists():
         # 模糊匹配：如果用户输入的是部分名称，尝试查找
-        matches = [p for p in presets_dir.glob("*.yaml") if name.replace(".yaml", "") in p.stem]
+        matches = [
+            p for p in presets_dir.glob("*.yaml") if name.replace(".yaml", "") in p.stem
+        ]
         if len(matches) == 1:
             preset_path = matches[0]
             print(f"模糊匹配到: {preset_path.stem}")
         elif len(matches) > 1:
-            print(f"找到多个匹配的预设：")
+            print("找到多个匹配的预设：")
             for m in matches:
                 print(f"  - {m.stem}")
             print("请指定更精确的名称。")
@@ -145,11 +168,14 @@ def validate(config_path: str) -> list[str]:
     if validate_script.exists():
         # 动态导入验证函数
         import importlib.util
-        spec = importlib.util.spec_from_file_location("validate_config", validate_script)
+
+        spec = importlib.util.spec_from_file_location(
+            "validate_config", validate_script
+        )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         try:
-            config = yaml.safe_load(open(config_path, "r", encoding="utf-8"))
+            config = yaml.safe_load(open(config_path, encoding="utf-8"))
         except yaml.YAMLError as e:
             return [f"YAML 语法错误: {e}"]
         if not isinstance(config, dict):
@@ -158,7 +184,7 @@ def validate(config_path: str) -> list[str]:
     else:
         # 简单验证：检查 YAML 语法
         try:
-            config = yaml.safe_load(open(config_path, "r", encoding="utf-8"))
+            config = yaml.safe_load(open(config_path, encoding="utf-8"))
         except yaml.YAMLError as e:
             return [f"YAML 语法错误: {e}"]
         return []
@@ -175,19 +201,30 @@ def main():
   python setup_config.py --create --output config.yaml
   python setup_config.py --validate --config config.yaml
   python setup_config.py --save --config config.yaml --name "XX大学_XX学院_本科"
-"""
+""",
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--list-presets", action="store_true", help="列出所有已保存的预设配置")
+    group.add_argument(
+        "--list-presets", action="store_true", help="列出所有已保存的预设配置"
+    )
     group.add_argument("--use", metavar="NAME", help="从预设库复制配置（支持模糊匹配）")
     group.add_argument("--create", action="store_true", help="从模板创建新配置")
     group.add_argument("--validate", action="store_true", help="验证配置文件")
     group.add_argument("--save", action="store_true", help="保存配置到预设库")
 
-    parser.add_argument("--output", "-o", default="config.yaml", help="输出文件路径（默认: config.yaml）")
-    parser.add_argument("--config", "-c", default="config.yaml", help="要验证/保存的配置文件路径")
-    parser.add_argument("--name", "-n", help="保存预设时的名称（格式: 学校_学院_论文类型）")
+    parser.add_argument(
+        "--output",
+        "-o",
+        default="config.yaml",
+        help="输出文件路径（默认: config.yaml）",
+    )
+    parser.add_argument(
+        "--config", "-c", default="config.yaml", help="要验证/保存的配置文件路径"
+    )
+    parser.add_argument(
+        "--name", "-n", help="保存预设时的名称（格式: 学校_学院_论文类型）"
+    )
 
     args = parser.parse_args()
 

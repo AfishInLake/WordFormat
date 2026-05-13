@@ -3,12 +3,10 @@ from copy import deepcopy
 from typing import Literal
 
 from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
 
 from wordformat.config.datamodel import KeywordsConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
-
 
 
 # 第一步：提取关键词基类，复用通用逻辑
@@ -70,7 +68,6 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
         if not label_pattern:
             return
 
-        p_elem = self.paragraph._element
         runs_to_split = []
 
         for run in self.paragraph.runs:
@@ -229,7 +226,9 @@ class KeywordsCN(BaseKeywordsNode):
 
     def _get_label_split_pattern(self) -> re.Pattern | None:
         """中文标签拆分模式：匹配 '关键词：' 或 '关键词:' 及其变体"""
-        return re.compile(r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*")
+        return re.compile(
+            r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*"
+        )
 
     def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
