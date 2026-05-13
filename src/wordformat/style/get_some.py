@@ -95,6 +95,10 @@ def _get_style_spacing(style, spacing_type="before"):  # noqa C901
 
     # 3. 优先读取Lines属性（beforeLines/afterLines）
     try:
+        # 先检查是否设置了自动间距（Autospacing=1 时 Word 忽略 Lines 和 twips 值）
+        autospacing_attr = spacing.get(qn(f"w:{spacing_type}Autospacing"))
+        if autospacing_attr is not None and autospacing_attr in ("1", "true"):
+            return None
         lines_attr = spacing.get(qn(f"w:{spacing_type}Lines"))
         # 检查lines_attr是否为Mock对象
         if hasattr(lines_attr, "__class__") and "Mock" in lines_attr.__class__.__name__:
@@ -108,60 +112,22 @@ def _get_style_spacing(style, spacing_type="before"):  # noqa C901
     except (AttributeError, ValueError):
         lines_val = None
 
-    if lines_val is not None and lines_val > 0:
+    if lines_val is not None:
         return lines_val
 
-    # 无Lines值时，继续递归查基样式（避免漏基样式的设置）
+    # 无Lines值时，继续递归查基样式
     try:
         base_lines = _get_style_spacing(style.base_style, spacing_type)
     except AttributeError:
         base_lines = None
 
-    # 修复：优先返回当前样式的有效值，否则返回基样式的值
-    if lines_val is not None and lines_val > 0:
-        return lines_val
-    else:
-        return base_lines
+    return base_lines
 
 
 def paragraph_get_space_before(paragraph) -> float | None:
-    """
-    精准获取段前间距（单位：行）
-    """
-    try:
-        p = paragraph._element
-        pPr = p.find(qn("w:pPr"))
+    """获取段前间距（单位：行）。
 
-        # 第一步：查段落自身的设置
-        self_lines = 0.0
-        if pPr is not None:
-            spacing = pPr.find(qn("w:spacing"))
-            if spacing is not None:
-                # 1.1 优先查Lines属性（Word中Lines优先级高于twips）
-                before_lines_attr = spacing.get(qn("w:beforeLines"))
-                if before_lines_attr is not None:
-                    try:
-                        self_lines = (
-                            int(before_lines_attr) / 100.0
-                        )  # Word中Lines单位是1/100行
-                    except (ValueError, TypeError):
-                        self_lines = None  # 异常值兜底为0
-
-        # 第二步：自身无值，查样式继承
-        style_lines = _get_style_spacing(paragraph.style, "before")
-        final_lines = self_lines if self_lines and self_lines > 0 else style_lines
-
-        # 第三步：有Lines值直接返回（Lines是Word显性设置，优先级最高）
-        if final_lines is not None and final_lines > 0:  # 先检查是否为None
-            return round(final_lines, 1)
-    except (AttributeError, TypeError):
-        pass
-    return None
-
-
-def paragraph_get_space_after(paragraph) -> float | None:
-    """
-    获取段落段后间距（行）
+    无显式值时返回 None（表示 Word 自动间距），不再与 0 混淆。
     """
     try:
         p = paragraph._element
@@ -169,23 +135,73 @@ def paragraph_get_space_after(paragraph) -> float | None:
 
         # 第一步：查段落自身的设置
         self_lines = None
+        self_autospacing = False
         if pPr is not None:
             spacing = pPr.find(qn("w:spacing"))
             if spacing is not None:
-                # 读取Lines值（优先）
-                after_lines_attr = spacing.get(qn("w:afterLines"))
-                if after_lines_attr is not None:
+                # 优先检查自动间距（Autospacing=1 时忽略 Lines/twips）
+                autospacing_attr = spacing.get(qn("w:beforeAutospacing"))
+                if autospacing_attr is not None and autospacing_attr in ("1", "true"):
+                    self_autospacing = True
+                before_lines_attr = spacing.get(qn("w:beforeLines"))
+                if before_lines_attr is not None:
                     try:
-                        self_lines = float(int(after_lines_attr) / 100.0)
+                        self_lines = int(before_lines_attr) / 100.0
                     except (ValueError, TypeError):
                         self_lines = None
 
+        # 如果段落自身设置了自动间距，直接返回 None（不查样式继承）
+        if self_autospacing:
+            return None
+
+        # 第二步：自身无值，查样式继承
+        style_lines = _get_style_spacing(paragraph.style, "before")
+        final_lines = self_lines if self_lines is not None else style_lines
+
+        # 第三步：有值直接返回（包括显式 0）
+        if final_lines is not None:
+            return round(final_lines, 1)
+    except (AttributeError, TypeError):
+        pass
+    return None
+
+
+def paragraph_get_space_after(paragraph) -> float | None:
+    """获取段后间距（单位：行）。
+
+    无显式值时返回 None（表示 Word 自动间距），不再与 0 混淆。
+    """
+    try:
+        p = paragraph._element
+        pPr = p.find(qn("w:pPr"))
+
+        # 第一步：查段落自身的设置
+        self_lines = None
+        self_autospacing = False
+        if pPr is not None:
+            spacing = pPr.find(qn("w:spacing"))
+            if spacing is not None:
+                # 优先检查自动间距（Autospacing=1 时忽略 Lines/twips）
+                autospacing_attr = spacing.get(qn("w:afterAutospacing"))
+                if autospacing_attr is not None and autospacing_attr in ("1", "true"):
+                    self_autospacing = True
+                after_lines_attr = spacing.get(qn("w:afterLines"))
+                if after_lines_attr is not None:
+                    try:
+                        self_lines = int(after_lines_attr) / 100.0
+                    except (ValueError, TypeError):
+                        self_lines = None
+
+        # 如果段落自身设置了自动间距，直接返回 None（不查样式继承）
+        if self_autospacing:
+            return None
+
         # 第二步：自身无值，查样式继承
         style_lines = _get_style_spacing(paragraph.style, "after")
-        final_lines = self_lines if self_lines and self_lines > 0 else style_lines
+        final_lines = self_lines if self_lines is not None else style_lines
 
-        # 第三步：有Lines值直接返回（Lines优先级最高）
-        if final_lines is not None and final_lines > 0:  # 先检查是否为None
+        # 第三步：有值直接返回（包括显式 0）
+        if final_lines is not None:
             return round(final_lines, 1)
     except (AttributeError, TypeError):
         pass

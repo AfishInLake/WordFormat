@@ -1243,7 +1243,8 @@ class TestGetStyleSpacing:
         mock_base_spacing.get.return_value = "150"  # 1.5 行
 
         result = _get_style_spacing(mock_style, "before")
-        assert result == 1.5
+        # 修复：显式 0 应被尊重，不回退到基样式
+        assert result == 0.0
 
     def test_no_pPr_falls_to_base(self):
         """样式没有 pPr 时递归查基样式"""
