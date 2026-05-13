@@ -8,6 +8,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from wordformat._version import __version__ as VERSION  # noqa: F401
+
 load_dotenv()
 
 # 设置工作目录
@@ -37,7 +39,6 @@ MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
 ONNX_VERSION = "20260204"
-
 
 VOIDNODELIST = [
     "top",
