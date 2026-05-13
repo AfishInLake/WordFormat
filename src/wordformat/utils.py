@@ -113,7 +113,7 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
     # 获取 numbering part
     try:
         numbering_part = paragraph.part.numbering_part
-    except (AttributeError, KeyError):
+    except (AttributeError, KeyError, NotImplementedError):
         return ""
 
     numbering_elm = numbering_part._element
@@ -275,6 +275,8 @@ def _get_level_fmt(abstract_num, ilvl: int) -> str:
 
 def _to_roman(num: int) -> str:
     """将整数转换为罗马数字"""
+    if num <= 0:
+        return "0"
     val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
     syms = ["m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"]
     roman = ""

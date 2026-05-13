@@ -35,7 +35,7 @@ API_KEY = os.getenv("WORDFORMAT_API_KEY", "")
 MODEL = os.getenv("WORDFORMAT_MODEL", "")
 MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
-BATCH_SIZE = os.getenv("BATCH_SIZE", 64)
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
 ONNX_VERSION = "20260204"
 
 VOIDNODELIST = [

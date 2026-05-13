@@ -587,17 +587,18 @@ class TestAbstractTitleContentCNBase:
             node._base(doc, p=False, r=False)
         assert mock_comment.call_count >= 3
 
-    def test_check_title_removes_cr_lf(self, root_config):
-        """_base 应移除 run.text 中的 \\r 和 \\n。"""
+    def test_check_mode_does_not_mutate_run_text(self, root_config):
+        """_base 在检查模式下不应修改 run.text（修复：移除了破坏性 replace）。"""
         doc = Document()
         p = doc.add_paragraph()
-        r = p.add_run("摘\r要\n")
+        original_text = "摘 要"
+        r = p.add_run(original_text)
         r.font.size = Pt(10)
         node = AbstractTitleContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         node._base(doc, p=True, r=True)
-        assert "\r" not in r.text
-        assert "\n" not in r.text
+        # 修复后：检查模式不应改变 run.text
+        assert r.text == original_text
 
 
 # ---------------------------------------------------------------------------
@@ -740,6 +741,62 @@ class TestAbstractTitleContentENBase:
         with patch.object(node, "add_comment") as mock_comment:
             node._base(doc, p=False, r=False)
         assert mock_comment.call_count >= 3
+
+    def test_check_title_normalizes_case_lower(self, root_config):
+        """小写 'abstract' 应匹配并自动修正为 'Abstract'。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r = p.add_run("abstract: some content")
+        r.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        assert r.text.startswith("Abstract")
+
+    def test_check_title_normalizes_case_upper(self, root_config):
+        """全大写 'ABSTRACT' 应匹配并自动修正为 'Abstract'。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r = p.add_run("ABSTRACT\n\nbody text")
+        r.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        assert r.text.startswith("Abstract")
+
+    def test_split_abstract_across_runs(self, root_config):
+        """"Abstract" 被拆分到两个 run 时仍能正确识别标题部分。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r1 = p.add_run("Abst")
+        r1.font.size = Pt(10)
+        r2 = p.add_run("ract: body text")
+        r2.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        # r1 开头被修正为 "Abstract"，r2 保持 "body text" 部分
+        assert r1.text.startswith("Abstract")
+        assert "body text" in r2.text
+
+    def test_split_abstract_across_three_runs(self, root_config):
+        """"Abstract" 被拆分到三个 run 时仍能正确识别。"""
+        doc = Document()
+        p = doc.add_paragraph()
+        r1 = p.add_run("Abs")
+        r1.font.size = Pt(10)
+        r2 = p.add_run("tra")
+        r2.font.size = Pt(10)
+        r3 = p.add_run("ct: content")
+        r3.font.size = Pt(10)
+        node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
+        node.load_config(root_config)
+        node._base(doc, p=True, r=True)
+        # r1 应被修正为 "Abstract"
+        assert r1.text.startswith("Abstract")
+        # r2 和 r3 开头部分属于标题前缀，应被清空
+        assert r2.text == ""
+        assert "content" in r3.text
 
 
 # ---------------------------------------------------------------------------

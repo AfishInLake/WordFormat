@@ -15,7 +15,7 @@ class Tree:
         self.root = TreeNode(root_value)
 
     def is_empty(self) -> bool:
-        return self.root is None
+        return len(self.root.children) == 0
 
     # ===== 遍历方法 =====
 

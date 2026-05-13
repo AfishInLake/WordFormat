@@ -487,9 +487,10 @@ class TestFontColor:
         assert FontColor("red") == (255, 0, 0)
         assert FontColor("red") != (0, 0, 0)
 
-    def test_eq_non_tuple(self):
-        assert FontColor("red") != "red"
-        assert FontColor("red") != (255, 0)  # wrong length
+    def test_eq_string(self):
+        """字符串比较应与解析后的RGB比较"""
+        assert FontColor("red") == "red"
+        assert FontColor("red") != "blue"
 
     def test_base_set(self, doc):
         run = doc.add_paragraph().add_run("x")
@@ -1405,11 +1406,11 @@ class TestFontColorEqEdgeCases:
     """Cover lines 344-345: FontColor.__eq__ with non-tuple or wrong length tuple"""
 
     def test_eq_non_tuple_returns_false(self):
-        """__eq__ with non-tuple returns False (line 337-338)"""
+        """__eq__ with non-color values returns False"""
         fc = FontColor("red")
-        assert fc != "red"
-        assert fc != 42
-        assert fc != None
+        assert fc == "red"          # 字符串颜色名现在被正确比较
+        assert fc != 42             # 非颜色应返回 False
+        assert fc != None           # None 应返回 False
 
     def test_eq_wrong_length_tuple_returns_false(self):
         """__eq__ with tuple of wrong length returns False (line 339-340)"""

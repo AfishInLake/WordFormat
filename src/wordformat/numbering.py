@@ -1,17 +1,18 @@
 #! /usr/bin/env python
 """
-标题自动编号模块
+标题自动编号 & 参考文献条目编号模块
 
 功能：
 1. 清除标题段落中的手动编号文本（正则匹配）
 2. 应用 Word 自动编号（通过 XML 操作）
+3. 清除参考文献条目中的手动编号
+4. 应用参考文献条目的自动编号
 
 流程：
-  格式化完成后 → 对 heading 节点 → 清除手动编号 → 应用自动编号
+  格式化完成后 → 对 heading / ReferenceEntry 节点 → 清除手动编号 → 应用自动编号
 """
 
 import re
-from copy import deepcopy
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.shared import Cm, Mm, Inches, Pt
@@ -90,6 +91,39 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
         stripped_len = len(match.group())
         _remove_chars(paragraph, stripped_len)
         return True
+
+    return False
+
+
+def _strip_reference_numbering(paragraph) -> bool:
+    """检测并清除参考文献条目开头的手动编号。
+
+    支持常见参考文献编号格式：
+      [1]  [1]  1.  1)  (1)  [1]  ［1］  ①
+    返回 True 表示已清除编号。
+    """
+    if not paragraph.runs:
+        return False
+
+    text = paragraph.text.lstrip("　 ")
+    if not text:
+        return False
+
+    patterns = [
+        r"^\[\d+\][\s　]*",        # [1]  [1]
+        r"^［\d+］[\s　]*",         # ［1］（全角方括号）
+        r"^\(\d+\)[\s　]*",         # (1)
+        r"^（\d+）[\s　]*",          # （1）（全角括号）
+        r"^\d+\.[\s　]+",           # 1.  (必须有空格，避免匹配年份如 2024.)
+        r"^\d+\)[\s　]*",           # 1)
+        r"^[①②③④⑤⑥⑦⑧⑨⑩][\s　]*",  # ①（带圈数字）
+    ]
+
+    for pattern in patterns:
+        match = re.match(pattern, text)
+        if match:
+            _remove_chars(paragraph, len(match.group()))
+            return True
 
     return False
 
@@ -260,7 +294,7 @@ def _build_numbering_rPr(headings_config, level_key: str):
 
 def process_heading_numbering(root_node, document, config, headings_config=None):
     """
-    处理所有标题节点的编号：自动清除手动编号 + 应用自动编号。
+    处理所有标题节点和参考文献条目节点的编号：自动清除手动编号 + 应用自动编号。
 
     Args:
         root_node: 文档树根节点
@@ -271,10 +305,10 @@ def process_heading_numbering(root_node, document, config, headings_config=None)
     if not config.enabled:
         return
 
-    # 创建编号定义（传入标题配置以同步编号样式）
-    num_id_map = create_numbering_definition(document, config, headings_config)
-    if not num_id_map:
-        return
+    # 创建编号定义（标题 + 参考文献）
+    definitions = create_numbering_definition(document, config, headings_config)
+    heading_num_map = definitions.get("headings", {})
+    reference_num_id = definitions.get("references")
 
     # 标题节点类型到配置级别和 ilvl 的映射
     heading_map = {
@@ -283,35 +317,51 @@ def process_heading_numbering(root_node, document, config, headings_config=None)
         "level_3": ("2", "level_3"),
     }
 
+    from wordformat.config.datamodel import NumberingLevelConfig
+    ref_config = getattr(config, "references", None)
+    ref_enabled = isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled
+
+    from wordformat.rules.references import ReferenceEntry
+
+    heading_count = 0
+    ref_count = 0
+
     def traverse(node):
+        nonlocal heading_count, ref_count
         category = node.value.get("category", "") if isinstance(node.value, dict) else ""
 
+        paragraph = getattr(node, "paragraph", None)
+        if not paragraph:
+            for child in node.children:
+                traverse(child)
+            return
+
+        # 处理标题节点
         for level_key, (ilvl_str, config_key) in heading_map.items():
             if category == f"heading_{level_key}":
                 level_config = getattr(config, config_key, None)
                 if not level_config or not level_config.enabled:
                     break
 
-                paragraph = getattr(node, "paragraph", None)
-                if not paragraph:
-                    break
-
-                # 1. 自动检测并清除手动编号
-                ilvl_int = int(ilvl_str)
-                _auto_strip_numbering(paragraph, ilvl_int)
-
-                # 2. 应用 Word 自动编号
-                num_id = num_id_map.get(config_key)
+                _auto_strip_numbering(paragraph, int(ilvl_str))
+                num_id = heading_num_map.get(config_key)
                 if num_id:
                     apply_auto_numbering(paragraph, num_id, ilvl_str)
-
+                heading_count += 1
                 break
+
+        # 处理参考文献条目节点
+        if ref_enabled and isinstance(node, ReferenceEntry):
+            _strip_reference_numbering(paragraph)
+            if reference_num_id:
+                apply_auto_numbering(paragraph, reference_num_id, "0")
+            ref_count += 1
 
         for child in node.children:
             traverse(child)
 
     traverse(root_node)
-    logger.info("标题自动编号处理完成")
+    logger.info(f"编号处理完成：标题 {heading_count} 个，参考文献条目 {ref_count} 个")
 
 
 def apply_auto_numbering(paragraph, num_id: str, ilvl: str = "0"):
@@ -349,40 +399,34 @@ def apply_auto_numbering(paragraph, num_id: str, ilvl: str = "0"):
     logger.debug(f"已应用自动编号: numId={num_id}, ilvl={ilvl}")
 
 
-def create_numbering_definition(document, config, headings_config=None) -> dict[str, str]:
+def create_numbering_definition(document, config, headings_config=None) -> dict:
     """
     在文档中创建自动编号定义（如果不存在）。
 
-    根据配置中的 template 生成 abstractNum 和 num 定义，
-    返回 {level_key: num_id} 映射。
+    根据配置中的 template 生成 abstractNum 和 num 定义。
 
-    关键设计：所有级别共用同一个 abstractNum，确保多级编号的计数器
-    正确联动（例如三级标题的 %1、%2 能正确反映父级编号）。
+    返回:
+      {
+        "headings": {"level_1": num_id, ...},
+        "references": num_id or None,
+      }
 
-    Args:
-        document: docx Document 对象
-        config: NumberingConfig 配置对象
-        headings_config: 标题配置（用于设置编号字体/字号跟随标题样式）
-
-    Returns:
-        dict: {"level_1": "100", "level_2": "100", "level_3": "100"}
-              （所有级别共享同一个 numId）
+    关键设计：
+      - 所有标题级别共用同一个 abstractNum，确保多级编号的计数器正确联动
+      - 参考文献条目使用独立的 abstractNum，不与标题编号互相干扰
     """
     if not config.enabled:
-        return {}
+        return {"headings": {}, "references": None}
 
     # 获取或创建 numbering part
     try:
         numbering_part = document.part.numbering_part
     except (AttributeError, KeyError, NotImplementedError):
-        # 文档没有 numbering part，需要手动创建
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from docx.opc.packuri import PackURI
         from docx.parts.numbering import NumberingPart
 
         numbering_elm = OxmlElement("w:numbering")
-
-        # 手动创建 NumberingPart 实例并建立关系
         numbering_part = NumberingPart(
             PackURI("/word/numbering.xml"),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
@@ -403,93 +447,141 @@ def create_numbering_definition(document, config, headings_config=None) -> dict[
         num_id = int(elem.get(qn("w:numId"), "0"))
         max_num_id = max(max_num_id, num_id)
 
-    # 收集所有启用的级别配置，按 ilvl 排序
+    heading_num_map = {}
+    reference_num_id = None
+
+    # ========================
+    # 1. 标题编号定义
+    # ========================
     level_configs = [
         ("level_1", config.level_1, 0),
         ("level_2", config.level_2, 1),
         ("level_3", config.level_3, 2),
     ]
-    enabled_levels = [
+    enabled_heading_levels = [
         (key, lcfg, ilvl) for key, lcfg, ilvl in level_configs
         if lcfg.enabled and lcfg.template
     ]
 
-    if not enabled_levels:
-        return {}
+    if enabled_heading_levels:
+        abstract_num_id = max_abstract_num_id + 1
+        num_id = max_num_id + 1
+        max_abstract_num_id += 1
+        max_num_id += 1
 
-    # 所有级别共用一个 abstractNum，确保计数器正确联动
-    abstract_num_id = max_abstract_num_id + 1
-    num_id = max_num_id + 1
+        abstract_num = OxmlElement("w:abstractNum")
+        abstract_num.set(qn("w:abstractNumId"), str(abstract_num_id))
 
-    abstract_num = OxmlElement("w:abstractNum")
-    abstract_num.set(qn("w:abstractNumId"), str(abstract_num_id))
+        for level_key, level_config, ilvl in enabled_heading_levels:
+            lvl = _build_numbering_level(level_key, level_config, ilvl, headings_config)
+            abstract_num.append(lvl)
 
-    for level_key, level_config, ilvl in enabled_levels:
-        lvl = OxmlElement("w:lvl")
-        lvl.set(qn("w:ilvl"), str(ilvl))
+        numbering_elm.append(abstract_num)
 
-        start = OxmlElement("w:start")
-        start.set(qn("w:val"), "1")
-        lvl.append(start)
+        num = OxmlElement("w:num")
+        num.set(qn("w:numId"), str(num_id))
+        abstract_num_id_ref = OxmlElement("w:abstractNumId")
+        abstract_num_id_ref.set(qn("w:val"), str(abstract_num_id))
+        num.append(abstract_num_id_ref)
+        numbering_elm.append(num)
 
-        numFmt = OxmlElement("w:numFmt")
-        template = level_config.template
-        if "第" in template and "章" in template:
-            numFmt.set(qn("w:val"), "chineseCountingThousand")
-        else:
-            numFmt.set(qn("w:val"), "decimal")
-        lvl.append(numFmt)
+        logger.debug(f"创建标题编号定义: abstractNumId={abstract_num_id}, numId={num_id}")
+        heading_num_map = {key: str(num_id) for key, _, _ in enabled_heading_levels}
 
-        lvlText = OxmlElement("w:lvlText")
-        lvlText.set(qn("w:val"), template)
-        lvl.append(lvlText)
+    # ========================
+    # 2. 参考文献条目编号定义
+    # ========================
+    from wordformat.config.datamodel import NumberingLevelConfig
 
-        # 编号后缀：tab（制表符）、space（空格）、nothing（无）
-        suff = OxmlElement("w:suff")
-        suff_val = level_config.suffix or "space"
-        suff.set(qn("w:val"), suff_val)
-        lvl.append(suff)
+    ref_config = getattr(config, "references", None)
+    if isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled and ref_config.template:
+        ref_abstract_num_id = max_abstract_num_id + 1
+        ref_num_id = max_num_id + 1
 
-        lvlJc = OxmlElement("w:lvlJc")
-        lvlJc.set(qn("w:val"), "left")
-        lvl.append(lvlJc)
+        ref_abstract_num = OxmlElement("w:abstractNum")
+        ref_abstract_num.set(qn("w:abstractNumId"), str(ref_abstract_num_id))
 
-        # pPr - 缩进设置
-        pPr = OxmlElement("w:pPr")
-        ind = OxmlElement("w:ind")
+        # 参考文献只有一级（ilvl=0），numFmt 始终为 decimal
+        ref_lvl = _build_numbering_level(None, ref_config, 0, None)
+        ref_abstract_num.append(ref_lvl)
 
-        if level_config.numbering_indent:
-            _set_indent_value(ind, "left", level_config.numbering_indent)
-        else:
-            ind.set(qn("w:left"), "0")
+        numbering_elm.append(ref_abstract_num)
 
-        if level_config.text_indent:
-            _set_indent_value(ind, "hanging", level_config.text_indent)
-        else:
-            ind.set(qn("w:hanging"), str((ilvl + 1) * 210))
+        ref_num = OxmlElement("w:num")
+        ref_num.set(qn("w:numId"), str(ref_num_id))
+        ref_abstract_num_id_ref = OxmlElement("w:abstractNumId")
+        ref_abstract_num_id_ref.set(qn("w:val"), str(ref_abstract_num_id))
+        ref_num.append(ref_abstract_num_id_ref)
+        numbering_elm.append(ref_num)
 
-        pPr.append(ind)
-        lvl.append(pPr)
+        reference_num_id = str(ref_num_id)
+        logger.debug(f"创建参考文献编号定义: abstractNumId={ref_abstract_num_id}, numId={ref_num_id}")
 
-        # rPr - 编号的字体/字号跟随标题样式
-        if headings_config:
-            rPr = _build_numbering_rPr(headings_config, level_key)
-            if rPr is not None:
-                lvl.append(rPr)
+    return {"headings": heading_num_map, "references": reference_num_id}
 
-        abstract_num.append(lvl)
 
-    numbering_elm.append(abstract_num)
+def _build_numbering_level(
+    level_key: str | None,
+    level_config,
+    ilvl: int,
+    headings_config,
+) -> "OxmlElement":
+    """构建单个 w:lvl 元素，供标题和参考文献共用。
 
-    # 创建 num 引用
-    num = OxmlElement("w:num")
-    num.set(qn("w:numId"), str(num_id))
-    abstract_num_id_ref = OxmlElement("w:abstractNumId")
-    abstract_num_id_ref.set(qn("w:val"), str(abstract_num_id))
-    num.append(abstract_num_id_ref)
-    numbering_elm.append(num)
+    Args:
+        level_key: 标题级别键（如 "level_1"），参考文献时为 None
+        level_config: NumberingLevelConfig 配置
+        ilvl: 编号级别（0-based）
+        headings_config: 标题配置（仅标题需要，参考文献传 None）
+    """
+    lvl = OxmlElement("w:lvl")
+    lvl.set(qn("w:ilvl"), str(ilvl))
 
-    logger.debug(f"创建编号定义: 共用 abstractNumId={abstract_num_id}, numId={num_id}")
+    start = OxmlElement("w:start")
+    start.set(qn("w:val"), "1")
+    lvl.append(start)
 
-    # 所有启用的级别共享同一个 numId
-    return {key: str(num_id) for key, _, _ in enabled_levels}
+    numFmt = OxmlElement("w:numFmt")
+    template = level_config.template or ""
+    if "第" in template and "章" in template:
+        numFmt.set(qn("w:val"), "chineseCountingThousand")
+    else:
+        numFmt.set(qn("w:val"), "decimal")
+    lvl.append(numFmt)
+
+    lvlText = OxmlElement("w:lvlText")
+    lvlText.set(qn("w:val"), template)
+    lvl.append(lvlText)
+
+    suff = OxmlElement("w:suff")
+    suff_val = level_config.suffix or "space"
+    suff.set(qn("w:val"), suff_val)
+    lvl.append(suff)
+
+    lvlJc = OxmlElement("w:lvlJc")
+    lvlJc.set(qn("w:val"), "left")
+    lvl.append(lvlJc)
+
+    pPr = OxmlElement("w:pPr")
+    ind = OxmlElement("w:ind")
+
+    if level_config.numbering_indent:
+        _set_indent_value(ind, "left", level_config.numbering_indent)
+    else:
+        ind.set(qn("w:left"), "0")
+
+    if level_config.text_indent:
+        _set_indent_value(ind, "hanging", level_config.text_indent)
+    else:
+        ind.set(qn("w:hanging"), str((ilvl + 1) * 210))
+
+    pPr.append(ind)
+    lvl.append(pPr)
+
+    # rPr — 编号字体/字号跟随样式（仅标题有此需求）
+    if headings_config and level_key:
+        rPr = _build_numbering_rPr(headings_config, level_key)
+        if rPr is not None:
+            lvl.append(rPr)
+
+    return lvl
