@@ -38,6 +38,7 @@ MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
 ONNX_VERSION = "20260204"
 
+
 VOIDNODELIST = [
     "top",
     "heading_mulu",

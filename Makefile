@@ -43,6 +43,8 @@ install:
 		fi \
 	fi
 	@.venv/bin/python scripts/download_model.py 2>/dev/null || .venv/Scripts/python.exe scripts/download_model.py
+	@echo "Installing pre-commit hooks..."
+	@.venv/bin/pre-commit install 2>/dev/null || .venv/Scripts/pre-commit.exe install 2>/dev/null || echo "pre-commit install skipped (not found)"
 	@echo "Development environment ready!"
 
 ## build: Run the build script (scripts/build.bat)

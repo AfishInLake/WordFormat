@@ -55,8 +55,10 @@ def create_citation_hyperlinks(root_node, document):
             continue
         _wrap_citations_in_hyperlinks(para, bookmark_names)
 
-    logger.info(f"引用超链接创建完成：{len(ref_entries)} 条参考文献，"
-                f"{len(body_nodes)} 个正文段落已处理")
+    logger.info(
+        f"引用超链接创建完成：{len(ref_entries)} 条参考文献，"
+        f"{len(body_nodes)} 个正文段落已处理"
+    )
 
 
 def _collect_nodes_of_type(root_node, node_type, result, collect_body=False):

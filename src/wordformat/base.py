@@ -3,18 +3,18 @@
 # @Author  : afish
 # @File    : DocxBase.py
 
+from docx import Document
 from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
+
 # from wordformat.config.config import get_config, init_config
 from wordformat.settings import BATCH_SIZE
-from wordformat.utils import get_paragraph_xml_fingerprint, get_paragraph_numbering_text
-from docx import Document
+from wordformat.utils import get_paragraph_numbering_text, get_paragraph_xml_fingerprint
 
 
 class DocxBase:
     def __init__(self, docx_file, configpath):
-
         self.re_dict = {}
         self.docx_file = docx_file
         self.document = Document(docx_file)
@@ -49,8 +49,8 @@ class DocxBase:
 
         # 按批次BATCH_SIZE进行批量推理
         for i in range(0, len(paragraphs), BATCH_SIZE):
-            batch_texts = paragraphs[i: i + BATCH_SIZE]
-            batch_paras = paragraph_objects[i: i + BATCH_SIZE]
+            batch_texts = paragraphs[i : i + BATCH_SIZE]
+            batch_paras = paragraph_objects[i : i + BATCH_SIZE]
 
             try:
                 batch_results = onnx_batch_infer(batch_texts)
@@ -60,7 +60,7 @@ class DocxBase:
 
             # batch 结果，应用后处理逻辑
             for _j, (text, para_obj, pred) in enumerate(
-                    zip(batch_texts, batch_paras, batch_results, strict=False)
+                zip(batch_texts, batch_paras, batch_results, strict=False)
             ):
                 tag = pred["label"]
                 score = pred["score"]

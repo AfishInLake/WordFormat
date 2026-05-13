@@ -692,8 +692,9 @@ def _ensure_style_exists(doc, style_name: str):
         # 标题样式设置大纲级别
         outline_lvl = _BUILTIN_STYLE_OUTLINE_LVL.get(style_name)
         if outline_lvl is not None:
-            from docx.oxml.ns import qn
             from docx.oxml import OxmlElement
+            from docx.oxml.ns import qn
+
             pPr = new_style.element.find(qn("w:pPr"))
             if pPr is None:
                 pPr = OxmlElement("w:pPr")

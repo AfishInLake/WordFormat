@@ -4,7 +4,6 @@
 # @File    : heading.py
 
 from docx.document import Document
-from docx.enum.dml import MSO_COLOR_TYPE
 from docx.oxml import OxmlElement
 from loguru import logger  # 推荐添加日志，便于调试
 
@@ -81,6 +80,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             builtin_name = getattr(cfg, "builtin_style_name", None)
             if builtin_name:
                 from docx.oxml.ns import qn
+
                 pPr = self.paragraph._element.find(qn("w:pPr"))
                 if pPr is None:
                     pPr = OxmlElement("w:pPr")
@@ -183,6 +183,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
 
         # 直接操作样式定义的 XML 元素
         from docx.oxml.ns import qn
+
         style_element = style.element
         rPr = style_element.find(qn("w:rPr"))
         if rPr is None:
@@ -215,9 +216,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
             new_color.set(qn("w:val"), hex_color)
             rPr.append(new_color)
 
-            logger.debug(
-                f"已修正样式 '{style_name}' 的主题色 → #{hex_color}"
-            )
+            logger.debug(f"已修正样式 '{style_name}' 的主题色 → #{hex_color}")
         except Exception as e:
             logger.warning(f"修正样式 '{style_name}' 颜色失败: {e}")
 

@@ -155,7 +155,9 @@ class CharacterStyle:
         current_color = run_get_font_color(run)
         if self.font_color != current_color:
             # current_color 为 None 表示使用了主题色（themeColor），rgb 只是猜测值
-            color_display = "主题色(不确定)" if current_color is None else str(current_color)
+            color_display = (
+                "主题色(不确定)" if current_color is None else str(current_color)
+            )
             diffs.append(
                 DIFFResult(
                     "font_color",
@@ -322,11 +324,13 @@ class ParagraphStyle:
         for diff in diffs:
             if diff.diff_type == "builtin_style_name":
                 self.builtin_style_name.format(docx_obj=paragraph)
-                result.append(DIFFResult(
-                     diff_type="builtin_style_name",
-                     expected_value=str(self.builtin_style_name),
-                     current_value="已应用",
-                 ))
+                result.append(
+                    DIFFResult(
+                        diff_type="builtin_style_name",
+                        expected_value=str(self.builtin_style_name),
+                        current_value="已应用",
+                    )
+                )
 
         # 第二步：应用其他段落格式（对齐、缩进、间距等）
         for diff in diffs:

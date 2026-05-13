@@ -17,13 +17,13 @@ from starlette.responses import FileResponse
 # 复用原有项目的核心函数和校验工具
 from wordformat.set_style import auto_format_thesis_document
 from wordformat.set_tag import set_tag_main
-from wordformat.settings import BASE_DIR, SERVER_HOST
+from wordformat.settings import BASE_DIR, SERVER_HOST, VERSION
 
 # ---------------------- 初始化FastAPI应用 ----------------------
 app = FastAPI(
     title="学位论文格式自动校验工具-WebAPI",
     description="基于FastAPI实现，支持generate-json/check-format/apply-format三种模式，兼容原有YAML配置",
-    version="1.0.0",
+    version=VERSION,
     docs_url="/docs",  # Swagger UI接口文档地址（推荐）
     redoc_url="/redoc",  # ReDoc接口文档地址（备选）
 )
@@ -95,7 +95,9 @@ def save_upload_file(upload_file: UploadFile, save_dir: Path) -> str:
 )
 async def api_generate_json(
     docx_file: UploadFile = File(..., description="待处理的Word文档（.docx格式）"),  # noqa B008
-    config_file: Optional[UploadFile] = File(None, description="格式配置YAML文件（可选）"),  # noqa B008
+    config_file: Optional[UploadFile] = File(  # noqa: B008
+        None, description="格式配置YAML文件（可选）"
+    ),
 ):
     """
     对应原命令行generate-json模式：仅生成JSON，不执行校验/格式化
@@ -107,7 +109,7 @@ async def api_generate_json(
         if not filename.endswith(".docx"):
             return OperationResult(
                 code=400,
-                msg=f"上传失败：仅支持 .docx式（你当前上传的是：{docx_file.filename}），请转换为docx后重试"
+                msg=f"上传失败：仅支持 .docx式（你当前上传的是：{docx_file.filename}），请转换为docx后重试",
             )
 
         # 保存上传文件（仅返回路径，无需提取原名称）
@@ -115,9 +117,7 @@ async def api_generate_json(
         config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
 
         # 执行核心逻辑生成JSON（configpath 可选）
-        json_data = set_tag_main(
-            docx_path=docx_path, configpath=config_path
-        )
+        json_data = set_tag_main(docx_path=docx_path, configpath=config_path)
 
         return OperationResult(
             code=200,
@@ -139,7 +139,9 @@ async def api_generate_json(
 )
 async def api_check_format(
     docx_file: UploadFile = File(..., description="待校验的Word文档（.docx格式）"),  # noqa B008
-    config_file: Optional[UploadFile] = File(None, description="格式配置YAML文件（可选）"),  # noqa B008
+    config_file: Optional[UploadFile] = File(  # noqa: B008
+        None, description="格式配置YAML文件（可选）"
+    ),
     json_data: str = Body(..., description="从/generate-json获取的文档结构JSON数据"),
 ):
     """
@@ -190,7 +192,9 @@ async def api_check_format(
 )
 async def api_apply_format(
     docx_file: UploadFile = File(..., description="待格式化的Word文档（.docx格式）"),  # noqa B008
-    config_file: Optional[UploadFile] = File(None, description="格式配置YAML文件（可选）"),  # noqa B008
+    config_file: Optional[UploadFile] = File(  # noqa: B008
+        None, description="格式配置YAML文件（可选）"
+    ),
     json_data: str = Body(..., description="从/generate-json获取的文档结构JSON数据"),
 ):
     """

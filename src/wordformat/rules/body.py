@@ -104,7 +104,9 @@ class BodyText(FormatNode[BodyTextConfig]):
 
         runs = list(para.runs)
         full_text = "".join(r.text for r in runs if r.text)
-        citations = [(m.start(), m.end()) for m in _CITATION_PATTERN.finditer(full_text)]
+        citations = [
+            (m.start(), m.end()) for m in _CITATION_PATTERN.finditer(full_text)
+        ]
         if not citations:
             return
 
@@ -138,7 +140,7 @@ class BodyText(FormatNode[BodyTextConfig]):
                 segments.append((last, len(text)))
 
                 # 更新第一个片段（原地修改）
-                t_elem.text = text[segments[0][0]:segments[0][1]]
+                t_elem.text = text[segments[0][0] : segments[0][1]]
                 if t_elem.text and t_elem.text != t_elem.text.strip():
                     t_elem.set(qn("xml:space"), "preserve")
 

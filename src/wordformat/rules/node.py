@@ -202,7 +202,7 @@ class FormatNode(TreeNode, Generic[T]):
                     run.text = replace_text[pos:]
                 else:
                     n = min(len(run.text), len(replace_text) - pos)
-                    run.text = replace_text[pos:pos + n] if n > 0 else ""
+                    run.text = replace_text[pos : pos + n] if n > 0 else ""
                     pos += n
 
         logger.debug(f"已替换段落文本 → {replace_text[:50]}...")

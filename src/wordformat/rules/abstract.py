@@ -243,7 +243,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
                         # "abstract" 完整在此 run 内 → 直接修正
                         m = re.match(r"abstract", text_clean, re.IGNORECASE)
                         if m:
-                            run.text = "Abstract" + text_clean[m.end():]
+                            run.text = "Abstract" + text_clean[m.end() :]
                     else:
                         # "Abstract" 被拆分到多个 run → 第一个 run 替换为 "Abstract"
                         run.text = "Abstract"
@@ -252,7 +252,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
                     run.text = ""
                 else:
                     # 后续 run 部分在标题前缀内 → 裁掉标题部分
-                    run.text = text_clean[title_end - run_start:]
+                    run.text = text_clean[title_end - run_start :]
 
                 c = CharacterStyle(
                     font_name_cn=cfg.english_title.chinese_font_name,

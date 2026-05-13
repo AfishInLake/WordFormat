@@ -352,6 +352,7 @@ def run_get_font_color(run: Run) -> tuple[int, int, int] | None:
 
     # 检测主题色类型：themeColor 优先级高于 rgb，rgb 只是猜测值
     from docx.enum.dml import MSO_COLOR_TYPE
+
     if color.type == MSO_COLOR_TYPE.THEME:
         return None
 

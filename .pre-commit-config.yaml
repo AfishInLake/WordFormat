@@ -1,16 +1,27 @@
 default_language_version:
-  python: python3.11
+  python: python3
 exclude: |
   (?x)^(
     tests/.* |
     dist/.* |
     build/.* |
     scripts/.* |
+    wordformat-skill/.* |
     .*\.egg-info/.*
   )$
 
 default_stages: [ pre-commit, pre-push ]
 repos:
+  - repo: local
+    hooks:
+      - id: sync-version
+        name: 同步版本号 (pyproject.toml → _version.py)
+        entry: python scripts/sync_version.py
+        language: system
+        files: ^pyproject\.toml$
+        pass_filenames: false
+        always_run: false
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:

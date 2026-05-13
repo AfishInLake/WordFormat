@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : datamodel.py
 
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -86,8 +86,9 @@ class GlobalFormatConfig(BaseModel):
     def validate_font_color(cls, v):
         """验证字体颜色为合法值"""
         if not v or not isinstance(v, str):
-            raise ValueError(f"字体颜色不能为空")
+            raise ValueError("字体颜色不能为空")
         return v
+
     bold: bool = Field(default=False, description="加粗")
     italic: bool = Field(default=False, description="斜体")
     underline: bool = Field(default=False, description="下划线")

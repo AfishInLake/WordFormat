@@ -13,12 +13,13 @@
 """
 
 import re
-from docx.oxml.ns import qn
+
 from docx.oxml import OxmlElement
-from docx.shared import Cm, Mm, Inches, Pt
-from wordformat.style.utils import extract_unit_from_string
+from docx.oxml.ns import qn
+from docx.shared import Cm, Inches, Mm, Pt
 from loguru import logger
 
+from wordformat.style.utils import extract_unit_from_string
 
 # EMU 到 twips 的换算系数
 _EMU_PER_TWIP = 635
@@ -45,7 +46,9 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
 
     # ---------- 公共原子 ----------
     _CH = "[一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖拾佰仟]"
-    _CHN = "(?:一|二|三|四|五|六|七|八|九|十|百|千|零|壹|贰|叁|肆|伍|陆|柒|捌|玖|拾|佰|仟)"
+    _CHN = (
+        "(?:一|二|三|四|五|六|七|八|九|十|百|千|零|壹|贰|叁|肆|伍|陆|柒|捌|玖|拾|佰|仟)"
+    )
     _NUM = r"\d+"
     _ROMAN = "[IVXLCDM]+"
 
@@ -58,29 +61,29 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
 
     if ilvl == 0:  # 一级标题
         patterns = [
-            rf"^第{_CHDM}章\s*",                              # 第一章、第1章
-            rf"^第{_CHDM}节\s*",                              # 第一节
-            rf"^第{_CHDM}部分\s*",                            # 第一部分
-            rf"^（{_CHDM}）\s*",                              # （一）、（1）
-            rf"^\({_CHDM}\)\s*",                              # (一)、(1)
-            rf"^{_CHDM}\)\s*",                                # 一)、1)
-            rf"^{_ROMAN}\.\s+",                               # I.  / V.
-            rf"^{_CH}\s*[、，,\.]?\s*",                       # 一、 / 一 / 一.
+            rf"^第{_CHDM}章\s*",  # 第一章、第1章
+            rf"^第{_CHDM}节\s*",  # 第一节
+            rf"^第{_CHDM}部分\s*",  # 第一部分
+            rf"^（{_CHDM}）\s*",  # （一）、（1）
+            rf"^\({_CHDM}\)\s*",  # (一)、(1)
+            rf"^{_CHDM}\)\s*",  # 一)、1)
+            rf"^{_ROMAN}\.\s+",  # I.  / V.
+            rf"^{_CH}\s*[、，,\.]?\s*",  # 一、 / 一 / 一.
         ]
     elif ilvl == 1:  # 二级标题
         patterns = [
-            rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",                  # 1.1.1 (先匹配更长的)
-            rf"^{_NUM}\.{_NUM}\s+",                          # 1.1   (带空格)
-            rf"^{_NUM}\.{_NUM}\s*",                          # 1.1
-            rf"^{_CH}\.{_NUM}\s*",                           # 一.1
-            rf"^{_CH}\s*[、，,\.]?\s*",                      # 一、/ 一.
+            rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",  # 1.1.1 (先匹配更长的)
+            rf"^{_NUM}\.{_NUM}\s+",  # 1.1   (带空格)
+            rf"^{_NUM}\.{_NUM}\s*",  # 1.1
+            rf"^{_CH}\.{_NUM}\s*",  # 一.1
+            rf"^{_CH}\s*[、，,\.]?\s*",  # 一、/ 一.
         ]
     else:  # 三级及以上
         patterns = [
-            rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",                  # 1.1.1
-            rf"^{_NUM}\.{_NUM}\.{_NUM}\s+",                  # 1.1.1 
-            rf"^{_NUM}\.{_NUM}\s*",                          # 1.1
-            rf"^{_NUM}\s*[、，,\.]?\s*",                     # 1. / 1、
+            rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",  # 1.1.1
+            rf"^{_NUM}\.{_NUM}\.{_NUM}\s+",  # 1.1.1
+            rf"^{_NUM}\.{_NUM}\s*",  # 1.1
+            rf"^{_NUM}\s*[、，,\.]?\s*",  # 1. / 1、
         ]
 
     # 去除所有尾部空格和零宽断言
@@ -110,12 +113,12 @@ def _strip_reference_numbering(paragraph) -> bool:
         return False
 
     patterns = [
-        r"^\[\d+\][\s　]*",        # [1]  [1]
-        r"^［\d+］[\s　]*",         # ［1］（全角方括号）
-        r"^\(\d+\)[\s　]*",         # (1)
-        r"^（\d+）[\s　]*",          # （1）（全角括号）
-        r"^\d+\.[\s　]+",           # 1.  (必须有空格，避免匹配年份如 2024.)
-        r"^\d+\)[\s　]*",           # 1)
+        r"^\[\d+\][\s　]*",  # [1]  [1]
+        r"^［\d+］[\s　]*",  # ［1］（全角方括号）
+        r"^\(\d+\)[\s　]*",  # (1)
+        r"^（\d+）[\s　]*",  # （1）（全角括号）
+        r"^\d+\.[\s　]+",  # 1.  (必须有空格，避免匹配年份如 2024.)
+        r"^\d+\)[\s　]*",  # 1)
         r"^[①②③④⑤⑥⑦⑧⑨⑩][\s　]*",  # ①（带圈数字）
     ]
 
@@ -221,9 +224,18 @@ def _set_indent_value(ind_element, indent_type: str, value_str: str):
 # 中文字号到半磅值（half-points）的映射
 # Word 内部字号单位为 half-points（半磅），如 12pt = 24 half-points
 _FONT_SIZE_HALF_PT_MAP = {
-    "一号": 52, "小一": 48, "二号": 44, "小二": 36,
-    "三号": 32, "小三": 30, "四号": 28, "小四": 24,
-    "五号": 21, "小五": 18, "六号": 15, "七号": 11,
+    "一号": 52,
+    "小一": 48,
+    "二号": 44,
+    "小二": 36,
+    "三号": 32,
+    "小三": 30,
+    "四号": 28,
+    "小四": 24,
+    "五号": 21,
+    "小五": 18,
+    "六号": 15,
+    "七号": 11,
 }
 
 
@@ -318,6 +330,7 @@ def process_heading_numbering(root_node, document, config, headings_config=None)
     }
 
     from wordformat.config.datamodel import NumberingLevelConfig
+
     ref_config = getattr(config, "references", None)
     ref_enabled = isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled
 
@@ -328,7 +341,9 @@ def process_heading_numbering(root_node, document, config, headings_config=None)
 
     def traverse(node):
         nonlocal heading_count, ref_count
-        category = node.value.get("category", "") if isinstance(node.value, dict) else ""
+        category = (
+            node.value.get("category", "") if isinstance(node.value, dict) else ""
+        )
 
         paragraph = getattr(node, "paragraph", None)
         if not paragraph:
@@ -459,7 +474,8 @@ def create_numbering_definition(document, config, headings_config=None) -> dict:
         ("level_3", config.level_3, 2),
     ]
     enabled_heading_levels = [
-        (key, lcfg, ilvl) for key, lcfg, ilvl in level_configs
+        (key, lcfg, ilvl)
+        for key, lcfg, ilvl in level_configs
         if lcfg.enabled and lcfg.template
     ]
 
@@ -485,7 +501,9 @@ def create_numbering_definition(document, config, headings_config=None) -> dict:
         num.append(abstract_num_id_ref)
         numbering_elm.append(num)
 
-        logger.debug(f"创建标题编号定义: abstractNumId={abstract_num_id}, numId={num_id}")
+        logger.debug(
+            f"创建标题编号定义: abstractNumId={abstract_num_id}, numId={num_id}"
+        )
         heading_num_map = {key: str(num_id) for key, _, _ in enabled_heading_levels}
 
     # ========================
@@ -494,7 +512,11 @@ def create_numbering_definition(document, config, headings_config=None) -> dict:
     from wordformat.config.datamodel import NumberingLevelConfig
 
     ref_config = getattr(config, "references", None)
-    if isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled and ref_config.template:
+    if (
+        isinstance(ref_config, NumberingLevelConfig)
+        and ref_config.enabled
+        and ref_config.template
+    ):
         ref_abstract_num_id = max_abstract_num_id + 1
         ref_num_id = max_num_id + 1
 
@@ -515,7 +537,9 @@ def create_numbering_definition(document, config, headings_config=None) -> dict:
         numbering_elm.append(ref_num)
 
         reference_num_id = str(ref_num_id)
-        logger.debug(f"创建参考文献编号定义: abstractNumId={ref_abstract_num_id}, numId={ref_num_id}")
+        logger.debug(
+            f"创建参考文献编号定义: abstractNumId={ref_abstract_num_id}, numId={ref_num_id}"
+        )
 
     return {"headings": heading_num_map, "references": reference_num_id}
 

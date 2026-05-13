@@ -165,6 +165,7 @@ def print_tree(
     # 如果传入的是 JSON 文件路径，先构建树再打印
     if isinstance(node_or_jsonpath, str):
         import json
+
         from wordformat.rules.node import TreeNode
 
         with open(node_or_jsonpath, encoding="utf-8") as f:
@@ -176,6 +177,7 @@ def print_tree(
 
         # 统计各类别数量
         from collections import Counter
+
         cat_counter = Counter()
         for p in paragraphs:
             cat_counter[p.get("category", "unknown")] += 1
@@ -187,16 +189,22 @@ def print_tree(
         print("=" * 60)
 
         _print_tree_node(
-            root_node, "", True,
-            show_confidence, show_index,
+            root_node,
+            "",
+            True,
+            show_confidence,
+            show_index,
             filter_categories,
         )
         return
 
     # 递归打印节点
     _print_tree_node(
-        node_or_jsonpath, prefix, is_last,
-        show_confidence, show_index,
+        node_or_jsonpath,
+        prefix,
+        is_last,
+        show_confidence,
+        show_index,
         filter_categories,
     )
 
@@ -206,19 +214,32 @@ def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
     from wordformat.tree import Stack
 
     HEADING_CATEGORIES = {
-        "heading_level_1", "heading_level_2", "heading_level_3",
-        "heading_mulu", "heading_fulu",
-        "references_title", "acknowledgements_title",
-        "abstract_chinese_title", "abstract_english_title",
-        "abstract_chinese_title_content", "abstract_english_title_content",
+        "heading_level_1",
+        "heading_level_2",
+        "heading_level_3",
+        "heading_mulu",
+        "heading_fulu",
+        "references_title",
+        "acknowledgements_title",
+        "abstract_chinese_title",
+        "abstract_english_title",
+        "abstract_chinese_title_content",
+        "abstract_english_title_content",
     }
     LEVEL_MAP = {
-        "heading_level_1": 1, "heading_level_2": 2, "heading_level_3": 3,
-        "heading_mulu": 1, "heading_fulu": 1,
-        "references_title": 1, "acknowledgements_title": 1,
-        "abstract_chinese_title": 1, "abstract_english_title": 1,
-        "abstract_chinese_title_content": 1, "abstract_english_title_content": 1,
-        "keywords_chinese": 3, "keywords_english": 3,
+        "heading_level_1": 1,
+        "heading_level_2": 2,
+        "heading_level_3": 3,
+        "heading_mulu": 1,
+        "heading_fulu": 1,
+        "references_title": 1,
+        "acknowledgements_title": 1,
+        "abstract_chinese_title": 1,
+        "abstract_english_title": 1,
+        "abstract_chinese_title_content": 1,
+        "abstract_english_title_content": 1,
+        "keywords_chinese": 3,
+        "keywords_english": 3,
     }
 
     stack = Stack()
@@ -234,7 +255,10 @@ def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
             while not stack.is_empty():
                 top = stack.peek()
                 top_level = LEVEL_MAP.get(
-                    top.value.get("category", "") if isinstance(top.value, dict) else "", 999
+                    top.value.get("category", "")
+                    if isinstance(top.value, dict)
+                    else "",
+                    999,
                 )
                 if top_level >= level:
                     stack.pop()
@@ -280,9 +304,13 @@ def _print_tree_node(
             if hasattr(node, "children"):
                 for child in node.children:
                     _print_tree_node(
-                        child, prefix, is_last,
-                        show_confidence, show_index,
-                        filter_categories, _counter,
+                        child,
+                        prefix,
+                        is_last,
+                        show_confidence,
+                        show_index,
+                        filter_categories,
+                        _counter,
                     )
             return
 
@@ -316,7 +344,11 @@ def _print_tree_node(
             extension = "    " if is_last else "│   "
             new_prefix = prefix + extension
             _print_tree_node(
-                child, new_prefix, is_last_child,
-                show_confidence, show_index,
-                filter_categories, _counter,
+                child,
+                new_prefix,
+                is_last_child,
+                show_confidence,
+                show_index,
+                filter_categories,
+                _counter,
             )

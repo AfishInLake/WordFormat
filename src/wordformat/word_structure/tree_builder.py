@@ -13,8 +13,7 @@ class DocumentTreeBuilder:
     """负责将扁平列表构建成层级树结构"""
 
     HEADING_CATEGORIES = {
-        k: v for k, v in CATEGORY_TO_CLASS.items()
-        if k != "body_text"
+        k: v for k, v in CATEGORY_TO_CLASS.items() if k != "body_text"
     }
     CONFIG = {}
 
@@ -61,7 +60,9 @@ class DocumentTreeBuilder:
     TERMINAL_CATEGORIES = {"heading_mulu", "heading_fulu"}
 
     def _is_heading_category(self, category: str) -> bool:
-        return category in self.HEADING_CATEGORIES or category in self.TERMINAL_CATEGORIES
+        return (
+            category in self.HEADING_CATEGORIES or category in self.TERMINAL_CATEGORIES
+        )
 
     def _attach_heading_node(self, node: FormatNode):
         """处理标题类节点：维护栈层级"""

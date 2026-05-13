@@ -155,7 +155,11 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
 
     lvl_text = lvl_text_elem.get(qn("w:val"), "")
     num_fmt_elem = lvl.find(qn("w:numFmt"))
-    num_fmt = num_fmt_elem.get(qn("w:val"), "decimal") if num_fmt_elem is not None else "decimal"
+    num_fmt = (
+        num_fmt_elem.get(qn("w:val"), "decimal")
+        if num_fmt_elem is not None
+        else "decimal"
+    )
 
     # 计算当前级别的编号值
     # 需要遍历文档中所有使用同一 abstractNum 的段落来计数
@@ -164,7 +168,7 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
     current_num = level_counters.get(ilvl, 1)
 
     # 根据格式化类型转换数字
-    formatted_num = _format_number(current_num, num_fmt)
+    _format_number(current_num, num_fmt)
 
     # 替换 lvlText 中的占位符
     # %1 -> 当前级别, %2 -> 下一级别, etc.
@@ -178,7 +182,9 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
     return result
 
 
-def _count_numbering_levels(numbering_elm, abstract_num_id: str, target_paragraph: Paragraph) -> dict[int, int]:
+def _count_numbering_levels(
+    numbering_elm, abstract_num_id: str, target_paragraph: Paragraph
+) -> dict[int, int]:
     """
     遍历文档段落，计算目标段落所在编号链的各级计数器值。
 
@@ -191,7 +197,10 @@ def _count_numbering_levels(numbering_elm, abstract_num_id: str, target_paragrap
     num_ids = set()
     for num_elem in numbering_elm.findall(qn("w:num")):
         abstract_num_id_ref = num_elem.find(qn("w:abstractNumId"))
-        if abstract_num_id_ref is not None and abstract_num_id_ref.get(qn("w:val")) == abstract_num_id:
+        if (
+            abstract_num_id_ref is not None
+            and abstract_num_id_ref.get(qn("w:val")) == abstract_num_id
+        ):
             num_ids.add(num_elem.get(qn("w:numId")))
 
     if not num_ids:
@@ -294,7 +303,6 @@ def _to_chinese_num(num: int) -> str:
     if num <= 0:
         return str(num)
     digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
-    units = ["", "十", "百", "千"]
     if num < 10:
         return digits[num]
     if num < 100:

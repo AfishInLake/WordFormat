@@ -2,12 +2,8 @@
 # @Time    : 2025/12/22 21:49
 # @Author  : afish
 # @File    : main.py
-import json
-import os
-from loguru import logger
 
 from wordformat.base import DocxBase
-
 
 
 def set_tag_main(docx_path: str, configpath: str = None) -> list[dict]:
