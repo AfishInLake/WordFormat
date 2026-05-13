@@ -260,6 +260,12 @@ def auto_format_thesis_document(
     if not check and hasattr(config_model, "numbering") and config_model.numbering.enabled:
         from wordformat.numbering import process_heading_numbering
         process_heading_numbering(root_node, document, config_model.numbering, config_model.headings)
+
+    # 创建引用超链接（仅在格式化模式下执行）
+    if not check:
+        from wordformat.hyperlinks import create_citation_hyperlinks
+        create_citation_hyperlinks(root_node, document)
+
     savepath = Path(savepath)
     if check:
         docx_path = str(savepath / f"{filename_without_ext}--标注版.docx")

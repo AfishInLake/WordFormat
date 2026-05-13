@@ -1870,6 +1870,126 @@ class TestProcessReferenceNumbering:
 
 
 # ============================================================
+# hyperlinks.py — _parse_ref_numbers
+# ============================================================
+
+
+class TestParseRefNumbers:
+    def test_single_number(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1]") == [1]
+
+    def test_multiple_numbers(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1,2,3]") == [1, 2, 3]
+
+    def test_range(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1-3]") == [1, 2, 3]
+
+    def test_mixed(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1,3-5]") == [1, 3, 4, 5]
+
+    def test_chinese_comma(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1，2，3]") == [1, 2, 3]
+
+    def test_spaces(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1, 2, 3]") == [1, 2, 3]
+
+
+# ============================================================
+# hyperlinks.py — _insert_bookmark
+# ============================================================
+
+
+class TestInsertBookmark:
+    def test_adds_bookmark_to_paragraph(self, doc):
+        from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+        p = doc.add_paragraph("A reference entry.")
+        bid = _next_bookmark_id()
+        _insert_bookmark(p, "_Ref1", bid)
+
+        para_elem = p._element
+        starts = para_elem.findall(qn("w:bookmarkStart"))
+        ends = para_elem.findall(qn("w:bookmarkEnd"))
+        assert len(starts) == 1
+        assert len(ends) == 1
+        assert starts[0].get(qn("w:name")) == "_Ref1"
+
+    def test_bookmark_before_first_run(self, doc):
+        from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+        p = doc.add_paragraph("Text")
+        bid = _next_bookmark_id()
+        _insert_bookmark(p, "_RefTest", bid)
+
+        para_elem = p._element
+        children = list(para_elem)
+        # bookmarkStart 应在第一个 run 之前
+        bm_idx = None
+        first_r_idx = None
+        for i, child in enumerate(children):
+            if child.tag == qn("w:bookmarkStart"):
+                bm_idx = i
+            if child.tag == qn("w:r") and first_r_idx is None:
+                first_r_idx = i
+        assert bm_idx is not None
+        assert first_r_idx is not None
+        assert bm_idx < first_r_idx
+
+
+# ============================================================
+# hyperlinks.py — _wrap_citations_in_hyperlinks
+# ============================================================
+
+
+class TestWrapCitationsInHyperlinks:
+    def test_wraps_citation_in_hyperlink(self, doc):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        p = doc.add_paragraph("参见")
+        p.add_run("[1]").font.superscript = True
+        p.add_run("的研究。")
+
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+        para_elem = p._element
+        hyperlinks = para_elem.findall(qn("w:hyperlink"))
+        assert len(hyperlinks) == 1
+        assert hyperlinks[0].get(qn("w:anchor")) == "_Ref1"
+
+    def test_regular_brackets_not_wrapped(self, doc):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        p = doc.add_paragraph("这是一个[注]释说明。")
+
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+        para_elem = p._element
+        hyperlinks = para_elem.findall(qn("w:hyperlink"))
+        assert len(hyperlinks) == 0
+
+    def test_run_retains_superscript_in_hyperlink(self, doc):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        p = doc.add_paragraph("见")
+        r = p.add_run("[1]")
+        r.font.superscript = True
+
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+        para_elem = p._element
+        hyperlink = para_elem.find(qn("w:hyperlink"))
+        assert hyperlink is not None
+        r_elem = hyperlink.find(qn("w:r"))
+        rPr = r_elem.find(qn("w:rPr"))
+        vertAlign = rPr.find(qn("w:vertAlign"))
+        assert vertAlign.get(qn("w:val")) == "superscript"
+        # 同时应有 Hyperlink 样式
+        rStyle = rPr.find(qn("w:rStyle"))
+        assert rStyle.get(qn("w:val")) == "Hyperlink"
+
+
+# ============================================================
 # base.py — DocxBase
 # ============================================================
 
