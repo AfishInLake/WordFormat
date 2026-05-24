@@ -73,9 +73,47 @@ jobs:
       - name: Run tests
         run: make tests
 
-  # =============== Job 2: 打包 Skill 并发布 ===============
-  release:
+  # =============== Job 2: 构建前端 UI ===============
+  build-ui:
+    name: Build UI
     needs: test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: WordFormatUI/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: WordFormatUI
+        run: npm ci
+
+      - name: Build UI
+        working-directory: WordFormatUI
+        run: npm run build
+
+      - name: Copy dist to api/static
+        run: |
+          rm -rf src/wordformat/api/static/*
+          cp -r WordFormatUI/dist/* src/wordformat/api/static/
+
+      - name: Upload built UI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: src/wordformat/api/static/
+          retention-days: 1
+
+  # =============== Job 3: 打包 Skill 并发布 ===============
+  release:
+    needs: [test, build-ui]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -84,6 +122,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
+
+      - name: Download built UI
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: src/wordformat/api/static/
 
       - name: Package skill folder as ZIP
         run: |
@@ -100,10 +144,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # =============== Job 3: 发布到 PyPI ===============
+  # =============== Job 4: 发布到 PyPI ===============
   publish-pypi:
     name: Publish to PyPI
-    needs: test
+    needs: [test, build-ui]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -113,6 +157,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
+
+      - name: Download built UI
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: src/wordformat/api/static/
 
       - name: Cache ONNX Model
         uses: actions/cache@v5.0.3
