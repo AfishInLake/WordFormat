@@ -1,9 +1,9 @@
 // 默认全局格式
 export const defaultGlobalFormat = {
-  alignment: "左对齐",
-  space_before: "0.5行",
-  space_after: "0.5行",
-  line_spacingrule: "单倍行距",
+  alignment: "两端对齐",
+  space_before: "0行",
+  space_after: "0行",
+  line_spacingrule: "1.5倍行距",
   line_spacing: "1.5倍",
   left_indent: "0字符",
   right_indent: "0字符",
@@ -29,72 +29,119 @@ export const createConfigWithGlobalInheritance = (baseConfig = {}) => {
 // 默认配置
 export const defaultConfig = {
   style_checks_warning: {
-    bold: true,
-    italic: true,
-    underline: true,
-    font_size: true,
+    bold: false,
+    italic: false,
+    underline: false,
+    font_size: false,
     font_name: false,
     font_color: false,
-    alignment: true,
-    space_before: true,
-    space_after: true,
-    line_spacing: true,
-    line_spacingrule: true,
-    left_indent: true,
-    right_indent: true,
-    first_line_indent: true,
-    builtin_style_name: true
+    alignment: false,
+    space_before: false,
+    space_after: false,
+    line_spacing: false,
+    line_spacingrule: false,
+    left_indent: false,
+    right_indent: false,
+    first_line_indent: false,
+    builtin_style_name: false
   },
   global_format: {
     ...defaultGlobalFormat
   },
   abstract: {
     chinese: {
-      chinese_title: createConfigWithGlobalInheritance(),
-      chinese_content: createConfigWithGlobalInheritance()
+      chinese_title: createConfigWithGlobalInheritance({
+        alignment: "居中对齐",
+        first_line_indent: "0字符",
+        chinese_font_name: "黑体",
+        font_size: "四号"
+      }),
+      chinese_content: createConfigWithGlobalInheritance({
+        alignment: "两端对齐"
+      })
     },
     english: {
-      english_title: createConfigWithGlobalInheritance(),
-      english_content: createConfigWithGlobalInheritance()
+      english_title: createConfigWithGlobalInheritance({
+        alignment: "居中对齐",
+        first_line_indent: "0字符",
+        font_size: "四号"
+      }),
+      english_content: createConfigWithGlobalInheritance({
+        alignment: "两端对齐"
+      })
     },
     keywords: {
-      english: createConfigWithGlobalInheritance({
-        label: createConfigWithGlobalInheritance({
-          bold: true,
-          font_size: '四号'
-        }),
-        count_min: 4,
-        count_max: 4,
-        trailing_punct_forbidden: true
-      }),
       chinese: createConfigWithGlobalInheritance({
         label: createConfigWithGlobalInheritance({
           chinese_font_name: '黑体',
           font_size: '四号',
-          bold: true
+          bold: false
         }),
-        count_min: 4,
-        count_max: 4,
+        count_min: 3,
+        count_max: 5,
+        trailing_punct_forbidden: true
+      }),
+      english: createConfigWithGlobalInheritance({
+        label: createConfigWithGlobalInheritance({
+          font_size: '四号',
+          bold: false
+        }),
+        count_min: 3,
+        count_max: 5,
         trailing_punct_forbidden: true
       })
     }
   },
   headings: {
-    level_1: createConfigWithGlobalInheritance(),
-    level_2: createConfigWithGlobalInheritance(),
-    level_3: createConfigWithGlobalInheritance()
+    level_1: createConfigWithGlobalInheritance({
+      alignment: "居中对齐",
+      first_line_indent: "0字符",
+      chinese_font_name: "黑体",
+      font_size: "小二",
+      space_before: "0.5行",
+      space_after: "0.5行",
+      builtin_style_name: "Heading 1"
+    }),
+    level_2: createConfigWithGlobalInheritance({
+      alignment: "左对齐",
+      first_line_indent: "0字符",
+      chinese_font_name: "黑体",
+      font_size: "三号",
+      space_before: "0行",
+      space_after: "0行",
+      builtin_style_name: "Heading 2"
+    }),
+    level_3: createConfigWithGlobalInheritance({
+      alignment: "左对齐",
+      first_line_indent: "0字符",
+      chinese_font_name: "黑体",
+      font_size: "小四",
+      space_before: "0行",
+      space_after: "0行",
+      builtin_style_name: "Heading 3"
+    })
   },
   body_text: createConfigWithGlobalInheritance(),
   figures: createConfigWithGlobalInheritance({
+    alignment: "居中对齐",
+    first_line_indent: "0字符",
+    font_size: "五号",
+    builtin_style_name: "题注",
     caption_position: "below",
     caption_prefix: "图"
   }),
   tables: createConfigWithGlobalInheritance({
+    alignment: "居中对齐",
+    first_line_indent: "0字符",
+    font_size: "五号",
+    builtin_style_name: "题注",
     caption_position: "above",
     caption_prefix: "表",
     content: createConfigWithGlobalInheritance({
+      chinese_font_name: '宋体',
+      english_font_name: 'Times New Roman',
       font_size: '五号',
-      line_spacingrule: '单倍行距',
+      line_spacingrule: '1.5倍行距',
       alignment: '居中对齐',
       first_line_indent: '0字符',
       space_before: "0行",
@@ -103,17 +150,34 @@ export const defaultConfig = {
   }),
   references: {
     title: createConfigWithGlobalInheritance({
+      alignment: "居中对齐",
+      first_line_indent: "0字符",
+      chinese_font_name: "黑体",
+      font_size: "三号",
       section_title: "参考文献"
     }),
     content: createConfigWithGlobalInheritance({
-      numbering_format: null,
-      entry_indent: 0.0,
-      entry_ending_punct: null
+      alignment: "两端对齐",
+      first_line_indent: "-2.2字符",
+      left_indent: "0.26字符",
+      chinese_font_name: "宋体",
+      font_size: "五号",
+      numbering_format: '[1], [2], ...',
+      entry_indent: 0,
+      entry_ending_punct: '.'
     })
   },
   acknowledgements: {
-    title: createConfigWithGlobalInheritance(),
-    content: createConfigWithGlobalInheritance()
+    title: createConfigWithGlobalInheritance({
+      alignment: "居中对齐",
+      first_line_indent: "0字符",
+      chinese_font_name: "黑体",
+      font_size: "小二"
+    }),
+    content: createConfigWithGlobalInheritance({
+      alignment: "两端对齐",
+      font_size: "五号"
+    })
   },
   numbering: {
     enabled: true,
