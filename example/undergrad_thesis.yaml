@@ -1,3 +1,22 @@
+# ===========================================================================
+# 本科毕业论文格式配置示例
+# ===========================================================================
+# 本文件展示所有可配置字段及其默认值。
+# 使用 YAML 锚点 &global_format 定义全局基础格式，
+# 各章节通过 <<: *global_format 继承后覆写特定字段。
+#
+# 支持的单位格式：
+#   字号：小四 / 四号 / 三号 / 小二 / 五号 / 数值(pt)
+#   间距：0行 / 0.5行 / 1行 / 12磅 / 0.5cm
+#   缩进：2字符 / -2.2字符(悬挂) / 0.75cm / 24磅
+#   行距：单倍行距 / 1.5倍行距 / 2倍行距 / 最小值 / 固定值 / 多倍行距
+#   字体颜色：黑色 / 红色 / 蓝色 等
+#   对齐：左对齐 / 居中对齐 / 右对齐 / 两端对齐 / 分散对齐
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# 预警开关：控制各字段差异是否在批注中显示（false=不显示该类型差异）
+# ---------------------------------------------------------------------------
 style_checks_warning:
   bold: false
   italic: false
@@ -14,352 +33,267 @@ style_checks_warning:
   right_indent: false
   first_line_indent: false
   builtin_style_name: false
-global_format:
-  alignment: 两端对齐
-  space_before: 0行
-  space_after: 0行
-  line_spacingrule: 1.5倍行距
-  line_spacing: 1.5倍
-  left_indent: 0字符
-  right_indent: 0字符
-  first_line_indent: 2字符
-  builtin_style_name: 正文
-  chinese_font_name: 宋体
-  english_font_name: Times New Roman
-  font_size: 小四
-  font_color: 黑色
-  bold: false
-  italic: false
-  underline: false
+
+# ---------------------------------------------------------------------------
+# 全局基础格式（其他节通过 <<: *global_format 继承后再覆写）
+# ---------------------------------------------------------------------------
+global_format: &global_format
+  # -- 段落格式 --
+  alignment: '两端对齐'           # 左对齐/居中对齐/右对齐/两端对齐/分散对齐
+  space_before: "0行"             # 段前间距
+  space_after: "0行"              # 段后间距
+  line_spacingrule: "1.5倍行距"   # 单倍行距/1.5倍行距/2倍行距/最小值/固定值/多倍行距
+  line_spacing: '1.5倍'           # 行距参数
+  left_indent: "0字符"            # 左侧缩进
+  right_indent: "0字符"           # 右侧缩进
+  first_line_indent: '2字符'      # 首行缩进（正值）/ 悬挂缩进（负值，如 -2.2字符）
+  builtin_style_name: '正文'      # Word 内置样式名（Heading 1, Heading 2, 正文, 题注 等）
+  # -- 字符格式 --
+  chinese_font_name: '宋体'       # 中文字体
+  english_font_name: 'Times New Roman'  # 英文字体
+  font_size: '小四'               # 字号（四号/三号/小二/五号 等）
+  font_color: '黑色'              # 字体颜色
+  bold: false                     # 加粗
+  italic: false                   # 斜体
+  underline: false                # 下划线
+
+# ===========================================================================
+# 摘要（中英文）
+# ===========================================================================
 abstract:
+  # -----------------------------------------------------------------------
+  # 中文摘要
+  # -----------------------------------------------------------------------
   chinese:
+    # -- 中文摘要标题（"摘要"二字）--
     chinese_title:
-      alignment: 居中对齐
-      space_before: 0行
-      space_after: 0行
-      line_spacingrule: 1.5倍行距
-      line_spacing: 1.5倍
-      left_indent: 0字符
-      right_indent: 0字符
-      first_line_indent: 0字符
-      builtin_style_name: 正文
-      chinese_font_name: 黑体
-      english_font_name: Times New Roman
-      font_size: 四号
-      font_color: 黑色
+      <<: *global_format
+      alignment: '居中对齐'
+      first_line_indent: '0字符'
+      chinese_font_name: '黑体'
+      font_size: '小二'
       bold: false
-      italic: false
-      underline: false
+
+    # -- 中文摘要正文 --
     chinese_content:
-      alignment: 两端对齐
-      space_before: 0行
-      space_after: 0行
-      line_spacingrule: 1.5倍行距
-      line_spacing: 1.5倍
-      left_indent: 0字符
-      right_indent: 0字符
-      first_line_indent: 2字符
-      builtin_style_name: 正文
-      chinese_font_name: 宋体
-      english_font_name: Times New Roman
-      font_size: 小四
-      font_color: 黑色
-      bold: false
-      italic: false
-      underline: false
+      <<: *global_format
+      alignment: '两端对齐'
+
+  # -----------------------------------------------------------------------
+  # 英文摘要
+  # -----------------------------------------------------------------------
   english:
+    # -- 英文摘要标题（"Abstract"）--
     english_title:
-      alignment: 居中对齐
-      space_before: 0行
-      space_after: 0行
-      line_spacingrule: 1.5倍行距
-      line_spacing: 1.5倍
-      left_indent: 0字符
-      right_indent: 0字符
-      first_line_indent: 0字符
-      builtin_style_name: 正文
-      chinese_font_name: 宋体
-      english_font_name: Times New Roman
-      font_size: 四号
-      font_color: 黑色
-      bold: false
-      italic: false
-      underline: false
+      <<: *global_format
+      alignment: '居中对齐'
+      first_line_indent: '0字符'
+      font_size: '小四'
+      bold: true
+
+    # -- 英文摘要正文 --
     english_content:
-      alignment: 两端对齐
-      space_before: 0行
-      space_after: 0行
-      line_spacingrule: 1.5倍行距
-      line_spacing: 1.5倍
-      left_indent: 0字符
-      right_indent: 0字符
-      first_line_indent: 2字符
-      builtin_style_name: 正文
-      chinese_font_name: 宋体
-      english_font_name: Times New Roman
-      font_size: 小四
-      font_color: 黑色
-      bold: false
-      italic: false
-      underline: false
+      <<: *global_format
+      alignment: '两端对齐'
+
+  # -----------------------------------------------------------------------
+  # 关键词（中英文）
+  # -----------------------------------------------------------------------
   keywords:
     chinese:
-      alignment: 两端对齐
-      space_before: 0行
-      space_after: 0行
-      line_spacingrule: 1.5倍行距
-      line_spacing: 1.5倍
-      left_indent: 0字符
-      right_indent: 0字符
-      first_line_indent: 2字符
-      builtin_style_name: 正文
-      chinese_font_name: 宋体
-      english_font_name: Times New Roman
-      font_size: 小四
-      font_color: 黑色
-      bold: false
-      italic: false
-      underline: false
-      keywords_bold: false
-      count_min: 3
-      count_max: 5
-      trailing_punct_forbidden: true
+      # 从 global_format 继承，再覆写关键词特有字段
+      <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '0字符'
+      font_size: '四号'
+      # -- 关键词标签（"关键词："）的字符格式 --
       label:
+        <<: *global_format
         chinese_font_name: '黑体'
         font_size: '四号'
-        bold: false
+        bold: true
+      # -- 关键词数量和标点校验 --
+      count_min: 3                   # 最少关键词数
+      count_max: 5                   # 最多关键词数
+      trailing_punct_forbidden: true # 中文关键词末尾是否禁止标点
+
     english:
-      alignment: 两端对齐
-      space_before: 0行
-      space_after: 0行
-      line_spacingrule: 1.5倍行距
-      line_spacing: 1.5倍
-      left_indent: 0字符
-      right_indent: 0字符
-      first_line_indent: 2字符
-      builtin_style_name: 正文
-      chinese_font_name: 宋体
-      english_font_name: Times New Roman
-      font_size: 小四
-      font_color: 黑色
-      bold: false
-      italic: false
-      underline: false
-      keywords_bold: false
+      <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '0字符'
+      font_size: '四号'
+      label:
+        <<: *global_format
+        font_size: '四号'
+        bold: true
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
-      label:
-        font_size: '四号'
-        bold: false
+
+# ===========================================================================
+# 各级标题（章、节、小节）
+# ===========================================================================
 headings:
+  # -- 一级标题（第1章）--
   level_1:
-    alignment: 居中对齐
-    space_before: 0.5行
-    space_after: 0.5行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0字符
-    right_indent: 0字符
-    first_line_indent: 0字符
-    builtin_style_name: Heading 1
-    chinese_font_name: 黑体
-    english_font_name: Times New Roman
-    font_size: 小二
-    font_color: 黑色
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '小二'
     bold: false
-    italic: false
-    underline: false
+    space_before: "0.5行"
+    space_after: "0.5行"
+    builtin_style_name: 'Heading 1'
+
+  # -- 二级标题（1.1）--
   level_2:
-    alignment: 左对齐
-    space_before: 0行
-    space_after: 0行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0字符
-    right_indent: 0字符
-    first_line_indent: 0字符
-    builtin_style_name: Heading 2
-    chinese_font_name: 黑体
-    english_font_name: Times New Roman
-    font_size: 三号
-    font_color: 黑色
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '三号'
     bold: false
-    italic: false
-    underline: false
+    space_before: "0.5行"
+    space_after: "0.5行"
+    builtin_style_name: 'Heading 2'
+
+  # -- 三级标题（1.1.1）--
   level_3:
-    alignment: 左对齐
-    space_before: 0行
-    space_after: 0行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0字符
-    right_indent: 0字符
-    first_line_indent: 0字符
-    builtin_style_name: Heading 3
-    chinese_font_name: 黑体
-    english_font_name: Times New Roman
-    font_size: 小四
-    font_color: 黑色
+    <<: *global_format
+    alignment: '左对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '小四'
     bold: false
-    italic: false
-    underline: false
+    space_before: "0.5行"
+    space_after: "0.5行"
+    builtin_style_name: 'Heading 3'
+
+# ===========================================================================
+# 正文段落
+# ===========================================================================
 body_text:
-  alignment: 两端对齐
-  space_before: 0行
-  space_after: 0行
-  line_spacingrule: 1.5倍行距
-  line_spacing: 1.5倍
-  left_indent: 0字符
-  right_indent: 0字符
-  first_line_indent: 2字符
-  builtin_style_name: 正文
-  chinese_font_name: 宋体
-  english_font_name: Times New Roman
-  font_size: 小四
-  font_color: 黑色
-  bold: false
-  italic: false
-  underline: false
+  <<: *global_format
+
+# ===========================================================================
+# 插图题注（Figure）
+# ===========================================================================
 figures:
-  alignment: 居中对齐
-  space_before: 0行
-  space_after: 0行
-  line_spacingrule: 1.5倍行距
-  line_spacing: 1.5倍
-  left_indent: 0字符
-  right_indent: 0字符
-  first_line_indent: 0字符
-  builtin_style_name: 题注
-  chinese_font_name: 宋体
-  english_font_name: Times New Roman
-  font_size: 五号
-  font_color: 黑色
-  bold: false
-  italic: false
-  underline: false
-  caption_position: below
-  caption_prefix: 图
+  <<: *global_format
+  font_size: '五号'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '0字符'
+  # -- 插图特有字段 --
+  caption_position: 'below'         # 图注位置：above(上方) / below(下方)
+  caption_prefix: '图'              # 图注编号前缀
+
+# ===========================================================================
+# 表格（题注 + 表格内容）
+# ===========================================================================
 tables:
-  alignment: 居中对齐
-  space_before: 0行
-  space_after: 0行
-  line_spacingrule: 1.5倍行距
-  line_spacing: 1.5倍
-  left_indent: 0字符
-  right_indent: 0字符
-  first_line_indent: 0字符
-  builtin_style_name: 题注
-  chinese_font_name: 宋体
-  english_font_name: Times New Roman
-  font_size: 五号
-  font_color: 黑色
-  bold: false
-  italic: false
-  underline: false
-  caption_position: above
-  caption_prefix: 表
+  <<: *global_format
+  font_size: '五号'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '0字符'
+  # -- 表格题注特有字段 --
+  caption_position: 'above'         # 表注位置：above(上方) / below(下方)
+  caption_prefix: '表'              # 表注编号前缀
+  # -- 表格内容格式（单元格内文字）--
   content:
+    <<: *global_format
     chinese_font_name: '宋体'
     english_font_name: 'Times New Roman'
     font_size: '五号'
-    line_spacingrule: '1.5倍行距'
+    line_spacingrule: '单倍行距'
     alignment: '居中对齐'
     first_line_indent: '0字符'
     space_before: "0行"
     space_after: "0行"
+
+# ===========================================================================
+# 参考文献
+# ===========================================================================
 references:
+  # -- 参考文献标题（"参考文献"）--
   title:
-    alignment: 居中对齐
-    space_before: 0行
-    space_after: 0行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0字符
-    right_indent: 0字符
-    first_line_indent: 0字符
-    builtin_style_name: 正文
-    chinese_font_name: 黑体
-    english_font_name: Times New Roman
-    font_size: 三号
-    font_color: 黑色
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '三号'
     bold: false
-    italic: false
-    underline: false
-    section_title: 参考文献
+    section_title: '参考文献'       # 章节标题文本
+
+  # -- 参考文献条目内容 --
   content:
-    alignment: 两端对齐
-    space_before: 0行
-    space_after: 0行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0.26字符
-    right_indent: 0字符
-    first_line_indent: -2.2字符
-    builtin_style_name: 正文
-    chinese_font_name: 宋体
-    english_font_name: Times New Roman
-    font_size: 五号
-    font_color: 黑色
-    bold: false
-    italic: false
-    underline: false
-    entry_indent: 0
-    entry_ending_punct: .
-    numbering_format: '[1], [2], ...'
+    <<: *global_format
+    alignment: '两端对齐'
+    first_line_indent: '-2.2字符'   # 悬挂缩进（负值=悬挂）
+    left_indent: '0.26字符'         # 文本之前
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '五号'
+    # 以下字段为预留字段，当前暂未启用：
+    entry_indent: 0.0               # [预留] 条目首行缩进量
+    entry_ending_punct: '.'         # [预留] 条目结束标点
+    numbering_format: '[1], [2], ...'  # [预留] 编号格式描述
+
+# ===========================================================================
+# 致谢
+# ===========================================================================
 acknowledgements:
+  # -- 致谢标题（"致谢"）--
   title:
-    alignment: 居中对齐
-    space_before: 0行
-    space_after: 0行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0字符
-    right_indent: 0字符
-    first_line_indent: 0字符
-    builtin_style_name: 正文
-    chinese_font_name: 黑体
-    english_font_name: Times New Roman
-    font_size: 小二
-    font_color: 黑色
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    chinese_font_name: '黑体'
+    font_size: '小二'
     bold: false
-    italic: false
-    underline: false
+
+  # -- 致谢正文 --
   content:
-    alignment: 两端对齐
-    space_before: 0行
-    space_after: 0行
-    line_spacingrule: 1.5倍行距
-    line_spacing: 1.5倍
-    left_indent: 0字符
-    right_indent: 0字符
-    first_line_indent: 2字符
-    builtin_style_name: 正文
-    chinese_font_name: 宋体
-    english_font_name: Times New Roman
-    font_size: 五号
-    font_color: 黑色
-    bold: false
-    italic: false
-    underline: false
+    <<: *global_format
+    alignment: '两端对齐'
+    font_size: '五号'
+
+# ===========================================================================
+# 标题自动编号
+# ===========================================================================
 numbering:
-  enabled: true
+  enabled: true                     # 总开关：是否启用自动编号
+
+  # -- 一级标题编号（如"第1章"）--
   level_1:
     enabled: true
-    template: '%1'
-    strip_pattern: ^\d+\s*
-    suffix: space
+    template: '%1'                  # %1=本级序号
+    suffix: 'space'                 # 编号后分隔符：tab / space / nothing
+    numbering_indent:               # [可选] 编号缩进，如 '0字符'
+    text_indent:                    # [可选] 文本缩进（悬挂缩进），如 '0.75cm'
+
+  # -- 二级标题编号（如"1.1"）--
   level_2:
     enabled: true
-    template: '%1.%2'
-    strip_pattern: ^\d+(\.\d+)\s*
-    suffix: space
+    template: '%1.%2'               # %1=上级序号, %2=本级序号
+    suffix: 'space'
+    numbering_indent:
+    text_indent:
+
+  # -- 三级标题编号（如"1.1.1"）--
   level_3:
     enabled: true
     template: '%1.%2.%3'
-    strip_pattern: ^\d+(\.\d+){2}\s*
-    suffix: space
+    suffix: 'space'
+    numbering_indent:
+    text_indent:
+
+  # -- 参考文献条目编号（如"[1]"）--
   references:
     enabled: true
     template: '[%1]'
-    suffix: space
+    suffix: 'space'
+    numbering_indent:
+    text_indent:                    # 悬挂缩进，如 '2.2字符'（优先级高于 references.content.first_line_indent）
