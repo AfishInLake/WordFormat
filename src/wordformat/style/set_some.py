@@ -153,9 +153,9 @@ class _SetSpacing:
             spacing.set(qn(f"w:{spacing_type}Lines"), str(lines_100unit))
 
             # 步骤4：清除冲突属性，确保新值生效
-            # 4a. 清除 w:XX twips属性（避免与Lines属性冲突）
-            if spacing.get(qn(f"w:{spacing_type}")) is not None:
-                spacing.attrib.pop(qn(f"w:{spacing_type}"))
+            # 4a. 显式设置 w:XX="0" 覆盖样式级 pt 间距（否则 Word 可能
+            #     忽略 w:XXLines="0" 而回退到样式继承的 pt 间距）
+            spacing.set(qn(f"w:{spacing_type}"), "0")
             # 4b. 清除 w:XXAutospacing 属性（自动间距会覆盖 Lines，导致设置无效）
             autospacing_key = qn(f"w:{spacing_type}Autospacing")
             if spacing.get(autospacing_key) is not None:
@@ -441,17 +441,15 @@ class _SetFirstLineIndent:
         paragraph: Paragraph, value: float | int
     ):
         """
-        设置首行缩进，支持字符/物理单位，写入Word原生XML字段（firstLineChars/firstLine）
+        设置首行缩进（>0）或悬挂缩进（<0），支持字符单位。
+        首行缩进 → w:firstLineChars；悬挂缩进 → w:hangingChars
+
         :param paragraph: 目标段落对象
-        :param value: 缩进值（字符单位为浮点数/整数，如2/2.0；物理单位为整数pt，如24）
-        :return: 设置成功返回True，失败返回False
+        :param value: 缩进值（正数为首行缩进，负数为悬挂缩进，如 -2.2 表示悬挂 2.2 字符）
+        :return: 设置成功返回 True，失败返回 False
         """
         _SetFirstLineIndent.clear(paragraph)
         try:
-            if value < 0:
-                logger.warning("缩进值不能为负，自动置为0")
-                value = 0
-
             p = paragraph._element
             pPr = p.get_or_add_pPr()
 
@@ -471,14 +469,16 @@ class _SetFirstLineIndent:
                 attrs["w:right"] = existing_right
 
             if value == 0:
-                # ✅ 现实主义方案：同时写 firstLine=0 和 firstLineChars=0
-                # 虽然冗余，但能确保 WPS/Word 都清零
                 attrs["w:firstLine"] = "0"
                 attrs["w:firstLineChars"] = "0"
-                attrs["w:hanging"] = "0"  # 顺手清 hanging
-            else:
+                attrs["w:hanging"] = "0"
+            elif value > 0:
                 chars_int = int(round(float(value) * 100))
                 attrs["w:firstLineChars"] = str(chars_int)
+            else:
+                # 悬挂缩进：负值 → 写 w:hangingChars（取绝对值）
+                chars_int = int(round(float(abs(value)) * 100))
+                attrs["w:hangingChars"] = str(chars_int)
 
             attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
             ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501

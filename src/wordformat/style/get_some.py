@@ -270,8 +270,14 @@ def paragraph_get_first_line_indent(paragraph: Paragraph) -> float | None:  # no
 
         # 步骤1：优先解析字符单位 firstLineChars（核心：值=字符数×100）
         first_line_chars = ind.get(qn("w:firstLineChars"))
-        if first_line_chars and first_line_chars.isdigit():
+        if first_line_chars and first_line_chars.lstrip("-").isdigit():
             chars_num = int(first_line_chars) / 100  # 200 → 2.0字符
+            return chars_num
+
+        # 步骤2：解析悬挂缩进 hangingChars（返回负值表示悬挂缩进）
+        hanging_chars = ind.get(qn("w:hangingChars"))
+        if hanging_chars and hanging_chars.isdigit():
+            chars_num = -int(hanging_chars) / 100  # 220 → -2.2字符
             return chars_num
 
         # 无任何缩进设置

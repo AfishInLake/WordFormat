@@ -1,6 +1,6 @@
 # Makefile
 
-.PHONY: help install build server clean tests export-requirements
+.PHONY: help install build build-ui server clean tests export-requirements
 
 PROJECT_ROOT := $(CURDIR)
 
@@ -11,6 +11,7 @@ help:
 	@echo "Targets:"
 	@echo "  install              # Install the project in editable mode with all dev dependencies"
 	@echo "  build                # Run the build script"
+	@echo "  build-ui             # Build Vue UI and copy dist to api/static"
 	@echo "  server               # Start the Uvicorn server"
 	@echo "  clean                # Clean build artifacts"
 	@echo "  tests                # Run the tests using pytest"
@@ -46,6 +47,15 @@ install:
 	@echo "Installing pre-commit hooks..."
 	@.venv/bin/pre-commit install 2>/dev/null || .venv/Scripts/pre-commit.exe install 2>/dev/null || echo "pre-commit install skipped (not found)"
 	@echo "Development environment ready!"
+
+## build-ui: Build Vue UI and copy dist to api/static
+build-ui:
+	@echo "Building Vue UI..."
+	@cd WordFormatUI && npm ci && npm run build
+	@echo "Copying dist to src/wordformat/api/static/..."
+	@rm -rf src/wordformat/api/static/*
+	@cp -r WordFormatUI/dist/* src/wordformat/api/static/
+	@echo "UI build complete."
 
 ## build: Run the build script (scripts/build.bat)
 build: install

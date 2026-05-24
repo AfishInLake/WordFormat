@@ -431,8 +431,8 @@ class TestSetFirstLineIndent:
     def test_clear_no_indent_ok(self, doc):
         _SetFirstLineIndent.clear(doc.add_paragraph())  # no crash
 
-    @pytest.mark.parametrize("val,expected", [(0, 0.0), (-1, 0.0)])
-    def test_zero_and_negative_clamped(self, doc, val, expected):
+    @pytest.mark.parametrize("val,expected", [(0, 0.0), (-1, -1.0)])
+    def test_first_line_and_hanging_indent(self, doc, val, expected):
         p = doc.add_paragraph()
         _SetFirstLineIndent.set_char(p, val)
         assert paragraph_get_first_line_indent(p) == expected
@@ -1159,8 +1159,8 @@ class TestSetSpacingUnits:
         _SetSpacing.set_mm(p, "after", 5.0)
         assert p.paragraph_format.space_after is not None
 
-    def test_set_hang_clears_twips(self, doc):
-        """set_hang clears w:XX twips attribute (lines 136-137)"""
+    def test_set_hang_sets_twips_to_zero(self, doc):
+        """set_hang 写入 w:before="0" 覆盖样式级 pt 间距"""
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
@@ -1169,9 +1169,8 @@ class TestSetSpacingUnits:
         spacing.set(qn("w:before"), "200")
         pPr.append(spacing)
         _SetSpacing.set_hang(p, "before", 0.5)
-        # The twips attribute should be removed
         spacing_after = pPr.find(qn("w:spacing"))
-        assert spacing_after.get(qn("w:before")) is None
+        assert spacing_after.get(qn("w:before")) == "0"
 
 
 class TestSetLineSpacingUnits:

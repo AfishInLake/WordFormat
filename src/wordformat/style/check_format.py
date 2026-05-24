@@ -101,7 +101,7 @@ class CharacterStyle:
         diffs = []
 
         # 1. 加粗
-        bold = bool(run.font.bold)
+        bold = run.font.bold
         if bold != self.bold:
             diffs.append(
                 DIFFResult(
@@ -113,7 +113,7 @@ class CharacterStyle:
                 )
             )
         # 2. 斜体
-        italic = bool(run.font.italic)
+        italic = run.font.italic
         if italic != self.italic:
             diffs.append(
                 DIFFResult(
@@ -126,7 +126,7 @@ class CharacterStyle:
             )
 
         # 3. 下划线
-        underline = bool(run.font.underline)
+        underline = run.font.underline
         if underline != self.underline:
             diffs.append(
                 DIFFResult(

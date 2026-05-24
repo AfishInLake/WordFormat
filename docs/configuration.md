@@ -56,7 +56,7 @@ global_format: &global_format
 ```
 
 ### 3. 摘要及关键词配置（abstract）
-包含中文摘要、英文摘要及对应关键词的统一配置节点。
+包含中文摘要、英文摘要及对应关键词的统一配置节点。关键词通过 `label` 子配置独立控制标签（"关键词：" / "Keywords:"）与内容的格式。
 ```yaml
 abstract:
   chinese:
@@ -75,34 +75,36 @@ abstract:
       <<: *global_format
       alignment: '居中对齐'
       first_line_indent: '0字符'
-      english_font_name: 'Times New Roman'
       font_size: '四号'
       bold: true
     english_content:
       <<: *global_format
       alignment: '两端对齐'
-      english_font_name: 'Times New Roman'
-      font_size: '小四'
   keywords:
     chinese:
       <<: *global_format
       alignment: '左对齐'
       first_line_indent: '0字符'
-      chinese_font_name: '黑体'
-      font_size: '小四'
-      keywords_bold: true
-      count_min: 4
-      count_max: 4
+      font_size: '四号'
+      label:                          # 标签（"关键词："）格式
+        <<: *global_format
+        chinese_font_name: '黑体'
+        font_size: '四号'
+        bold: true
+      count_min: 3
+      count_max: 5
       trailing_punct_forbidden: true
     english:
       <<: *global_format
       alignment: '左对齐'
       first_line_indent: '0字符'
-      english_font_name: 'Times New Roman'
-      font_size: '小四'
-      keywords_bold: true
-      count_min: 4
-      count_max: 4
+      font_size: '四号'
+      label:                          # 标签（"Keywords:"）格式
+        <<: *global_format
+        font_size: '四号'
+        bold: true
+      count_min: 3
+      count_max: 5
       trailing_punct_forbidden: true
 ```
 
@@ -162,22 +164,32 @@ figures:
 ```
 
 ### 7. 表格格式（tables）
-配置表格及其题注的格式，题注默认位于表格上方。
+配置表格题注及表格内容（单元格内文字）的格式。题注默认位于表格上方，`content` 子配置控制表格内文字。
+
 ```yaml
 tables:
   <<: *global_format
   caption_position: 'above'
   caption_prefix: '表'
-  chinese_font_name: '宋体'
   font_size: '五号'
-  english_font_name: 'Times New Roman'
   builtin_style_name: '题注'
   alignment: '居中对齐'
   first_line_indent: '0字符'
+  content:                          # 表格内容格式
+    <<: *global_format
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '五号'
+    line_spacingrule: '单倍行距'
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    space_before: "0行"
+    space_after: "0行"
 ```
 
 ### 8. 参考文献格式（references）
-包含参考文献标题与条目内容的格式，支持编号、缩进、结尾标点控制。
+包含参考文献标题与条目内容的格式。条目支持悬挂缩进（`first_line_indent` 设为负值）。
+
 ```yaml
 references:
   title:
@@ -190,14 +202,15 @@ references:
     section_title: '参考文献'
   content:
     <<: *global_format
-    alignment: '左对齐'
-    first_line_indent: '0字符'
+    alignment: '两端对齐'
+    first_line_indent: '-2.2字符'   # 悬挂缩进（负值）
+    left_indent: '0.26字符'         # 文本之前
     chinese_font_name: '宋体'
     english_font_name: 'Times New Roman'
     font_size: '五号'
-    entry_indent: 0.0
-    entry_ending_punct: '.'
-    numbering_format: '[1], [2], ...'
+    entry_indent: 0.0               # [预留] 暂未启用
+    entry_ending_punct: '.'         # [预留] 暂未启用
+    numbering_format: '[1], [2], ...'  # [预留] 暂未启用
 ```
 
 ### 9. 致谢格式（acknowledgements）
@@ -218,7 +231,7 @@ acknowledgements:
 ```
 
 ### 10. 标题自动编号（numbering）
-控制标题的自动编号功能，包括编号格式、编号与文字的间距、缩进等。仅在格式化模式（`wf af`）下生效。
+控制标题和参考文献条目的自动编号功能，包括编号格式、分隔符、缩进等。仅在格式化模式（`wf af`）下生效。
 
 ```yaml
 numbering:
@@ -226,33 +239,29 @@ numbering:
   level_1:
     enabled: true
     template: '%1'
-    strip_pattern: '^\d+\s+'
-    suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
+    suffix: 'space'                 # tab / space / nothing
+    numbering_indent:               # [可选] 编号缩进，如 '0字符'
+    text_indent:                    # [可选] 文本悬挂缩进
   level_2:
     enabled: true
     template: '%1.%2'
-    strip_pattern: '^\d+(\.\d+)\s+'
     suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
   level_3:
     enabled: true
     template: '%1.%2.%3'
-    strip_pattern: '^\d+(\.\d+){2}\s+'
     suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
+  references:
+    enabled: true
+    template: '[%1]'
+    suffix: 'space'
+    text_indent:                    # 悬挂缩进，如 '2.2字符'
 ```
 
-**编号模板（template）**：使用 `%1`、`%2`、`%3` 占位符表示各级序号，常用格式如 `'%1'`（1 绪论）、`'%1.%2'`（1.1 研究背景）、`'第%1章'`（第一章 绪论）。
+**编号模板（template）**：使用 `%1`、`%2`、`%3` 占位符表示各级序号，常用格式如 `'%1'`（1 绪论）、`'%1.%2'`（1.1 研究背景）、`'第%1章'`（第一章 绪论）、`'[%1]'`（[1] 参考文献条目）。
 
-**清除手动编号（strip_pattern）**：正则表达式，用于清除标题段落开头的手动编号文字。
+**编号之后（suffix）**：控制编号与文字之间的分隔符，可选 `tab`（制表符）、`space`（空格）、`nothing`（无）。
 
-**编号之后（suffix）**：控制编号与标题文字之间的分隔符，可选 `tab`（制表符）、`space`（空格）、`nothing`（无）。
-
-**缩进设置**：`numbering_indent`（编号缩进）和 `text_indent`（文本悬挂缩进）支持厘米、毫米、英寸、磅、字符等多种单位。
+**缩进设置**：`numbering_indent`（编号缩进）和 `text_indent`（文本悬挂缩进）为可选字段，支持厘米、毫米、英寸、磅、字符等多种单位。
 
 > 编号的字体、字号、加粗等样式会自动跟随对应级别标题的 `headings` 配置，无需单独设置。
 
@@ -287,7 +296,7 @@ numbering:
 | line_spacing | 行距数值 | 倍 | 1倍、1.5倍、2倍 |
 | left_indent | 左缩进 | 字符/磅/毫米/厘米/英寸 | 0字符、2字符、20磅 |
 | right_indent | 右缩进 | 字符/磅/毫米/厘米/英寸 | 0字符、2字符 |
-| first_line_indent | 首行缩进 | 字符/磅/毫米/厘米/英寸 | 2字符、20磅 |
+| first_line_indent | 首行缩进（正值）/ 悬挂缩进（负值） | 字符/磅/毫米/厘米/英寸 | 2字符、-2.2字符 |
 | builtin_style_name | Word内置样式名 | - | 正文、Heading 1、Heading 2、题注 |
 
 ### 字符格式字段
@@ -304,7 +313,10 @@ numbering:
 ### 关键词专用字段
 | 配置项 | 说明 | 取值 |
 |-------|------|--------|
-| keywords_bold | 关键词是否加粗 | true/false |
+| label | 关键词标签（"关键词：" / "Keywords:"）的字符格式 | 子配置（继承 global_format 的 15 个字段） |
+| label.bold | 标签是否加粗 | true/false |
+| label.chinese_font_name | 标签中文字体 | 宋体、黑体 等 |
+| label.font_size | 标签字号 | 四号、小四 等 |
 | count_min | 最少关键词数量 | 正整数 |
 | count_max | 最多关键词数量 | 正整数 |
 | trailing_punct_forbidden | 是否禁止末尾标点 | true/false |
@@ -327,11 +339,10 @@ numbering:
 | 配置项 | 说明 | 可选值 |
 |-------|------|--------|
 | enabled | 是否启用自动编号 | true/false |
-| template | 编号模板 | '%1'、'%1.%2'、'%1.%2.%3'、'第%1章' 等 |
-| strip_pattern | 清除手动编号的正则 | 如 '^\d+\s+' |
+| template | 编号模板 | '%1'、'%1.%2'、'%1.%2.%3'、'第%1章'、'[%1]' 等 |
 | suffix | 编号后分隔符 | tab、space、nothing |
-| numbering_indent | 编号缩进 | 带单位的值，如 '0字符'、'0.75cm' |
-| text_indent | 文本悬挂缩进 | 带单位的值，如 '0字符'、'0.75cm' |
+| numbering_indent | [可选] 编号缩进 | 带单位的值，如 '0字符'、'0.75cm' |
+| text_indent | [可选] 文本悬挂缩进 | 带单位的值，如 '0字符'、'0.75cm'、'2.2字符' |
 
 ## 配置继承机制
 使用 YAML 锚点 `&` 与引用 `<<:` 实现样式复用：
