@@ -123,7 +123,7 @@ def extract_unit_from_string(text: str) -> UnitResult:
         r"字符",
         r"倍",
     ]
-    combined_pattern = r"(?i)(\d+\.?\d*)\s*(?:{})".format("|".join(unit_patterns))
+    combined_pattern = r"(?i)(-?\d+\.?\d*)\s*(?:{})".format("|".join(unit_patterns))
     match = re.search(combined_pattern, text)
 
     if match:
@@ -131,7 +131,7 @@ def extract_unit_from_string(text: str) -> UnitResult:
         result.value = float(match.group(1))
         # 提取原始单位
         full_match = match.group(0)
-        result.original_unit = re.sub(r"(?i)\d+\.?\d*\s*", "", full_match).strip()
+        result.original_unit = re.sub(r"(?i)-?\d+\.?\d*\s*", "", full_match).strip()
         # 转换为标准化单位
         result.standard_unit = unit_mapping.get(result.original_unit, None)
         # 标记为合法

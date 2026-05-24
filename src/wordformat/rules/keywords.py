@@ -146,17 +146,16 @@ class KeywordsEN(BaseKeywordsNode):
             self._split_mixed_runs()
 
         # 4. 字符样式检查（区分标签/内容）
-        # (a) "Keywords:" 标签 —— 加粗
+        label_cfg = cfg.label
         label_style = CharacterStyle(
-            font_name_cn=cfg.chinese_font_name,
-            font_name_en=cfg.english_font_name,
-            font_size=cfg.font_size,
-            font_color=cfg.font_color,
-            bold=cfg.keywords_bold,  # 修复拼写错误：kewords → keywords
-            italic=cfg.italic,
-            underline=cfg.underline,
+            font_name_cn=label_cfg.chinese_font_name,
+            font_name_en=label_cfg.english_font_name,
+            font_size=label_cfg.font_size,
+            font_color=label_cfg.font_color,
+            bold=label_cfg.bold,
+            italic=label_cfg.italic,
+            underline=label_cfg.underline,
         )
-        # (b) 关键词内容 —— 不加粗
         content_style = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
             font_name_en=cfg.english_font_name,
@@ -260,17 +259,16 @@ class KeywordsCN(BaseKeywordsNode):
             self._split_mixed_runs()
 
         # 4. 字符样式检查（区分标签/内容）
-        # (a) "关键词：" 标签 —— 加粗（修复拼写错误：kewords_bold → kewords_bold）
+        label_cfg = cfg.label
         label_style = CharacterStyle(
-            font_name_cn=cfg.chinese_font_name,
-            font_name_en=cfg.english_font_name,
-            font_size=cfg.font_size,
-            font_color=cfg.font_color,
-            bold=cfg.keywords_bold,  # 原代码拼写错误：kewords → keywords
-            italic=cfg.italic,
-            underline=cfg.underline,
+            font_name_cn=label_cfg.chinese_font_name,
+            font_name_en=label_cfg.english_font_name,
+            font_size=label_cfg.font_size,
+            font_color=label_cfg.font_color,
+            bold=label_cfg.bold,
+            italic=label_cfg.italic,
+            underline=label_cfg.underline,
         )
-        # (b) 关键词内容 —— 不加粗
         content_style = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
             font_name_en=cfg.english_font_name,

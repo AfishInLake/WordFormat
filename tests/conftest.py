@@ -141,18 +141,25 @@ abstract:
       alignment: '两端对齐'
   keywords:
     chinese:
+      label:
+        chinese_font_name: '黑体'
+        font_size: '三号'
+        bold: true
       alignment: '左对齐'
       first_line_indent: '0字符'
-      chinese_font_name: '黑体'
+      chinese_font_name: '宋体'
       font_size: '小四'
-      keywords_bold: true
+      bold: false
       count_min: 3
       count_max: 5
     english:
+      label:
+        font_size: '三号'
+        bold: true
       alignment: '左对齐'
       first_line_indent: '0字符'
       font_size: '小四'
-      keywords_bold: true
+      bold: false
       count_min: 3
       count_max: 5
 headings:
@@ -182,6 +189,8 @@ figures:
 tables:
   caption_position: 'above'
   caption_prefix: '表'
+  content:
+    font_size: '五号'
 references:
   title:
     alignment: '居中对齐'

@@ -14,197 +14,352 @@ style_checks_warning:
   right_indent: false
   first_line_indent: false
   builtin_style_name: false
-
-# 全局页面格式（正文通用）
-global_format: &global_format
-  alignment: '两端对齐'
-  space_before: "0行"
-  space_after: "0行"
-  line_spacingrule: "1.5倍行距"
-  line_spacing: '1.5倍'
-  left_indent: "0字符"
-  right_indent: "0字符"
-  first_line_indent: '2字符'
-  builtin_style_name: '正文'
-  chinese_font_name: '宋体'
-  english_font_name: 'Times New Roman'
-  font_size: '小四'
-  font_color: '黑色'
+global_format:
+  alignment: 两端对齐
+  space_before: 0行
+  space_after: 0行
+  line_spacingrule: 1.5倍行距
+  line_spacing: 1.5倍
+  left_indent: 0字符
+  right_indent: 0字符
+  first_line_indent: 2字符
+  builtin_style_name: 正文
+  chinese_font_name: 宋体
+  english_font_name: Times New Roman
+  font_size: 小四
+  font_color: 黑色
   bold: false
   italic: false
   underline: false
-
-# 摘要部分（中英文）
 abstract:
   chinese:
     chinese_title:
-      <<: *global_format
-      alignment: '居中对齐'
-      first_line_indent: '0字符'
-      chinese_font_name: '黑体'
-      font_size: '小二'
+      alignment: 居中对齐
+      space_before: 0行
+      space_after: 0行
+      line_spacingrule: 1.5倍行距
+      line_spacing: 1.5倍
+      left_indent: 0字符
+      right_indent: 0字符
+      first_line_indent: 0字符
+      builtin_style_name: 正文
+      chinese_font_name: 黑体
+      english_font_name: Times New Roman
+      font_size: 四号
+      font_color: 黑色
       bold: false
+      italic: false
+      underline: false
     chinese_content:
-      <<: *global_format
-      alignment: '两端对齐'
+      alignment: 两端对齐
+      space_before: 0行
+      space_after: 0行
+      line_spacingrule: 1.5倍行距
+      line_spacing: 1.5倍
+      left_indent: 0字符
+      right_indent: 0字符
+      first_line_indent: 2字符
+      builtin_style_name: 正文
+      chinese_font_name: 宋体
+      english_font_name: Times New Roman
+      font_size: 小四
+      font_color: 黑色
+      bold: false
+      italic: false
+      underline: false
   english:
     english_title:
-      <<: *global_format
-      alignment: '居中对齐'
-      first_line_indent: '0字符'
-      english_font_name: 'Times New Roman'
-      font_size: '小四'
-      bold: true
+      alignment: 居中对齐
+      space_before: 0行
+      space_after: 0行
+      line_spacingrule: 1.5倍行距
+      line_spacing: 1.5倍
+      left_indent: 0字符
+      right_indent: 0字符
+      first_line_indent: 0字符
+      builtin_style_name: 正文
+      chinese_font_name: 宋体
+      english_font_name: Times New Roman
+      font_size: 四号
+      font_color: 黑色
+      bold: false
+      italic: false
+      underline: false
     english_content:
-      <<: *global_format
-      alignment: '两端对齐'
-      english_font_name: 'Times New Roman'
-      font_size: '小四'
+      alignment: 两端对齐
+      space_before: 0行
+      space_after: 0行
+      line_spacingrule: 1.5倍行距
+      line_spacing: 1.5倍
+      left_indent: 0字符
+      right_indent: 0字符
+      first_line_indent: 2字符
+      builtin_style_name: 正文
+      chinese_font_name: 宋体
+      english_font_name: Times New Roman
+      font_size: 小四
+      font_color: 黑色
+      bold: false
+      italic: false
+      underline: false
   keywords:
     chinese:
-      <<: *global_format
-      alignment: '左对齐'
-      first_line_indent: '0字符'
-      chinese_font_name: '黑体'
-      font_size: '四号'
-      keywords_bold: true
+      alignment: 两端对齐
+      space_before: 0行
+      space_after: 0行
+      line_spacingrule: 1.5倍行距
+      line_spacing: 1.5倍
+      left_indent: 0字符
+      right_indent: 0字符
+      first_line_indent: 2字符
+      builtin_style_name: 正文
+      chinese_font_name: 宋体
+      english_font_name: Times New Roman
+      font_size: 小四
+      font_color: 黑色
+      bold: false
+      italic: false
+      underline: false
+      keywords_bold: false
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
+      label:
+        chinese_font_name: '黑体'
+        font_size: '四号'
+        bold: false
     english:
-      <<: *global_format
-      alignment: '左对齐'
-      first_line_indent: '0字符'
-      english_font_name: 'Times New Roman'
-      font_size: '四号'
-      keywords_bold: true
+      alignment: 两端对齐
+      space_before: 0行
+      space_after: 0行
+      line_spacingrule: 1.5倍行距
+      line_spacing: 1.5倍
+      left_indent: 0字符
+      right_indent: 0字符
+      first_line_indent: 2字符
+      builtin_style_name: 正文
+      chinese_font_name: 宋体
+      english_font_name: Times New Roman
+      font_size: 小四
+      font_color: 黑色
+      bold: false
+      italic: false
+      underline: false
+      keywords_bold: false
       count_min: 3
       count_max: 5
       trailing_punct_forbidden: true
-
-# 各级标题格式（章、节、小节）
+      label:
+        font_size: '四号'
+        bold: false
 headings:
   level_1:
-    <<: *global_format
-    alignment: '居中对齐'
-    first_line_indent: '0字符'
-    chinese_font_name: '黑体'
-    english_font_name: 'Times New Roman'
-    font_size: '小二'
+    alignment: 居中对齐
+    space_before: 0.5行
+    space_after: 0.5行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0字符
+    right_indent: 0字符
+    first_line_indent: 0字符
+    builtin_style_name: Heading 1
+    chinese_font_name: 黑体
+    english_font_name: Times New Roman
+    font_size: 小二
+    font_color: 黑色
     bold: false
-    space_before: "0.5行"
-    space_after: "0.5行"
-    line_spacingrule: "1.5倍行距"
-    line_spacing: '1.5倍'
-    builtin_style_name: 'Heading 1'
-
+    italic: false
+    underline: false
   level_2:
-    <<: *global_format
-    alignment: '左对齐'
-    first_line_indent: '0字符'
-    chinese_font_name: '黑体'
-    english_font_name: 'Times New Roman'
-    font_size: '三号'
-    font_color: '黑色'
+    alignment: 左对齐
+    space_before: 0行
+    space_after: 0行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0字符
+    right_indent: 0字符
+    first_line_indent: 0字符
+    builtin_style_name: Heading 2
+    chinese_font_name: 黑体
+    english_font_name: Times New Roman
+    font_size: 三号
+    font_color: 黑色
     bold: false
-    space_before: "0.5行"
-    space_after: "0.5行"
-    line_spacingrule: "1.5倍行距"
-    line_spacing: '1.5倍'
-    builtin_style_name: 'Heading 2'
-
+    italic: false
+    underline: false
   level_3:
-    <<: *global_format
-    alignment: '左对齐'
-    first_line_indent: '0字符'
-    chinese_font_name: '黑体'
-    english_font_name: 'Times New Roman'
-    font_size: '小四'
-    font_color: '黑色'
+    alignment: 左对齐
+    space_before: 0行
+    space_after: 0行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0字符
+    right_indent: 0字符
+    first_line_indent: 0字符
+    builtin_style_name: Heading 3
+    chinese_font_name: 黑体
+    english_font_name: Times New Roman
+    font_size: 小四
+    font_color: 黑色
     bold: false
-    space_before: "0.5行"
-    space_after: "0.5行"
-    line_spacingrule: "1.5倍行距"
-    line_spacing: '1.5倍'
-    builtin_style_name: 'Heading 3'
-
-# 正文段落格式
+    italic: false
+    underline: false
 body_text:
-  <<: *global_format
-
-# 插图（Figure）格式
+  alignment: 两端对齐
+  space_before: 0行
+  space_after: 0行
+  line_spacingrule: 1.5倍行距
+  line_spacing: 1.5倍
+  left_indent: 0字符
+  right_indent: 0字符
+  first_line_indent: 2字符
+  builtin_style_name: 正文
+  chinese_font_name: 宋体
+  english_font_name: Times New Roman
+  font_size: 小四
+  font_color: 黑色
+  bold: false
+  italic: false
+  underline: false
 figures:
-  <<: *global_format
-  caption_position: 'below'
-  caption_prefix: '图'
-  font_size: '五号'
-  builtin_style_name: '题注'
-  alignment: '居中对齐'
-  first_line_indent: '0字符'
-
-# 表格（Table）格式
+  alignment: 居中对齐
+  space_before: 0行
+  space_after: 0行
+  line_spacingrule: 1.5倍行距
+  line_spacing: 1.5倍
+  left_indent: 0字符
+  right_indent: 0字符
+  first_line_indent: 0字符
+  builtin_style_name: 题注
+  chinese_font_name: 宋体
+  english_font_name: Times New Roman
+  font_size: 五号
+  font_color: 黑色
+  bold: false
+  italic: false
+  underline: false
+  caption_position: below
+  caption_prefix: 图
 tables:
-  <<: *global_format
-  caption_position: 'above'
-  caption_prefix: '表'
-  chinese_font_name: '宋体'
-  font_size: '五号'
-  english_font_name: 'Times New Roman'
-  builtin_style_name: '题注'
-  alignment: '居中对齐'
-  first_line_indent: '0字符'
-
-# 参考文献（References）
-references:
-  title:
-    <<: *global_format
-    alignment: '居中对齐'
-    first_line_indent: '0字符'
-    chinese_font_name: '黑体'
-    font_size: '三号'
-    bold: false
+  alignment: 居中对齐
+  space_before: 0行
+  space_after: 0行
+  line_spacingrule: 1.5倍行距
+  line_spacing: 1.5倍
+  left_indent: 0字符
+  right_indent: 0字符
+  first_line_indent: 0字符
+  builtin_style_name: 题注
+  chinese_font_name: 宋体
+  english_font_name: Times New Roman
+  font_size: 五号
+  font_color: 黑色
+  bold: false
+  italic: false
+  underline: false
+  caption_position: above
+  caption_prefix: 表
   content:
-    <<: *global_format
-    alignment: '左对齐'
-    first_line_indent: '0字符'
     chinese_font_name: '宋体'
     english_font_name: 'Times New Roman'
     font_size: '五号'
-    entry_indent: 0.0
-    entry_ending_punct: '.'
-    numbering_format: '[1], [2], ...'
-
-# 致谢（Acknowledgements）
-acknowledgements:
-  title:
-    <<: *global_format
+    line_spacingrule: '1.5倍行距'
     alignment: '居中对齐'
     first_line_indent: '0字符'
-    chinese_font_name: '黑体'
-    font_size: '小二'
+    space_before: "0行"
+    space_after: "0行"
+references:
+  title:
+    alignment: 居中对齐
+    space_before: 0行
+    space_after: 0行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0字符
+    right_indent: 0字符
+    first_line_indent: 0字符
+    builtin_style_name: 正文
+    chinese_font_name: 黑体
+    english_font_name: Times New Roman
+    font_size: 三号
+    font_color: 黑色
     bold: false
+    italic: false
+    underline: false
+    section_title: 参考文献
   content:
-    <<: *global_format
-    alignment: '两端对齐'
-    first_line_indent: '2字符'
-    font_size: '五号'
-
-# 标题自动编号（已启用）
+    alignment: 两端对齐
+    space_before: 0行
+    space_after: 0行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0.26字符
+    right_indent: 0字符
+    first_line_indent: -2.2字符
+    builtin_style_name: 正文
+    chinese_font_name: 宋体
+    english_font_name: Times New Roman
+    font_size: 五号
+    font_color: 黑色
+    bold: false
+    italic: false
+    underline: false
+    entry_indent: 0
+    entry_ending_punct: .
+    numbering_format: '[1], [2], ...'
+acknowledgements:
+  title:
+    alignment: 居中对齐
+    space_before: 0行
+    space_after: 0行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0字符
+    right_indent: 0字符
+    first_line_indent: 0字符
+    builtin_style_name: 正文
+    chinese_font_name: 黑体
+    english_font_name: Times New Roman
+    font_size: 小二
+    font_color: 黑色
+    bold: false
+    italic: false
+    underline: false
+  content:
+    alignment: 两端对齐
+    space_before: 0行
+    space_after: 0行
+    line_spacingrule: 1.5倍行距
+    line_spacing: 1.5倍
+    left_indent: 0字符
+    right_indent: 0字符
+    first_line_indent: 2字符
+    builtin_style_name: 正文
+    chinese_font_name: 宋体
+    english_font_name: Times New Roman
+    font_size: 五号
+    font_color: 黑色
+    bold: false
+    italic: false
+    underline: false
 numbering:
   enabled: true
   level_1:
     enabled: true
     template: '%1'
-    suffix: 'space'
+    strip_pattern: ^\d+\s*
+    suffix: space
   level_2:
     enabled: true
     template: '%1.%2'
-    suffix: 'space'
+    strip_pattern: ^\d+(\.\d+)\s*
+    suffix: space
   level_3:
     enabled: true
     template: '%1.%2.%3'
-    suffix: 'space'
+    strip_pattern: ^\d+(\.\d+){2}\s*
+    suffix: space
   references:
     enabled: true
     template: '[%1]'
-    suffix: 'space'
+    suffix: space

@@ -95,11 +95,16 @@ class GlobalFormatConfig(BaseModel):
 
 
 # -------------------------- 摘要配置模型 --------------------------
-class KeywordsConfig(GlobalFormatConfig):
-    """关键词配置模型（继承全局格式）"""
+class KeywordLabelConfig(GlobalFormatConfig):
+    """关键词标签格式配置（"关键词："或"Keywords:"部分的字符格式）"""
 
-    # 关键词特有配置
-    keywords_bold: bool = Field(default=True, description="关键字加粗")
+
+class KeywordsConfig(GlobalFormatConfig):
+    """关键词配置模型（继承全局格式，用于关键词内容部分）"""
+
+    label: KeywordLabelConfig = Field(
+        default_factory=KeywordLabelConfig, description="关键词标签的字符格式"
+    )
     count_min: int = Field(default=4, description="最小关键字数")
     count_max: int = Field(default=4, description="最大关键字数")
     trailing_punct_forbidden: bool = Field(default=True, description="禁止最后有标点")
@@ -207,13 +212,20 @@ class FiguresConfig(GlobalFormatConfig):
 
 
 # -------------------------- 表格配置模型 --------------------------
+class TableContentConfig(GlobalFormatConfig):
+    """表格内容格式配置（表格内单元格文字的字体、字号、行距等）"""
+
+
 class TablesConfig(GlobalFormatConfig):
-    """表格配置"""
+    """表格配置（题注格式 + 表格内容格式）"""
 
     caption_position: Literal["above", "below"] = Field(
         default="above", description="表注位置"
     )
     caption_prefix: Optional[str] = Field(default="表", description="表注编号前缀")
+    content: TableContentConfig = Field(
+        default_factory=TableContentConfig, description="表格内容格式"
+    )
 
 
 # -------------------------- 参考文献配置模型 --------------------------

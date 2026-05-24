@@ -10,6 +10,7 @@
 
 import re
 from collections import deque
+from copy import deepcopy
 
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -41,9 +42,11 @@ def create_citation_hyperlinks(root_node, document):
         para = getattr(entry, "paragraph", None)
         if para is None:
             bookmark_names.append(None)
+            logger.warning(f"参考文献条目 #{i} 未匹配到段落，跳过书签创建")
             continue
         bm_name = f"_Ref{i}"
-        _insert_bookmark(para, bm_name, i)
+        bm_id = _next_bookmark_id()
+        _insert_bookmark(para, bm_name, bm_id)
         bookmark_names.append(bm_name)
 
     # 3. 遍历正文段落，将引用标记包裹为超链接
@@ -126,16 +129,76 @@ def _insert_bookmark(paragraph, bookmark_name: str, bookmark_id: int):
 # ---------------------------------------------------------------------------
 
 
-def _wrap_citations_in_hyperlinks(paragraph, bookmark_names: list):
+def _wrap_citations_in_hyperlinks(paragraph, bookmark_names: list):  # noqa: C901
     """将段落中匹配引用标记的 run 包裹为超链接。
+
+    分两步：
+      1. 先扫描所有 run，将含有引用标记的混合 run 拆分为独立 run
+         （作为 _apply_citation_superscript 未覆盖到的兜底处理）
+      2. 再遍历拆分后的 run，将独立的引用标记包裹为超链接
 
     Args:
         paragraph: docx Paragraph 对象
         bookmark_names: 与引用编号对应的书签名列表（1-indexed）
     """
     para_elem = paragraph._element
-    # 使用列表快照，因为我们会修改 paragraph.runs
+
+    # ---- 第 1 步：拆分包含引用标记的混合 run ----
     r_elems = list(para_elem.findall(qn("w:r")))
+    for r_elem in r_elems:
+        t_elem = r_elem.find(qn("w:t"))
+        if t_elem is None or t_elem.text is None:
+            continue
+        text = t_elem.text
+
+        # 查找所有引用标记位置
+        citation_spans = [
+            (m.start(), m.end()) for m in _CITATION_PATTERN.finditer(text)
+        ]
+        if not citation_spans:
+            continue
+
+        # 如果整个 run 就是引用标记，无需拆分
+        if len(citation_spans) == 1 and citation_spans[0] == (0, len(text)):
+            continue
+
+        # 按引用边界切分
+        rPr = deepcopy(r_elem.find(qn("w:rPr")))
+        split_points = set()
+        for c_start, c_end in citation_spans:
+            if c_start > 0:
+                split_points.add(c_start)
+            if c_end < len(text):
+                split_points.add(c_end)
+
+        segments = []
+        last = 0
+        for pos in sorted(split_points):
+            segments.append((last, pos))
+            last = pos
+        segments.append((last, len(text)))
+
+        # 更新当前 run 为第一段
+        t_elem.text = text[segments[0][0] : segments[0][1]]
+
+        # 为后续段创建新 run
+        ref = r_elem
+        for seg_start, seg_end in segments[1:]:
+            seg_text = text[seg_start:seg_end]
+            if not seg_text:
+                continue
+            new_r = OxmlElement("w:r")
+            if rPr is not None:
+                new_r.append(deepcopy(rPr))
+            new_t = OxmlElement("w:t")
+            new_t.text = seg_text
+            new_r.append(new_t)
+            ref.addnext(new_r)
+            ref = new_r
+
+    # ---- 第 2 步：将独立的引用 run 包裹为超链接 ----
+    r_elems = list(para_elem.findall(qn("w:r")))
+    skipped_count = 0
 
     for r_elem in r_elems:
         t_elem = r_elem.find(qn("w:t"))
@@ -149,12 +212,24 @@ def _wrap_citations_in_hyperlinks(paragraph, bookmark_names: list):
 
         # 提取引用编号
         ref_nums = _parse_ref_numbers(text)
-        if not ref_nums or ref_nums[0] > len(bookmark_names):
+        if not ref_nums:
+            skipped_count += 1
+            continue
+
+        if ref_nums[0] > len(bookmark_names):
+            logger.debug(
+                f"引用 {text} 编号超出参考文献总数 ({len(bookmark_names)})，跳过"
+            )
+            skipped_count += 1
             continue
 
         # 链接到第一个引用编号对应的参考文献
         anchor = bookmark_names[ref_nums[0] - 1]
         if anchor is None:
+            logger.debug(
+                f"引用 {text} 对应的参考文献条目 #{ref_nums[0]} 缺少书签，跳过"
+            )
+            skipped_count += 1
             continue
 
         # 在 rPr 中添加 Hyperlink 字符样式（保留已有格式如上标）
@@ -171,9 +246,11 @@ def _wrap_citations_in_hyperlinks(paragraph, bookmark_names: list):
         hyperlink = OxmlElement("w:hyperlink")
         hyperlink.set(qn("w:anchor"), anchor)
         hyperlink.set(qn("w:history"), "1")
-        # 将 hyperlink 插入到 r_elem 之前，再将 r_elem 移入 hyperlink
         r_elem.addprevious(hyperlink)
         hyperlink.append(r_elem)
+
+    if skipped_count > 0:
+        logger.debug(f"段落中有 {skipped_count} 个引用标记未创建超链接")
 
 
 def _parse_ref_numbers(text: str) -> list[int]:

@@ -215,6 +215,21 @@ class TestLoadConfig:
         assert node._pydantic_config is not None
         assert node._pydantic_config.caption_position == "above"
 
+    def test_table_content_config(self, root_config):
+        """TablesConfig 的 content 字段默认加载。"""
+        node = _make_node(CaptionTable)
+        node.load_config(root_config)
+        assert node._pydantic_config.content is not None
+        assert node._pydantic_config.content.font_size == "五号"
+
+    def test_table_content_config_default(self):
+        """TablesConfig 的 content 有默认值。"""
+        from wordformat.config.datamodel import TablesConfig
+
+        cfg = TablesConfig()
+        assert cfg.content is not None
+        assert cfg.content.font_size == "小四"  # GlobalFormatConfig 默认值
+
     def test_references(self, root_config):
         node = _make_node(References)
         node.load_config(root_config)
@@ -255,14 +270,14 @@ class TestLoadConfig:
         node = _make_node(KeywordsEN)
         node.load_config(raw)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.keywords_bold is True
+        assert node._pydantic_config.label.bold is False  # 默认值
 
     def test_keywords_cn_from_node_config_root(self, root_config):
         """KeywordsCN 从 NodeConfigRoot 加载时使用 chinese 子配置。"""
         node = _make_node(KeywordsCN)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.chinese_font_name == "黑体"
+        assert node._pydantic_config.label.chinese_font_name == "黑体"
 
     def test_keywords_en_from_node_config_root(self, root_config):
         """KeywordsEN 从 NodeConfigRoot 加载时使用 english 子配置。"""
