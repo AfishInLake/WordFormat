@@ -128,9 +128,9 @@ python scripts/validate_config.py --config config.yaml
 |------|------|--------|
 | `space_before` | 行/磅/厘米/毫米/英寸 | `"0行"` `"0.5行"` `"12磅"` `"0.5cm"` |
 | `space_after` | 同上 | `"0行"` `"0.5行"` `"12磅"` |
-| `left_indent` | 字符/磅/厘米/毫米/英寸 | `"0字符"` `"2字符"` `"20磅"` |
+| `left_indent` | 字符/磅/厘米/毫米/英寸 | `"0字符"` `"2字符"` `"0.26字符"` |
 | `right_indent` | 同上 | `"0字符"` `"2字符"` |
-| `first_line_indent` | 同上 | `"0字符"` `"2字符"` `"20磅"` |
+| `first_line_indent` | 同上 | 正值为首行缩进：`"2字符"`；**负值为悬挂缩进**：`"-2.2字符"` |
 
 ### 标题自动编号（numbering）
 
@@ -138,7 +138,6 @@ python scripts/validate_config.py --config config.yaml
 |------|------|--------|------|
 | `enabled` | bool | `true` / `false` | 是否启用自动编号（总开关） |
 | `template` | string | `'%1'` `'%1.%2'` `'%1.%2.%3'` `'第%1章'` 等 | 编号模板，`%1`=本级序号 |
-| `strip_pattern` | string | 正则表达式 | 清除手动编号，如 `'^\d+\s+'` |
 | `suffix` | string | `tab` / `space` / `nothing` | 编号之后的分隔符 |
 | `numbering_indent` | string | 带单位的值 | 编号缩进，如 `'0字符'` `'0.75cm'` |
 | `text_indent` | string | 带单位的值 | 文本悬挂缩进，如 `'0字符'` `'0.75cm'` |
@@ -151,7 +150,12 @@ python scripts/validate_config.py --config config.yaml
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `keywords_bold` | bool | 关键词文字是否加粗 |
+| `label` | KeywordLabelConfig | 关键词标签（"关键词：" / "Keywords:"）的字符格式配置 |
+| `label.chinese_font_name` | string | 标签中文字体 |
+| `label.english_font_name` | string | 标签英文字体 |
+| `label.font_size` | string/number | 标签字号 |
+| `label.bold` | bool | 标签是否加粗 |
+| `label.font_color` | string | 标签字体颜色 |
 | `count_min` | int | 最少关键词数量（必须 > 0） |
 | `count_max` | int | 最多关键词数量（必须 > 0） |
 | `trailing_punct_forbidden` | bool | 是否禁止最后一个关键词后有标点 |
@@ -209,17 +213,32 @@ global_format: &global_format
   line_spacing: '20磅'
 ```
 
-### 示例 4：修改关键词数量为 3~6 个
+### 示例 4：修改关键词标签为黑体加粗，内容为宋体不加粗
 
 ```yaml
 abstract:
   keywords:
     chinese:
       <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '0字符'
+      font_size: '四号'
+      label:
+        <<: *global_format
+        chinese_font_name: '黑体'
+        font_size: '四号'
+        bold: true
       count_min: 3
       count_max: 6
     english:
       <<: *global_format
+      alignment: '左对齐'
+      first_line_indent: '0字符'
+      font_size: '四号'
+      label:
+        <<: *global_format
+        font_size: '四号'
+        bold: true
       count_min: 3
       count_max: 6
 ```
@@ -237,18 +256,41 @@ figures:
   builtin_style_name: '题注'
 ```
 
-### 示例 6：参考文献条目悬挂缩进
+### 示例 6：修改表格内容格式（单元格内文字五号、单倍行距）
+
+```yaml
+tables:
+  <<: *global_format
+  caption_position: 'above'
+  caption_prefix: '表'
+  font_size: '五号'
+  builtin_style_name: '题注'
+  alignment: '居中对齐'
+  first_line_indent: '0字符'
+  content:
+    <<: *global_format
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '五号'
+    line_spacingrule: '单倍行距'
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+```
+
+### 示例 7：参考文献条目悬挂缩进 2.2 字符
 
 ```yaml
 references:
   content:
     <<: *global_format
-    entry_indent: 0.0
-    entry_ending_punct: '.'
-    numbering_format: '[1], [2], ...'
+    alignment: '两端对齐'
+    first_line_indent: '-2.2字符'   # 负值 = 悬挂缩进
+    left_indent: '0.26字符'         # 文本之前微调
+    chinese_font_name: '宋体'
+    font_size: '五号'
 ```
 
-### 示例 7：启用标题自动编号（阿拉伯数字 + 空格分隔）
+### 示例 8：启用标题编号（阿拉伯数字 + 空格分隔）
 
 ```yaml
 numbering:
@@ -256,45 +298,30 @@ numbering:
   level_1:
     enabled: true
     template: '%1'
-    strip_pattern: '^\d+\s+'
     suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
   level_2:
     enabled: true
     template: '%1.%2'
-    strip_pattern: '^\d+(\.\d+)\s+'
     suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
   level_3:
     enabled: true
     template: '%1.%2.%3'
-    strip_pattern: '^\d+(\.\d+){2}\s+'
     suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
+  references:
+    enabled: true
+    template: '[%1]'
+    suffix: 'space'
 ```
 
-### 示例 8：启用标题自动编号（中文"第X章" + 制表符分隔 + 缩进）
+### 示例 9：二级标题段前段后设为 0 行
 
 ```yaml
-numbering:
-  enabled: true
-  level_1:
-    enabled: true
-    template: '第%1章'
-    strip_pattern: '^第[一二三四五六七八九十百千零]+章\s*'
-    suffix: 'tab'
-    numbering_indent: '0.75cm'
-    text_indent: '0.75cm'
+headings:
   level_2:
-    enabled: true
-    template: '%1.%2'
-    strip_pattern: '^\d+(\.\d+)\s+'
-    suffix: 'space'
-    numbering_indent: '0字符'
-    text_indent: '0字符'
+    <<: *global_format
+    space_before: "0行"
+    space_after: "0行"
+    builtin_style_name: 'Heading 2'
 ```
 
 ---
