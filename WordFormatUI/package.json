@@ -1,0 +1,20 @@
+{
+  "dependencies": {
+    "axios": "^1.13.5",
+    "js-yaml": "^4.1.1",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.3"
+  },
+  "name": "wordformatui",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}

@@ -25,3 +25,5 @@ dist
 build
 src/wordformat/data/model/*.onnx
 src/wordformat.egg-info
+node_modules/
+.env

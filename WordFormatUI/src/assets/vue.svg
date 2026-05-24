@@ -1,0 +1,44 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <!-- 渐变背景 -->
+    <defs>
+        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#4F46E5"/>
+            <stop offset="100%" stop-color="#7C3AED"/>
+        </linearGradient>
+        <linearGradient id="docGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#FFFFFF"/>
+            <stop offset="100%" stop-color="#F9FAFB"/>
+        </linearGradient>
+    </defs>
+
+    <!-- 背景圆角矩形 -->
+    <rect x="12" y="12" width="104" height="104" rx="24" fill="url(#bgGradient)"/>
+
+    <!-- 阴影效果 -->
+    <rect x="16" y="16" width="96" height="96" rx="20" fill="rgba(0,0,0,0.1)"/>
+
+    <!-- 主文档形状 -->
+    <path d="M28 28 L100 28 L100 100 L28 100 Z" fill="url(#docGradient)" stroke="#E5E7EB" stroke-width="2"/>
+
+    <!-- 文档折角效果 -->
+    <path d="M85 28 L100 43 L85 43 Z" fill="#E5E7EB"/>
+
+    <!-- 格式化文本行 -->
+    <g stroke="#4F46E5" stroke-width="2.5" stroke-linecap="round">
+        <line x1="38" y1="42" x2="90" y2="42"/>
+        <line x1="38" y1="52" x2="75" y2="52"/>
+        <line x1="38" y1="62" x2="90" y2="62"/>
+        <line x1="38" y1="72" x2="80" y2="72"/>
+        <line x1="38" y1="82" x2="70" y2="82"/>
+    </g>
+
+    <!-- 装饰性格式化图标 -->
+    <g fill="#10B981">
+        <!-- 复选标记 -->
+        <path d="M85 75 L89 79 L95 73" stroke="#10B981" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="90" cy="76" r="12" fill="none" stroke="#10B981" stroke-width="2"/>
+    </g>
+
+    <!-- 高光效果 -->
+    <path d="M32 32 L96 32 L96 36 L32 36 Z" fill="rgba(255,255,255,0.3)" opacity="0.6"/>
+</svg>
