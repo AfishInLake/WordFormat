@@ -1,29 +1,9 @@
 <template>
   <div class="references-config">
     <h3>参考文献标题</h3>
-    <div class="grid grid-cols-2 gap-4 mb-4">
-      <div class="form-item">
-        <label>章节标题:</label>
-        <input type="text" v-model="config.title.section_title">
-      </div>
-    </div>
     <FormatConfig :config="config.title" />
 
     <h3 class="mt-4">参考文献内容</h3>
-    <div class="grid grid-cols-2 gap-4 mb-4">
-      <div class="form-item">
-        <label>编号格式:</label>
-        <input type="text" v-model="config.content.numbering_format">
-      </div>
-      <div class="form-item">
-        <label>条目首行缩进量:</label>
-        <input type="number" step="0.1" v-model.number="config.content.entry_indent">
-      </div>
-      <div class="form-item">
-        <label>条目结束标点:</label>
-        <input type="text" v-model="config.content.entry_ending_punct">
-      </div>
-    </div>
     <FormatConfig :config="config.content" />
   </div>
 </template>

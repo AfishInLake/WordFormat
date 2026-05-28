@@ -167,7 +167,6 @@ figures:
   builtin_style_name: '题注'
   alignment: '居中对齐'
   first_line_indent: '0字符'
-  caption_position: 'below'
   caption_prefix: '图'
 
 # ===========================================================================
@@ -179,7 +178,6 @@ tables:
   builtin_style_name: '题注'
   alignment: '居中对齐'
   first_line_indent: '0字符'
-  caption_position: 'above'
   caption_prefix: '表'
   # -- 表格内容格式（单元格内文字）--
   content:
@@ -204,7 +202,6 @@ references:
     chinese_font_name: '黑体'
     font_size: '三号'
     bold: true
-    section_title: '参考文献'
   content:
     <<: *global_format
     alignment: '两端对齐'
@@ -213,10 +210,6 @@ references:
     chinese_font_name: '宋体'
     english_font_name: 'Times New Roman'
     font_size: '五号'
-    # 以下字段为预留字段，当前暂未启用：
-    entry_indent: 0.0
-    entry_ending_punct: '.'
-    numbering_format: '[1], [2], ...'
 
 # ===========================================================================
 # 致谢

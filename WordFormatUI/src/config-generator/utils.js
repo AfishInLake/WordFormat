@@ -127,7 +127,6 @@ export const defaultConfig = {
     first_line_indent: "0字符",
     font_size: "五号",
     builtin_style_name: "题注",
-    caption_position: "below",
     caption_prefix: "图"
   }),
   tables: createConfigWithGlobalInheritance({
@@ -135,7 +134,6 @@ export const defaultConfig = {
     first_line_indent: "0字符",
     font_size: "五号",
     builtin_style_name: "题注",
-    caption_position: "above",
     caption_prefix: "表",
     content: createConfigWithGlobalInheritance({
       chinese_font_name: '宋体',
@@ -154,17 +152,13 @@ export const defaultConfig = {
       first_line_indent: "0字符",
       chinese_font_name: "黑体",
       font_size: "三号",
-      section_title: "参考文献"
     }),
     content: createConfigWithGlobalInheritance({
       alignment: "两端对齐",
       first_line_indent: "-2.2字符",
       left_indent: "0.26字符",
       chinese_font_name: "宋体",
-      font_size: "五号",
-      numbering_format: '[1], [2], ...',
-      entry_indent: 0,
-      entry_ending_punct: '.'
+      font_size: "五号"
     })
   },
   acknowledgements: {
@@ -200,6 +194,11 @@ export const defaultConfig = {
       enabled: true,
       template: '[%1]',
       suffix: 'space'
+    },
+    captions: {
+      enabled: false,
+      separator: '.',
+      label_number_space: false
     }
   }
 }
@@ -218,9 +217,6 @@ export const englishFontOptions = ["Times New Roman", "Arial", "Calibri", "Couri
 
 // 字号选项
 export const fontSizeOptions = ["一号", "小一", "二号", "小二", "三号", "小三", "四号", "小四", "五号", "小五", "六号", "七号"]
-
-// 图注位置选项
-export const captionPositionOptions = ["above", "below"]
 
 // 深度合并：用 defaults 填充 config 中缺失的字段
 export const mergeWithDefaults = (config, defaults) => {
@@ -284,28 +280,22 @@ export const applyGlobalFormatToAll = (userConfig) => {
   // 插图配置
   userConfig.figures = {
     ...userConfig.global_format,
-    caption_position: userConfig.figures.caption_position,
     caption_prefix: userConfig.figures.caption_prefix
   }
 
   // 表格配置
   userConfig.tables = {
     ...userConfig.global_format,
-    caption_position: userConfig.tables.caption_position,
     caption_prefix: userConfig.tables.caption_prefix,
     content: userConfig.tables.content
   }
 
   // 参考文献配置
   userConfig.references.title = {
-    ...userConfig.global_format,
-    section_title: userConfig.references.title.section_title
+    ...userConfig.global_format
   }
   userConfig.references.content = {
-    ...userConfig.global_format,
-    numbering_format: userConfig.references.content.numbering_format,
-    entry_indent: userConfig.references.content.entry_indent,
-    entry_ending_punct: userConfig.references.content.entry_ending_punct
+    ...userConfig.global_format
   }
 
   // 致谢配置

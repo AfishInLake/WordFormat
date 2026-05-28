@@ -9,7 +9,7 @@ from docx import Document
 from loguru import logger
 
 from wordformat.config.config import get_config, init_config
-from wordformat.config.datamodel import NodeConfigRoot
+from wordformat.config.datamodel import BaseModel, NodeConfigRoot
 from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -29,81 +29,214 @@ from wordformat.word_structure.utils import (
 )
 
 
-def _fix_all_heading_style_definitions(document: Document, config_model):
-    """在格式化开始前，统一修正所有 heading 样式定义。
+def _collect_all_style_configs(config_model) -> dict:
+    """遍历 NodeConfigRoot，收集所有唯一的 (英文样式名 → 配置段) 映射。
 
-    修正内容：
-    1. 清除样式定义中的主题色引用（themeColor），替换为配置指定的颜色
-    2. 确保样式定义存在（不存在则创建）
-
-    这样做的原因：Word 的样式继承机制下，如果样式定义使用了主题色，
-    段落内的 run 即使没有显式设置颜色，也会继承样式中的主题色。
-    仅修改 run 级别的颜色不够，必须同时修正样式定义本身。
+    对于被多个段引用的同一样式（如 body_text 和 references.content 都用 "Normal"），
+    保留先遇到的配置段。
     """
+    from wordformat.config.datamodel import GlobalFormatConfig
+    from wordformat.style.style_enum import BuiltInStyle
+
+    style_map: dict[str, object] = {}
+
+    def _resolve_style_name(cfg) -> str | None:
+        raw = getattr(cfg, "builtin_style_name", None)
+        if not raw:
+            return None
+        try:
+            return BuiltInStyle(raw).rel_value  # "正文" → "Normal", "题注" → "Caption"
+        except Exception:
+            return raw  # 自定义样式名直接使用
+
+    def _walk(obj, path: str = ""):
+        if isinstance(obj, GlobalFormatConfig):
+            eng_name = _resolve_style_name(obj)
+            if eng_name and eng_name not in style_map:
+                style_map[eng_name] = obj
+        if isinstance(obj, BaseModel):
+            for f_name in type(obj).model_fields:
+                val = getattr(obj, f_name)
+                if isinstance(val, BaseModel):
+                    _walk(val, f"{path}.{f_name}")
+                elif isinstance(val, dict):
+                    for _k, v in val.items():
+                        if isinstance(v, BaseModel):
+                            _walk(v, f"{path}.{_k}")
+
+    _walk(config_model)
+    return style_map
+
+
+def _fix_style_run_properties(style, cfg, style_name: str):
+    """修正样式定义中的字符格式属性（w:rPr）。"""
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
 
-    from wordformat.style.style_enum import FontColor, _ensure_style_exists
+    from wordformat.style.style_enum import FontColor, FontSize
 
-    heading_config = getattr(config_model, "headings", None)
-    if not heading_config:
-        return
+    style_element = style.element
 
-    # 收集所有 heading 级别的配置
-    level_map = {
-        "level_1": getattr(heading_config, "level_1", None),
-        "level_2": getattr(heading_config, "level_2", None),
-        "level_3": getattr(heading_config, "level_3", None),
-    }
+    # 确保 w:rPr 存在
+    rPr = style_element.find(qn("w:rPr"))
+    if rPr is None:
+        rPr = OxmlElement("w:rPr")
+        style_element.insert(0, rPr)
 
-    for _level_key, level_cfg in level_map.items():
-        if level_cfg is None:
-            continue
+    # --- 字体名称 ---
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = OxmlElement("w:rFonts")
+        rPr.insert(0, rFonts)
+    # 中文字体（eastAsia）
+    cn_name = getattr(cfg, "chinese_font_name", None)
+    if cn_name:
+        rFonts.set(qn("w:eastAsia"), str(cn_name))
+    # 英文字体（ascii + hAnsi）
+    en_name = getattr(cfg, "english_font_name", None)
+    if en_name:
+        rFonts.set(qn("w:ascii"), str(en_name))
+        rFonts.set(qn("w:hAnsi"), str(en_name))
 
-        style_name = getattr(level_cfg, "builtin_style_name", None)
-        if not style_name:
-            continue
+    # --- 字号 ---
+    font_size = getattr(cfg, "font_size", None)
+    if font_size is not None:
+        try:
+            fs = FontSize(font_size)
+            pt_val = fs.rel_value  # e.g. "小四" → 12.0
+            half_pt = str(int(round(pt_val * 2)))
+            # 更新或创建 w:sz
+            sz = rPr.find(qn("w:sz"))
+            if sz is None:
+                sz = OxmlElement("w:sz")
+                rPr.append(sz)
+            sz.set(qn("w:val"), half_pt)
+            # w:szCs（复杂脚本字号）
+            szCs = rPr.find(qn("w:szCs"))
+            if szCs is None:
+                szCs = OxmlElement("w:szCs")
+                rPr.append(szCs)
+            szCs.set(qn("w:val"), half_pt)
+        except Exception as e:
+            logger.warning(f"设置样式 '{style_name}' 字号失败: {e}")
 
-        # 确保样式存在
-        _ensure_style_exists(document, style_name)
+    # --- 字体颜色（清除主题色） ---
+    font_color = getattr(cfg, "font_color", None)
+    if font_color is not None:
+        try:
+            fc = FontColor(font_color)
+            rgb = fc.rel_value
+            hex_color = f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+            # 移除旧的 w:color（尤其是有主题色的）
+            for old_color in rPr.findall(qn("w:color")):
+                rPr.remove(old_color)
+            new_color = OxmlElement("w:color")
+            new_color.set(qn("w:val"), hex_color)
+            rPr.append(new_color)
+        except Exception as e:
+            logger.warning(f"设置样式 '{style_name}' 颜色失败: {e}")
+
+    # --- 加粗 ---
+    bold = getattr(cfg, "bold", None)
+    if bold is not None:
+        b = rPr.find(qn("w:b"))
+        if bold:
+            if b is None:
+                rPr.append(OxmlElement("w:b"))
+        else:
+            if b is not None:
+                rPr.remove(b)
+
+    # --- 斜体 ---
+    italic = getattr(cfg, "italic", None)
+    if italic is not None:
+        i = rPr.find(qn("w:i"))
+        if italic:
+            if i is None:
+                rPr.append(OxmlElement("w:i"))
+        else:
+            if i is not None:
+                rPr.remove(i)
+
+    # --- 下划线 ---
+    underline = getattr(cfg, "underline", None)
+    if underline is not None:
+        u = rPr.find(qn("w:u"))
+        if underline:
+            if u is None:
+                u = OxmlElement("w:u")
+                u.set(qn("w:val"), "single")
+                rPr.append(u)
+        else:
+            if u is not None:
+                rPr.remove(u)
+
+
+def _fix_style_paragraph_properties(style, cfg, style_name: str):
+    """修正样式定义中的段落格式属性（w:pPr）。"""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    from wordformat.style.style_enum import Alignment
+
+    style_element = style.element
+
+    pPr = style_element.find(qn("w:pPr"))
+    if pPr is None:
+        pPr = OxmlElement("w:pPr")
+        style_element.append(pPr)
+
+    # --- 对齐方式 ---
+    alignment = getattr(cfg, "alignment", None)
+    if alignment is not None:
+        try:
+            al = Alignment(alignment)
+            jc = pPr.find(qn("w:jc"))
+            if jc is None:
+                jc = OxmlElement("w:jc")
+                pPr.append(jc)
+            # WD_ALIGN_PARAGRAPH → XML val
+            xml_val_map = {
+                0: "left",
+                1: "center",
+                2: "right",
+                3: "both",
+                4: "distribute",
+            }
+            jc.set(qn("w:val"), xml_val_map.get(al.rel_value, "left"))
+        except Exception as e:
+            logger.warning(f"设置样式 '{style_name}' 对齐方式失败: {e}")
+
+
+def _fix_all_style_definitions(document: Document, config_model):
+    """在格式化开始前，统一修正文档中所有使用的样式定义。
+
+    遍历配置中所有段（body_text、headings、abstract、figures、tables、
+    references、acknowledgements 等），收集唯一的 builtin_style_name，
+    然后修正每个样式定义的字符格式和段落格式，使其与配置一致。
+
+    修正内容：
+    1. 字符格式：中英文字体、字号、颜色（清除主题色）、加粗、斜体、下划线
+    2. 段落格式：对齐方式
+    3. 确保样式定义存在（不存在则创建）
+    """
+    from wordformat.style.style_enum import _ensure_style_exists
+
+    style_configs = _collect_all_style_configs(config_model)
+
+    for eng_style_name, cfg in style_configs.items():
+        _ensure_style_exists(document, eng_style_name)
 
         try:
-            style = document.styles[style_name]
+            style = document.styles[eng_style_name]
         except KeyError:
-            logger.warning(f"样式 '{style_name}' 创建失败，跳过修正")
+            logger.warning(f"样式 '{eng_style_name}' 创建失败，跳过修正")
             continue
 
-        style_element = style.element
-        rPr = style_element.find(qn("w:rPr"))
+        _fix_style_run_properties(style, cfg, eng_style_name)
+        _fix_style_paragraph_properties(style, cfg, eng_style_name)
 
-        # 修正字体颜色：清除主题色，设置为配置指定的颜色
-        if rPr is not None:
-            color_elem = rPr.find(qn("w:color"))
-            has_theme = False
-            if color_elem is not None:
-                has_theme = (
-                    color_elem.get(qn("w:themeColor")) is not None
-                    or color_elem.get(qn("w:themeTint")) is not None
-                    or color_elem.get(qn("w:themeShade")) is not None
-                )
-
-            if has_theme:
-                font_color_str = getattr(level_cfg, "font_color", "黑色") or "黑色"
-                try:
-                    fc = FontColor(font_color_str)
-                    rgb_tuple = fc.rel_value
-                    hex_color = (
-                        f"{rgb_tuple[0]:02X}{rgb_tuple[1]:02X}{rgb_tuple[2]:02X}"
-                    )
-
-                    rPr.remove(color_elem)
-                    new_color = OxmlElement("w:color")
-                    new_color.set(qn("w:val"), hex_color)
-                    rPr.append(new_color)
-
-                    logger.info(f"已修正样式 '{style_name}' 主题色 → #{hex_color}")
-                except Exception as e:
-                    logger.warning(f"修正样式 '{style_name}' 颜色失败: {e}")
+        logger.debug(f"已修正样式定义: {eng_style_name}")
 
 
 def apply_format_check_to_all_nodes(
@@ -118,11 +251,23 @@ def apply_format_check_to_all_nodes(
     :param config: 配置文件
     :param check: 用来控制是仅检查还是仅修改
     """
+    from wordformat.rules.caption import CaptionFigure, CaptionTable
 
-    def traverse(node, parent_category=""):
+    chapter_index: int = 0
+    figure_counter: dict[int, int] = {}
+    table_counter: dict[int, int] = {}
+
+    def traverse(node, parent_category="", current_chapter: int = 0):
+        nonlocal chapter_index
+
         category = (
             node.value.get("category", "") if isinstance(node.value, dict) else ""
         )
+
+        # 遇到一级标题时递增章节号
+        if category == "heading_level_1":
+            chapter_index += 1
+            current_chapter = chapter_index
 
         if hasattr(node, "check_format"):
             try:
@@ -133,7 +278,20 @@ def apply_format_check_to_all_nodes(
                 )
                 if category not in VOIDNODELIST and not is_top_direct_body_text:
                     node.load_config(config)
-                    logger.debug(node)
+
+                    # 对题注节点注入章节号和顺序号
+                    if isinstance(node, (CaptionFigure, CaptionTable)):
+                        chapter = current_chapter if current_chapter > 0 else 0
+                        if isinstance(node, CaptionFigure):
+                            counter = figure_counter
+                        else:
+                            counter = table_counter
+                        counter[chapter] = counter.get(chapter, 0) + 1
+                        node.value["chapter_number"] = chapter
+                        node.value["sequence_number"] = counter[chapter]
+                        if hasattr(config, "numbering"):
+                            node.value["_numbering_cfg"] = config.numbering.captions
+
                     if node.paragraph:
                         # 先执行内容替换（check/format 两种模式均执行）
                         node.apply_replace(document)
@@ -149,7 +307,9 @@ def apply_format_check_to_all_nodes(
         SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu"}
         if category not in SKIP_CHILDREN_CATEGORIES:
             for child in node.children:
-                traverse(child, parent_category=category)
+                traverse(
+                    child, parent_category=category, current_chapter=current_chapter
+                )
 
     traverse(root_node)
 
@@ -326,7 +486,7 @@ def auto_format_thesis_document(
         )
     # 执行格式化前，先统一修正样式定义（清除主题色、设置字体等）
     if not check:
-        _fix_all_heading_style_definitions(document, config_model)
+        _fix_all_style_definitions(document, config_model)
 
     # 执行格式化
     apply_format_check_to_all_nodes(root_node, document, config_model, check)

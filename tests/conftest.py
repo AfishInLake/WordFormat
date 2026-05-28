@@ -184,10 +184,8 @@ headings:
 body_text:
   alignment: '两端对齐'
 figures:
-  caption_position: 'below'
   caption_prefix: '图'
 tables:
-  caption_position: 'above'
   caption_prefix: '表'
   content:
     font_size: '五号'

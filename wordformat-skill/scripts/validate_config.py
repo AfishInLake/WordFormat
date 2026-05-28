@@ -116,25 +116,19 @@ HEADING_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # figures 合法字段
 FIGURES_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "caption_position",
     "caption_prefix",
 }
 
 # tables 合法字段
 TABLES_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "caption_position",
     "caption_prefix",
 }
 
 # references.title 合法字段
-REF_TITLE_FIELDS = GLOBAL_FORMAT_FIELDS | {"section_title"}
+REF_TITLE_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # references.content 合法字段
-REF_CONTENT_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "entry_indent",
-    "entry_ending_punct",
-    "numbering_format",
-}
+REF_CONTENT_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # acknowledgements.title / content 合法字段
 ACK_FIELDS = GLOBAL_FORMAT_FIELDS

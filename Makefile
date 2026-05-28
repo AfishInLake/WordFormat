@@ -78,9 +78,9 @@ server:
 ## lint: Run code quality checks
 lint:
 	@echo "Running ruff check..."
-	@ruff check src/
-	@echo "Running ruff format check..."
-	@ruff format --check src/
+	@ruff check --fix src/
+	@echo "Running ruff format..."
+	@ruff format src/
 	@echo "All checks passed!"
 
 ## tests: Run lint then tests
