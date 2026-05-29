@@ -320,6 +320,217 @@ def _to_chinese_num(num: int) -> str:
     return str(num)
 
 
+def _from_roman(roman: str) -> int:
+    """罗马数字转整数，如 'I'→1, 'IV'→4, 'X'→10"""
+    roman = roman.strip().lower()
+    if not roman:
+        raise ValueError("Empty roman numeral")
+    roman_map = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+    result = 0
+    prev_val = 0
+    for char in reversed(roman):
+        val = roman_map.get(char)
+        if val is None:
+            raise ValueError(f"Invalid roman numeral: '{roman}'")
+        if val < prev_val:
+            result -= val
+        else:
+            result += val
+        prev_val = val
+    return result
+
+
+def _from_chinese_num(chinese: str) -> int:
+    """中文数字转整数，如 '一'→1, '十二'→12, '一百'→100, '一百二十三'→123"""
+    chinese = chinese.strip()
+    if not chinese:
+        raise ValueError("Empty chinese numeral")
+
+    digit_map = {
+        "零": 0,
+        "一": 1,
+        "二": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "壹": 1,
+        "贰": 2,
+        "叁": 3,
+        "肆": 4,
+        "伍": 5,
+        "陆": 6,
+        "柒": 7,
+        "捌": 8,
+        "玖": 9,
+    }
+    unit_map = {"十": 10, "拾": 10, "百": 100, "佰": 100, "千": 1000, "仟": 1000}
+
+    # 纯数字字符
+    if all(c in digit_map for c in chinese):
+        result = 0
+        for c in chinese:
+            result = result * 10 + digit_map[c]
+        return result
+
+    result = 0
+    section = 0
+    for char in chinese:
+        if char in digit_map:
+            section = digit_map[char]
+        elif char in unit_map:
+            unit = unit_map[char]
+            if section == 0:
+                section = 1
+            result += section * unit
+            section = 0
+        else:
+            raise ValueError(f"Invalid chinese numeral character: '{char}'")
+    result += section
+    return result
+
+
+def parse_caption_text(text: str) -> dict | None:
+    """解析题注文本为结构化组件。
+
+    支持格式：[续][标签][章节号][分隔符][题注编号] [题注名称]
+    章节号支持阿拉伯数字、中文数字、罗马数字。
+    分隔符支持 . - : — –
+    支持 "续表"/"续图" 前缀，解析后 is_continued 为 True。
+
+    Returns:
+        {"label", "chapter_text", "separator", "number_text", "name",
+         "chapter_num", "number_num", "is_continued"} 或 None
+    """
+    import re
+
+    text = text.strip()
+    if not text:
+        return None
+
+    # 检测 "续" 前缀（续表/续图）
+    is_continued = text.startswith("续")
+    if is_continued:
+        text = text[1:].strip()
+
+    if not text:
+        return None
+
+    # 分隔符：句点 . 、连字符 - 、冒号 : 、长划线 — (U+2014)、短划线 – (U+2013)
+    SEP = r"[.\-:—–]"
+    # 标签后可选空格（支持 "图 1.2 xxx" 和 "图1.2 xxx"）
+    LABEL = r"([图表])\s*"
+
+    # 模式1：图/表 + 阿拉伯数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
+    m = re.match(rf"^{LABEL}(\d+)({SEP})(\d+)[\s　]+(.+)$", text)
+    if m:
+        label, ch_text, sep, num_text, name = m.groups()
+        return {
+            "label": label,
+            "chapter_text": ch_text,
+            "chapter_num": int(ch_text),
+            "separator": sep,
+            "number_text": num_text,
+            "number_num": int(num_text),
+            "name": name.strip(),
+            "is_continued": is_continued,
+        }
+
+    # 模式2：图/表 + 中文数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
+    chinese_num_chars = r"[一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖拾佰仟]+"
+    m = re.match(rf"^{LABEL}({chinese_num_chars})({SEP})(\d+)[\s　]+(.+)$", text)
+    if m:
+        label, ch_text, sep, num_text, name = m.groups()
+        try:
+            ch_num = _from_chinese_num(ch_text)
+        except ValueError:
+            ch_num = None
+        return {
+            "label": label,
+            "chapter_text": ch_text,
+            "chapter_num": ch_num,
+            "separator": sep,
+            "number_text": num_text,
+            "number_num": int(num_text),
+            "name": name.strip(),
+            "is_continued": is_continued,
+        }
+
+    # 模式3：图/表 + 罗马数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
+    roman_chars = r"[IVXLCDMivxlcdm]+"
+    m = re.match(rf"^{LABEL}({roman_chars})({SEP})(\d+)[\s　]+(.+)$", text)
+    if m:
+        label, ch_text, sep, num_text, name = m.groups()
+        try:
+            ch_num = _from_roman(ch_text)
+        except ValueError:
+            ch_num = None
+        return {
+            "label": label,
+            "chapter_text": ch_text,
+            "chapter_num": ch_num,
+            "separator": sep,
+            "number_text": num_text,
+            "number_num": int(num_text),
+            "name": name.strip(),
+            "is_continued": is_continued,
+        }
+
+    # 尝试匹配编号部分也使用中文数字或罗马数字
+    m = re.match(
+        rf"^{LABEL}(\d+)({SEP})({chinese_num_chars}|{roman_chars})[\s　]+(.+)$", text
+    )
+    if m:
+        label, ch_text, sep, num_text, name = m.groups()
+        ch_num = int(ch_text)
+        try:
+            is_chinese = any(c in _digit_map for c in num_text)
+            num_num = (
+                _from_chinese_num(num_text) if is_chinese else _from_roman(num_text)
+            )
+        except ValueError:
+            num_num = None
+        return {
+            "label": label,
+            "chapter_text": ch_text,
+            "chapter_num": ch_num,
+            "separator": sep,
+            "number_text": num_text,
+            "number_num": num_num,
+            "name": name.strip(),
+            "is_continued": is_continued,
+        }
+
+    return None
+
+
+# 供 parse_caption_text 内部使用的 digit_map
+_digit_map = {
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "壹": 1,
+    "贰": 2,
+    "叁": 3,
+    "肆": 4,
+    "伍": 5,
+    "陆": 6,
+    "柒": 7,
+    "捌": 8,
+    "玖": 9,
+}
+
+
 def remove_all_numbering(doc):
     """
     强制解除样式与列表的绑定

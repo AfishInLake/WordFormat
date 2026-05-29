@@ -116,25 +116,19 @@ HEADING_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # figures 合法字段
 FIGURES_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "caption_position",
     "caption_prefix",
 }
 
 # tables 合法字段
 TABLES_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "caption_position",
     "caption_prefix",
 }
 
 # references.title 合法字段
-REF_TITLE_FIELDS = GLOBAL_FORMAT_FIELDS | {"section_title"}
+REF_TITLE_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # references.content 合法字段
-REF_CONTENT_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "entry_indent",
-    "entry_ending_punct",
-    "numbering_format",
-}
+REF_CONTENT_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # acknowledgements.title / content 合法字段
 ACK_FIELDS = GLOBAL_FORMAT_FIELDS
@@ -425,10 +419,10 @@ def main():
         # 保留 YAML 锚点引用（fix 会破坏锚点，需要特殊处理）
         # 由于 fix 会移除 <<: *global_format，这里提示用户
         print("\n⚠️  --fix 模式会移除 YAML 锚点引用，建议手动编辑修复。")
-        print("   请参考 data/config_editing_guide.md 中的编辑指南。")
+        print("   运行 wordf config 查看可用字段。")
         sys.exit(1)
 
-    print("\n请手动修复以上问题，或参考 data/config_editing_guide.md。")
+    print("\n请手动修复以上问题，运行 wordf config 查看可用字段。")
     sys.exit(1)
 
 

@@ -19,7 +19,6 @@ from wordformat.rules.heading import (
     HeadingLevel1Node,
     HeadingLevel2Node,
     HeadingLevel3Node,
-    BaseHeadingNode,
 )
 from wordformat.rules.keywords import KeywordsCN, KeywordsEN
 from wordformat.numbering import (
@@ -34,7 +33,7 @@ from wordformat.style.style_enum import (
     _ensure_style_exists,
 )
 from wordformat.set_style import (
-    _fix_all_heading_style_definitions,
+    _fix_all_style_definitions,
     apply_format_check_to_all_nodes,
 )
 from wordformat.style.get_some import (
@@ -89,18 +88,15 @@ def root_config(config_path):
 class TestHeadingCoverageBoost:
     """覆盖 heading.py 中未覆盖的代码行。"""
 
-    def test_apply_to_paragraph_removes_existing_jc(self, root_config):
-        """覆盖行 92: pPr.remove(jc) — 段落已有 jc 元素时移除显式对齐方式。
-
-        当 p=False（格式化模式）且段落已有 w:jc 元素时，应移除该元素。
-        注意：后续 ParagraphStyle.apply_to_paragraph 可能会重新设置对齐方式。
-        """
+    def test_apply_format_sets_paragraph_style_and_alignment(self, root_config):
+        """ParagraphStyle.apply_to_paragraph 先应用 builtin_style_name，
+        再应用显式段落格式。验证两者都被正确设置。"""
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("第一章 绪论")
         r.font.size = Pt(10)
 
-        # 手动在 XML 中添加 w:jc 元素
+        # 手动在 XML 中添加 w:jc=both（错误的对齐方式）
         pPr = p._element.find(qn("w:pPr"))
         if pPr is None:
             pPr = OxmlElement("w:pPr")
@@ -109,34 +105,22 @@ class TestHeadingCoverageBoost:
         jc.set(qn("w:val"), "both")
         pPr.append(jc)
 
-        # 验证 jc 确实存在
-        assert p._element.find(qn("w:pPr")).find(qn("w:jc")) is not None
-
         node = HeadingLevel1Node(value=p, level=1, paragraph=p)
         node.load_config(root_config)
-
-        # 使用 spy 验证 pPr.remove 被调用
-        original_remove = pPr.remove
-        remove_called = []
-        def spy_remove(child):
-            remove_called.append(child.tag)
-            return original_remove(child)
-        pPr.remove = spy_remove
 
         with patch.object(node, "add_comment"):
             node._base(doc, p=False, r=False)
 
-        # 验证 pPr.remove 被调用过，且参数包含 jc
-        assert any("jc" in tag for tag in remove_called), \
-            f"pPr.remove was not called with jc, calls: {remove_called}"
+        # builtin_style_name 已设置为 Heading 1（python-docx 存储为 "Heading1"）
+        assert p.style.name == "Heading 1"
+        # w:jc 已被 ParagraphStyle.apply_to_paragraph 更新为居中对齐
+        jc_after = pPr.find(qn("w:jc"))
+        assert jc_after is not None
+        assert jc_after.get(qn("w:val")) == "center"
 
-    def test_apply_to_paragraph_updates_existing_pStyle(self, root_config):
-        """覆盖行 97: pStyle.set(qn('w:val'), builtin_name) — pStyle 已存在时更新值。
-
-        当段落已有 w:pStyle 元素时，应更新其值而非创建新元素。
-        注意：后续 ParagraphStyle.apply_to_paragraph 会通过 python-docx API
-        再次设置样式，python-docx 内部使用 "Heading2" 格式。
-        """
+    def test_apply_format_updates_existing_pstyle(self, root_config):
+        """当段落已有 w:pStyle 时，ParagraphStyle.apply_to_paragraph
+        通过 python-docx API 将其更新为正确的样式。"""
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("1.1 研究背景")
@@ -151,169 +135,129 @@ class TestHeadingCoverageBoost:
         pStyle.set(qn("w:val"), "Normal")
         pPr.append(pStyle)
 
-        # 验证 pStyle 值为 "Normal"
         assert pPr.find(qn("w:pStyle")).get(qn("w:val")) == "Normal"
 
         node = HeadingLevel2Node(value=p, level=2, paragraph=p)
         node.load_config(root_config)
 
-        # 使用 spy 验证 pStyle.set 被调用
-        original_set = pStyle.set
-        set_calls = []
-        def spy_set(key, value):
-            set_calls.append((key, value))
-            return original_set(key, value)
-        pStyle.set = spy_set
-
         with patch.object(node, "add_comment"):
             node._base(doc, p=False, r=False)
 
-        # 验证 pStyle.set 被调用过，且设置了 builtin_style_name
-        ns_val = qn("w:val")
-        assert any(k == ns_val and v == "Heading 2" for k, v in set_calls), \
-            f"pStyle.set was not called with 'Heading 2', calls: {set_calls}"
+        # python-docx 通过 paragraph.style = "Heading 2" 更新了样式
+        assert p.style.name == "Heading 2"
 
-    def test_fix_style_definition_color_no_style_name(self, root_config):
-        """覆盖行 174-176: builtin_style_name 为 None 时直接返回。"""
+    def test_fix_all_style_definitions_collects_all_styles(self, root_config):
+        """_collect_all_style_configs 应收集配置中所有唯一的样式名。"""
+        from wordformat.set_style import _collect_all_style_configs
+
+        style_map = _collect_all_style_configs(root_config)
+        assert len(style_map) > 0
+        # 应包含 Normal（body_text 使用）和 Heading 1/2/3
+        style_names = list(style_map.keys())
+        assert any("Normal" in s for s in style_names)
+
+    def test_fix_all_style_definitions_handles_document(self, root_config):
+        """_fix_all_style_definitions 应对文档中存在的样式定义进行修正。"""
+        from wordformat.set_style import _fix_all_style_definitions
+
         doc = Document()
-        cfg = MagicMock()
-        cfg.builtin_style_name = None
+        _fix_all_style_definitions(doc, root_config)
         # 不应抛出异常
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
 
-    def test_fix_style_definition_color_style_not_exists(self, root_config):
-        """覆盖行 178-182: 样式不存在时跳过。"""
-        doc = Document()
-        cfg = MagicMock()
-        cfg.builtin_style_name = "NonExistentStyle"
-        # 不应抛出异常
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
+    def test_fix_style_run_properties_clears_theme_color(self, root_config):
+        """_fix_style_run_properties 应清除样式定义中的主题色。"""
+        from wordformat.set_style import _fix_style_run_properties
+        from wordformat.style.style_enum import _ensure_style_exists
 
-    def test_fix_style_definition_color_no_rPr(self, root_config):
-        """覆盖行 187-190: 样式无 rPr 元素时跳过。"""
-        doc = Document()
-        cfg = MagicMock()
-        cfg.builtin_style_name = "Heading 1"
-        # Heading 1 样式存在但可能没有 rPr
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
-
-    def test_fix_style_definition_color_no_color_element(self, root_config):
-        """覆盖行 192-195: 样式无 color 元素时跳过。"""
-        doc = Document()
-        cfg = MagicMock()
-        cfg.builtin_style_name = "Heading 1"
-        # 确保 rPr 存在但 color 不存在
-        try:
-            style = doc.styles["Heading 1"]
-            rPr = style.element.find(qn("w:rPr"))
-            if rPr is not None:
-                color = rPr.find(qn("w:color"))
-                if color is not None:
-                    rPr.remove(color)
-        except KeyError:
-            pass
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
-
-    def test_fix_style_definition_color_no_theme(self, root_config):
-        """覆盖行 198-204: color 元素无主题色属性时直接返回。"""
-        doc = Document()
-        cfg = MagicMock()
-        cfg.builtin_style_name = "Heading 1"
-        # 确保 color 元素存在但无 themeColor
-        try:
-            style = doc.styles["Heading 1"]
-            rPr = style.element.find(qn("w:rPr"))
-            if rPr is None:
-                rPr = OxmlElement("w:rPr")
-                style.element.insert(0, rPr)
-            color = rPr.find(qn("w:color"))
-            if color is None:
-                color = OxmlElement("w:color")
-                color.set(qn("w:val"), "000000")
-                rPr.append(color)
-            # 确保没有主题色属性
-            for attr in [qn("w:themeColor"), qn("w:themeTint"), qn("w:themeShade")]:
-                if color.get(attr) is not None:
-                    del color.attrib[attr]
-        except KeyError:
-            pass
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
-
-    def test_fix_style_definition_color_with_theme_color(self, root_config):
-        """覆盖行 206-222: 有主题色时修正为配置颜色。"""
         doc = Document()
         cfg = root_config.headings.level_1
-        # 确保 color 元素存在且有 themeColor
-        try:
-            style = doc.styles["Heading 1"]
-            rPr = style.element.find(qn("w:rPr"))
-            if rPr is None:
-                rPr = OxmlElement("w:rPr")
-                style.element.insert(0, rPr)
-            color = rPr.find(qn("w:color"))
-            if color is None:
-                color = OxmlElement("w:color")
-                rPr.append(color)
-            # 设置主题色
-            color.set(qn("w:themeColor"), "accent1")
-            color.set(qn("w:val"), "4472C4")
-        except KeyError:
-            pytest.skip("Heading 1 样式不存在")
+        _ensure_style_exists(doc, "Heading 1")
+        style = doc.styles["Heading 1"]
 
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
+        # 手动设置主题色
+        rPr = style.element.find(qn("w:rPr"))
+        if rPr is None:
+            rPr = OxmlElement("w:rPr")
+            style.element.insert(0, rPr)
+        color = OxmlElement("w:color")
+        color.set(qn("w:themeColor"), "accent1")
+        color.set(qn("w:val"), "4472C4")
+        rPr.append(color)
 
-        # 验证主题色已被移除
+        _fix_style_run_properties(style, cfg, "Heading 1")
+
         rPr_after = style.element.find(qn("w:rPr"))
         color_after = rPr_after.find(qn("w:color"))
+        assert color_after is not None
         assert color_after.get(qn("w:themeColor")) is None
 
-    def test_fix_style_definition_color_with_theme_tint(self, root_config):
-        """覆盖行 200-201: themeTint 属性存在时也应修正。"""
+    def test_fix_style_run_properties_sets_font_name(self, root_config):
+        """_fix_style_run_properties 应设置样式定义中的英文字体名。"""
+        from wordformat.set_style import _fix_style_run_properties
+        from wordformat.style.style_enum import _ensure_style_exists
+
         doc = Document()
-        cfg = root_config.headings.level_2
-        try:
-            style = doc.styles["Heading 2"]
-            rPr = style.element.find(qn("w:rPr"))
-            if rPr is None:
-                rPr = OxmlElement("w:rPr")
-                style.element.insert(0, rPr)
-            color = rPr.find(qn("w:color"))
-            if color is None:
-                color = OxmlElement("w:color")
-                rPr.append(color)
-            color.set(qn("w:themeTint"), "99")
-            color.set(qn("w:val"), "000000")
-        except KeyError:
-            pytest.skip("Heading 2 样式不存在")
+        cfg = root_config.body_text
+        _ensure_style_exists(doc, "Normal")
+        style = doc.styles["Normal"]
 
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
+        _fix_style_run_properties(style, cfg, "Normal")
 
-        rPr_after = style.element.find(qn("w:rPr"))
-        color_after = rPr_after.find(qn("w:color"))
-        assert color_after.get(qn("w:themeTint")) is None
+        rPr = style.element.find(qn("w:rPr"))
+        rFonts = rPr.find(qn("w:rFonts"))
+        assert rFonts is not None
 
-    def test_fix_style_definition_color_exception_handling(self, root_config):
-        """覆盖行 221-222: 颜色修正失败时的异常处理。"""
+    def test_fix_style_run_properties_sets_bold(self, root_config):
+        """_fix_style_run_properties 应设置样式定义中的加粗属性。"""
+        from wordformat.set_style import _fix_style_run_properties
+        from wordformat.style.style_enum import _ensure_style_exists
+        from wordformat.config.datamodel import HeadingLevelConfig
+
         doc = Document()
-        cfg = MagicMock()
-        cfg.builtin_style_name = "Heading 1"
-        cfg.font_color = "invalid_color_value_xyz"
-        try:
-            style = doc.styles["Heading 1"]
-            rPr = style.element.find(qn("w:rPr"))
-            if rPr is None:
-                rPr = OxmlElement("w:rPr")
-                style.element.insert(0, rPr)
-            color = rPr.find(qn("w:color"))
-            if color is None:
-                color = OxmlElement("w:color")
-                rPr.append(color)
-            color.set(qn("w:themeColor"), "accent1")
-        except KeyError:
-            pytest.skip("Heading 1 样式不存在")
+        cfg = HeadingLevelConfig(bold=True)
+        _ensure_style_exists(doc, "Heading 1")
+        style = doc.styles["Heading 1"]
 
-        # 无效颜色应触发异常处理分支，不抛出
-        BaseHeadingNode._fix_style_definition_color(doc, cfg)
+        _fix_style_run_properties(style, cfg, "Heading 1")
+
+        rPr = style.element.find(qn("w:rPr"))
+        b = rPr.find(qn("w:b"))
+        assert b is not None
+
+    def test_fix_style_run_properties_removes_italic(self, root_config):
+        """_fix_style_run_properties 当 italic=False 时应移除斜体元素。"""
+        from wordformat.set_style import _fix_style_run_properties
+        from wordformat.style.style_enum import _ensure_style_exists
+        from wordformat.config.datamodel import HeadingLevelConfig
+
+        doc = Document()
+        cfg = HeadingLevelConfig(italic=False)
+        _ensure_style_exists(doc, "Heading 1")
+        style = doc.styles["Heading 1"]
+
+        _fix_style_run_properties(style, cfg, "Heading 1")
+
+        rPr = style.element.find(qn("w:rPr"))
+        i = rPr.find(qn("w:i"))
+        assert i is None
+
+    def test_fix_style_paragraph_properties_sets_alignment(self, root_config):
+        """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""
+        from wordformat.set_style import _fix_style_paragraph_properties
+        from wordformat.style.style_enum import _ensure_style_exists
+        from wordformat.config.datamodel import HeadingLevelConfig
+
+        doc = Document()
+        cfg = HeadingLevelConfig(alignment="居中对齐")
+        _ensure_style_exists(doc, "Heading 1")
+        style = doc.styles["Heading 1"]
+
+        _fix_style_paragraph_properties(style, cfg, "Heading 1")
+
+        pPr = style.element.find(qn("w:pPr"))
+        jc = pPr.find(qn("w:jc"))
+        assert jc is not None
+        assert jc.get(qn("w:val")) == "center"
 
 
 # ===========================================================================
@@ -575,6 +519,7 @@ class TestNumberingCoverageBoost:
         level_cfg.chinese_font_name = None
         level_cfg.english_font_name = None
         level_cfg.font_size = None
+        level_cfg.font_color = None
         level_cfg.bold = None
         headings_config.level_1 = level_cfg
         result = _build_numbering_rPr(headings_config, "level_1")
@@ -787,48 +732,30 @@ class TestStyleEnumCoverageBoost:
 class TestSetStyleCoverageBoost:
     """覆盖 set_style.py 中未覆盖的代码行。"""
 
-    def test_fix_all_heading_style_definitions_no_headings(self):
-        """覆盖行 45-46: heading_config 为 None 时直接返回。"""
+    def test_fix_all_style_definitions_no_config_sections(self):
+        """config_model 无任何有效的 GlobalFormatConfig 时不抛异常。"""
         doc = Document()
-        config_model = MagicMock()
-        config_model.headings = None
-        _fix_all_heading_style_definitions(doc, config_model)
+        # 使用一个只有 numbering 和 global_format 的空模型
+        from wordformat.config.datamodel import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
+
+        config_bare = NodeConfigRoot(
+            global_format=GlobalFormatConfig(),
+            body_text=BodyTextConfig(),
+        )
+        _fix_all_style_definitions(doc, config_bare)
         # 不应抛出异常
 
-    def test_fix_all_heading_style_definitions_level_none(self):
-        """覆盖行 57: level_cfg 为 None 时 continue。"""
-        doc = Document()
-        config_model = MagicMock()
-        config_model.headings = MagicMock()
-        config_model.headings.level_1 = None
-        config_model.headings.level_2 = None
-        config_model.headings.level_3 = None
-        _fix_all_heading_style_definitions(doc, config_model)
-        # 不应抛出异常
+    def test_fix_all_style_definitions_theme_color_fix(self):
+        """修正主题色的完整流程：有 themeColor 的样式被修正。"""
+        from wordformat.config.datamodel import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
 
-    def test_fix_all_heading_style_definitions_empty_style_name(self):
-        """覆盖行 61: style_name 为空时 continue。"""
         doc = Document()
-        config_model = MagicMock()
-        config_model.headings = MagicMock()
-        level_cfg = MagicMock()
-        level_cfg.builtin_style_name = ""
-        config_model.headings.level_1 = level_cfg
-        config_model.headings.level_2 = None
-        config_model.headings.level_3 = None
-        _fix_all_heading_style_definitions(doc, config_model)
-
-    def test_fix_all_heading_style_definitions_theme_color_fix(self):
-        """覆盖行 86-100: 修正主题色的完整流程。"""
-        doc = Document()
-        config_model = MagicMock()
-        level_cfg = MagicMock()
-        level_cfg.builtin_style_name = "Heading 1"
-        level_cfg.font_color = "黑色"
-        config_model.headings = MagicMock()
-        config_model.headings.level_1 = level_cfg
-        config_model.headings.level_2 = None
-        config_model.headings.level_3 = None
+        config_model = NodeConfigRoot(
+            global_format=GlobalFormatConfig(),
+            headings=HeadingsConfig(
+                level_1=HeadingLevelConfig(builtin_style_name="Heading 1", font_color="黑色"),
+            ),
+        )
 
         # 确保 Heading 1 有主题色
         try:
@@ -845,7 +772,13 @@ class TestSetStyleCoverageBoost:
         except KeyError:
             pass
 
-        _fix_all_heading_style_definitions(doc, config_model)
+        _fix_all_style_definitions(doc, config_model)
+
+        # 验证主题色已清除
+        rPr_after = style.element.find(qn("w:rPr"))
+        color_after = rPr_after.find(qn("w:color"))
+        assert color_after is not None
+        assert color_after.get(qn("w:themeColor")) is None
 
     def test_apply_format_check_to_all_nodes_void_category(self):
         """覆盖行 99-100: traverse 中 category 在 VOIDNODELIST 中。

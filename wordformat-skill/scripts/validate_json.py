@@ -2,7 +2,7 @@
 """
 WordFormat JSON 标签文件校验脚本
 
-校验 wf gj 生成的 JSON 文件中的 category 字段是否合法，
+校验 wordf gj 生成的 JSON 文件中的 category 字段是否合法，
 并输出每个段落的分类结果供人工检查。
 
 用法：
@@ -129,6 +129,7 @@ def print_results(data: list, threshold: float = 0.0):
     print(f"  JSON 标签检查结果（共 {len(data)} 个段落）")
     print(f"{'=' * 70}\n")
 
+    replaced_count = 0
     for i, item in enumerate(data):
         category = item.get("category", "???")
         score = item.get("score", 0)
@@ -142,9 +143,19 @@ def print_results(data: list, threshold: float = 0.0):
         if category not in VALID_CATEGORIES:
             flag = " ❌ 非法类型"
 
+        # 检查 replace 字段
+        replace_text = item.get("replace", "")
+        has_replace = bool(replace_text and isinstance(replace_text, str))
+
         print(f"  [{i:3d}] {label:20s}  置信度:{score:.4f}{flag}")
         print(f"        {paragraph}...")
+        if has_replace:
+            print(f"        🔄 replace → \"{replace_text[:60]}\"")
+            replaced_count += 1
         print()
+
+    if replaced_count > 0:
+        print(f"  🔄 共 {replaced_count} 个段落包含 replace 字段")
 
 
 def print_stats(data: list):

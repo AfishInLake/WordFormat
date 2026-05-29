@@ -2,12 +2,6 @@
   <div class="figures-config">
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div class="form-item">
-        <label>图注位置:</label>
-        <select v-model="config.caption_position">
-          <option v-for="option in captionPositionOptions" :key="option" :value="option">{{ option }}</option>
-        </select>
-      </div>
-      <div class="form-item">
         <label>图注编号前缀:</label>
         <input type="text" v-model="config.caption_prefix">
       </div>
@@ -17,7 +11,6 @@
 </template>
 
 <script setup>
-import { captionPositionOptions } from '../utils'
 import FormatConfig from './FormatConfig.vue'
 
 const props = defineProps({

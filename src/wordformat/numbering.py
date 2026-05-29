@@ -254,13 +254,20 @@ def _build_numbering_rPr(headings_config, level_key: str):
     if level_cfg is None:
         return None
 
-    # 获取字体和字号
+    # 获取字体、字号、颜色、加粗
     chinese_font = getattr(level_cfg, "chinese_font_name", None)
     english_font = getattr(level_cfg, "english_font_name", None)
     font_size = getattr(level_cfg, "font_size", None)
+    font_color = getattr(level_cfg, "font_color", None)
     bold = getattr(level_cfg, "bold", None)
 
-    if not chinese_font and not english_font and not font_size and bold is None:
+    if (
+        not chinese_font
+        and not english_font
+        and not font_size
+        and not font_color
+        and bold is None
+    ):
         return None
 
     rPr = OxmlElement("w:rPr")
@@ -293,6 +300,20 @@ def _build_numbering_rPr(headings_config, level_key: str):
             szCs = OxmlElement("w:szCs")
             szCs.set(qn("w:val"), str(half_pt))
             rPr.append(szCs)
+
+    # 设置字体颜色（避免继承主题蓝色）
+    if font_color:
+        from wordformat.style.style_enum import FontColor
+
+        try:
+            fc = FontColor(font_color)
+            rgb = fc.rel_value
+            hex_color = f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+            color = OxmlElement("w:color")
+            color.set(qn("w:val"), hex_color)
+            rPr.append(color)
+        except Exception:
+            pass
 
     # 设置加粗
     if bold is True:

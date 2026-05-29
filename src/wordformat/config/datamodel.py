@@ -205,9 +205,6 @@ class BodyTextConfig(GlobalFormatConfig):
 class FiguresConfig(GlobalFormatConfig):
     """插图配置"""
 
-    caption_position: Literal["above", "below"] = Field(
-        default="below", description="图注位置"
-    )
     caption_prefix: Optional[str] = Field(default="图", description="图注编号前缀")
 
 
@@ -219,9 +216,6 @@ class TableContentConfig(GlobalFormatConfig):
 class TablesConfig(GlobalFormatConfig):
     """表格配置（题注格式 + 表格内容格式）"""
 
-    caption_position: Literal["above", "below"] = Field(
-        default="above", description="表注位置"
-    )
     caption_prefix: Optional[str] = Field(default="表", description="表注编号前缀")
     content: TableContentConfig = Field(
         default_factory=TableContentConfig, description="表格内容格式"
@@ -232,17 +226,9 @@ class TablesConfig(GlobalFormatConfig):
 class ReferencesTitleConfig(GlobalFormatConfig):
     """参考文献标题配置（继承全局格式）"""
 
-    section_title: Optional[str] = Field(
-        default="参考文献", description="参考文献章节标题"
-    )
-
 
 class ReferencesContentConfig(GlobalFormatConfig):
     """参考文献内容配置（继承全局格式）"""
-
-    numbering_format: Optional[str] = Field(default=None, description="编号格式")
-    entry_indent: Optional[float] = Field(default=0.0, description="条目首行缩进量")
-    entry_ending_punct: Optional[str] = Field(default=None, description="条目结束标点")
 
 
 class ReferencesConfig(BaseModel):
@@ -278,6 +264,21 @@ class AcknowledgementsConfig(BaseModel):
     )
 
 
+# -------------------------- 题注编号配置模型 --------------------------
+class CaptionNumberingConfig(BaseModel):
+    """题注编号校验/修正配置模型"""
+
+    enabled: bool = Field(default=False, description="是否启用题注编号校验/修正")
+    separator: str = Field(
+        default=".",
+        description="章节号与题注编号间的分隔符，如 . - : — –",
+    )
+    label_number_space: bool = Field(
+        default=False,
+        description="标签与编号之间是否加空格（图 1.1 vs 图1.1）",
+    )
+
+
 # -------------------------- 编号配置模型 --------------------------
 class NumberingLevelConfig(BaseModel):
     """单级标题编号配置"""
@@ -307,6 +308,10 @@ class NumberingConfig(BaseModel):
     """标题自动编号配置"""
 
     enabled: bool = Field(default=False, description="是否启用自动编号功能")
+    captions: CaptionNumberingConfig = Field(
+        default_factory=CaptionNumberingConfig,
+        description="题注编号配置",
+    )
     level_1: NumberingLevelConfig = Field(
         default_factory=lambda: NumberingLevelConfig(
             enabled=False,

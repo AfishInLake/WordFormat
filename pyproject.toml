@@ -1,6 +1,6 @@
 [project]
 name = "wordformat"
-version = "1.3.0"
+version = "1.3.1"
 description = "论文格式自动化处理工具"
 readme = "README.md"
 license = "Apache-2.0"
@@ -125,7 +125,7 @@ wordformat = ["data/**/*", "api/static/**/*"]
 
 [project.scripts]
 wordformat = "wordformat.cli:main"
-wf = "wordformat.cli:main"
+wordf = "wordformat.cli:main"
 
 
 [project.optional-dependencies]

@@ -6,286 +6,203 @@ argument-hint: "[docx文件路径]"
 
 # WordFormat - 论文格式自动化处理工具
 
-使用 AI 模型智能识别 Word 文档结构，根据 YAML 配置文件自动校验或修正论文格式。
-
 ## 安装
 
 ```bash
-# 国内用户优先使用镜像源
-pip install wordformat -i https://pypi.tuna.tsinghua.edu.cn/simple
-# 海外用户
-pip install wordformat
+pip install wordformat -i https://pypi.tuna.tsinghua.edu.cn/simple  # 国内
+pip install wordformat  # 海外
 ```
 
-验证：`wf --help`
+验证：`wordf --help`
+
+## 功能速查
+
+### CLI 命令
+
+| 命令 | 功能 | 输入 | 输出 |
+|------|------|------|------|
+| `wordf config` | 查看所有可配置字段及默认值 | 无 | 终端输出 |
+| `wordf config -o config.yaml` | 输出完整配置模板 | 无 | `config.yaml` |
+| `wordf gj` | AI 识别文档结构 | `.docx` + `config.yaml` | `output/xxx.json` |
+| `wordf tree` | 查看结构树 | `.json` | 终端树形图 |
+| `wordf cf` | 检查格式（批注） | `.docx` + `config.yaml` + `.json` | `--标注版.docx` |
+| `wordf af` | 修正格式（直接改） | `.docx` + `config.yaml` + `.json` | `--修改版.docx` |
+| `wordf startapi` | Web 界面 | 无 | http://127.0.0.1:8000 |
+
+### 辅助脚本
+
+| 脚本 | 功能 |
+|------|------|
+| `setup_config.py` | 验证/保存 YAML 配置 |
+| `validate_json.py` | 校验 JSON category，显示统计 |
+
+### JSON 字段（`wordf gj` 输出，可手动编辑）
+
+| 字段 | 说明 |
+|------|------|
+| `category` | 段落类型（16种），改这里修正分类 |
+| `replace` | 可选，填入新文本直接替换段落内容 |
+| `fingerprint` | 段落指纹（不要改） |
+| `score` | AI 置信度 |
+
+### 格式检查范围
+
+段落（对齐/间距/行距/缩进）、字符（字体/字号/颜色/粗斜体/下划线）、标题自动编号、题注编号校验、关键词数量、表格内容。
+
+### 不支持
+
+页眉页脚、目录生成、封面排版、图片尺寸、Word 域代码。需提前告知用户手动处理。
+
+---
 
 ## 工作流程
 
-本技能包含**两个独立任务**，可分别执行，互不干扰：
-
-| 任务 | 说明 | 产物 |
-|------|------|------|
-| **任务一：准备配置文件** | 根据格式要求生成/编辑 config.yaml | `config.yaml` |
-| **任务二：执行格式化** | 使用配置文件对论文进行格式检查或修正 | `--标注版.docx` 或 `--修改版.docx` |
-
-**执行顺序**：必须先完成任务一再执行任务二。两个任务可以分两次对话完成。
+两个独立任务，先任务一再任务二。每个任务完成后**必须将产物复制到用户工作目录**。
 
 ---
 
 ## 任务一：准备配置文件
 
-> **本任务的产物是 `config.yaml`，必须保存到用户工作目录。**
+> **🚨 用户已提供 .yaml 配置 → 直接跳到步骤 1.2 验证，禁止新建。**
+> **🚨 用户说"用上次的配置"/"和上次一样" → 复用已有配置，禁止新建。**
 
-严格按照以下步骤执行。**每个步骤开始前，先阅读该步骤引用的参考文档，不要提前阅读后续步骤的文档。**
+### 步骤 1.0 查找已有配置
 
-### 步骤 1.0 检查已有配置
-
-**优先级顺序**：工作目录已有 .yaml 配置 > 预设库 > 新建配置
-
-**⚠️ 关键：配置文件名称不固定（如 `config.yaml`、`清华大学_本科.yaml` 等），必须扫描工作目录下所有 .yaml 文件，绝不能只查找 `config.yaml`。**
-
-#### 1.0.1 扫描工作目录下所有 .yaml 配置文件
+**优先级：用户提供的 > 工作目录已有 > 预设库 > 新建**
 
 ```bash
-# 列出工作目录下所有 .yaml 文件
-ls *.yaml 2>/dev/null || echo "工作目录无 .yaml 文件"
+# 扫描工作目录下所有 .yaml 文件
+ls *.yaml 2>/dev/null || echo "无 .yaml 文件"
 ```
 
-**如果工作目录存在 .yaml 文件**：
-1. 逐个验证，找出合法的 wordformat 配置文件：
-   ```bash
-   for f in *.yaml; do
-     echo "--- 验证: $f ---"
-     python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --validate --config "$f" 2>&1 && echo "✅ 合法" || echo "❌ 非配置文件"
-   done
-   ```
-2. 找到合法配置文件后，**询问用户**：已检测到以下配置文件 `{文件名列表}`，请确认使用哪一个？如需修改格式参数请告知具体内容。
-3. 用户确认后，将选中的配置文件作为本次任务的 config.yaml 使用（复制或直接引用），跳到步骤 1.4。
+找到文件后逐个验证：
 
-**如果工作目录没有任何 .yaml 文件，或所有 .yaml 文件验证均不通过**，继续 1.0.2。
+```bash
+for f in *.yaml; do
+  echo "--- 验证: $f ---"
+  python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --validate --config "$f" 2>&1 \
+    && echo "✅ 合法" || echo "❌ 非配置文件"
+done
+```
 
-#### 1.0.2 查找预设库
+找到合法配置 → **询问用户确认**，不要新建或覆盖。用户确认后跳到步骤 1.2。
 
-预设保存在**项目工作目录**下 `presets/` 目录，命名格式 `{学校}_{学院/专业}_{论文类型}.yaml`。
+没有 .yaml 文件时尝试预设库：
 
 ```bash
 python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --list-presets
-```
-
-找到匹配预设时直接使用，跳到步骤 1.2 验证：
-```bash
 python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --use "清华大学_计算机学院_本科" --output config.yaml
 ```
 
-没有匹配预设时，继续 1.1。
+预设也找不到时，继续步骤 1.1 新建。
 
-### 步骤 1.1 提取格式要求并编辑配置
+### 步骤 1.1 新建配置
 
-> **开始本步骤前，阅读 [data/config_editing_guide.md](data/config_editing_guide.md) 了解字段取值。如需查看完整字段白名单，阅读 [data/config_spec.md](data/config_spec.md)。**
+> 运行 `wordf config` 查看所有字段和默认值，`wordf config -o config.yaml` 生成模板。
 
-**⚠️ 关键：必须先完整读取用户的格式规范文件，提取所有格式参数，再编辑 config.yaml。不要边看边改。**
+**先完整读完格式要求文件，再编辑。** 编辑原则：只改值、不增减字段、不动 YAML 锚点语法。
 
-需要提取的参数：正文字体/字号/行距/段前段后/缩进、各级标题格式、摘要格式、关键词数量、图表题注、参考文献、致谢。
-
-**如果格式文档要求标题自动编号（如"第一章"、"1.1"），还需提取：**
-- 各级标题的编号格式（如 `第%1章`、`%1.%2`、`%1.%2.%3`）
-- 编号后缀（制表符 `tab`、空格 `space`、无 `nothing`）
-- 编号缩进和文本缩进（如 `"0字符"`、`"0.75cm"`）
-
-> 手动编号会自动识别并清除，无需用户配置正则表达式。
-
-**特别注意：`line_spacingrule` 和 `line_spacing` 必须配合设置：**
-
-| line_spacingrule | line_spacing | 说明 |
-|------------------|--------------|------|
-| `固定值` | `"20磅"` | 固定 20 磅行距 |
-| `1.5倍行距` | `"1.5倍"` | 1.5 倍行距 |
-| `单倍行距` | `"1倍"` | 单倍行距 |
-| `最小值` | `"12磅"` | 最小 12 磅 |
-
-```bash
-python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --create --output config.yaml
-```
-
-编辑核心原则：
-- **只修改已有字段的值，不要添加新字段**
-- **不要删除任何已有字段**
-- **不要修改 YAML 锚点语法**（`&global_format` 和 `<<: *global_format`）
-
-### 步骤 1.2 验证配置文件
+### 步骤 1.2 验证
 
 ```bash
 python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --validate --config config.yaml
 ```
 
-验证失败则根据提示修正，直到通过。
+失败则根据提示修正，直到通过。
 
-### 步骤 1.3 保存到预设库（首次生成时）
+### 步骤 1.3 保存预设（首次生成时可选）
 
 ```bash
 python ${CLAUDE_SKILL_DIR}/scripts/setup_config.py --save --config config.yaml --name "XX大学_XX学院_本科"
 ```
 
-### 步骤 1.4 交付配置文件
-
-**⚠️ 必须将 `config.yaml` 复制到用户工作目录（workspace），作为任务产物交付给用户。**
+### 步骤 1.4 交付
 
 ```bash
-cp config.yaml <用户工作目录>/config.yaml
+cp config.yaml <用户工作目录>/
 ```
 
-然后**询问用户**：配置文件已生成，请检查各项格式参数是否正确。有些格式要求可能无法通过配置文件完全体现（如特殊的页眉页脚、目录格式等），用户可以手动补充或告知需要调整的地方。
-
-**任务一完成。** 用户确认配置无误后，可继续执行任务二。
+询问用户确认配置，提醒页眉页脚、目录等无法自动处理。**任务一完成。**
 
 ---
 
 ## 任务二：执行格式化
 
-> **前置条件**：需要任务一产出的 `config.yaml` 和原始 `.docx` 论文文件。**
+> 前提：有 `config.yaml` 和 `.docx` 论文。
 
-### 步骤 2.1 生成文档结构 JSON
-
-```bash
-wf gj -d $ARGUMENTS -c config.yaml
-```
-
-记住输出的 JSON 文件路径。
-
-### 步骤 2.2 查看文档结构树
+### 步骤 2.1 生成 JSON
 
 ```bash
-wf tree -f <JSON文件路径>
+wordf gj -d $ARGUMENTS -c config.yaml
 ```
 
-输出文档的段落分类统计和树形结构图，快速检查分类是否正确。
+记住输出的 JSON 路径（`output/论文_xxx.json`）。
+
+### 步骤 2.2 检查结构
 
 ```bash
-# 仅查看标题结构
-wf tree -f <JSON文件路径> --filter heading_level_1,heading_level_2
-
-# 显示分类置信度（低置信度的段落需要重点检查）
-wf tree -f <JSON文件路径> --confidence
+wordf tree -f <JSON路径>
+wordf tree -f <JSON路径> --confidence  # 看低置信度段落
 ```
 
-### 步骤 2.3 校验并检查 JSON 标签
+### 步骤 2.3 校验并修正 JSON
 
-> **开始本步骤前，阅读 [data/category_reference.md](data/category_reference.md) 了解 category 判定规则、自动类型提升机制、以及 `"other"` 标记规则。**
-
-#### 运行校验脚本
+> 先读 [data/category_reference.md](data/category_reference.md)。
 
 ```bash
-python ${CLAUDE_SKILL_DIR}/scripts/validate_json.py --json <JSON文件路径> --stats --show-all --threshold 0.8
+python ${CLAUDE_SKILL_DIR}/scripts/validate_json.py --json <JSON路径> --stats --show-all --threshold 0.8
 ```
 
-#### 人工检查并修正
+**常见修正**：
 
-对照文档实际内容，检查每个段落的分类是否正确。常见误判：
-- "摘要" → `abstract_chinese_title`，不是 `heading_level_1`
-- "关键词：..." → `keywords_chinese`，不是 `body_text`
-- "参考文献" → `references_title`，不是 `heading_level_1`
-- 摘要标题+正文在同一段 → `abstract_chinese_title_content`
+| 误识别 | 改为 |
+|--------|------|
+| "摘要" → `heading_level_1` | `abstract_chinese_title` |
+| "关键词：..." → `body_text` | `keywords_chinese` |
+| "参考文献" → `heading_level_1` | `references_title` |
+| 摘要标题+正文同一段 | `abstract_chinese_title_content` |
+| 目录/封面/页眉页脚 | `other`（跳过格式化） |
 
-**⚠️ 目录、页眉页脚等非内容段落 → 改为 `"other"`**（代码会自动跳过）
+**⚠️ 不修改的 body_text**：摘要标题后的正文（自动升级为摘要正文）、参考文献标题后的条目（自动升级为参考文献条目）。
 
-**⚠️ 目录部分必须全部标记为 `"other"`，不要格式化、不要添加段落标签：**
-- 目录标题（"目录"、"目 录"）→ `"other"`
-- 所有目录条目（带省略号和页码的行）→ `"other"`
-- 目录区域内的所有段落（含空行）→ `"other"`
-- 目录条目常被误识别为 `heading_level_1`、`heading_level_2`、`body_text`，必须全部纠正
+**用 `replace` 修正文本**：添加 `"replace": "正确文本"`，格式化时自动替换。
 
-**⚠️ 不要修改以下 `body_text`（代码会自动处理）：**
-- 摘要标题后面的正文段落 → 自动升级为摘要正文类型
-- 参考文献标题后面的每条文献 → 自动升级为参考文献条目类型
+修正后重新验证确认无误。
 
-发现错误时直接编辑 JSON 文件修改 `category` 字段，修正后重新运行校验脚本。
-
-#### 可选：添加 `replace` 字段替换段落内容
-
-每个段落条目可以**可选**添加 `"replace"` 字段，格式化时会将原段落文本替换为 `replace` 中指定的内容。
-
-**典型场景**：
-- 修正 AI 识别错误的标题文字
-- 替换摘要或关键词中的错别字
-- 统一修正特定短语
-
-**JSON 示例**：
-```json
-{
-    "category": "abstract_chinese_title",
-    "score": 0.9982,
-    "comment": "置信度：0.9982",
-    "paragraph": "摘    要",
-    "fingerprint": "abc123...",
-    "replace": "摘  要"
-}
-```
-
-**注意事项**：
-- `replace` 字段是可选的，不需要时不用添加
-- 替换在格式校验/修正之前执行，替换后的文本会按配置文件规范进行格式化
-- 检查模式和格式化模式均会执行替换
-
-### 步骤 2.4 执行格式检查或格式化
-
-**检查格式（不修改原文档）：**
-```bash
-wf cf -d 论文.docx -c config.yaml -f <JSON文件路径>
-```
-
-**自动格式化（直接修正）：**
-```bash
-wf af -d 论文.docx -c config.yaml -f <JSON文件路径>
-```
-
-> **注意**：如果 config.yaml 中启用了 `numbering.enabled: true`，格式化时会自动：
-> 1. 识别并清除标题段落的手动编号文字
-> 2. 应用 Word 自动编号（编号由 Word 渲染，不会丢失）
-> 此功能仅在格式化模式（`wf af`）下生效，检查模式（`wf cf`）不会修改编号。
-
-### 步骤 2.5 交付产物
-
-**⚠️ 必须将输出文件复制到用户工作目录（workspace），作为任务产物交付给用户。**
-
-输出文件说明：
-- 检查模式：`--标注版.docx`（原文档副本，批注标注格式问题）
-- 格式化模式：`--修改版.docx`（直接修正后的文档）
+### 步骤 2.4 格式化
 
 ```bash
-cp <输出文件> <用户工作目录>/
+wordf cf -d 论文.docx -c config.yaml -f <JSON路径>  # 检查（批注，不改原文）
+wordf af -d 论文.docx -c config.yaml -f <JSON路径>  # 修正（直接改）
 ```
 
-然后**询问用户**：格式化已完成，请打开文档检查格式是否正确。由于部分格式（如页眉页脚、目录、特殊排版等）无法通过工具自动处理，可能需要手动补充调整。如有问题请告知需要修改的地方。
+`numbering.enabled: true` 时，`af` 模式会自动清除手动编号并应用 Word 自动编号。
+
+### 步骤 2.5 交付
+
+```bash
+cp output/论文--标注版.docx <用户工作目录>/   # cf 模式
+cp output/论文--修改版.docx <用户工作目录>/   # af 模式
+```
+
+询问用户检查结果，提醒手动补充。**任务二完成。**
 
 ---
 
-## Python 编程调用
+## Python 调用
 
 ```python
-import os
-os.environ['MULTIPROCESSING_RESOURCE_TRACKER'] = '0'
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-
 from wordformat.set_tag import set_tag_main
 from wordformat.set_style import auto_format_thesis_document
-import json
 
 data = set_tag_main(docx_path="论文.docx", configpath="config.yaml")
-with open("output.json", "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=4)
-
-auto_format_thesis_document(
-    jsonpath="output.json", docxpath="论文.docx",
-    configpath="config.yaml", savepath="output/", check=True
-)
+auto_format_thesis_document(jsonpath=data, docxpath="论文.docx",
+                            configpath="config.yaml", savepath="output/", check=True)
 ```
 
 ## 注意事项
 
-- 仅支持 `.docx` 格式，不支持 `.doc`
-- Python >= 3.10
-- **务必检查 JSON 中的分类结果**，AI 识别并非 100% 准确
-- **配置文件和输出文件都是任务产物，必须保存到用户工作目录**
-- **每个任务完成后都必须询问用户确认结果**
-- 部分格式（页眉页脚、目录、特殊排版等）无法自动处理，需提醒用户手动补充
+- 仅 `.docx`，Python ≥ 3.10
+- AI 分类非 100% 准确，**务必检查 JSON**
+- 产物必须复制到用户工作目录
+- 每个任务完成后询问用户确认

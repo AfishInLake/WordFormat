@@ -8,7 +8,7 @@
 
 为 [WordFormat](https://github.com/AfishInLake/WordFormat) 提供 Web 图形化操作界面的 Vue 3 单页应用，帮助用户轻松完成学术论文格式自动化检查与修正。
 
-> 前端构建产物随 Python 包分发，用户通过 `wf startapi` 启动后端后，在浏览器中直接使用。
+> 前端构建产物随 Python 包分发，用户通过 `wordf startapi` 启动后端后，在浏览器中直接使用。
 
 ---
 
@@ -29,7 +29,7 @@ npm install
 npm run dev
 ```
 
-开发模式下 Vite 提供热重载，API 请求会自动代理到本地 WordFormat 后端（需先启动 `wf startapi`）。
+开发模式下 Vite 提供热重载，API 请求会自动代理到本地 WordFormat 后端（需先启动 `wordf startapi`）。
 
 ### 构建生产版本
 
@@ -72,7 +72,7 @@ WordFormatUI/
 
 ## 后端关联
 
-前端构建产物在 CI 中自动复制到 `src/wordformat/api/static/`，随 `wordformat` Python 包一起发布。用户安装 `wordformat` 后运行 `wf startapi` 即可直接访问前端界面。
+前端构建产物在 CI 中自动复制到 `src/wordformat/api/static/`，随 `wordformat` Python 包一起发布。用户安装 `wordformat` 后运行 `wordf startapi` 即可直接访问前端界面。
 
 ---
 

@@ -39,6 +39,14 @@
           <div class="field" :class="{ disabled: !config.references.enabled }"><label>后缀</label><select v-model="config.references.suffix" :disabled="!config.references.enabled"><option value="space">空格</option><option value="tab">制表符</option><option value="nothing">无</option></select></div>
         </div>
       </div>
+      <div class="level-item">
+        <h4>题注编号</h4>
+        <div class="level-controls">
+          <label class="inline-check"><input type="checkbox" v-model="config.captions.enabled" /><span>启用</span></label>
+          <div class="field" :class="{ disabled: !config.captions.enabled }"><label>分隔符</label><input type="text" v-model="config.captions.separator" :disabled="!config.captions.enabled" /><span class="hint">章节号与编号间的分隔符，如 . - :</span></div>
+          <label class="inline-check" :class="{ disabled: !config.captions.enabled }"><input type="checkbox" v-model="config.captions.label_number_space" :disabled="!config.captions.enabled" /><span>标签与编号间加空格</span></label>
+        </div>
+      </div>
     </div>
   </div>
 </template>

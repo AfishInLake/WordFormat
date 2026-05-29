@@ -35,42 +35,136 @@ def validate_file(
     return abs_path
 
 
+def _show_config():
+    """输出所有可配置字段及其说明"""
+    from wordformat.config.datamodel import (
+        CaptionNumberingConfig,
+        GlobalFormatConfig,
+        KeywordsConfig,
+        NumberingConfig,
+        NumberingLevelConfig,
+        WarningFieldConfig,
+    )
+
+    def _fields(cls):
+        return [(n, i) for n, i in cls.model_fields.items()]
+
+    def _desc(info):
+        return (info.description or "").replace("\n", " ")
+
+    def _default(info):
+        if info.default is not None:
+            return repr(info.default)
+        if info.default_factory is not None:
+            return "(子配置)"
+        return "—"
+
+    def _print_fields(fields, indent=2):
+        prefix = " " * indent
+        for name, info in fields:
+            print(f"{prefix}{name:<28s} {_desc(info):<40s} 默认: {_default(info)}")
+
+    gf = _fields(GlobalFormatConfig)
+    wf = _fields(WarningFieldConfig)
+    kw_extra = [
+        (n, i) for n, i in _fields(KeywordsConfig) if n not in {f[0] for f in gf}
+    ]
+    nc = _fields(NumberingConfig)
+    ncp = _fields(CaptionNumberingConfig)
+    nl = _fields(NumberingLevelConfig)
+
+    # 段落节点名列表（从 NodeConfigRoot 直接读）
+    paragraph_nodes = [
+        ("global_format", "全局基础格式"),
+        ("abstract.chinese.chinese_title", "中文摘要标题"),
+        ("abstract.chinese.chinese_content", "中文摘要正文"),
+        ("abstract.english.english_title", "英文摘要标题"),
+        ("abstract.english.english_content", "英文摘要正文"),
+        ("abstract.keywords.chinese", "中文关键词"),
+        ("abstract.keywords.english", "英文关键词"),
+        ("headings.level_1", "一级标题"),
+        ("headings.level_2", "二级标题"),
+        ("headings.level_3", "三级标题"),
+        ("body_text", "正文"),
+        ("figures", "图注"),
+        ("tables", "表注"),
+        ("references.title", "参考文献标题"),
+        ("references.content", "参考文献内容"),
+        ("acknowledgements.title", "致谢标题"),
+        ("acknowledgements.content", "致谢内容"),
+    ]
+
+    # 每个节点的额外字段
+    extras = {
+        "figures": [("caption_prefix", "图注编号前缀", "'图'")],
+        "tables": [
+            ("caption_prefix", "表注编号前缀", "'表'"),
+            ("content", "表格内容格式（子配置，字段同 global_format）", "(子配置)"),
+        ],
+        "abstract.keywords.chinese": [(n, _desc(i), _default(i)) for n, i in kw_extra],
+        "abstract.keywords.english": [(n, _desc(i), _default(i)) for n, i in kw_extra],
+    }
+
+    print("config.yaml 完整字段参考\n")
+
+    for path, label in paragraph_nodes:
+        print(f"[{path}] — {label}")
+        _print_fields(gf)
+        for name, desc, default in extras.get(path, []):
+            print(f"  {name:<28s} {desc:<40s} 默认: {default}")
+        print()
+
+    print("[style_checks_warning] — 格式警告开关")
+    _print_fields(wf)
+    print()
+
+    print("[numbering] — 自动编号总开关（仅 wordf af 模式生效）")
+    for n, i in nc:
+        if n not in ("level_1", "level_2", "level_3", "references", "captions"):
+            print(f"  {n:<28s} {_desc(i):<40s} 默认: {_default(i)}")
+    print()
+
+    print("[numbering.captions] — 题注编号")
+    _print_fields(ncp)
+    print()
+
+    for key in ("level_1", "level_2", "level_3", "references"):
+        print(f"[numbering.{key}] — 编号配置")
+        _print_fields(nl)
+        print()
+
+
 def main():
     from wordformat.log_config import setup_logger
 
     setup_logger()
 
+    print(f"WordFormat v{VERSION}")
+
     # 无参数直接展示完整帮助
     if len(sys.argv) == 1:
-        print("""  # noqa: T201
-📝 论文格式自动工具（极简命令）
+        print("""📝 论文格式自动工具（极简命令）
 ==================================================
 【极简命令】
-wf gj    生成文档JSON结构（自动生成，无需指定json路径）
-wf cf    检查格式错误
-wf af    自动格式化论文
-wf tree  查看文档结构树
-wf startapi    启动API服务
+wordf gj    生成文档JSON结构
+wordf cf    检查格式错误
+wordf af    自动格式化论文
+wordf tree  查看文档结构树
+wordf config  查看所有可配置字段
+wordf startapi    启动API服务
 
 【一键示例】
-wf gj -d 论文.docx -c config.yaml -o output/
-wf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
-wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
-wf tree -f output/xxx.json
-wf startapi -H 127.0.0.1 -p 8000
-
-参数：
--d    Word 文档路径（必填）
--c    YAML 配置文件（gj/cf/af 命令需要，startapi 不需要）
--f    JSON 文件路径（仅 cf/af/tree 需要）
--o    输出目录（默认 output/）
--H    API服务地址（默认 127.0.0.1）
--p    API服务端口（默认 8000）
+wordf gj -d 论文.docx -c config.yaml -o output/
+wordf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wordf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wordf tree -f output/xxx.json
+wordf config
+wordf startapi -H 127.0.0.1 -p 8000
 ==================================================
 """)
         return
 
-    parser = argparse.ArgumentParser(prog="wf", description="论文格式自动工具")
+    parser = argparse.ArgumentParser(prog="wordf", description="论文格式自动工具")
     parser.add_argument(
         "--version",
         "-V",
@@ -165,7 +259,15 @@ wf startapi -H 127.0.0.1 -p 8000
     )
 
     # ------------------------------
-    # 5. startapi = 启动API服务
+    # 5. config = 查看可配置字段 / 输出配置模板
+    # ------------------------------
+    p_config = subparsers.add_parser("config", help="查看可配置字段 / 输出配置模板")
+    p_config.add_argument(
+        "-o", default=None, help="输出配置模板到文件（如 config.yaml）"
+    )
+
+    # ------------------------------
+    # 6. startapi = 启动API服务
     # ------------------------------
     p_startapi = subparsers.add_parser("startapi", help="启动API服务")
     p_startapi.add_argument(
@@ -250,6 +352,27 @@ wf startapi -H 127.0.0.1 -p 8000
             show_index=args.index,
             filter_categories=filter_categories,
         )
+
+    elif args.mode == "config":
+        if args.o:
+            import warnings
+
+            import yaml
+
+            from wordformat.config.datamodel import NodeConfigRoot
+
+            cfg = NodeConfigRoot()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                data = cfg.model_dump()
+            yaml_str = yaml.dump(
+                data, default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
+            with open(args.o, "w", encoding="utf-8") as f:
+                f.write(yaml_str)
+            logger.success(f"配置模板已输出 → {args.o}")
+        else:
+            _show_config()
 
     elif args.mode == "startapi":
         logger.info("🚀 启动API服务...")

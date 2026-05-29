@@ -207,13 +207,13 @@ class TestLoadConfig:
         node = _make_node(CaptionFigure)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.caption_position == "below"
+        assert node._pydantic_config.caption_prefix == "图"
 
     def test_caption_table(self, root_config):
         node = _make_node(CaptionTable)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.caption_position == "above"
+        assert node._pydantic_config.caption_prefix == "表"
 
     def test_table_content_config(self, root_config):
         """TablesConfig 的 content 字段默认加载。"""
@@ -1120,12 +1120,6 @@ class TestCaptionFigureBase:
             node._base(doc, p=False, r=False)
         assert mock_comment.call_count >= 1
 
-    def test_check_caption_position(self, root_config):
-        """验证 caption_position 配置正确。"""
-        node = _make_node(CaptionFigure)
-        node.load_config(root_config)
-        assert node._pydantic_config.caption_position == "below"
-
 
 # ---------------------------------------------------------------------------
 # 17. CaptionTable._base 覆盖
@@ -1158,12 +1152,6 @@ class TestCaptionTableBase:
         with patch.object(node, "add_comment") as mock_comment:
             node._base(doc, p=False, r=False)
         assert mock_comment.call_count >= 1
-
-    def test_check_caption_position(self, root_config):
-        """验证 caption_position 配置正确。"""
-        node = _make_node(CaptionTable)
-        node.load_config(root_config)
-        assert node._pydantic_config.caption_position == "above"
 
 
 # ---------------------------------------------------------------------------
