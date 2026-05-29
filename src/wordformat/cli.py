@@ -42,22 +42,21 @@ def main():
 
     # 无参数直接展示完整帮助
     if len(sys.argv) == 1:
-        print("""  # noqa: T201
-📝 论文格式自动工具（极简命令）
+        print("""📝 论文格式自动工具（极简命令）
 ==================================================
 【极简命令】
-wf gj    生成文档JSON结构（自动生成，无需指定json路径）
-wf cf    检查格式错误
-wf af    自动格式化论文
-wf tree  查看文档结构树
-wf startapi    启动API服务
+wordf gj    生成文档JSON结构（自动生成，无需指定json路径）
+wordf cf    检查格式错误
+wordf af    自动格式化论文
+wordf tree  查看文档结构树
+wordf startapi    启动API服务
 
 【一键示例】
-wf gj -d 论文.docx -c config.yaml -o output/
-wf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
-wf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
-wf tree -f output/xxx.json
-wf startapi -H 127.0.0.1 -p 8000
+wordf gj -d 论文.docx -c config.yaml -o output/
+wordf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wordf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
+wordf tree -f output/xxx.json
+wordf startapi -H 127.0.0.1 -p 8000
 
 参数：
 -d    Word 文档路径（必填）

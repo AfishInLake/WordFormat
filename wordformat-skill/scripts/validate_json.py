@@ -2,7 +2,7 @@
 """
 WordFormat JSON 标签文件校验脚本
 
-校验 wf gj 生成的 JSON 文件中的 category 字段是否合法，
+校验 wordf gj 生成的 JSON 文件中的 category 字段是否合法，
 并输出每个段落的分类结果供人工检查。
 
 用法：

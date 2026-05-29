@@ -17,7 +17,7 @@ pip install wordformat -i https://pypi.tuna.tsinghua.edu.cn/simple
 pip install wordformat
 ```
 
-验证：`wf --help`
+验证：`wordf --help`
 
 ## 工作流程
 
@@ -147,7 +147,7 @@ cp config.yaml <用户工作目录>/config.yaml
 ### 步骤 2.1 生成文档结构 JSON
 
 ```bash
-wf gj -d $ARGUMENTS -c config.yaml
+wordf gj -d $ARGUMENTS -c config.yaml
 ```
 
 记住输出的 JSON 文件路径。
@@ -155,17 +155,17 @@ wf gj -d $ARGUMENTS -c config.yaml
 ### 步骤 2.2 查看文档结构树
 
 ```bash
-wf tree -f <JSON文件路径>
+wordf tree -f <JSON文件路径>
 ```
 
 输出文档的段落分类统计和树形结构图，快速检查分类是否正确。
 
 ```bash
 # 仅查看标题结构
-wf tree -f <JSON文件路径> --filter heading_level_1,heading_level_2
+wordf tree -f <JSON文件路径> --filter heading_level_1,heading_level_2
 
 # 显示分类置信度（低置信度的段落需要重点检查）
-wf tree -f <JSON文件路径> --confidence
+wordf tree -f <JSON文件路径> --confidence
 ```
 
 ### 步骤 2.3 校验并检查 JSON 标签
@@ -230,18 +230,18 @@ python ${CLAUDE_SKILL_DIR}/scripts/validate_json.py --json <JSON文件路径> --
 
 **检查格式（不修改原文档）：**
 ```bash
-wf cf -d 论文.docx -c config.yaml -f <JSON文件路径>
+wordf cf -d 论文.docx -c config.yaml -f <JSON文件路径>
 ```
 
 **自动格式化（直接修正）：**
 ```bash
-wf af -d 论文.docx -c config.yaml -f <JSON文件路径>
+wordf af -d 论文.docx -c config.yaml -f <JSON文件路径>
 ```
 
 > **注意**：如果 config.yaml 中启用了 `numbering.enabled: true`，格式化时会自动：
 > 1. 识别并清除标题段落的手动编号文字
 > 2. 应用 Word 自动编号（编号由 Word 渲染，不会丢失）
-> 此功能仅在格式化模式（`wf af`）下生效，检查模式（`wf cf`）不会修改编号。
+> 此功能仅在格式化模式（`wordf af`）下生效，检查模式（`wordf cf`）不会修改编号。
 
 ### 步骤 2.5 交付产物
 

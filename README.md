@@ -23,10 +23,10 @@
 
 ### 实用功能
 - **自动批注生成**：在格式违规位置自动添加 Word 批注，标注问题类型和修正建议
-- **文档结构可视化**：通过 `wf tree` 命令以树形结构展示文档段落分类和层级关系，支持按类别过滤、显示置信度
+- **文档结构可视化**：通过 `wordf tree` 命令以树形结构展示文档段落分类和层级关系，支持按类别过滤、显示置信度
 - **格式一键修正**：支持根据规范自动修正部分常见格式问题（如标题字号、正文行距）
 - **标题自动编号**：支持自动清除手动编号并应用 Word 自动编号，可自定义编号模板（如"第X章"、"1.1.1"）、编号后缀（制表符/空格/无）和缩进设置
-- **Web 可视化界面**：内置 Vue 前端界面，通过 `wf startapi` 一键启动图形化操作面板，告别命令行
+- **Web 可视化界面**：内置 Vue 前端界面，通过 `wordf startapi` 一键启动图形化操作面板，告别命令行
 - **自定义配置**：通过 YAML 配置文件灵活定义格式规范，适配不同学校/期刊的格式要求
 - **跨平台兼容**：支持 Windows/macOS/Linux 系统，基于 python-docx 实现跨平台 Word 文档处理
 
@@ -41,22 +41,36 @@
 
 ### 安装步骤
 
-**方式一：从 PyPI 安装（推荐普通用户）**
+**方式一：pipx 安装（强烈推荐）**
+
+`pipx` 会自动隔离环境并注册命令，安装完就能用，不会有 PATH 问题。
 
 ```bash
-# 使用 pip
-pip install wordformat
+# 安装 pipx（如果还没有）
+brew install pipx        # macOS
+pip install pipx         # 其他平台
 
-# 如果需要 Web 可视化界面（startapi），安装时带上 api 依赖
-pip install "wordformat[api]"
+# 安装 WordFormat
+pipx install wordformat
 
-# 或使用 uv
-uv add wordformat
+# 需要 Web 界面时安装 api 版本
+pipx install "wordformat[api]"
 ```
 
-安装完成后即可使用 `wf` 和 `wordformat` 命令。
+安装完成后直接使用 `wordf` 或 `wordformat` 命令。
 
-**方式二：从源码安装（开发者）**
+**方式二：pip 安装**
+
+```bash
+pip install wordformat
+# 或
+pip install "wordformat[api]"
+```
+
+> 安装后如果提示"找不到 wordf 命令"，说明 Python 脚本目录不在系统 PATH 中。
+> 请改用 `python3 -m wordformat` 替代，或改用 pipx 安装。
+
+**方式三：从源码安装（开发者）**
 
 1. **克隆项目**
    ```bash
@@ -84,19 +98,19 @@ WordFormat 提供三种核心执行模式：
 
 ```bash
 # 1. 生成文档结构 JSON
-wf gj -d 论文.docx -c 配置.yaml
+wordf gj -d 论文.docx -c 配置.yaml
 
 # 2. 查看文档结构树（检查分类是否正确）
-wf tree -f 结构文件.json
+wordf tree -f 结构文件.json
 
 # 3. 执行格式校验（添加批注，不修改原文）
-wf cf -d 论文.docx -c 配置.yaml -f 结构文件.json
+wordf cf -d 论文.docx -c 配置.yaml -f 结构文件.json
 
 # 4. 执行自动格式化（一键修正格式）
-wf af -d 论文.docx -c 配置.yaml -f 结构文件.json
+wordf af -d 论文.docx -c 配置.yaml -f 结构文件.json
 
 # 5. 启动 Web 可视化界面
-wf startapi
+wordf startapi
 # 然后在浏览器打开 http://127.0.0.1:8000
 ```
 ### startapi命令行预览（推荐使用）
@@ -104,18 +118,19 @@ wf startapi
 ```bash
 # 下载api版
 pip install "wordformat[api]"
-#启动 Web 可视化界面
-wf startapi
+# 启动 Web 可视化界面
+wordf startapi
 # 访问 http://127.0.0.1:8000
 
-# 若提示无法找到wf命令，请执行以下命令
-python -m wordformat.cli startapi
+# 若提示无法找到 wordf 命令，请改用 pipx 安装
+# 或直接使用：
+python3 -m wordformat startapi
 ```
 
 - 推荐使用.bat实现快速启动
 在桌面创建`start.txt`文件，写入下列命令（点击复制即可），修改后缀为`.bat`(完整文件名称`start.bat`)，双击即可启动
 ```bash
-python -m wordformat.cli startapi
+python -m wordformat startapi
 ```
 #### 配置界面
 ![配置界面预览](./docs/image/config.png)
