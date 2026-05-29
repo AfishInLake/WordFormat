@@ -113,6 +113,26 @@ class _SetSpacing:
             spacing.attrib.pop(lines_key)
 
     @staticmethod
+    def _set_hang_on_pPr(pPr, spacing_type: str, value: float):
+        """在任意 pPr 元素上设置「行」单位间距（段落或样式定义通用）。"""
+        value = max(float(value), 0.0)
+        if value > 10.0:
+            logger.warning(f"间距{value}行过大，自动兜底为10行")
+            value = 10.0
+        lines_100unit = int(round(value * 100))
+
+        spacing = pPr.find(qn("w:spacing"))
+        if spacing is None:
+            spacing = OxmlElement("w:spacing")
+            pPr.append(spacing)
+
+        spacing.set(qn(f"w:{spacing_type}Lines"), str(lines_100unit))
+        spacing.set(qn(f"w:{spacing_type}"), "0")
+        autospacing_key = qn(f"w:{spacing_type}Autospacing")
+        if spacing.get(autospacing_key) is not None:
+            spacing.attrib.pop(autospacing_key)
+
+    @staticmethod
     def set_hang(paragraph: Paragraph, spacing_type: str, value: float):
         """
         核心通用设置逻辑：段前/段后间距统一处理（行→Lines属性×100）
@@ -123,44 +143,14 @@ class _SetSpacing:
         4. 支持浮点数行值（如0.5行→50，1.2行→120）
         """
         try:
-            # 校验行值：非负数，过大值兜底（避免排版异常）
-            value = max(float(value), 0.0)
-            if value > 10.0:
-                logger.warning(f"间距{value}行过大，自动兜底为10行")
-                value = 10.0
-
-            # 核心：Word中Lines属性以「1/100行」为单位存储（如0.5行→50，1行→100）
-            lines_100unit = int(round(value * 100))  # 四舍五入为整数，匹配Word存储
-
             p = paragraph._element
-            # 步骤1：创建/获取pPr节点（段落属性根节点，无则创建）
             pPr = p.find(qn("w:pPr"))
             if pPr is None:
                 pPr = parse_xml(
                     r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
                 )
                 p.append(pPr)
-
-            # 步骤2：创建/获取spacing节点（间距节点，无则创建）
-            spacing = pPr.find(qn("w:spacing"))
-            if spacing is None:
-                spacing = parse_xml(
-                    r'<w:spacing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-                )
-                pPr.append(spacing)
-
-            # 步骤3：设置核心属性w:XXLines（优先级最高，与获取函数对应）
-            spacing.set(qn(f"w:{spacing_type}Lines"), str(lines_100unit))
-
-            # 步骤4：清除冲突属性，确保新值生效
-            # 4a. 显式设置 w:XX="0" 覆盖样式级 pt 间距（否则 Word 可能
-            #     忽略 w:XXLines="0" 而回退到样式继承的 pt 间距）
-            spacing.set(qn(f"w:{spacing_type}"), "0")
-            # 4b. 清除 w:XXAutospacing 属性（自动间距会覆盖 Lines，导致设置无效）
-            autospacing_key = qn(f"w:{spacing_type}Autospacing")
-            if spacing.get(autospacing_key) is not None:
-                spacing.attrib.pop(autospacing_key)
-
+            _SetSpacing._set_hang_on_pPr(pPr, spacing_type, value)
         except Exception as e:
             logger.error(f"设置段落{spacing_type}间距{value}行失败: {e}")
 
@@ -231,6 +221,20 @@ class _SetLineSpacing:
     """
 
     @staticmethod
+    def _set_on_pPr(pPr, line_rule: str, line_val: float):
+        """在任意 pPr 元素上设置行距（段落或样式定义通用）。
+
+        line_rule: "auto" | "exact" | "atLeast"
+        line_val: 行距值（auto 模式下为 240×倍数，exact/atLeast 模式下为 twips）
+        """
+        spacing = pPr.find(qn("w:spacing"))
+        if spacing is None:
+            spacing = OxmlElement("w:spacing")
+            pPr.append(spacing)
+        spacing.set(qn("w:lineRule"), line_rule)
+        spacing.set(qn("w:line"), str(int(round(line_val))))
+
+    @staticmethod
     def set_pt(paragraph: Paragraph, value: float):
         """
         使用 PT/磅 为单位设置行距
@@ -281,6 +285,30 @@ class _SetIndent:
     """
 
     @staticmethod
+    def _set_char_on_pPr(pPr, indent_type: str, value: float):
+        """在任意 pPr 元素上设置「字符」单位缩进（段落或样式定义通用）。"""
+        if indent_type not in ("R", "X"):
+            raise ValueError(
+                f"无效的缩进类型: {indent_type}. 仅支持 'R'（左）或 'X'（右）"
+            )
+
+        ind = pPr.find(qn("w:ind"))
+        if ind is None:
+            ind = OxmlElement("w:ind")
+            pPr.append(ind)
+
+        char_attr = qn("w:leftChars") if indent_type == "R" else qn("w:rightChars")
+        physical_attr = qn("w:left") if indent_type == "R" else qn("w:right")
+
+        if value == 0:
+            if char_attr in ind.attrib:
+                del ind.attrib[char_attr]
+            if physical_attr in ind.attrib:
+                del ind.attrib[physical_attr]
+        else:
+            ind.set(char_attr, str(int(round(float(value) * 100))))
+
+    @staticmethod
     def set_char(paragraph: Paragraph, indent_type: str, value: float) -> bool:
         """
         使用 字符 为单位设置缩进
@@ -290,42 +318,9 @@ class _SetIndent:
             value: 字符数值
         """
         try:
-            if indent_type not in ("R", "X"):
-                logger.error(
-                    f"无效的缩进类型: {indent_type}. 仅支持 'R'（左）或 'X'（右）"
-                )
-                return False
-
-            p = paragraph._element
-            pPr = p.get_or_add_pPr()
-
-            # 获取或创建 <w:ind> 元素
-            ind = pPr.find(qn("w:ind"))
-            if ind is None:
-                from docx.oxml import OxmlElement
-
-                ind = OxmlElement("w:ind")
-                pPr.append(ind)
-
-            # 清除旧的字符缩进和物理缩进（根据类型）
-            char_attr = qn("w:leftChars") if indent_type == "R" else qn("w:rightChars")
-            physical_attr = qn("w:left") if indent_type == "R" else qn("w:right")
-
-            # 设置新值
-            if value == 0:
-                # 删除属性
-                if char_attr in ind.attrib:
-                    del ind.attrib[char_attr]
-                if physical_attr in ind.attrib:
-                    del ind.attrib[physical_attr]
-            else:
-                # 1 字符 = 100 单位
-                chars_int = int(round(float(value) * 100))
-                ind.set(char_attr, str(chars_int))
-                # 注意：不要设置 physical_attr，Word 会优先使用 *Chars
-
+            pPr = paragraph._element.get_or_add_pPr()
+            _SetIndent._set_char_on_pPr(pPr, indent_type, value)
             return True
-
         except Exception as e:
             logger.error(f"设置字符缩进失败 (type={indent_type}, value={value}): {e}")
             return False
@@ -399,42 +394,62 @@ class _SetFirstLineIndent:
     """
 
     @staticmethod
-    def clear(paragraph: Paragraph):
-        """
-        清除段落的首行缩进设置（包括 firstLine 和 firstLineChars 字段），
-        同时保留左缩进（left）和右缩进（right）
-        Args:
-            paragraph: 段落对象
-        """
-        p = paragraph._element
-        pPr = p.get_or_add_pPr()
+    def _clear_ind_on_pPr(pPr):
+        """清除 pPr 中 <w:ind> 的首行/悬挂缩进属性，保留 left/right。"""
         ind = pPr.find(qn("w:ind"))
-
         if ind is None:
-            # 没有缩进设置，无需操作
             return
-
-        # 保留 left 和 right
         left = ind.get(qn("w:left"))
         right = ind.get(qn("w:right"))
-
-        # 创建新的属性字典，只保留 left / right
         new_attrs = {}
         if left is not None:
             new_attrs[qn("w:left")] = left
         if right is not None:
             new_attrs[qn("w:right")] = right
-
         if new_attrs:
-            # 有保留的属性，更新 <w:ind>
-            # 先清空所有属性
             ind.clear()
-            # 再设置保留的属性
             for k, v in new_attrs.items():
                 ind.set(k, v)
         else:
-            # 没有保留属性，直接删除 <w:ind>
             pPr.remove(ind)
+
+    @staticmethod
+    def clear(paragraph: Paragraph):
+        """
+        清除段落的首行缩进设置（包括 firstLine 和 firstLineChars 字段），
+        同时保留左缩进（left）和右缩进（right）
+        """
+        pPr = paragraph._element.get_or_add_pPr()
+        _SetFirstLineIndent._clear_ind_on_pPr(pPr)
+
+    @staticmethod
+    def _set_char_on_pPr(pPr, value: float, existing_left=None, existing_right=None):
+        """在任意 pPr 元素上设置「字符」单位首行缩进（段落或样式定义通用）。
+
+        value > 0 → 首行缩进（w:firstLineChars）
+        value < 0 → 悬挂缩进（w:hangingChars）
+        value == 0 → 清除缩进
+        """
+        # 保留 left / right（如果存在）
+        attrs = {}
+        if existing_left is not None:
+            attrs["w:left"] = existing_left
+        if existing_right is not None:
+            attrs["w:right"] = existing_right
+
+        if value == 0:
+            attrs["w:firstLine"] = "0"
+            attrs["w:firstLineChars"] = "0"
+            attrs["w:hanging"] = "0"
+        elif value > 0:
+            attrs["w:firstLineChars"] = str(int(round(float(value) * 100)))
+        else:
+            attrs["w:hangingChars"] = str(int(round(float(abs(value)) * 100)))
+
+        attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
+        ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501
+        new_ind = parse_xml(ind_xml)
+        pPr.append(new_ind)
 
     @staticmethod
     def set_char(  # noqa C901
@@ -450,10 +465,7 @@ class _SetFirstLineIndent:
         """
         _SetFirstLineIndent.clear(paragraph)
         try:
-            p = paragraph._element
-            pPr = p.get_or_add_pPr()
-
-            # 保留 left / right
+            pPr = paragraph._element.get_or_add_pPr()
             existing_left = None
             existing_right = None
             ind = pPr.find(qn("w:ind"))
@@ -461,32 +473,10 @@ class _SetFirstLineIndent:
                 existing_left = ind.get(qn("w:left"))
                 existing_right = ind.get(qn("w:right"))
                 pPr.remove(ind)
-
-            attrs = {}
-            if existing_left is not None:
-                attrs["w:left"] = existing_left
-            if existing_right is not None:
-                attrs["w:right"] = existing_right
-
-            if value == 0:
-                attrs["w:firstLine"] = "0"
-                attrs["w:firstLineChars"] = "0"
-                attrs["w:hanging"] = "0"
-            elif value > 0:
-                chars_int = int(round(float(value) * 100))
-                attrs["w:firstLineChars"] = str(chars_int)
-            else:
-                # 悬挂缩进：负值 → 写 w:hangingChars（取绝对值）
-                chars_int = int(round(float(abs(value)) * 100))
-                attrs["w:hangingChars"] = str(chars_int)
-
-            attr_str = " ".join(f'{k}="{v}"' for k, v in attrs.items())
-            ind_xml = f'<w:ind xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" {attr_str}/>'  # noqa E501
-
-            new_ind = parse_xml(ind_xml)
-            pPr.append(new_ind)
+            _SetFirstLineIndent._set_char_on_pPr(
+                pPr, value, existing_left, existing_right
+            )
             return True
-
         except Exception as e:
             logger.error(f"设置首行缩进失败：{e}")
             return False
