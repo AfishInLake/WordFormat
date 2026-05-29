@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
 """
-WordFormat 配置准备脚本
-
-统一处理配置文件的准备流程：
-1. 查找已有预设配置
-2. 复制模板生成新配置
-3. 验证配置合法性
-4. 保存到预设库
+WordFormat 配置管理脚本
 
 用法：
+    # 生成配置模板
+    wordf config -o config.yaml
+
     # 查找已有预设
     python setup_config.py --list-presets
 
     # 从预设库复制配置
     python setup_config.py --use "清华大学_计算机学院_本科" --output config.yaml
-
-    # 从模板创建新配置（复制模板到工作目录）
-    python setup_config.py --create --output config.yaml
 
     # 验证配置文件
     python setup_config.py --validate --config config.yaml
@@ -74,7 +68,6 @@ PRESETS_DIR = Path("presets")
 
 # 获取脚本所在目录（用于定位模板和验证脚本）
 SCRIPT_DIR = Path(__file__).resolve().parent
-TEMPLATE_FILE = SCRIPT_DIR.parent / "data" / "config.yaml"
 
 
 def get_presets_dir() -> Path:
@@ -128,16 +121,6 @@ def use_preset(name: str, output: str):
 
     shutil.copy2(preset_path, output)
     print(f"已复制预设配置: {preset_path.stem} -> {output}")
-
-
-def create_from_template(output: str):
-    """从模板创建新配置"""
-    if not TEMPLATE_FILE.exists():
-        print(f"模板文件不存在: {TEMPLATE_FILE}")
-        sys.exit(1)
-    shutil.copy2(TEMPLATE_FILE, output)
-    print(f"已从模板创建配置: {output}")
-    print("请根据格式要求编辑此文件，然后运行 --validate 验证。")
 
 
 def save_preset(config_path: str, name: str):
@@ -196,10 +179,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python setup_config.py --list-presets
+  wordf config -o config.yaml                                      # 生成模板
+  python setup_config.py --list-presets                            # 列预设
   python setup_config.py --use "清华大学_计算机学院_本科" --output config.yaml
-  python setup_config.py --create --output config.yaml
-  python setup_config.py --validate --config config.yaml
+  python setup_config.py --validate --config config.yaml           # 验证
   python setup_config.py --save --config config.yaml --name "XX大学_XX学院_本科"
 """,
     )
@@ -209,7 +192,6 @@ def main():
         "--list-presets", action="store_true", help="列出所有已保存的预设配置"
     )
     group.add_argument("--use", metavar="NAME", help="从预设库复制配置（支持模糊匹配）")
-    group.add_argument("--create", action="store_true", help="从模板创建新配置")
     group.add_argument("--validate", action="store_true", help="验证配置文件")
     group.add_argument("--save", action="store_true", help="保存配置到预设库")
 
@@ -232,8 +214,6 @@ def main():
         list_presets()
     elif args.use:
         use_preset(args.use, args.output)
-    elif args.create:
-        create_from_template(args.output)
     elif args.validate:
         errors = validate(args.config)
         if not errors:

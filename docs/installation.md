@@ -19,7 +19,7 @@ pip install wordformat
 uv pip install wordformat
 ```
 
-安装完成后即可使用 `wf` 和 `wordformat` 命令。
+安装完成后即可使用 `wordf` 和 `wordformat` 命令。
 
 如需 API 服务功能，安装 api 可选依赖：
 
@@ -63,7 +63,7 @@ uv pip install -e ".[dev]"
 ```bash
 wordformat --help
 # 或
-wf --help
+wordf --help
 ```
 
 如果输出了命令行帮助信息，则说明安装成功。

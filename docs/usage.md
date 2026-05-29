@@ -5,26 +5,26 @@
 ## 命令行使用（推荐 · 极简版）
 
 WordFormat 现已支持**超短命令**，输入更快捷、不易出错。
-支持 **`wordformat` / `wf`** 双命令启动。
+支持 **`wordformat` / `wordf`** 双命令启动。
 
 ---
 
 ## 极简命令速查（最常用）
 ```bash
 # 生成文档结构 JSON（自动保存，无需指定json路径）
-wf gj -d 论文.docx -c 配置.yaml
+wordf gj -d 论文.docx -c 配置.yaml
 
 # 查看文档结构树（检查分类是否正确）
-wf tree -f 生成的文件.json
+wordf tree -f 生成的文件.json
 
 # 检查格式错误（添加批注，不修改原文）
-wf cf -d 论文.docx -c 配置.yaml -f 生成的文件.json
+wordf cf -d 论文.docx -c 配置.yaml -f 生成的文件.json
 
 # 自动格式化论文（一键修正格式）
-wf af -d 论文.docx -c 配置.yaml -f 生成的文件.json
+wordf af -d 论文.docx -c 配置.yaml -f 生成的文件.json
 
 # 启动API服务（提供Web接口）
-wf startapi
+wordf startapi
 ```
 
 ---
@@ -32,7 +32,7 @@ wf startapi
 ## 详细使用说明
 
 ### 命令说明
-- `wf` 或 `wordformat`：工具主命令
+- `wordf` 或 `wordformat`：工具主命令
 - `gj`：generate-json → 生成文档结构 JSON
 - `tree`：查看文档结构树
 - `cf`：check-format → 检查格式
@@ -55,13 +55,13 @@ wf startapi
 
 ```bash
 # 最简用法（带配置文件）
-wf gj -d your_document.docx -c example/undergrad_thesis.yaml
+wordf gj -d your_document.docx -c example/undergrad_thesis.yaml
 
 # 不带配置文件（使用内置默认配置）
-wf gj -d your_document.docx
+wordf gj -d your_document.docx
 
 # 自定义输出目录
-wf gj -d your_document.docx -c example/undergrad_thesis.yaml -o output/
+wordf gj -d your_document.docx -c example/undergrad_thesis.yaml -o output/
 ```
 
 ---
@@ -71,16 +71,16 @@ wf gj -d your_document.docx -c example/undergrad_thesis.yaml -o output/
 
 ```bash
 # 查看完整结构（含各类别统计）
-wf tree -f output/论文_1744123456.json
+wordf tree -f output/论文_1744123456.json
 
 # 仅查看标题结构
-wf tree -f output/论文_1744123456.json --filter heading_level_1,heading_level_2
+wordf tree -f output/论文_1744123456.json --filter heading_level_1,heading_level_2
 
 # 显示节点序号
-wf tree -f output/论文_1744123456.json --index
+wordf tree -f output/论文_1744123456.json --index
 
 # 显示分类置信度
-wf tree -f output/论文_1744123456.json --confidence
+wordf tree -f output/论文_1744123456.json --confidence
 ```
 
 **tree 专属参数：**
@@ -115,10 +115,10 @@ wf tree -f output/论文_1744123456.json --confidence
 
 ```bash
 # 基础用法
-wf cf -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json
+wordf cf -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json
 
 # 自定义输出目录
-wf cf -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json -o check_result/
+wordf cf -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json -o check_result/
 ```
 
 ---
@@ -128,19 +128,19 @@ wf cf -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 
 ```bash
 # 基础用法
-wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json
+wordf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json
 
 # 自定义输出目录
-wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json -o final_output/
+wordf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_1744123456.json -o final_output/
 ```
 
-> **标题自动编号**：如果配置文件中启用了 `numbering.enabled: true`，格式化时会自动清除标题的手动编号并应用 Word 自动编号。编号样式（字体/字号/加粗）会自动跟随标题配置。此功能仅在 `wf af` 模式下生效。
+> **标题自动编号**：如果配置文件中启用了 `numbering.enabled: true`，格式化时会自动清除标题的手动编号并应用 Word 自动编号。编号样式（字体/字号/加粗）会自动跟随标题配置。此功能仅在 `wordf af` 模式下生效。
 
 ---
 
 ## 5. 启动 Web 可视化界面（startapi）
 
-`wf startapi` 会启动一个完整的 Web 服务，提供以下能力：
+`wordf startapi` 会启动一个完整的 Web 服务，提供以下能力：
 
 | 能力 | 说明 |
 |------|------|
@@ -156,10 +156,10 @@ wf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文_17
 pip install "wordformat[api]"
 
 # 默认启动（127.0.0.1:8000，仅本机可访问）
-wf startapi
+wordf startapi
 
 # 监听所有网络接口（局域网内其他设备也可访问）
-wf startapi -H 0.0.0.0 -p 8080
+wordf startapi -H 0.0.0.0 -p 8080
 ```
 
 ### 访问地址
@@ -228,16 +228,16 @@ print(f"校验结果: http://127.0.0.1:8000{download_url}")
 ## 完整测试示例
 ```bash
 # 1. 生成 JSON（自动命名）
-wf gj -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml"
+wordf gj -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml"
 
 # 2. 查看文档结构（检查分类）
-wf tree -f "output/毕业设计说明书_1744123456.json"
+wordf tree -f "output/毕业设计说明书_1744123456.json"
 
 # 3. 格式检查
-wf cf -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f "output/毕业设计说明书_1744123456.json"
+wordf cf -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f "output/毕业设计说明书_1744123456.json"
 
 # 4. 自动格式化
-wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f "output/毕业设计说明书_1744123456.json"
+wordf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f "output/毕业设计说明书_1744123456.json"
 ```
 
 ---
@@ -246,11 +246,11 @@ wf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" -f 
 
 | 命令 | 全称 | 作用 | 必填参数 |
 |------|------|------|----------|
-| `wf gj` | generate-json | 生成文档结构 JSON | `-d`（`-c` 推荐） |
-| `wf tree` | tree | 查看文档结构树 | `-f` |
-| `wf cf` | check-format | 检查格式并添加批注 | `-d`,`-c`,`-f` |
-| `wf af` | apply-format | 自动格式化论文 | `-d`,`-c`,`-f` |
-| `wf startapi` | start-api | 启动Web可视化界面 | 无 |
+| `wordf gj` | generate-json | 生成文档结构 JSON | `-d`（`-c` 推荐） |
+| `wordf tree` | tree | 查看文档结构树 | `-f` |
+| `wordf cf` | check-format | 检查格式并添加批注 | `-d`,`-c`,`-f` |
+| `wordf af` | apply-format | 自动格式化论文 | `-d`,`-c`,`-f` |
+| `wordf startapi` | start-api | 启动Web可视化界面 | 无 |
 
 | 参数 | 作用 | 必填 |
 |------|------|------|

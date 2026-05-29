@@ -3,8 +3,8 @@
 
 ## 命令行使用问题
 
-### Q1：直接输入 `wf` 报错？
-**回答**：不会报错！现在直接输入 `wf` 会自动显示**完整使用指南**，不会出现参数错误。
+### Q1：直接输入 `wordf` 报错？
+**回答**：不会报错！现在直接输入 `wordf` 会自动显示**完整使用指南**，不会出现参数错误。
 
 ### Q2：命令行执行报参数缺失？
 **核心原因**：三个模式必填参数不同
@@ -14,9 +14,9 @@
 
 **正确示例**
 ```bash
-wf gj -d 论文.docx -c 配置.yaml
-wf cf -d 论文.docx -c 配置.yaml -f 论文_1234567890.json
-wf af -d 论文.docx -c 配置.yaml -f 论文_1234567890.json
+wordf gj -d 论文.docx -c 配置.yaml
+wordf cf -d 论文.docx -c 配置.yaml -f 论文_1234567890.json
+wordf af -d 论文.docx -c 配置.yaml -f 论文_1234567890.json
 ```
 
 ### Q3：`gj` 模式找不到 `-f` 参数？
@@ -25,24 +25,24 @@ JSON 会**自动生成**在 `-o` 目录，文件名 = 文档名 + 10位时间戳
 
 ### Q4：`cf / af` 提示 JSON 文件不存在？
 **排查方向**
-1. 确认已先执行 `wf gj` 生成 JSON
+1. 确认已先执行 `wordf gj` 生成 JSON
 2. 确认 `-f` 后面是**完整的 JSON 文件路径**，不是文件夹
 3. 检查路径是否正确（可直接复制终端打印的 JSON 路径）
 
 ### Q4.5：如何快速检查 JSON 中的分类是否正确？
-**回答**：使用 `wf tree` 命令查看文档结构树：
+**回答**：使用 `wordf tree` 命令查看文档结构树：
 ```bash
 # 查看完整结构
-wf tree -f output/论文_1234567890.json
+wordf tree -f output/论文_1234567890.json
 
 # 仅看标题
-wf tree -f output/论文_1234567890.json --filter heading_level_1,heading_level_2
+wordf tree -f output/论文_1234567890.json --filter heading_level_1,heading_level_2
 
 # 显示置信度（低于 80% 的需要重点检查）
-wf tree -f output/论文_1234567890.json --confidence
+wordf tree -f output/论文_1234567890.json --confidence
 ```
 
-### Q5：`wf` 或 `wordformat` 命令未找到？
+### Q5：`wordf` 或 `wordformat` 命令未找到？
 **排查方向**
 1. 确认进入了虚拟环境
 2. 执行过 `pip install -e .`
@@ -83,7 +83,7 @@ wf tree -f output/论文_1234567890.json --confidence
 **排查方向**
 1. 确认 `numbering.enabled` 设为 `true`
 2. 确认对应级别的 `level_1/2/3.enabled` 也设为 `true`
-3. 自动编号仅在 `wf af`（格式化模式）下生效，`wf cf`（检查模式）不会修改编号
+3. 自动编号仅在 `wordf af`（格式化模式）下生效，`wordf cf`（检查模式）不会修改编号
 4. 检查 `strip_pattern` 正则是否能匹配文档中的手动编号
 
 ---

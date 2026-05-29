@@ -97,6 +97,9 @@ pip install "wordformat[api]"
 WordFormat 提供三种核心执行模式：
 
 ```bash
+# 0. 生成配置模板
+wordf config -o 配置.yaml
+
 # 1. 生成文档结构 JSON
 wordf gj -d 论文.docx -c 配置.yaml
 
