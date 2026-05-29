@@ -79,8 +79,6 @@ class DocxBase:
                     response["comment"] = (
                         f"原预测标签为 '{tag}'，置信度 {score:.4f} < 0.6，已强制设为 'body_text'"
                     )
-
-                logger.info(response)
                 result.append(response)
 
         return result

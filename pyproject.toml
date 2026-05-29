@@ -125,7 +125,7 @@ wordformat = ["data/**/*", "api/static/**/*"]
 
 [project.scripts]
 wordformat = "wordformat.cli:main"
-wf = "wordformat.cli:main"
+wordf = "wordformat.cli:main"
 
 
 [project.optional-dependencies]
