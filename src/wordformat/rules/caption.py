@@ -51,8 +51,9 @@ def _check_caption_numbering(
     issues = []
     if parsed["label"] != expected_label:
         issues.append(f"题注标签应为'{expected_label}'，当前为'{parsed['label']}'")
-    # 检查标签与编号之间的空格
-    label_with_space = text.startswith(f"{expected_label} ")
+    # 检查标签与编号之间的空格（跳过续前缀再检查）
+    check_text = text[1:].lstrip() if parsed.get("is_continued") else text
+    label_with_space = check_text.startswith(f"{expected_label} ")
     if label_with_space != numbering_cfg.label_number_space:
         want = "有空格" if numbering_cfg.label_number_space else "无空格"
         issues.append(f"标签与编号间应为{want}")
@@ -89,9 +90,9 @@ def _apply_caption_numbering(
 
     parsed = parse_caption_text(text)
     name = parsed["name"] if parsed else text
-    label_part = (
-        f"{expected_label} " if numbering_cfg.label_number_space else expected_label
-    )
+    is_continued = parsed.get("is_continued", False) if parsed else False
+    label_text = f"续{expected_label}" if is_continued else expected_label
+    label_part = f"{label_text} " if numbering_cfg.label_number_space else label_text
     new_text = f"{label_part}{chapter}{separator}{seq} {name}"
     _replace_paragraph_text(paragraph, new_text)
 

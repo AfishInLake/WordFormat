@@ -148,6 +148,51 @@ class TestParseCaptionText:
         assert result["number_num"] == 1
         assert result["name"] == "系统架构图"
 
+    def test_continued_table_caption(self):
+        """续表 5.3 API接口测试结果 → 正确解析"""
+        result = parse_caption_text("续表5.3 API接口测试结果")
+        assert result is not None
+        assert result["label"] == "表"
+        assert result["chapter_num"] == 5
+        assert result["separator"] == "."
+        assert result["number_num"] == 3
+        assert result["name"] == "API接口测试结果"
+        assert result["is_continued"] is True
+
+    def test_continued_figure_caption(self):
+        """续图 2.1 系统架构图 → 正确解析"""
+        result = parse_caption_text("续图2.1 系统架构图")
+        assert result is not None
+        assert result["label"] == "图"
+        assert result["chapter_num"] == 2
+        assert result["number_num"] == 1
+        assert result["name"] == "系统架构图"
+        assert result["is_continued"] is True
+
+    def test_continued_caption_with_space_after_label(self):
+        """续 表 5.3 xxx → 去掉续后正常匹配。"""
+        result = parse_caption_text("续 表 5.3 测试表格")
+        assert result is not None
+        assert result["label"] == "表"
+        assert result["is_continued"] is True
+        assert result["name"] == "测试表格"
+
+    def test_continued_table_with_hyphen(self):
+        """续表5-3 测试 → 连字符分隔符"""
+        result = parse_caption_text("续表5-3 测试")
+        assert result is not None
+        assert result["label"] == "表"
+        assert result["chapter_num"] == 5
+        assert result["separator"] == "-"
+        assert result["number_num"] == 3
+        assert result["is_continued"] is True
+
+    def test_regular_caption_not_continued(self):
+        """普通题注 is_continued 为 False"""
+        result = parse_caption_text("表5.3 测试")
+        assert result is not None
+        assert result["is_continued"] is False
+
 
 # ======================== _replace_paragraph_text ========================
 
@@ -352,6 +397,35 @@ class TestCheckCaptionNumbering:
 
         mock_comment.assert_not_called()
 
+    def test_continued_table_correct_no_comment(self):
+        """续表格式正确不添加批注。"""
+        from wordformat.rules.caption import _check_caption_numbering
+
+        doc = Document()
+        p = self._make_paragraph("续表5.3 测试")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+
+        with patch.object(node, "add_comment") as mock_comment:
+            _check_caption_numbering(node, doc, "表", cfg)
+
+        mock_comment.assert_not_called()
+
+    def test_continued_table_label_space_wrong(self):
+        """续表 label_number_space=True 但无空格 → 添加批注。"""
+        from wordformat.rules.caption import _check_caption_numbering
+
+        doc = Document()
+        p = self._make_paragraph("续表5.3 测试")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=True)
+
+        with patch.object(node, "add_comment") as mock_comment:
+            _check_caption_numbering(node, doc, "表", cfg)
+
+        mock_comment.assert_called_once()
+        assert "标签与编号间应为有空格" in mock_comment.call_args[0][2]
+
 
 # ======================== _apply_caption_numbering ========================
 
@@ -413,6 +487,42 @@ class TestApplyCaptionNumbering:
         _apply_caption_numbering(node, "图", cfg)
 
         assert p.text == "图 1.1 旧名称"
+
+    def test_continued_table_preserves_numbering(self):
+        """续表保留原标题注编号并保留续前缀。"""
+        from wordformat.rules.caption import _apply_caption_numbering
+
+        p = self._make_paragraph("续表5.3 API接口测试结果")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+
+        _apply_caption_numbering(node, "表", cfg)
+
+        assert p.text == "续表5.3 API接口测试结果"
+
+    def test_continued_table_preserves_numbering_with_label_space(self):
+        """续表 label_number_space=true → 标签后加空格。"""
+        from wordformat.rules.caption import _apply_caption_numbering
+
+        p = self._make_paragraph("续表5.3 API接口测试结果")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=True)
+
+        _apply_caption_numbering(node, "表", cfg)
+
+        assert p.text == "续表 5.3 API接口测试结果"
+
+    def test_continued_table_corrects_separator(self):
+        """续表修正分隔符。"""
+        from wordformat.rules.caption import _apply_caption_numbering
+
+        p = self._make_paragraph("续表5-3 测试")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+
+        _apply_caption_numbering(node, "表", cfg)
+
+        assert p.text == "续表5.3 测试"
 
 
 # ======================== apply_format_check_to_all_nodes 集成 ========================
@@ -644,3 +754,49 @@ numbering:
         mock_comment.assert_not_called()
         assert fig.value["chapter_number"] == 1
         assert fig.value["sequence_number"] == 1
+
+    @pytest.mark.usefixtures("_suppress_format_comments")
+    def test_continued_table_does_not_increment_counter(self, caption_yaml):
+        """续表不消耗题注编号，后续普通题注编号正确递增。"""
+        from wordformat.set_style import apply_format_check_to_all_nodes
+
+        doc = Document()
+        p1 = self._make_paragraph("表5.1 岗位信息表")
+        p2 = self._make_paragraph("续表5.1 岗位信息表")
+        p3 = self._make_paragraph("表5.2 薪资表")
+
+        tab1 = self._make_caption_table(p1)
+        tab_continued = self._make_caption_table(p2)
+        tab2 = self._make_caption_table(p3)
+        heading = self._make_heading_node(children=[tab1, tab_continued, tab2])
+        config = self._init_config(caption_yaml)
+
+        with patch.object(tab1, "add_comment"), \
+             patch.object(tab_continued, "add_comment"), \
+             patch.object(tab2, "add_comment"):
+            apply_format_check_to_all_nodes(heading, doc, config, check=True)
+
+        # 表5.1: 章节号5，序号1
+        assert tab1.value["chapter_number"] == 1
+        assert tab1.value["sequence_number"] == 1
+        # 续表5.1: 保留原编号，不递增
+        assert tab_continued.value["chapter_number"] == 5
+        assert tab_continued.value["sequence_number"] == 1
+        # 表5.2: 章节号1，序号2（续表未消耗编号）
+        assert tab2.value["chapter_number"] == 1
+        assert tab2.value["sequence_number"] == 2
+
+    @pytest.mark.usefixtures("_suppress_format_comments")
+    def test_continued_table_apply_mode_preserves_prefix(self, caption_yaml):
+        """apply 模式：续表文本保留续前缀。"""
+        from wordformat.set_style import apply_format_check_to_all_nodes
+
+        doc = Document()
+        p = self._make_paragraph("续表5.3 API接口测试结果")
+        tab = self._make_caption_table(p)
+        heading = self._make_heading_node(children=[tab])
+        config = self._init_config(caption_yaml)
+
+        apply_format_check_to_all_nodes(heading, doc, config, check=False)
+
+        assert p.text == "续表5.3 API接口测试结果"

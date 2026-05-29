@@ -252,6 +252,7 @@ def apply_format_check_to_all_nodes(
     :param check: 用来控制是仅检查还是仅修改
     """
     from wordformat.rules.caption import CaptionFigure, CaptionTable
+    from wordformat.utils import parse_caption_text
 
     chapter_index: int = 0
     figure_counter: dict[int, int] = {}
@@ -281,14 +282,27 @@ def apply_format_check_to_all_nodes(
 
                     # 对题注节点注入章节号和顺序号
                     if isinstance(node, (CaptionFigure, CaptionTable)):
-                        chapter = current_chapter if current_chapter > 0 else 0
-                        if isinstance(node, CaptionFigure):
-                            counter = figure_counter
+                        # 检查是否为续表/续图：保留原标题注编号，不递增计数器
+                        text = node.paragraph.text.strip() if node.paragraph else ""
+                        parsed = parse_caption_text(text)
+                        if (
+                            parsed
+                            and parsed.get("is_continued")
+                            and parsed.get("chapter_num") is not None
+                            and parsed.get("number_num") is not None
+                        ):
+                            chapter = parsed["chapter_num"]
+                            seq = parsed["number_num"]
                         else:
-                            counter = table_counter
-                        counter[chapter] = counter.get(chapter, 0) + 1
+                            chapter = current_chapter if current_chapter > 0 else 0
+                            if isinstance(node, CaptionFigure):
+                                counter = figure_counter
+                            else:
+                                counter = table_counter
+                            counter[chapter] = counter.get(chapter, 0) + 1
+                            seq = counter[chapter]
                         node.value["chapter_number"] = chapter
-                        node.value["sequence_number"] = counter[chapter]
+                        node.value["sequence_number"] = seq
                         if hasattr(config, "numbering"):
                             node.value["_numbering_cfg"] = config.numbering.captions
 

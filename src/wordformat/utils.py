@@ -396,17 +396,26 @@ def _from_chinese_num(chinese: str) -> int:
 def parse_caption_text(text: str) -> dict | None:
     """解析题注文本为结构化组件。
 
-    支持格式：[标签][章节号][分隔符][题注编号] [题注名称]
+    支持格式：[续][标签][章节号][分隔符][题注编号] [题注名称]
     章节号支持阿拉伯数字、中文数字、罗马数字。
     分隔符支持 . - : — –
+    支持 "续表"/"续图" 前缀，解析后 is_continued 为 True。
 
     Returns:
         {"label", "chapter_text", "separator", "number_text", "name",
-         "chapter_num", "number_num"} 或 None
+         "chapter_num", "number_num", "is_continued"} 或 None
     """
     import re
 
     text = text.strip()
+    if not text:
+        return None
+
+    # 检测 "续" 前缀（续表/续图）
+    is_continued = text.startswith("续")
+    if is_continued:
+        text = text[1:].strip()
+
     if not text:
         return None
 
@@ -427,6 +436,7 @@ def parse_caption_text(text: str) -> dict | None:
             "number_text": num_text,
             "number_num": int(num_text),
             "name": name.strip(),
+            "is_continued": is_continued,
         }
 
     # 模式2：图/表 + 中文数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
@@ -446,6 +456,7 @@ def parse_caption_text(text: str) -> dict | None:
             "number_text": num_text,
             "number_num": int(num_text),
             "name": name.strip(),
+            "is_continued": is_continued,
         }
 
     # 模式3：图/表 + 罗马数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
@@ -465,6 +476,7 @@ def parse_caption_text(text: str) -> dict | None:
             "number_text": num_text,
             "number_num": int(num_text),
             "name": name.strip(),
+            "is_continued": is_continued,
         }
 
     # 尝试匹配编号部分也使用中文数字或罗马数字
@@ -489,6 +501,7 @@ def parse_caption_text(text: str) -> dict | None:
             "number_text": num_text,
             "number_num": num_num,
             "name": name.strip(),
+            "is_continued": is_continued,
         }
 
     return None
