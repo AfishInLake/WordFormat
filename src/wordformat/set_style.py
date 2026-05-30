@@ -233,6 +233,11 @@ def _fix_style_paragraph_properties(style, cfg, style_name: str):
             inst = cls(val)
             if inst.rel_unit == "hang":
                 _SetSpacing._set_hang_on_pPr(pPr, spacing_type, inst.rel_value)
+            else:
+                logger.warning(
+                    f"样式 '{style_name}' {attr_name} 使用了 '{inst.rel_unit}' 单位，"
+                    f"样式定义仅支持'行'单位，已跳过"
+                )
         except Exception as e:
             logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
 
@@ -264,11 +269,30 @@ def _fix_style_paragraph_properties(style, cfg, style_name: str):
                 else:
                     line_val = ls_val * 240
                 _SetLineSpacing._set_on_pPr(pPr, line_rule, line_val)
+            else:
+                logger.warning(
+                    f"样式 '{style_name}' 设置了 line_spacingrule 但未设置 line_spacing，已跳过行距"
+                )
         except Exception as e:
             logger.warning(f"设置样式 '{style_name}' 行距失败: {e}")
 
-    # --- 缩进 ---
+    # --- 缩进：先设置首行缩进，再设置左右缩进，避免 _clear_ind_on_pPr 清除 *Chars 属性 ---
     from wordformat.style.set_some import _SetFirstLineIndent, _SetIndent
+
+    first_line_indent = getattr(cfg, "first_line_indent", None)
+    if first_line_indent is not None:
+        try:
+            inst = FirstLineIndent(first_line_indent)
+            if inst.rel_unit == "char":
+                _SetFirstLineIndent._clear_ind_on_pPr(pPr)
+                _SetFirstLineIndent._set_char_on_pPr(pPr, inst.rel_value)
+            else:
+                logger.warning(
+                    f"样式 '{style_name}' first_line_indent 使用了 '{inst.rel_unit}' 单位，"
+                    f"样式定义仅支持'字符'单位，已跳过"
+                )
+        except Exception as e:
+            logger.warning(f"设置样式 '{style_name}' first_line_indent 失败: {e}")
 
     for attr_name, cls, indent_type in [
         ("left_indent", LeftIndent, "R"),
@@ -281,19 +305,13 @@ def _fix_style_paragraph_properties(style, cfg, style_name: str):
             inst = cls(val)
             if inst.rel_unit == "char":
                 _SetIndent._set_char_on_pPr(pPr, indent_type, inst.rel_value)
+            else:
+                logger.warning(
+                    f"样式 '{style_name}' {attr_name} 使用了 '{inst.rel_unit}' 单位，"
+                    f"样式定义仅支持'字符'单位，已跳过"
+                )
         except Exception as e:
             logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
-
-    first_line_indent = getattr(cfg, "first_line_indent", None)
-    if first_line_indent is not None:
-        try:
-            inst = FirstLineIndent(first_line_indent)
-            if inst.rel_unit == "char":
-                # 样式定义无需保留 existing left/right，全量覆盖
-                _SetFirstLineIndent._clear_ind_on_pPr(pPr)
-                _SetFirstLineIndent._set_char_on_pPr(pPr, inst.rel_value)
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' first_line_indent 失败: {e}")
 
 
 def _fix_all_style_definitions(document: Document, config_model):
