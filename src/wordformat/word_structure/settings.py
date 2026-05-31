@@ -2,6 +2,10 @@
 # @Time    : 2026/1/11 22:25
 # @Author  : afish
 # @File    : settings.py
+from wordformat.core.category import (  # noqa: F401 — re-export
+    HEADING_CATEGORIES,
+    LEVEL_MAP,
+)
 from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -21,7 +25,7 @@ from wordformat.rules import (
     References,
 )
 
-# 标签节点映射
+# 标签 → FormatNode 子类映射（不可放入 core，因 core 不依赖 rules）
 CATEGORY_TO_CLASS = {
     "abstract_chinese_title": AbstractTitleCN,
     "abstract_english_title": AbstractTitleEN,
@@ -39,19 +43,4 @@ CATEGORY_TO_CLASS = {
     "caption_figure": CaptionFigure,
     "caption_table": CaptionTable,
     "body_text": BodyText,
-}
-LEVEL_MAP = {
-    "heading_level_1": 1,
-    "heading_level_2": 2,
-    "heading_level_3": 3,
-    "heading_mulu": 1,
-    "heading_fulu": 1,
-    "references_title": 1,
-    "acknowledgements_title": 1,
-    "abstract_chinese_title": 1,
-    "abstract_english_title": 1,
-    "abstract_chinese_title_content": 1,
-    "abstract_english_title_content": 1,
-    "keywords_chinese": 3,
-    "keywords_english": 3,
 }

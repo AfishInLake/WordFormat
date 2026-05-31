@@ -14,6 +14,16 @@ from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 from wordformat.utils import parse_caption_text
 
 
+def _get_node_attr(node, key: str, default=0):
+    """优先读取实例属性，回退到 value dict（向后兼容）。"""
+    val = getattr(node, key, None)
+    if val is not None:
+        return val
+    if isinstance(node.value, dict):
+        return node.value.get(key, default)
+    return default
+
+
 def _replace_paragraph_text(paragraph, new_text: str) -> None:
     """替换段落全部文本，保留第一个 run 的格式，清除其余 run。"""
     runs = paragraph.runs
@@ -35,8 +45,8 @@ def _check_caption_numbering(
     if not paragraph:
         return
 
-    chapter = node.value.get("chapter_number", 0)
-    seq = node.value.get("sequence_number", 0)
+    chapter = _get_node_attr(node, "chapter_number", 0)
+    seq = _get_node_attr(node, "sequence_number", 0)
     separator = numbering_cfg.separator
 
     text = paragraph.text.strip()
@@ -80,8 +90,8 @@ def _apply_caption_numbering(
     if not paragraph:
         return
 
-    chapter = node.value.get("chapter_number", 0)
-    seq = node.value.get("sequence_number", 0)
+    chapter = _get_node_attr(node, "chapter_number", 0)
+    seq = _get_node_attr(node, "sequence_number", 0)
     separator = numbering_cfg.separator
 
     text = paragraph.text.strip()
@@ -145,7 +155,7 @@ class CaptionFigure(FormatNode[FiguresConfig]):
 
         # 题注编号校验/修正（仅当 value 为 dict 且有 _numbering_cfg 时才执行）
         if isinstance(self.value, dict):
-            numbering_cfg = self.value.get("_numbering_cfg")
+            numbering_cfg = getattr(self, "_numbering_cfg", None)
             if numbering_cfg and numbering_cfg.enabled:
                 prefix = cfg.caption_prefix or "图"
                 if p:
@@ -202,7 +212,7 @@ class CaptionTable(FormatNode[TablesConfig]):
 
         # 题注编号校验/修正（仅当 value 为 dict 且有 _numbering_cfg 时才执行）
         if isinstance(self.value, dict):
-            numbering_cfg = self.value.get("_numbering_cfg")
+            numbering_cfg = getattr(self, "_numbering_cfg", None)
             if numbering_cfg and numbering_cfg.enabled:
                 prefix = cfg.caption_prefix or "表"
                 if p:

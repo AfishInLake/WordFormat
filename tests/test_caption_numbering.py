@@ -613,8 +613,8 @@ numbering:
         with patch.object(fig, "add_comment"):
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
 
-        assert fig.value["chapter_number"] == 1
-        assert fig.value["sequence_number"] == 1
+        assert fig.chapter_number == 1
+        assert fig.sequence_number == 1
 
     # 抑制格式检查产生的 comment，仅关注编号逻辑
     @pytest.fixture
@@ -703,8 +703,8 @@ numbering:
 
         mc1.assert_not_called()
         mc2.assert_not_called()
-        assert fig.value["sequence_number"] == 1
-        assert tab.value["sequence_number"] == 1
+        assert fig.sequence_number == 1
+        assert tab.sequence_number == 1
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_multi_chapter_counters_reset(self, caption_yaml):
@@ -731,10 +731,10 @@ numbering:
              patch.object(fig2, "add_comment"):
             apply_format_check_to_all_nodes(root, doc, config, check=True)
 
-        assert fig1.value["chapter_number"] == 1
-        assert fig1.value["sequence_number"] == 1
-        assert fig2.value["chapter_number"] == 2
-        assert fig2.value["sequence_number"] == 1
+        assert fig1.chapter_number == 1
+        assert fig1.sequence_number == 1
+        assert fig2.chapter_number == 2
+        assert fig2.sequence_number == 1
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_disabled_skips_numbering_check(self, caption_yaml):
@@ -752,8 +752,8 @@ numbering:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
 
         mock_comment.assert_not_called()
-        assert fig.value["chapter_number"] == 1
-        assert fig.value["sequence_number"] == 1
+        assert fig.chapter_number == 1
+        assert fig.sequence_number == 1
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_continued_table_does_not_increment_counter(self, caption_yaml):
@@ -777,14 +777,14 @@ numbering:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
 
         # 表5.1: 章节号5，序号1
-        assert tab1.value["chapter_number"] == 1
-        assert tab1.value["sequence_number"] == 1
+        assert tab1.chapter_number == 1
+        assert tab1.sequence_number == 1
         # 续表5.1: 保留原编号，不递增
-        assert tab_continued.value["chapter_number"] == 5
-        assert tab_continued.value["sequence_number"] == 1
+        assert tab_continued.chapter_number == 5
+        assert tab_continued.sequence_number == 1
         # 表5.2: 章节号1，序号2（续表未消耗编号）
-        assert tab2.value["chapter_number"] == 1
-        assert tab2.value["sequence_number"] == 2
+        assert tab2.chapter_number == 1
+        assert tab2.sequence_number == 2
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_continued_table_apply_mode_preserves_prefix(self, caption_yaml):

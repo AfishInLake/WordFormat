@@ -4,46 +4,22 @@ from typing import Literal
 
 from docx.oxml.ns import qn
 
-from wordformat.config.datamodel import KeywordsConfig, NodeConfigRoot
+from wordformat.config.datamodel import KeywordsConfig
 from wordformat.rules.node import FormatNode
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 
 # 第一步：提取关键词基类，复用通用逻辑
 class BaseKeywordsNode(FormatNode[KeywordsConfig]):
-    """关键词节点基类（复用中英文通用逻辑）"""
+    """关键词节点基类（复用中英文通用逻辑）
 
-    # 子类必须定义的属性
+    CONFIG_PATH 由子类定义（如 "abstract.chinese.keywords"），
+    load_config 由 FormatNode 基类统一处理（CONFIG_PATH getattr 链）。
+    """
+
     LANG: Literal["cn", "en"] = ""  # 语言类型：cn/en
     NODE_TYPE: str = ""
     CONFIG_MODEL = KeywordsConfig
-
-    def _get_lang_config(self, root_config: NodeConfigRoot) -> KeywordsConfig:
-        """根据语言类型获取对应配置"""
-        lang_config_map = {
-            "cn": root_config.abstract.keywords["chinese"],
-            "en": root_config.abstract.keywords["english"],
-        }
-        return lang_config_map.get(self.LANG, root_config.abstract.keywords["chinese"])
-
-    def load_config(self, root_config: dict | NodeConfigRoot):
-        """重载加载配置，自动匹配对应语言的关键词配置"""
-        if isinstance(root_config, dict):
-            # 从字典中提取对应语言的配置，通过父类方法设置 __config
-            lang_config = (
-                root_config.get("abstract", {}).get("keywords", {}).get(self.LANG, {})
-            )
-            # 直接设置父类的 __config（避免名称修饰问题）
-            self._TreeNode__config = lang_config
-            self._pydantic_config = self.CONFIG_MODEL(**self.config)
-        elif isinstance(root_config, NodeConfigRoot):
-            # 从Pydantic模型提取对应语言的配置
-            self._pydantic_config = self._get_lang_config(root_config)
-            self._TreeNode__config = self._pydantic_config.model_dump()
-        else:
-            raise TypeError(
-                f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"
-            )
 
     def _check_paragraph_style(self, cfg: KeywordsConfig, p: bool) -> str:
         """通用段落样式检查（复用）"""
@@ -114,6 +90,7 @@ class KeywordsEN(BaseKeywordsNode):
 
     LANG = "en"
     NODE_TYPE = "abstract.keywords.english"
+    CONFIG_PATH = "abstract.keywords.english"
 
     def _check_keyword_label(self, run) -> bool:
         """检查run是否包含英文关键词标签（Keywords/KEY WORDS）"""
@@ -217,6 +194,7 @@ class KeywordsCN(BaseKeywordsNode):
 
     LANG = "cn"
     NODE_TYPE = "abstract.keywords.chinese"
+    CONFIG_PATH = "abstract.keywords.chinese"
 
     def _check_keyword_label(self, run) -> bool:
         """检查run是否包含中文关键词标签（关键词）"""

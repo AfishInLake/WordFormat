@@ -9,7 +9,18 @@ from docx import Document
 from loguru import logger
 
 from wordformat.config.config import get_config, init_config
-from wordformat.config.datamodel import BaseModel, NodeConfigRoot
+from wordformat.config.datamodel import NodeConfigRoot
+
+# ---- 从 orchestration/ 导入（原 set_style.py 中的函数已拆分到各子模块） ----
+from wordformat.orchestration.binding import (
+    bind_and_sync as _bind_and_sync,
+)
+from wordformat.orchestration.style_fixer import (
+    fix_all_style_definitions as _fix_all_style_definitions,
+)
+from wordformat.orchestration.table_formatter import (  # noqa: E402
+    format_table_content,
+)
 from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -20,329 +31,11 @@ from wordformat.rules import (
     References,
 )
 from wordformat.settings import VOIDNODELIST
-from wordformat.style.check_format import CharacterStyle, ParagraphStyle
-from wordformat.utils import ensure_directory_exists, get_paragraph_xml_fingerprint
+from wordformat.utils import ensure_directory_exists
 from wordformat.word_structure.document_builder import DocumentBuilder
 from wordformat.word_structure.utils import (
-    find_and_modify_first,
     promote_bodytext_in_subtrees_of_type,
 )
-
-
-def _collect_all_style_configs(config_model) -> dict:
-    """遍历 NodeConfigRoot，收集所有唯一的 (英文样式名 → 配置段) 映射。
-
-    对于被多个段引用的同一样式（如 body_text 和 references.content 都用 "Normal"），
-    保留先遇到的配置段。
-    """
-    from wordformat.config.datamodel import GlobalFormatConfig
-    from wordformat.style.style_enum import BuiltInStyle
-
-    style_map: dict[str, object] = {}
-
-    def _resolve_style_name(cfg) -> str | None:
-        raw = getattr(cfg, "builtin_style_name", None)
-        if not raw:
-            return None
-        try:
-            return BuiltInStyle(raw).rel_value  # "正文" → "Normal", "题注" → "Caption"
-        except Exception:
-            return raw  # 自定义样式名直接使用
-
-    def _walk(obj, path: str = ""):
-        if isinstance(obj, GlobalFormatConfig):
-            eng_name = _resolve_style_name(obj)
-            if eng_name and eng_name not in style_map:
-                style_map[eng_name] = obj
-        if isinstance(obj, BaseModel):
-            for f_name in type(obj).model_fields:
-                val = getattr(obj, f_name)
-                if isinstance(val, BaseModel):
-                    _walk(val, f"{path}.{f_name}")
-                elif isinstance(val, dict):
-                    for _k, v in val.items():
-                        if isinstance(v, BaseModel):
-                            _walk(v, f"{path}.{_k}")
-
-    _walk(config_model)
-    return style_map
-
-
-def _fix_style_run_properties(style, cfg, style_name: str):
-    """修正样式定义中的字符格式属性（w:rPr）。"""
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    from wordformat.style.style_enum import FontColor, FontSize
-
-    style_element = style.element
-
-    # 确保 w:rPr 存在
-    rPr = style_element.find(qn("w:rPr"))
-    if rPr is None:
-        rPr = OxmlElement("w:rPr")
-        style_element.insert(0, rPr)
-
-    # --- 字体名称 ---
-    rFonts = rPr.find(qn("w:rFonts"))
-    if rFonts is None:
-        rFonts = OxmlElement("w:rFonts")
-        rPr.insert(0, rFonts)
-    # 中文字体（eastAsia）
-    cn_name = getattr(cfg, "chinese_font_name", None)
-    if cn_name:
-        rFonts.set(qn("w:eastAsia"), str(cn_name))
-    # 英文字体（ascii + hAnsi）
-    en_name = getattr(cfg, "english_font_name", None)
-    if en_name:
-        rFonts.set(qn("w:ascii"), str(en_name))
-        rFonts.set(qn("w:hAnsi"), str(en_name))
-
-    # --- 字号 ---
-    font_size = getattr(cfg, "font_size", None)
-    if font_size is not None:
-        try:
-            fs = FontSize(font_size)
-            pt_val = fs.rel_value  # e.g. "小四" → 12.0
-            half_pt = str(int(round(pt_val * 2)))
-            # 更新或创建 w:sz
-            sz = rPr.find(qn("w:sz"))
-            if sz is None:
-                sz = OxmlElement("w:sz")
-                rPr.append(sz)
-            sz.set(qn("w:val"), half_pt)
-            # w:szCs（复杂脚本字号）
-            szCs = rPr.find(qn("w:szCs"))
-            if szCs is None:
-                szCs = OxmlElement("w:szCs")
-                rPr.append(szCs)
-            szCs.set(qn("w:val"), half_pt)
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' 字号失败: {e}")
-
-    # --- 字体颜色（清除主题色） ---
-    font_color = getattr(cfg, "font_color", None)
-    if font_color is not None:
-        try:
-            fc = FontColor(font_color)
-            rgb = fc.rel_value
-            hex_color = f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
-            # 移除旧的 w:color（尤其是有主题色的）
-            for old_color in rPr.findall(qn("w:color")):
-                rPr.remove(old_color)
-            new_color = OxmlElement("w:color")
-            new_color.set(qn("w:val"), hex_color)
-            rPr.append(new_color)
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' 颜色失败: {e}")
-
-    # --- 加粗 ---
-    bold = getattr(cfg, "bold", None)
-    if bold is not None:
-        b = rPr.find(qn("w:b"))
-        if bold:
-            if b is None:
-                rPr.append(OxmlElement("w:b"))
-        else:
-            if b is not None:
-                rPr.remove(b)
-
-    # --- 斜体 ---
-    italic = getattr(cfg, "italic", None)
-    if italic is not None:
-        i = rPr.find(qn("w:i"))
-        if italic:
-            if i is None:
-                rPr.append(OxmlElement("w:i"))
-        else:
-            if i is not None:
-                rPr.remove(i)
-
-    # --- 下划线 ---
-    underline = getattr(cfg, "underline", None)
-    if underline is not None:
-        u = rPr.find(qn("w:u"))
-        if underline:
-            if u is None:
-                u = OxmlElement("w:u")
-                u.set(qn("w:val"), "single")
-                rPr.append(u)
-        else:
-            if u is not None:
-                rPr.remove(u)
-
-
-def _fix_style_paragraph_properties(style, cfg, style_name: str):
-    """修正样式定义中的段落格式属性（w:pPr）。
-
-    设置：对齐方式、段前/段后间距、行距、首行缩进、左右缩进。
-    直接在 w:pPr 元素上操作 XML，确保样式定义级别生效。
-    """
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    from wordformat.style.style_enum import (
-        Alignment,
-        FirstLineIndent,
-        LeftIndent,
-        LineSpacing,
-        LineSpacingRule,
-        RightIndent,
-        SpaceAfter,
-        SpaceBefore,
-    )
-
-    style_element = style.element
-
-    pPr = style_element.find(qn("w:pPr"))
-    if pPr is None:
-        pPr = OxmlElement("w:pPr")
-        style_element.append(pPr)
-
-    # --- 对齐方式 ---
-    alignment = getattr(cfg, "alignment", None)
-    if alignment is not None:
-        try:
-            al = Alignment(alignment)
-            jc = pPr.find(qn("w:jc"))
-            if jc is None:
-                jc = OxmlElement("w:jc")
-                pPr.append(jc)
-            xml_val_map = {
-                0: "left",
-                1: "center",
-                2: "right",
-                3: "both",
-                4: "distribute",
-            }
-            jc.set(qn("w:val"), xml_val_map.get(al.rel_value, "left"))
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' 对齐方式失败: {e}")
-
-    # --- 段前/段后间距 ---
-    from wordformat.style.set_some import _SetSpacing
-
-    for attr_name, cls, spacing_type in [
-        ("space_before", SpaceBefore, "before"),
-        ("space_after", SpaceAfter, "after"),
-    ]:
-        val = getattr(cfg, attr_name, None)
-        if val is None:
-            continue
-        try:
-            inst = cls(val)
-            if inst.rel_unit == "hang":
-                _SetSpacing._set_hang_on_pPr(pPr, spacing_type, inst.rel_value)
-            else:
-                logger.warning(
-                    f"样式 '{style_name}' {attr_name} 使用了 '{inst.rel_unit}' 单位，"
-                    f"样式定义仅支持'行'单位，已跳过"
-                )
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
-
-    # --- 行距 ---
-    from wordformat.style.set_some import _SetLineSpacing
-
-    line_spacingrule = getattr(cfg, "line_spacingrule", None)
-    if line_spacingrule is not None:
-        try:
-            lsr = LineSpacingRule(line_spacingrule)
-            rule_map = {
-                0: "auto",
-                1: "auto",
-                2: "auto",
-                3: "atLeast",
-                4: "exact",
-                5: "auto",
-            }
-            line_rule = rule_map.get(lsr.rel_value, "auto")
-
-            line_spacing = getattr(cfg, "line_spacing", None)
-            if line_spacing is not None:
-                ls = LineSpacing(line_spacing)
-                ls_val = ls.rel_value
-                if ls.rel_unit == "倍":
-                    line_val = ls_val * 240  # 倍数 → w:line
-                elif ls.rel_unit in ("pt",):
-                    line_val = ls_val * 20  # pt → twips
-                else:
-                    line_val = ls_val * 240
-                _SetLineSpacing._set_on_pPr(pPr, line_rule, line_val)
-            else:
-                logger.warning(
-                    f"样式 '{style_name}' 设置了 line_spacingrule 但未设置 line_spacing，已跳过行距"
-                )
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' 行距失败: {e}")
-
-    # --- 缩进：先设置首行缩进，再设置左右缩进，避免 _clear_ind_on_pPr 清除 *Chars 属性 ---
-    from wordformat.style.set_some import _SetFirstLineIndent, _SetIndent
-
-    first_line_indent = getattr(cfg, "first_line_indent", None)
-    if first_line_indent is not None:
-        try:
-            inst = FirstLineIndent(first_line_indent)
-            if inst.rel_unit == "char":
-                _SetFirstLineIndent._clear_ind_on_pPr(pPr)
-                _SetFirstLineIndent._set_char_on_pPr(pPr, inst.rel_value)
-            else:
-                logger.warning(
-                    f"样式 '{style_name}' first_line_indent 使用了 '{inst.rel_unit}' 单位，"
-                    f"样式定义仅支持'字符'单位，已跳过"
-                )
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' first_line_indent 失败: {e}")
-
-    for attr_name, cls, indent_type in [
-        ("left_indent", LeftIndent, "R"),
-        ("right_indent", RightIndent, "X"),
-    ]:
-        val = getattr(cfg, attr_name, None)
-        if val is None:
-            continue
-        try:
-            inst = cls(val)
-            if inst.rel_unit == "char":
-                _SetIndent._set_char_on_pPr(pPr, indent_type, inst.rel_value)
-            else:
-                logger.warning(
-                    f"样式 '{style_name}' {attr_name} 使用了 '{inst.rel_unit}' 单位，"
-                    f"样式定义仅支持'字符'单位，已跳过"
-                )
-        except Exception as e:
-            logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
-
-
-def _fix_all_style_definitions(document: Document, config_model):
-    """在格式化开始前，统一修正文档中所有使用的样式定义。
-
-    遍历配置中所有段（body_text、headings、abstract、figures、tables、
-    references、acknowledgements 等），收集唯一的 builtin_style_name，
-    然后修正每个样式定义的字符格式和段落格式，使其与配置一致。
-
-    修正内容：
-    1. 字符格式：中英文字体、字号、颜色（清除主题色）、加粗、斜体、下划线
-    2. 段落格式：对齐方式
-    3. 确保样式定义存在（不存在则创建）
-    """
-    from wordformat.style.style_enum import _ensure_style_exists
-
-    style_configs = _collect_all_style_configs(config_model)
-
-    for eng_style_name, cfg in style_configs.items():
-        _ensure_style_exists(document, eng_style_name)
-
-        try:
-            style = document.styles[eng_style_name]
-        except KeyError:
-            logger.warning(f"样式 '{eng_style_name}' 创建失败，跳过修正")
-            continue
-
-        _fix_style_run_properties(style, cfg, eng_style_name)
-        _fix_style_paragraph_properties(style, cfg, eng_style_name)
-
-        logger.debug(f"已修正样式定义: {eng_style_name}")
 
 
 def apply_format_check_to_all_nodes(
@@ -407,10 +100,10 @@ def apply_format_check_to_all_nodes(
                                 counter = table_counter
                             counter[chapter] = counter.get(chapter, 0) + 1
                             seq = counter[chapter]
-                        node.value["chapter_number"] = chapter
-                        node.value["sequence_number"] = seq
+                        node.chapter_number = chapter
+                        node.sequence_number = seq
                         if hasattr(config, "numbering"):
-                            node.value["_numbering_cfg"] = config.numbering.captions
+                            node._numbering_cfg = config.numbering.captions
 
                     if node.paragraph:
                         # 先执行内容替换（check/format 两种模式均执行）
@@ -432,91 +125,6 @@ def apply_format_check_to_all_nodes(
                 )
 
     traverse(root_node)
-
-
-def xg(root_node, paragraph):
-    """
-    根据段落对象查找对应的节点
-    :param root_node: 树的根节点
-    :param paragraph: docx文档的段落对象
-    :return: 找到的节点
-    """
-
-    def condition(node):
-        if getattr(node, "fingerprint", False):
-            return node.fingerprint == get_paragraph_xml_fingerprint(paragraph)
-        return False
-
-    return find_and_modify_first(root=root_node, condition=condition)
-
-
-def format_table_content(
-    document: Document, config: NodeConfigRoot, check: bool = True
-):
-    """对文档中所有表格的单元格内容进行格式校验或应用。
-
-    遍历 document.tables → rows → cells → paragraphs，
-    根据 config.tables.content 中的格式配置对每个单元格段落进行
-    段落样式和字符样式的检查（check=True）或应用（check=False）。
-
-    Args:
-        document: docx 文档对象
-        config: Pydantic 配置根模型
-        check: True 为仅检查（diff），False 为应用格式
-    """
-    try:
-        content_cfg = config.tables.content
-    except AttributeError:
-        return
-
-    ps = ParagraphStyle.from_config(content_cfg)
-    cstyle = CharacterStyle(
-        font_name_cn=content_cfg.chinese_font_name,
-        font_name_en=content_cfg.english_font_name,
-        font_size=content_cfg.font_size,
-        font_color=content_cfg.font_color,
-        bold=content_cfg.bold,
-        italic=content_cfg.italic,
-        underline=content_cfg.underline,
-    )
-
-    for table in document.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    if not paragraph.text.strip():
-                        continue
-
-                    # 段落样式
-                    if check:
-                        para_issues = ps.diff_from_paragraph(paragraph)
-                    else:
-                        para_issues = ps.apply_to_paragraph(paragraph)
-                    para_text = ParagraphStyle.to_string(para_issues)
-                    if para_text.strip():
-                        document.add_comment(
-                            runs=paragraph.runs,
-                            text=para_text,
-                            author="论文解析器",
-                            initials="afish",
-                        )
-
-                    # 字符样式
-                    for run in paragraph.runs:
-                        if not run.text.strip():
-                            continue
-                        if check:
-                            diff = cstyle.diff_from_run(run)
-                        else:
-                            diff = cstyle.apply_to_run(run)
-                        run_text = CharacterStyle.to_string(diff)
-                        if run_text.strip():
-                            document.add_comment(
-                                runs=run,
-                                text=run_text,
-                                author="论文解析器",
-                                initials="afish",
-                            )
 
 
 def auto_format_thesis_document(
@@ -587,12 +195,7 @@ def auto_format_thesis_document(
             style_list.append(style.name)
         logger.info(f"可用的样式有：{style_list}")
 
-    for paragraph in document.paragraphs:
-        if not paragraph.text:
-            continue
-        node = xg(root_node, paragraph)
-        if node:
-            node.paragraph = paragraph
+    _bind_and_sync(root_node, document, check)
 
     # 替换摘要节点
     subtress_dict = {

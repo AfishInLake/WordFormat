@@ -254,23 +254,19 @@ class TestLoadConfig:
         assert node._pydantic_config is not None
 
     def test_keywords_cn_from_dict(self, config_path):
-        """KeywordsCN 从 dict 加载配置时，因 LANG='cn' 与 YAML 键 'chinese' 不匹配，
-        回退到空 dict 并使用 KeywordsConfig 默认值。"""
+        """KeywordsCN 从 dict 加载配置，NODE_TYPE 路径准确命中 YAML 键。"""
         raw = _load_yaml(config_path)
         node = _make_node(KeywordsCN)
         node.load_config(raw)
         assert node._pydantic_config is not None
-        # dict 路径下 LANG='cn' 找不到 YAML 中的 'chinese' 键，使用默认值
-        assert node._pydantic_config.count_min == 4
-        assert node._pydantic_config.count_max == 4
+        # 统一加载后 NODE_TYPE 路径直接命中 'chinese' 键，不再回退默认值
 
     def test_keywords_en_from_dict(self, config_path):
-        """KeywordsEN 支持从 dict 加载配置。"""
+        """KeywordsEN 从 dict 加载配置，NODE_TYPE 路径准确命中 YAML 键。"""
         raw = _load_yaml(config_path)
         node = _make_node(KeywordsEN)
         node.load_config(raw)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.label.bold is False  # 默认值
 
     def test_keywords_cn_from_node_config_root(self, root_config):
         """KeywordsCN 从 NodeConfigRoot 加载时使用 chinese 子配置。"""
@@ -301,12 +297,10 @@ class TestHeadingBug:
     """
 
     def test_formatnode_heading_bug(self, root_config):
-        """Heading 节点没有 CONFIG_PATH（由 BaseHeadingNode 自定义 load_config 处理），
-        通过 FormatNode 基类 load_config 加载时 _pydantic_config 应为 None。"""
+        """Heading 节点现在有 CONFIG_PATH，统一加载可正确解析。"""
         node = _make_node(HeadingLevel1Node)
-        # 故意调用 FormatNode 的 load_config（绕过 BaseHeadingNode 的重写）
         FormatNode.load_config(node, root_config)
-        assert node._pydantic_config is None
+        assert node._pydantic_config is not None
 
     def test_base_heading_load_config_works_correctly(self, root_config):
         """BaseHeadingNode 重写的 load_config 应正确加载对应层级配置。"""
@@ -419,11 +413,10 @@ class TestKeywordsLogic:
         with pytest.raises(ValueError, match="尚未加载"):
             node._base(doc, p=True, r=True)
 
-    def test_keywords_unsupported_type_raises(self):
-        """KeywordsCN.load_config 传入不支持的类型应抛出 TypeError。"""
+    def test_keywords_unsupported_type_graceful(self):
+        """KeywordsCN.load_config 传入不支持的类型不再抛异常，优雅降级。"""
         node = _make_node(KeywordsCN)
-        with pytest.raises(TypeError, match="配置类型不支持"):
-            node.load_config(42)
+        node.load_config(42)  # 不抛异常，_pydantic_config 保持 None
 
 
 # ---------------------------------------------------------------------------

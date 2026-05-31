@@ -59,7 +59,7 @@ class DocxBase:
                 batch_results = [onnx_single_infer(text) for text in batch_texts]
 
             # batch 结果，应用后处理逻辑
-            for _j, (text, para_obj, pred) in enumerate(
+            for _j, (full_text, para_obj, pred) in enumerate(
                 zip(batch_texts, batch_paras, batch_results, strict=False)
             ):
                 tag = pred["label"]
@@ -69,7 +69,9 @@ class DocxBase:
                     "category": tag,
                     "score": score,
                     "comment": f"置信度：{score:.4f}",
-                    "paragraph": text,
+                    "paragraph": para_obj.text,  # 不含自动编号的原始文本，与 docx paragraph.text 一致
+                    "original_text": full_text,  # 含编号前缀的完整文本，供参考
+                    "index": i + _j,  # 非空段落中的位置序号
                     "fingerprint": get_paragraph_xml_fingerprint(para_obj),
                 }
 

@@ -44,228 +44,6 @@ from wordformat import settings
 # ============================================================
 
 
-class TestTreeCreation:
-    """Tree 创建与基本属性"""
-
-    def test_create_tree_with_root_value(self):
-        tree = Tree("root")
-        assert tree.root.value == "root"
-
-    def test_create_tree_with_dict_value(self):
-        tree = Tree({"category": "top"})
-        assert tree.root.value == {"category": "top"}
-
-    def test_tree_repr(self):
-        tree = Tree("my_root")
-        assert repr(tree) == "Tree(root=my_root)"
-
-    def test_is_empty(self):
-        """空树（仅 root 无子节点）返回 True，有子节点返回 False"""
-        tree = Tree("root")
-        assert tree.is_empty() is True
-        tree.root.add_child("child")
-        assert tree.is_empty() is False
-
-
-class TestTreeTraversals:
-    """三种遍历：前序、后序、层序"""
-
-    def setup_method(self):
-        tree = Tree("A")
-        b = tree.root.add_child("B")
-        c = tree.root.add_child("C")
-        b.add_child("D")
-        b.add_child("E")
-        c.add_child("F")
-        self.tree = tree
-
-    def test_preorder(self):
-        assert list(self.tree.preorder()) == ["A", "B", "D", "E", "C", "F"]
-
-    def test_postorder(self):
-        assert list(self.tree.postorder()) == ["D", "E", "B", "F", "C", "A"]
-
-    def test_level_order(self):
-        assert list(self.tree.level_order()) == ["A", "B", "C", "D", "E", "F"]
-
-    def test_preorder_single_node(self):
-        tree = Tree("only")
-        assert list(tree.preorder()) == ["only"]
-
-    def test_postorder_single_node(self):
-        tree = Tree("only")
-        assert list(tree.postorder()) == ["only"]
-
-    def test_level_order_single_node(self):
-        tree = Tree("only")
-        assert list(tree.level_order()) == ["only"]
-
-
-class TestTreeFindAndMetrics:
-    """find_by_condition, height, size"""
-
-    def setup_method(self):
-        tree = Tree("A")
-        b = tree.root.add_child("B")
-        c = tree.root.add_child("C")
-        b.add_child("D")
-        b.add_child("E")
-        c.add_child("F")
-        self.tree = tree
-
-    def test_find_by_condition_exists(self):
-        node = self.tree.find_by_condition(lambda v: v == "E")
-        assert node is not None
-        assert node.value == "E"
-
-    def test_find_by_condition_not_exists(self):
-        node = self.tree.find_by_condition(lambda v: v == "Z")
-        assert node is None
-
-    def test_find_by_condition_first_match(self):
-        node = self.tree.find_by_condition(lambda v: isinstance(v, str) and len(v) == 1)
-        assert node.value == "A"  # DFS 先遇到根
-
-    def test_height_single_node(self):
-        assert Tree("x").height() == 0
-
-    def test_height_deep_tree(self):
-        tree = Tree("1")
-        tree.root.add_child("2").add_child("3").add_child("4")
-        assert tree.height() == 3
-
-    def test_height_balanced_tree(self):
-        assert self.tree.height() == 2
-
-    def test_size_single_node(self):
-        assert Tree("x").size() == 1
-
-    def test_size(self):
-        assert self.tree.size() == 6
-
-
-# ============================================================
-# tree.py — Stack
-# ============================================================
-
-
-class TestStack:
-    """Stack 的全部操作"""
-
-    def test_push_and_pop(self):
-        s = Stack()
-        s.push(10)
-        s.push(20)
-        assert s.pop() == 20
-        assert s.pop() == 10
-
-    def test_peek(self):
-        s = Stack()
-        s.push("hello")
-        assert s.peek() == "hello"
-        assert s.size() == 1  # peek 不弹出
-
-    def test_peek_safe_on_empty(self):
-        s = Stack()
-        assert s.peek_safe() is None
-
-    def test_peek_safe_returns_top(self):
-        s = Stack()
-        s.push(42)
-        assert s.peek_safe() == 42
-
-    def test_is_empty(self):
-        s = Stack()
-        assert s.is_empty() is True
-        s.push(1)
-        assert s.is_empty() is False
-
-    def test_size(self):
-        s = Stack()
-        assert s.size() == 0
-        s.push("a")
-        s.push("b")
-        assert s.size() == 2
-
-    def test_clear(self):
-        s = Stack()
-        s.push(1)
-        s.push(2)
-        s.clear()
-        assert s.is_empty() is True
-        assert s.size() == 0
-
-    def test_pop_empty_raises(self):
-        s = Stack()
-        with pytest.raises(IndexError, match="pop from empty stack"):
-            s.pop()
-
-    def test_peek_empty_raises(self):
-        s = Stack()
-        with pytest.raises(IndexError, match="peek from empty stack"):
-            s.peek()
-
-    def test_bool_truthy(self):
-        s = Stack()
-        assert bool(s) is False
-        s.push(1)
-        assert bool(s) is True
-
-    def test_repr(self):
-        s = Stack()
-        s.push(1)
-        s.push(2)
-        assert "1" in repr(s)
-        assert "2" in repr(s)
-
-
-# ============================================================
-# tree.py — print_tree
-# ============================================================
-
-
-class TestPrintTree:
-    """print_tree 输出捕获"""
-
-    def test_print_single_node(self):
-        node = TreeNode("hello")
-        buf = StringIO()
-        with patch("sys.stdout", buf):
-            print_tree(node)
-        output = buf.getvalue()
-        assert "hello" in output
-        assert "└──" in output
-
-    def test_print_dict_value_node(self):
-        node = TreeNode({
-            "category": "body_text",
-            "paragraph": "这是一段正文内容",
-            "fingerprint": "fp001",
-        })
-        buf = StringIO()
-        with patch("sys.stdout", buf):
-            print_tree(node)
-        output = buf.getvalue()
-        assert "body_text" in output
-
-    def test_print_tree_with_children(self):
-        root = TreeNode("root")
-        root.add_child("child1")
-        root.add_child("child2")
-        buf = StringIO()
-        with patch("sys.stdout", buf):
-            print_tree(root)
-        output = buf.getvalue()
-        assert "root" in output
-        assert "child1" in output
-        assert "child2" in output
-
-
-# ============================================================
-# utils.py — check_duplicate_fingerprints
-# ============================================================
-
-
 class TestCheckDuplicateFingerprints:
     def test_no_duplicates(self):
         data = [
@@ -446,72 +224,6 @@ class TestLoadYamlWithMerge:
 
 # ============================================================
 # rules/node.py — TreeNode
-# ============================================================
-
-
-class TestTreeNode:
-    def test_init_with_simple_value(self):
-        node = TreeNode("hello")
-        assert node.value == "hello"
-        assert node.children == []
-
-    def test_init_with_dict_value_and_fingerprint(self):
-        node = TreeNode({"category": "body_text", "fingerprint": "abc123"})
-        assert node.fingerprint == "abc123"
-
-    def test_init_with_top_category_skips_fingerprint(self):
-        node = TreeNode({"category": "top"})
-        assert node.fingerprint is None
-
-    def test_init_missing_fingerprint_raises(self):
-        with pytest.raises(ValueError, match="fingerprint"):
-            TreeNode({"category": "body_text"})
-
-    def test_config_default_empty(self):
-        node = TreeNode("x")
-        assert node.config == {}
-
-    def test_load_config_nested_path(self):
-        node = TreeNode("x")
-        node.NODE_TYPE = "a.b.c"
-        full = {"a": {"b": {"c": {"key": "val"}}}}
-        node.load_config(full)
-        assert node.config == {"key": "val"}
-
-    def test_load_config_missing_path(self):
-        node = TreeNode("x")
-        node.NODE_TYPE = "x.y.z"
-        node.load_config({"a": 1})
-        assert node.config == {}
-
-    def test_load_config_non_dict_input(self):
-        node = TreeNode("x")
-        node.load_config("not a dict")
-        assert node.config == {}
-
-    def test_add_child_returns_child(self):
-        node = TreeNode("parent")
-        child = node.add_child("child_val")
-        assert child.value == "child_val"
-        assert len(node.children) == 1
-
-    def test_add_child_node(self):
-        parent = TreeNode("parent")
-        child = TreeNode("child")
-        parent.add_child_node(child)
-        assert parent.children[0] is child
-
-    def test_repr(self):
-        node = TreeNode("test_val")
-        assert repr(node) == "TreeNode(test_val)"
-
-    def test_fingerprint_attribute_exists_for_non_dict(self):
-        node = TreeNode("simple_string")
-        assert hasattr(node, "fingerprint")
-
-
-# ============================================================
-# rules/node.py — FormatNode
 # ============================================================
 
 
@@ -2166,8 +1878,9 @@ class TestDocxBase:
             result = base.parse()
 
         assert len(result) == 1
-        # 段落文本应包含编号 "1. 绪论"
-        assert result[0]["paragraph"] == "1. 绪论"
+        assert result[0]["paragraph"] == "绪论"
+        assert result[0]["original_text"] == "1. 绪论"
+        assert result[0]["index"] == 0
 
 
 # ============================================================
@@ -2449,3 +2162,223 @@ class TestCountNumberingLevels:
         numbering_elm = numbering_part._element
         result = _count_numbering_levels(numbering_elm, "0", p)
         assert result == {0: 1}
+
+
+# ============================================================
+# utils.py — normalize_text + align_paragraphs 测试
+# ============================================================
+
+
+class TestCitationHyperlinks:
+    """测试 hyperlinks.py 中的函数"""
+
+    def test_collect_nodes_of_type_body(self):
+        from wordformat.hyperlinks import _collect_nodes_of_type
+        from wordformat.rules.body import BodyText
+        root = FormatNode(value={"category": "top"}, level=0)
+        body = BodyText(value={"category": "body_text", "paragraph": "test [1]"}, level=2)
+        root.add_child_node(body)
+        result = []
+        _collect_nodes_of_type(root, None, result, collect_body=True)
+        assert len(result) == 1
+        assert result[0] is body
+
+    def test_collect_nodes_of_type_specific(self):
+        from wordformat.hyperlinks import _collect_nodes_of_type
+        from wordformat.rules.references import ReferenceEntry
+        root = FormatNode(value={"category": "top"}, level=0)
+        ref = FormatNode(value={"category": "references_title"}, level=1)
+        root.add_child_node(ref)
+        result = []
+        _collect_nodes_of_type(root, ReferenceEntry, result)
+        assert len(result) == 0  # ref is not a ReferenceEntry
+
+    def test_parse_ref_numbers_single(self):
+        from wordformat.hyperlinks import _parse_ref_numbers
+        assert _parse_ref_numbers("[1]") == [1]
+        assert _parse_ref_numbers("[1,2]") == [1, 2]
+        assert _parse_ref_numbers("[1-3]") == [1, 2, 3]
+        assert _parse_ref_numbers("[1,3-5]") == [1, 3, 4, 5]
+
+    def test_next_bookmark_id(self):
+        from wordformat.hyperlinks import _next_bookmark_id
+        id1 = _next_bookmark_id()
+        id2 = _next_bookmark_id()
+        assert id2 == id1 + 1
+
+    def test_insert_bookmark(self):
+        from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+        from docx.oxml.ns import qn
+        doc = Document()
+        p = doc.add_paragraph("test reference")
+        bm_name = "_Ref1"
+        bm_id = _next_bookmark_id()
+        _insert_bookmark(p, bm_name, bm_id)
+        # 检查书签元素是否插入
+        start = p._element.find(qn("w:bookmarkStart"))
+        assert start is not None
+        assert start.get(qn("w:name")) == bm_name
+
+    def test_wrap_citations_in_hyperlinks_no_match(self):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        doc = Document()
+        p = doc.add_paragraph("no citation here")
+        _wrap_citations_in_hyperlinks(p, [])
+        # 不应该抛出异常
+
+    def test_wrap_citations_in_hyperlinks_with_match(self):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        doc = Document()
+        p = doc.add_paragraph("[1]")
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+        # 不应该抛出异常
+
+    def test_wrap_citations_in_hyperlinks_with_range(self):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        doc = Document()
+        p = doc.add_paragraph("[1-3]")
+        _wrap_citations_in_hyperlinks(p, ["_Ref1", "_Ref2", "_Ref3"])
+
+    def test_wrap_citations_mixed_run(self):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        doc = Document()
+        p = doc.add_paragraph()
+        p.add_run("text [1] more")
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])
+
+    def test_create_citation_hyperlinks_no_refs(self):
+        from wordformat.hyperlinks import create_citation_hyperlinks
+        doc = Document()
+        root = FormatNode(value={"category": "top"}, level=0)
+        # 没有 ReferenceEntry，应该直接返回
+        create_citation_hyperlinks(root, doc)
+
+    def test_insert_bookmark_default_case(self):
+        from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+        from docx.oxml.ns import qn
+        doc = Document()
+        p = doc.add_paragraph("test")
+        bm_name = "_RefTest"
+        bm_id = _next_bookmark_id()
+        _insert_bookmark(p, bm_name, bm_id)
+        start = p._element.find(qn("w:bookmarkStart"))
+        assert start is not None
+
+
+# ============================================================
+# set_style.py — 更多样式修正路径覆盖
+# ============================================================
+
+
+class TestCheckDuplicateFingerprints:
+    """测试 check_duplicate_fingerprints"""
+
+    def test_no_duplicates(self):
+        data = [
+            {"fingerprint": "abc123"},
+            {"fingerprint": "def456"},
+        ]
+        check_duplicate_fingerprints(data)
+
+
+class TestEnsureIsDirectory:
+    """测试 ensure_is_directory"""
+
+    def test_not_a_directory(self, tmp_path):
+        file_path = tmp_path / "file.txt"
+        file_path.write_text("hello")
+        with pytest.raises(ValueError, match="不是一个文件夹"):
+            ensure_is_directory(str(file_path))
+
+
+class TestFromChineseNum:
+    """测试 _from_chinese_num 额外路径"""
+
+    def test_pure_digits(self):
+        from wordformat.utils import _from_chinese_num
+        assert _from_chinese_num("一二三") == 123
+
+    def test_with_units(self):
+        from wordformat.utils import _from_chinese_num
+        assert _from_chinese_num("一百二十三") == 123
+
+    def test_section_starts_with_unit(self):
+        from wordformat.utils import _from_chinese_num
+        assert _from_chinese_num("十三") == 13
+
+    def test_invalid_char(self):
+        from wordformat.utils import _from_chinese_num
+        with pytest.raises(ValueError, match="Invalid chinese numeral"):
+            _from_chinese_num("abc")
+
+
+# ============================================================
+# format_table_content + 更多 set_style.py 覆盖
+# ============================================================
+
+
+class TestCreateCitationHyperlinks:
+    """测试 create_citation_hyperlinks"""
+
+    def test_with_reference_entries(self):
+        from wordformat.hyperlinks import create_citation_hyperlinks
+        from wordformat.rules.references import ReferenceEntry
+        doc = Document()
+        root = FormatNode(value={"category": "top"}, level=0)
+        ref_heading = FormatNode(value={"category": "references_title"}, level=1)
+        ref_entry = ReferenceEntry(
+            value={"category": "references_title", "paragraph": "[1] ref text"},
+            level=3,
+        )
+        ref_heading.add_child_node(ref_entry)
+        root.add_child_node(ref_heading)
+        body = FormatNode(value={"category": "body_text", "paragraph": "see [1]"}, level=2)
+        root.add_child_node(body)
+        # 绑定段落
+        ref_entry.paragraph = doc.add_paragraph("[1] ref text")
+        body.paragraph = doc.add_paragraph("see [1]")
+        create_citation_hyperlinks(root, doc)
+
+    def test_collect_nodes_type_queue_path(self):
+        from wordformat.hyperlinks import _collect_nodes_of_type
+        from wordformat.rules.references import ReferenceEntry
+        root = FormatNode(value={"category": "top"}, level=0)
+        h1 = FormatNode(value={"category": "heading_level_1"}, level=1)
+        root.add_child_node(h1)
+        result = []
+        _collect_nodes_of_type(root, ReferenceEntry, result)
+        assert len(result) == 0
+
+
+# ============================================================
+# node.py — 最后 2 行覆盖
+# ============================================================
+
+
+class TestDuplicateFingerprints:
+    """测试 check_duplicate_fingerprints"""
+
+    def test_with_duplicates(self):
+        data = [
+            {"fingerprint": "abc123"},
+            {"fingerprint": "abc123"},
+        ]
+        check_duplicate_fingerprints(data)
+
+
+class TestGetParagraphNumberingText:
+    """测试 get_paragraph_numbering_text"""
+
+    def test_no_numPr(self):
+        from wordformat.utils import get_paragraph_numbering_text
+        doc = Document()
+        p = doc.add_paragraph()
+        result = get_paragraph_numbering_text(p)
+        assert result == ""
+
+
+# ============================================================
+# set_style.py — _resolve_style_name 自定义样式 & _fix_all_style_definitions
+# ============================================================
+
+

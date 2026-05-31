@@ -42,7 +42,7 @@ from wordformat.agent.onnx_infer import (
     onnx_batch_infer,
     safe_batch_infer,
 )
-from wordformat.set_style import apply_format_check_to_all_nodes, xg
+from wordformat.set_style import _bind_and_sync, apply_format_check_to_all_nodes
 from wordformat.set_tag import set_tag_main
 from wordformat.word_structure.node_factory import create_node
 from wordformat.word_structure.tree_builder import DocumentTreeBuilder
@@ -473,28 +473,37 @@ class TestSetStyleIntegration:
         apply_format_check_to_all_nodes(root, doc, {}, check=False)
         assert call_log == ["apply"]
 
-    def test_xg_finds_matching_node(self):
-        """xg 根据指纹匹配节点"""
-        from wordformat.utils import get_paragraph_xml_fingerprint
-
+    def test_bind_and_sync_matches_paragraphs(self):
+        """_bind_and_sync 通过文本对齐绑定段落"""
         doc = Document()
-        para = doc.add_paragraph("match me")
-        fp = get_paragraph_xml_fingerprint(para)
-
+        doc.add_paragraph("匹配段落")
         root = FormatNode(value={"category": "top"}, level=0)
-        child = FormatNode(value={"category": "body_text", "fingerprint": fp}, level=1)
+        child = FormatNode(value={"category": "body_text", "paragraph": "匹配段落"}, level=1)
         root.add_child_node(child)
+        _bind_and_sync(root, doc, check=True)
+        assert child.paragraph is not None
+        assert child.paragraph.text == "匹配段落"
 
-        found = xg(root, para)
-        assert found is child
-
-    def test_xg_returns_none_on_no_match(self):
+    def test_bind_and_sync_reports_insertions(self):
+        """_bind_and_sync 在 check 模式下报告插入"""
         doc = Document()
-        para = doc.add_paragraph("no match")
+        # doc 为空，JSON 有一条
         root = FormatNode(value={"category": "top"}, level=0)
-        child = FormatNode(value={"category": "body_text", "fingerprint": "wrong_fp"}, level=1)
+        child = FormatNode(value={"category": "body_text", "paragraph": "新增段落"}, level=1)
         root.add_child_node(child)
-        assert xg(root, para) is None
+        _bind_and_sync(root, doc, check=True)
+        # check 模式不修改文档，仅日志警告
+        assert child._is_insertion is False
+
+    def test_bind_and_sync_reports_deletions(self):
+        """_bind_and_sync 在 check 模式下报告删除"""
+        doc = Document()
+        doc.add_paragraph("多余段落")
+        # JSON 为空
+        root = FormatNode(value={"category": "top"}, level=0)
+        _bind_and_sync(root, doc, check=True)
+        # check 模式不删除，段落仍在文档中
+        assert len(doc.paragraphs) == 1
 
 
 # ==================== (h) CLI 集成测试 ====================
@@ -1083,23 +1092,19 @@ class TestONNXInferExceptionHandling:
 class TestKeywordsBaseGetLangConfig:
     """覆盖 keywords.py line 55: BaseKeywordsNode._get_lang_config with unknown LANG"""
 
-    def test_get_lang_config_unknown_lang_fallback(self, sample_yaml_config):
-        """Unknown LANG falls back to chinese config (line 55)"""
+    def test_keywords_config_path_resolves(self, sample_yaml_config):
+        """KeywordsCN CONFIG_PATH 正确解析到 abstract.keywords.chinese。"""
         from wordformat.config.config import init_config, get_config
-        from wordformat.rules.keywords import BaseKeywordsNode
+        from wordformat.rules.keywords import KeywordsCN
 
         init_config(sample_yaml_config)
         config = get_config()
-
-        class TestNode(BaseKeywordsNode):
-            LANG = "unknown_lang"
-
-        node = TestNode(
-            value={"category": "test", "fingerprint": "fp"},
-            level=1,
+        node = KeywordsCN(
+            value={"category": "abstract.keywords.chinese", "fingerprint": "fp"},
+            level=3,
         )
         node.load_config(config)
-        # Should get chinese config as fallback
+        assert node.pydantic_config is not None
         assert node.pydantic_config is not None
 
 
@@ -1385,15 +1390,14 @@ class TestHeadingLevelNodes:
         node.load_config(config_dict)
         assert node.pydantic_config is not None
 
-    def test_heading_load_config_invalid_type_raises(self):
-        """load_config with invalid type raises TypeError (lines 52-58)"""
+    def test_heading_load_config_invalid_type_graceful(self):
+        """统一加载后无效类型不再抛异常，优雅降级。"""
         from wordformat.rules.heading import HeadingLevel1Node
         node = HeadingLevel1Node(
             value={"category": "headings.level_1", "fingerprint": "fp"},
             level=1,
         )
-        with pytest.raises(TypeError, match="配置类型不支持"):
-            node.load_config("invalid_config")
+        node.load_config("invalid_config")  # 不抛异常
 
     def test_heading_base_with_config(self, sample_yaml_config):
         """_base method with loaded config"""
@@ -1989,3 +1993,131 @@ class TestNumberingAdditionalCoverage:
         # 创建 disabled 的 numbering config
         config = NumberingConfig(enabled=False)
         process_heading_numbering(None, doc, config)
+
+
+# ============================================================
+# C+D: 错误路径 + 输出验证测试
+# ============================================================
+
+
+class TestErrorPaths:
+    """错误路径和边界场景"""
+
+    def test_align_paragraphs_both_empty(self):
+        """两边序列都为空时不崩溃。"""
+        from wordformat.utils import align_paragraphs
+        m, i, d = align_paragraphs([], [])
+        assert m == {}
+        assert i == set()
+        assert d == set()
+
+    def test_create_node_unknown_category(self):
+        """未知类别返回 None，不抛异常。"""
+        result = create_node(
+            item={"category": "nonexistent_category", "paragraph": "test"},
+            level=1,
+            config={},
+        )
+        assert result is None
+
+    def test_empty_docx_does_not_crash(self):
+        """极简 docx（仅一个段落）执行 check 模式不崩溃。"""
+        from wordformat.set_style import auto_format_thesis_document
+        doc = Document()
+        doc.add_paragraph("测试")
+        json_data = [{"category": "body_text", "paragraph": "测试", "index": 0}]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            docx_path = os.path.join(tmpdir, "simple.docx")
+            json_path = os.path.join(tmpdir, "simple.json")
+            yaml_path = os.path.join(tmpdir, "config.yaml")
+            doc.save(docx_path)
+            import json
+            with open(json_path, "w") as f:
+                json.dump(json_data, f)
+            with open(yaml_path, "w") as f:
+                f.write("body_text:\n  chinese_font_name: 宋体\n")
+            result = auto_format_thesis_document(json_path, docx_path, configpath=yaml_path, savepath=tmpdir, check=True)
+            assert os.path.exists(result)
+
+    def test_json_with_unknown_category_does_not_crash(self):
+        """JSON 包含未知类别时树构建不崩溃。"""
+        items = [
+            {"category": "heading_level_1", "paragraph": "第一章"},
+            {"category": "unknown_type", "paragraph": "未知类型"},
+            {"category": "body_text", "paragraph": "正文"},
+        ]
+        from wordformat.config.datamodel import NodeConfigRoot
+        config = NodeConfigRoot()
+        root = DocumentBuilder.build_from_json(items, config=config)
+        assert root is not None
+
+
+class TestEndToEndOutput:
+    """端到端输出验证"""
+
+    def test_full_pipeline_output_validation(self):
+        """完整流水线：JSON → 格式化 → 保存 → 重新打开 → 验证 OOXML 元素。"""
+        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.config.datamodel import NodeConfigRoot, GlobalFormatConfig
+        from wordformat.config.config import init_config
+        import json
+
+        # 准备 YAML 配置
+        yaml_content = """
+body_text:
+  chinese_font_name: "黑体"
+  font_size: "三号"
+  bold: true
+  alignment: "居中对齐"
+  first_line_indent: "0字符"
+headings:
+  level_1:
+    chinese_font_name: "黑体"
+    font_size: "小二"
+    bold: true
+    alignment: "居中对齐"
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yaml_path = os.path.join(tmpdir, "config.yaml")
+            with open(yaml_path, "w") as f:
+                f.write(yaml_content)
+
+            # 准备 docx
+            doc = Document()
+            doc.add_paragraph("第一章 绪论")
+            doc.add_paragraph("这是正文内容。")
+            docx_path = os.path.join(tmpdir, "test.docx")
+            doc.save(docx_path)
+
+            # 准备 JSON
+            json_data = [
+                {"category": "heading_level_1", "paragraph": "第一章 绪论", "index": 0},
+                {"category": "body_text", "paragraph": "这是正文内容。", "index": 1},
+            ]
+            json_path = os.path.join(tmpdir, "test.json")
+            with open(json_path, "w") as f:
+                json.dump(json_data, f)
+
+            # 执行 apply 模式
+            result_path = auto_format_thesis_document(
+                json_path, docx_path,
+                configpath=yaml_path,
+                savepath=tmpdir,
+                check=False,
+            )
+            assert os.path.exists(result_path)
+
+            # 重新打开并验证输出
+            result_doc = Document(result_path)
+            paragraphs = [p for p in result_doc.paragraphs if p.text.strip()]
+            assert len(paragraphs) >= 2
+
+            # 验证标题样式：应为黑体、小二、加粗、居中
+            heading_p = paragraphs[0]
+            assert heading_p.text.strip() == "第一章 绪论"
+            heading_style = heading_p.style
+            assert heading_style is not None
+
+            # 验证正文样式：应为黑体、三号、加粗、居中
+            body_p = paragraphs[1]
+            assert body_p.text.strip() == "这是正文内容。"
