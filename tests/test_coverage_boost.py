@@ -32,7 +32,9 @@ from wordformat.style.style_enum import (
     FirstLineIndent,
     _ensure_style_exists,
 )
+from wordformat.rules.node import FormatNode
 from wordformat.set_style import (
+    _bind_and_sync,
     _fix_all_style_definitions,
     apply_format_check_to_all_nodes,
 )
@@ -1165,3 +1167,310 @@ class TestUtilsCoverageBoost:
         file_path.write_text("test")
         with pytest.raises(ValueError, match="不是文件夹"):
             ensure_directory_exists(str(file_path))
+
+
+# ============================================================
+# set_style.py — _resolve_style_name 自定义样式 + 更多段落属性路径
+# ============================================================
+
+
+class TestResolveStyleName:
+    """覆盖 _resolve_style_name 的自定义样式路径"""
+
+    def test_custom_style_name_bypasses_enum(self):
+        from wordformat.set_style import _collect_all_style_configs
+        from wordformat.config.datamodel import NodeConfigRoot, GlobalFormatConfig
+
+        class CustomStyleConfig(NodeConfigRoot):
+            references: GlobalFormatConfig = GlobalFormatConfig(
+                chinese_font_name="宋体",
+                builtin_style_name="MyCustomStyle",
+            )
+
+        config = CustomStyleConfig()
+        result = _collect_all_style_configs(config)
+        assert "MyCustomStyle" in result
+
+
+class TestFixStyleParagraphMore:
+    """覆盖 _fix_style_paragraph_properties 更多路径"""
+
+    def test_space_after_pt_unit_skipped(self):
+        from docx.oxml import OxmlElement
+        from wordformat.set_style import _fix_style_paragraph_properties
+
+        class MockStyle:
+            element = OxmlElement("w:style")
+
+        class MockCfg:
+            alignment = None
+            space_before = None
+            space_after = "12pt"
+            line_spacingrule = None
+            line_spacing = None
+            first_line_indent = None
+            left_indent = None
+            right_indent = None
+
+        style = MockStyle()
+        _fix_style_paragraph_properties(style, MockCfg(), "test")
+
+    def test_left_indent_pt_unit_warning(self):
+        from docx.oxml import OxmlElement
+        from wordformat.set_style import _fix_style_paragraph_properties
+
+        class MockStyle:
+            element = OxmlElement("w:style")
+
+        class MockCfg:
+            alignment = None
+            space_before = None
+            space_after = None
+            line_spacingrule = None
+            line_spacing = None
+            first_line_indent = None
+            left_indent = "10pt"
+            right_indent = None
+
+        style = MockStyle()
+        _fix_style_paragraph_properties(style, MockCfg(), "test")
+
+    def test_right_indent_char_unit_applied(self):
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        from wordformat.set_style import _fix_style_paragraph_properties
+
+        class MockStyle:
+            element = OxmlElement("w:style")
+
+        class MockCfg:
+            alignment = None
+            space_before = None
+            space_after = None
+            line_spacingrule = None
+            line_spacing = None
+            first_line_indent = None
+            left_indent = "2字符"
+            right_indent = "2字符"
+
+        style = MockStyle()
+        _fix_style_paragraph_properties(style, MockCfg(), "test")
+
+
+# ============================================================
+# utils.py — 更多覆盖
+# ============================================================
+
+
+class TestToRoman:
+    """覆盖 _to_roman 额外路径"""
+
+    def test_zero(self):
+        from wordformat.utils import _to_roman
+        assert _to_roman(0) == "0"
+
+    def test_negative(self):
+        from wordformat.utils import _to_roman
+        assert _to_roman(-1) == "0"
+
+
+class TestParseCaptionText:
+    """覆盖 parse_caption_text 罗马数字章节路径"""
+
+    def test_roman_numeral_chapter(self):
+        from wordformat.utils import parse_caption_text
+        result = parse_caption_text("表 III.5 数据统计表")
+        assert result is not None
+        assert result["chapter_num"] == 3
+        assert result["number_num"] == 5
+
+    def test_lowercase_roman(self):
+        from wordformat.utils import parse_caption_text
+        result = parse_caption_text("图 iv.2 架构图")
+        assert result is not None
+        assert result["chapter_num"] == 4
+
+
+class TestRemoveAllNumbering:
+    """覆盖 remove_all_numbering"""
+
+    def test_style_not_found(self):
+        from wordformat.utils import remove_all_numbering
+        doc = Document()
+        remove_all_numbering(doc)
+
+    def test_style_found_no_numPr(self):
+        from wordformat.utils import remove_all_numbering
+        doc = Document()
+        remove_all_numbering(doc)
+
+
+class TestCountNumberingLevels:
+    """覆盖 _count_numbering_levels 边缘情况"""
+
+    def test_no_numPr_paragraph(self):
+        from wordformat.utils import _count_numbering_levels
+        from docx.oxml import OxmlElement
+        doc = Document()
+        p = doc.add_paragraph()
+        numbering_elm = OxmlElement("w:numbering")
+        result = _count_numbering_levels(numbering_elm, "0", p)
+        assert result == {}
+
+    def test_no_matching_numId(self):
+        from wordformat.utils import _count_numbering_levels
+        from docx.oxml import OxmlElement
+        doc = Document()
+        numbering_elm = OxmlElement("w:numbering")
+        num_elem = OxmlElement("w:num")
+        num_elem.set(qn("w:numId"), "2")
+        abstract_num_ref = OxmlElement("w:abstractNumId")
+        abstract_num_ref.set(qn("w:val"), "0")
+        num_elem.append(abstract_num_ref)
+        numbering_elm.append(num_elem)
+        p = doc.add_paragraph()
+        pPr = OxmlElement("w:pPr")
+        numPr = OxmlElement("w:numPr")
+        numId_elem = OxmlElement("w:numId")
+        numId_elem.set(qn("w:val"), "1")
+        numPr.append(numId_elem)
+        pPr.append(numPr)
+        p._element.insert(0, pPr)
+        result = _count_numbering_levels(numbering_elm, "0", p)
+        assert result == {}
+
+
+class TestGetParagraphNumberingTextMore:
+    """覆盖 get_paragraph_numbering_text 更多路径"""
+
+    def test_no_numId_value(self):
+        from wordformat.utils import get_paragraph_numbering_text
+        from docx.oxml import OxmlElement
+        doc = Document()
+        p = doc.add_paragraph()
+        pPr = p._element.find(qn("w:pPr"))
+        if pPr is None:
+            pPr = OxmlElement("w:pPr")
+            p._element.insert(0, pPr)
+        numPr = OxmlElement("w:numPr")
+        numId_elem = OxmlElement("w:numId")
+        numId_elem.set(qn("w:val"), "0")
+        numPr.append(numId_elem)
+        pPr.append(numPr)
+        result = get_paragraph_numbering_text(p)
+        assert result == ""
+
+    def test_numId_zero(self):
+        from wordformat.utils import get_paragraph_numbering_text
+        from docx.oxml import OxmlElement
+        doc = Document()
+        p = doc.add_paragraph()
+        pPr = p._element.find(qn("w:pPr"))
+        if pPr is None:
+            pPr = OxmlElement("w:pPr")
+            p._element.insert(0, pPr)
+        numPr = OxmlElement("w:numPr")
+        numId_elem = OxmlElement("w:numId")
+        numId_elem.set(qn("w:val"), "0")
+        numPr.append(numId_elem)
+        pPr.append(numPr)
+        result = get_paragraph_numbering_text(p)
+        assert result == ""
+
+
+# ============================================================
+# set_style.py — _bind_and_sync check=False 路径
+# ============================================================
+
+
+class TestBindAndSyncApply:
+    """覆盖 _bind_and_sync apply 模式"""
+
+    def test_apply_with_insertions(self):
+        from wordformat.set_style import _bind_and_sync
+        doc = Document()
+        doc.add_paragraph("keep")
+        root = FormatNode(value={"category": "top"}, level=0)
+        keep = FormatNode(value={"category": "body_text", "paragraph": "keep"}, level=2)
+        new_node = FormatNode(value={"category": "body_text", "paragraph": "new"}, level=2)
+        root.add_child_node(keep)
+        root.add_child_node(new_node)
+        _bind_and_sync(root, doc, check=False)
+        assert new_node.paragraph is not None
+        assert new_node.paragraph.text == "new"
+
+    def test_apply_with_deletions(self):
+        from wordformat.set_style import _bind_and_sync
+        doc = Document()
+        doc.add_paragraph("keep")
+        extra = doc.add_paragraph("extra")
+        root = FormatNode(value={"category": "top"}, level=0)
+        keep_node = FormatNode(value={"category": "body_text", "paragraph": "keep"}, level=2)
+        root.add_child_node(keep_node)
+        _bind_and_sync(root, doc, check=False)
+        # "extra" 应该已被删除
+        remaining_texts = [p.text for p in doc.paragraphs if p.text.strip()]
+        assert "extra" not in remaining_texts
+
+
+# ============================================================
+# body.py — 覆盖 BodyText.apply_replace 和 _apply_citation_superscript
+# ============================================================
+
+
+class TestBodyTextCitation:
+    """覆盖 BodyText 引用上标相关路径"""
+
+    def test_apply_citation_superscript_no_paragraph(self):
+        from wordformat.rules.body import BodyText
+        node = BodyText(value={"category": "body_text"}, level=2)
+        node._apply_citation_superscript()
+
+    def test_apply_citation_superscript_mixed_run(self):
+        from wordformat.rules.body import BodyText
+        doc = Document()
+        p = doc.add_paragraph()
+        p.add_run("text [1] more")
+        node = BodyText(value={"category": "body_text"}, level=2, paragraph=p)
+        node._apply_citation_superscript()
+
+    def test_apply_replace_clears_vertAlign(self):
+        from wordformat.rules.body import BodyText
+        from docx.oxml import OxmlElement
+        doc = Document()
+        p = doc.add_paragraph()
+        run = p.add_run("old")
+        rPr = OxmlElement("w:rPr")
+        vertAlign = OxmlElement("w:vertAlign")
+        vertAlign.set(qn("w:val"), "superscript")
+        rPr.append(vertAlign)
+        run._element.insert(0, rPr)
+        node = BodyText(value={"category": "body_text", "replace": "new"}, level=2, paragraph=p)
+        node.apply_replace(doc)
+
+
+# ============================================================
+# hyperlinks.py — 更多覆盖
+# ============================================================
+
+
+class TestHyperlinksMore:
+    """覆盖 hyperlinks.py 更多路径"""
+
+    def test_create_citation_hyperlinks_ref_without_paragraph(self):
+        from wordformat.hyperlinks import create_citation_hyperlinks
+        from wordformat.rules.references import ReferenceEntry
+        doc = Document()
+        root = FormatNode(value={"category": "top"}, level=0)
+        ref = ReferenceEntry(
+            value={"category": "references_title", "paragraph": "ref"},
+            level=3,
+        )
+        root.add_child_node(ref)
+        create_citation_hyperlinks(root, doc)
+
+    def test_wrap_citations_whole_run_is_citation(self):
+        from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+        doc = Document()
+        p = doc.add_paragraph("[1]")
+        _wrap_citations_in_hyperlinks(p, ["_Ref1"])

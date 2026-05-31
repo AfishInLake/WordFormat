@@ -4,7 +4,10 @@
 # @File    : utils.py
 import hashlib
 import os
+import re
+import unicodedata
 from collections import Counter
+from difflib import SequenceMatcher
 from typing import Any
 
 import yaml
@@ -42,6 +45,75 @@ def check_duplicate_fingerprints(data):
             logger.warning(f"  - {fp} （出现 {count} 次）")
     else:
         logger.info("未发现重复的 fingerprint。")
+
+
+def normalize_text(text: str) -> str:
+    """Unicode NFC 归一化 + 空白字符折叠 + 去除首尾空格。
+
+    用于在序列对齐前对 JSON 和 docx 两端的段落文本做标准化，
+    使小幅差异（全角/半角空格、多空白、Unicode 组合字符）不影响匹配。
+    """
+    text = unicodedata.normalize("NFC", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def align_paragraphs(
+    json_entries: list[dict],
+    docx_paragraphs: list[Paragraph],
+) -> tuple[dict[int, Paragraph], set[int], set[int]]:
+    """将 JSON 条目与 docx 段落按文本内容做序列对齐。
+
+    使用 difflib.SequenceMatcher 做最长公共子序列匹配，
+    输出三类结果：
+      - matches:    {json_index: Paragraph}
+      - insertions: {json_index}  — JSON 有、docx 无
+      - deletions:  {docx_index}  — docx 有、JSON 无
+
+    autojunk=False 避免中文文本被误判为垃圾序列。
+    """
+    json_texts = [normalize_text(e.get("paragraph", "")) for e in json_entries]
+    docx_texts = [normalize_text(p.text) for p in docx_paragraphs]
+
+    sm = SequenceMatcher(None, json_texts, docx_texts, autojunk=False)
+
+    matches: dict[int, Paragraph] = {}
+    insertions: set[int] = set()
+    deletions: set[int] = set()
+
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            for k in range(i2 - i1):
+                matches[i1 + k] = docx_paragraphs[j1 + k]
+        elif op == "replace":
+            # 在 replace 区间内按归一化文本做精确匹配，剩余归入插入/删除
+            json_sub = json_texts[i1:i2]
+            docx_sub = docx_texts[j1:j2]
+            # 标记哪些 docx 位置已被匹配
+            matched_docx: set[int] = set()
+            for i_offset, jt in enumerate(json_sub):
+                found = False
+                for j_offset, dt in enumerate(docx_sub):
+                    if j_offset in matched_docx:
+                        continue
+                    if jt == dt:
+                        matches[i1 + i_offset] = docx_paragraphs[j1 + j_offset]
+                        matched_docx.add(j_offset)
+                        found = True
+                        break
+                if not found:
+                    insertions.add(i1 + i_offset)
+            for j_offset in range(len(docx_sub)):
+                if j_offset not in matched_docx:
+                    deletions.add(j1 + j_offset)
+        elif op == "delete":
+            for k in range(i2 - i1):
+                insertions.add(i1 + k)
+        elif op == "insert":
+            for k in range(j2 - j1):
+                deletions.add(j1 + k)
+
+    return matches, insertions, deletions
 
 
 def get_paragraph_xml_fingerprint(paragraph: Paragraph):

@@ -32,7 +32,9 @@ class DocumentBuilder:
     def build_from_json(cls, json_path: str | list, config) -> FormatNode:
         paragraphs = cls.load_paragraphs(json_path)
         logger.debug(f"共有 {len(paragraphs)} 条语料")
-        check_duplicate_fingerprints(paragraphs)  # 检查重复的指纹
+        # 仅当条目包含 fingerprint 字段时才检查重复（新版 JSON 可能不生成 fingerprint）
+        if paragraphs and "fingerprint" in paragraphs[0]:
+            check_duplicate_fingerprints(paragraphs)
         DocumentTreeBuilder.CONFIG = config
         builder = DocumentTreeBuilder()
         builder._config = config

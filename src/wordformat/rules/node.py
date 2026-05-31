@@ -14,17 +14,17 @@ from loguru import logger
 from pydantic import ValidationError
 
 from wordformat.config.datamodel import BaseModel, NodeConfigRoot
+from wordformat.core.tree import TreeNode as _CoreTreeNode
 
 
-class TreeNode:
-    """树的节点类"""
+class TreeNode(_CoreTreeNode):
+    """树的节点类 —— 继承 core.TreeNode，增加指纹和配置支持。"""
 
     NODE_TYPE = "node"
 
     def __init__(self, value: Any):
-        self.value = value
+        super().__init__(value=value)
         self.__config = {}
-        self.children: list[TreeNode] = []
         self.__set_fingerprint()
 
     @property
@@ -61,14 +61,13 @@ class TreeNode:
             self.__config = {}
 
     def __set_fingerprint(self):
-        self.fingerprint = None  # 初始化为 None
+        self.fingerprint = None
+        self.index = None
         if self.value and isinstance(self.value, dict):
             if self.value.get("category") == "top":
                 return
-            try:
-                self.fingerprint = self.value["fingerprint"]
-            except KeyError as err:
-                raise ValueError(f"{self.value} must have a 'fingerprint' key") from err
+            self.fingerprint = self.value.get("fingerprint", None)
+            self.index = self.value.get("index", None)
 
     def add_child(self, child_value: Any) -> "TreeNode":
         """添加一个子节点，并返回该子节点（便于链式调用）"""
@@ -103,6 +102,7 @@ class FormatNode(TreeNode, Generic[T]):
         self.level: int | float = level
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
+        self._is_insertion: bool = False
         self._pydantic_config: Optional[T] = None  # Pydantic配置对象
 
     @property
@@ -131,26 +131,32 @@ class FormatNode(TreeNode, Generic[T]):
             raise RuntimeError(f"加载配置失败: {e}") from e
 
     def load_config(self, full_config: NodeConfigRoot):
-        """重写父类方法：同时加载字典配置和Pydantic配置。
+        """统一的配置加载：字典路径（TreeNode） + Pydantic getattr/item 链。
 
-        通过 CONFIG_PATH 属性声明配置路径，沿路径逐级 getattr 解析。
-        子类只需设置 CONFIG_PATH = "abstract.chinese.chinese_title" 即可，
-        无需在此方法中维护硬编码映射表。
+        子类只需设置 CONFIG_PATH = "abstract.chinese.keywords" 即可，
+        无需覆写此方法或维护硬编码映射表。
         """
-        # 1. 先执行父类的字典配置加载（兼容旧逻辑）
+        # 1. 字典配置（TreeNode.load_config 处理，兼容 dict 输入）
         super().load_config(full_config)
 
-        # 2. 有自定义 load_config 的子类（BaseHeadingNode、BaseKeywordsNode）
-        #    会重写此方法，不会执行到这里
         config_path = getattr(self, "CONFIG_PATH", None)
         if config_path is None:
             return
 
-        # 3. 沿 CONFIG_PATH 逐级 getattr
-        obj = full_config
-        for part in config_path.split("."):
-            obj = getattr(obj, part)
-        self._pydantic_config = obj
+        # 2. Pydantic 配置：NodeConfigRoot → getattr/item 链
+        if isinstance(full_config, NodeConfigRoot):
+            obj = full_config
+            for part in config_path.split("."):
+                obj = obj[part] if isinstance(obj, dict) else getattr(obj, part)
+            self._pydantic_config = obj
+            return
+
+        # 3. dict 输入兼容：从字典配置重建 Pydantic 模型
+        if isinstance(full_config, dict) and self.config:
+            try:
+                self._pydantic_config = self.CONFIG_MODEL(**self.config)
+            except Exception:
+                pass
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph

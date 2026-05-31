@@ -27,6 +27,19 @@ def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bo
     return None
 
 
+def collect_nodes_in_order(root: "FormatNode") -> list["FormatNode"]:
+    """按 DFS 前序遍历收集所有非根节点，返回文档顺序的节点列表。"""
+    result: list[FormatNode] = []
+
+    def _dfs(node):
+        for child in node.children:
+            result.append(child)
+            _dfs(child)
+
+    _dfs(root)
+    return result
+
+
 def promote_bodytext_in_subtrees_of_type(
     root: "FormatNode", parent_type: type, target_type: type
 ):
