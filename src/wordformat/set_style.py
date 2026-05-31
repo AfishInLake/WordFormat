@@ -12,11 +12,24 @@ from wordformat.config.config import get_config, init_config
 from wordformat.config.datamodel import NodeConfigRoot
 
 # ---- 从 orchestration/ 导入（原 set_style.py 中的函数已拆分到各子模块） ----
+from wordformat.orchestration.binding import (  # noqa: E402, F401
+    _sync_deletions,
+    _sync_insertions,
+)
 from wordformat.orchestration.binding import (
     bind_and_sync as _bind_and_sync,
 )
+from wordformat.orchestration.style_fixer import (  # noqa: E402, F401
+    collect_all_style_configs as _collect_all_style_configs,
+)
 from wordformat.orchestration.style_fixer import (
     fix_all_style_definitions as _fix_all_style_definitions,
+)
+from wordformat.orchestration.style_fixer import (
+    fix_style_paragraph_properties as _fix_style_paragraph_properties,
+)
+from wordformat.orchestration.style_fixer import (
+    fix_style_run_properties as _fix_style_run_properties,
 )
 from wordformat.orchestration.table_formatter import (  # noqa: E402
     format_table_content,

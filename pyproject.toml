@@ -98,7 +98,7 @@ max-complexity = 10
 "body.py" = ["C901"]
 "heading.py" = ["C901"]
 "numbering.py" = ["C901"]
-"set_style.py" = ["C901"]
+"set_style.py" = ["C901", "F401"]
 "utils.py" = ["C901"]
 
 [tool.ruff.format]
