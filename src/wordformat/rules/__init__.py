@@ -14,10 +14,13 @@ from .abstract import (
 from .acknowledgement import Acknowledgements, AcknowledgementsCN
 from .body import BodyText
 from .caption import CaptionFigure, CaptionTable
+from .formula import FormulaNode
 from .heading import HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node
+from .image import ImageNode
 from .keywords import KeywordsCN, KeywordsEN
 from .node import FormatNode
 from .references import ReferenceEntry, References
+from .table import TableNode
 
 __all__ = [
     "AbstractTitleCN",
@@ -36,6 +39,9 @@ __all__ = [
     "HeadingLevel1Node",
     "HeadingLevel2Node",
     "HeadingLevel3Node",
+    "FormulaNode",
+    "ImageNode",
+    "TableNode",
     "References",
     "ReferenceEntry",
     "FormatNode",

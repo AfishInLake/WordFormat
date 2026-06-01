@@ -48,6 +48,9 @@ class CategoryRegistry:
             "caption_figure": (999, False),
             "caption_table": (999, False),
             "body_text": (999, False),
+            "image": (999, False),
+            "table": (999, False),
+            "formula": (999, False),
         }
         for name, (level, is_heading) in defaults.items():
             self._level_map[name] = level

@@ -29,7 +29,13 @@ def check_duplicate_fingerprints(data):
     """
     # 提取所有 fingerprint 值
     try:
-        fingerprints = [item["fingerprint"] for item in data]
+        fingerprints = []
+        for item in data:
+            meta = item.get("meta", {}) if isinstance(item.get("meta"), dict) else {}
+            fp = meta.get("fingerprint") or item.get("fingerprint")
+            if not fp:
+                raise KeyError("fingerprint")
+            fingerprints.append(fp)
     except KeyError as e:
         raise ValueError(f"数据中缺少 'fingerprint' 字段: {e}") from e
 
@@ -58,6 +64,42 @@ def normalize_text(text: str) -> str:
     return text
 
 
+def _get_para_alignment_text(item) -> str:
+    """获取段落用于序列对齐的内容摘要（稳定，不依赖 XML 指纹）。
+
+    文本段落：返回段落文本。
+    图片段落：返回 "[IMAGE:{sha256(blob)}]" —— 基于图片二进制内容，格式变化不影响。
+    """
+    if isinstance(item, dict):
+        # JSON 条目
+        text = item.get("paragraph", "").strip()
+        if text:
+            return text
+        meta = item.get("meta", {}) if isinstance(item.get("meta"), dict) else {}
+        # 新式声明式图片条目（image_sha256 在 meta 中）
+        sha = meta.get("image_sha256", "") or item.get("image_sha256", "")
+        if sha:
+            return f"[IMAGE:{sha}]"
+        # 旧式 drawings 条目（向后兼容）
+        if item.get("drawings"):
+            fp = meta.get("fingerprint") or item.get("fingerprint", "")
+            return f"[IMAGE:{fp}]"
+        return ""
+    else:
+        # docx Paragraph 对象
+        text = item.text.strip()
+        if text:
+            return text
+        # 检查是否为图片段落，提取 blob 计算内容 sha256
+        from wordformat.orchestration.image_registry import ImageRegistry
+
+        info = ImageRegistry.extract_from_paragraph(item)
+        sha = info.get("sha256", "")
+        if sha:
+            return f"[IMAGE:{sha}]"
+        return ""
+
+
 def align_paragraphs(
     json_entries: list[dict],
     docx_paragraphs: list[Paragraph],
@@ -72,8 +114,8 @@ def align_paragraphs(
 
     autojunk=False 避免中文文本被误判为垃圾序列。
     """
-    json_texts = [normalize_text(e.get("paragraph", "")) for e in json_entries]
-    docx_texts = [normalize_text(p.text) for p in docx_paragraphs]
+    json_texts = [normalize_text(_get_para_alignment_text(e)) for e in json_entries]
+    docx_texts = [normalize_text(_get_para_alignment_text(p)) for p in docx_paragraphs]
 
     sm = SequenceMatcher(None, json_texts, docx_texts, autojunk=False)
 

@@ -60,15 +60,13 @@ def temp_json(tmp_path):
     data = [
         {
             "category": "heading_level_1",
-            "score": 0.95,
             "paragraph": "第一章 绪论",
-            "fingerprint": "abc123",
+            "meta": {"score": 0.95, "fingerprint": "abc123"},
         },
         {
             "category": "body_text",
-            "score": 0.88,
             "paragraph": "这是正文内容",
-            "fingerprint": "def456",
+            "meta": {"score": 0.88, "fingerprint": "def456"},
         },
     ]
     path = tmp_path / "test.json"

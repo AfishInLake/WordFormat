@@ -236,8 +236,13 @@ class TestTreeNode:
         assert node.children == []
 
     def test_init_with_dict_value_and_fingerprint(self):
-        node = TreeNode({"category": "body_text", "fingerprint": "abc123"})
+        node = TreeNode({"category": "body_text", "meta": {"fingerprint": "abc123"}})
         assert node.fingerprint == "abc123"
+
+    def test_init_with_top_level_fingerprint_fallback(self):
+        """向后兼容：旧 JSON（fingerprint 在顶层）仍可读取。"""
+        node = TreeNode({"category": "body_text", "fingerprint": "old123"})
+        assert node.fingerprint == "old123"
 
     def test_init_with_top_category_skips_fingerprint(self):
         node = TreeNode({"category": "top"})

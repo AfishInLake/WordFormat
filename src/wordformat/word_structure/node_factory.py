@@ -23,6 +23,38 @@ def create_node(
     if category in CATEGORY_TO_CLASS:
         cls = CATEGORY_TO_CLASS[category]
         instance = cls(value=item, expected_rule={}, level=level)
+        # 图片节点：从 JSON 的 meta 声明式字段初始化 content
+        if category == "image":
+            meta = item.get("meta", {}) if isinstance(item.get("meta"), dict) else {}
+            instance.content["image_source"] = meta.get("image_source") or item.get(
+                "image_source", ""
+            )
+            instance.content["image_sha256"] = meta.get("image_sha256") or item.get(
+                "image_sha256", ""
+            )
+            instance.content["width_emu"] = meta.get("width_emu") or item.get(
+                "width_emu", 0
+            )
+            instance.content["height_emu"] = meta.get("height_emu") or item.get(
+                "height_emu", 0
+            )
+            instance.content["alignment"] = meta.get("alignment") or item.get(
+                "alignment", "center"
+            )
+            instance.content["image_path"] = meta.get("image_path") or item.get(
+                "image_path", ""
+            )
+        # 公式节点：从 JSON meta 初始化 latex
+        if category == "formula":
+            meta = item.get("meta", {}) if isinstance(item.get("meta"), dict) else {}
+            instance.content["latex"] = meta.get("latex") or item.get("latex", "")
+            instance.content["display"] = meta.get("display", True)
+        # 表格节点：从 JSON meta 初始化 rows/cols/cells
+        if category == "table":
+            meta = item.get("meta", {}) if isinstance(item.get("meta"), dict) else {}
+            instance.content["rows"] = meta.get("rows") or item.get("rows", 1)
+            instance.content["cols"] = meta.get("cols") or item.get("cols", 1)
+            instance.content["cells"] = meta.get("cells") or item.get("cells", [])
         instance.load_config(config)
         return instance
     else:

@@ -66,8 +66,17 @@ class TreeNode(_CoreTreeNode):
         if self.value and isinstance(self.value, dict):
             if self.value.get("category") == "top":
                 return
-            self.fingerprint = self.value.get("fingerprint", None)
-            self.index = self.value.get("index", None)
+            meta = (
+                self.value.get("meta", {})
+                if isinstance(self.value.get("meta"), dict)
+                else {}
+            )
+            self.fingerprint = meta.get("fingerprint") or self.value.get("fingerprint")
+            self.index = (
+                meta.get("index")
+                if meta.get("index") is not None
+                else self.value.get("index")
+            )
 
     def add_child(self, child_value: Any) -> "TreeNode":
         """添加一个子节点，并返回该子节点（便于链式调用）"""
@@ -246,3 +255,48 @@ class FormatNode(TreeNode, Generic[T]):
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         if text.strip():
             doc.add_comment(runs=runs, text=text, author="论文解析器", initials="afish")
+
+    # ── 声明式内容接口 ──────────────────────────────────────────────
+    # 子类可覆写以提供类型特定的 extract / render / patch 行为。
+    # 默认实现以遗留方式工作，保持向后兼容。
+
+    def extract(self, paragraph: Paragraph) -> dict:  # noqa: B027
+        """从真实 docx 段落读取内容状态，返回 dict 合并到 self.content。"""
+        return {"text": paragraph.text or ""}
+
+    def render(self, document: Document) -> Any:  # noqa: B027
+        """从虚拟状态创建 OOXML 元素。默认创建一个简单 w:p。"""
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        new_p = OxmlElement("w:p")
+        text = self.content.get("text", self.value.get("paragraph", ""))
+        if text and text.strip():
+            new_r = OxmlElement("w:r")
+            new_t = OxmlElement("w:t")
+            new_t.text = text
+            new_t.set(qn("xml:space"), "preserve")
+            new_r.append(new_t)
+            new_p.append(new_r)
+        return new_p
+
+    def patch(self, paragraph: Paragraph, document: Document) -> list[str]:  # noqa: B027
+        """比较虚拟内容与真实段落，返回变更描述列表。"""
+        return []
+
+    def get_alignment_text(self) -> str:
+        """返回用于序列对齐的内容摘要（稳定，不依赖 XML 指纹）。"""
+        text = self.content.get("text", "")
+        if not text and isinstance(self.value, dict):
+            text = self.value.get("paragraph", "")
+        return text.strip()
+
+    def to_value_dict(self) -> dict:
+        """序列化为 JSON 兼容 dict，排除二进制数据。"""
+        d = (
+            dict(self.value)
+            if isinstance(self.value, dict)
+            else {"category": self.type}
+        )
+        d.update(self.content)
+        return d

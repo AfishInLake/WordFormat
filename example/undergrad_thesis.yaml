@@ -104,7 +104,7 @@ abstract:
       # 从 global_format 继承，再覆写关键词特有字段
       <<: *global_format
       alignment: '左对齐'
-      first_line_indent: '0字符'
+      first_line_indent: '2字符'
       font_size: '四号'
       # -- 关键词标签（"关键词："）的字符格式 --
       label:

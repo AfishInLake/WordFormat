@@ -1742,9 +1742,9 @@ class TestDocxBase:
         assert len(result) == 3
         assert result[0]["category"] == "heading_level_1"
         assert result[1]["category"] == "body_text"
-        assert "fingerprint" in result[0]
+        assert "fingerprint" in result[0]["meta"]
         assert "paragraph" in result[0]
-        assert "score" in result[0]
+        assert "score" in result[0]["meta"]
 
     def test_parse_low_score_forced_to_body_text(self, tmp_path):
         """测试低置信度结果被强制设为 body_text"""
@@ -1760,7 +1760,7 @@ class TestDocxBase:
 
         assert result[0]["category"] == "heading_level_1"
         assert result[1]["category"] == "body_text"
-        assert "强制设为" in result[1]["comment"]
+        assert "强制设为" in result[1]["meta"]["comment"]
 
 
     def test_parse_batch_failure_fallback_to_single(self, temp_docx):
@@ -1879,8 +1879,8 @@ class TestDocxBase:
 
         assert len(result) == 1
         assert result[0]["paragraph"] == "绪论"
-        assert result[0]["original_text"] == "1. 绪论"
-        assert result[0]["index"] == 0
+        assert result[0]["meta"]["original_text"] == "1. 绪论"
+        assert result[0]["meta"]["index"] == 0
 
 
 # ============================================================

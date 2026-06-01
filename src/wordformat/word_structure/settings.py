@@ -17,12 +17,15 @@ from wordformat.rules import (
     BodyText,
     CaptionFigure,
     CaptionTable,
+    FormulaNode,
     HeadingLevel1Node,
     HeadingLevel2Node,
     HeadingLevel3Node,
+    ImageNode,
     KeywordsCN,
     KeywordsEN,
     References,
+    TableNode,
 )
 
 # 标签 → FormatNode 子类映射（不可放入 core，因 core 不依赖 rules）
@@ -43,4 +46,7 @@ CATEGORY_TO_CLASS = {
     "caption_figure": CaptionFigure,
     "caption_table": CaptionTable,
     "body_text": BodyText,
+    "image": ImageNode,
+    "table": TableNode,
+    "formula": FormulaNode,
 }

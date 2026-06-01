@@ -416,34 +416,37 @@ class TestBuildElement:
         assert t_elem.text == ""
 
     def test_build_image_element(self):
-        from wordformat.orchestration.binding import _build_image_element
-        from wordformat.core.tree import TreeNode
-        node = TreeNode({"category": "image"})
-        node.type = "image"
-        node.content = {"path": "/tmp/img.png", "width": 400, "height": 300}
-        elem = _build_image_element(node)
-        assert elem.tag.endswith("}drawing")
+        """ImageNode.render() 创建占位符段落（无 blob 时）。"""
+        from wordformat.rules.image import ImageNode
+        node = ImageNode(value={"category": "image"}, level=999)
+        node.content["width_emu"] = 400
+        node.content["height_emu"] = 300
+        from docx import Document
+        doc = Document()
+        elem = node.render(doc)
+        assert elem.tag.endswith("}p")  # 返回 w:p 包裹 drawing
 
     def test_build_element_dispatches_correctly(self):
-        from wordformat.orchestration.binding import _build_element
+        """各节点类型通过 render() 创建正确元素。"""
+        from docx import Document
         from wordformat.core.tree import TreeNode
-        # paragraph
-        p_node = TreeNode({"paragraph": "text"})
-        assert _build_element(p_node).tag.endswith("}p")
-        # table
+        from wordformat.rules.image import ImageNode
+        doc = Document()
+        # paragraph（文本节点用 FormatNode.render 默认实现）
+        from wordformat.rules.node import FormatNode
+        p_node = FormatNode(value={"paragraph": "text"}, level=999)
+        assert p_node.render(doc).tag.endswith("}p")
+        # table（遗留 _build_table_element）
+        from wordformat.orchestration.binding import _build_table_element
         t_node = TreeNode({"category": "table"})
         t_node.type = "table"
         t_node.content = {"rows": 1, "cols": 1}
-        assert _build_element(t_node).tag.endswith("}tbl")
+        assert _build_table_element(t_node).tag.endswith("}tbl")
         # image
-        i_node = TreeNode({"category": "image"})
-        i_node.type = "image"
-        i_node.content = {"path": "/tmp/img.png"}
-        assert _build_element(i_node).tag.endswith("}drawing")
-        # unknown fallback
-        u_node = TreeNode({"paragraph": "unknown"})
-        u_node.type = "unknown"
-        assert _build_element(u_node).tag.endswith("}p")
+        i_node = ImageNode(value={"category": "image"}, level=999)
+        i_node.content["width_emu"] = 400
+        i_node.content["height_emu"] = 300
+        assert i_node.render(doc).tag.endswith("}p")
 
 
 # ============================================================
@@ -596,14 +599,17 @@ class TestBuildElementEdgeCases:
         assert len(rows) == 2  # 不崩溃
 
     def test_build_image_zero_dimensions(self):
-        from wordformat.orchestration.binding import _build_image_element
-        from wordformat.core.tree import TreeNode
-        node = TreeNode({"category": "image"})
-        node.type = "image"
-        node.content = {"path": "", "width": 0, "height": 0}
-        elem = _build_image_element(node)
+        """零尺寸图片回退到默认占位符尺寸。"""
+        from docx import Document
+        from wordformat.rules.image import ImageNode
+        doc = Document()
+        node = ImageNode(value={"category": "image"}, level=999)
+        node.content["width_emu"] = 0
+        node.content["height_emu"] = 0
+        elem = node.render(doc)
+        # 占位符：0 尺寸会被替换为默认 914400
         extent = elem.find(".//{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}extent")
-        assert extent.get("cx") == "0"
+        assert extent is not None
 
 
 class TestSyncInsertionsEdgeCases:
@@ -683,18 +689,20 @@ class TestBindAndSyncMixed:
 
     def test_mixed_node_types_paragraph_and_table(self):
         from wordformat.orchestration.binding import bind_and_sync
+        from wordformat.rules.table import TableNode
         from docx import Document
         doc = Document()
         p = doc.add_paragraph("正文")
         root = FormatNode(value={"category": "top"}, level=0)
         para_node = FormatNode(value={"category": "body_text", "paragraph": "正文"}, level=2)
-        table_node = FormatNode(value={"category": "table"}, level=2)
-        table_node.type = "table"
+        table_node = TableNode(value={"category": "table"}, level=2)
         table_node.content = {"rows": 1, "cols": 1, "cells": [["数据"]]}
         root.add_child_node(para_node)
         root.add_child_node(table_node)
         bind_and_sync(root, doc, check=False)
-        assert table_node.paragraph is not None
+        # 表格节点不设置 paragraph（w:tbl 不是 w:p），但文档中应有表格
+        assert len(doc.tables) == 1
+        assert doc.tables[0].cell(0, 0).text == "数据"
 
 
 class TestStyleFixerErrorPaths:

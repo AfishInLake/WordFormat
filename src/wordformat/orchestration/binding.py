@@ -8,34 +8,36 @@ from docx.text.paragraph import Paragraph
 from loguru import logger
 
 from wordformat.rules.node import FormatNode
-from wordformat.utils import align_paragraphs
+from wordformat.utils import _get_para_alignment_text, align_paragraphs
 from wordformat.word_structure.utils import collect_nodes_in_order
 
 
 def bind_and_sync(root_node: FormatNode, document: Document, check: bool):
     """将虚拟节点树与 docx 文档同步。
 
-    1. 收集非空 docx 段落和树节点（文档顺序）
-    2. 文本序列对齐 → matches / insertions / deletions
-    3. 匹配节点直接绑定 paragraph
-    4. apply 模式下：插入节点创建新段落、删除节点移除多余段落
-    5. check 模式下：仅记录差异日志，不修改文档
+    1. 收集 docx 段落和树节点（文档顺序）
+    2. 内容摘要序列对齐 → matches / insertions / deletions
+    3. 匹配节点绑定 paragraph → extract → patch
+    4. 插入节点创建新段落、删除节点移除多余段落
     """
-    docx_paras = [p for p in document.paragraphs if p.text.strip()]
+    docx_paras = [p for p in document.paragraphs if _get_para_alignment_text(p)]
     tree_nodes = collect_nodes_in_order(root_node)
     json_entries = [n.value for n in tree_nodes]
 
-    if len(json_entries) != len(tree_nodes):
-        logger.warning(
-            f"节点数量 ({len(tree_nodes)}) 与 JSON 条目数量 ({len(json_entries)}) 不一致"
-        )
-
     matches, insertions, deletions = align_paragraphs(json_entries, docx_paras)
 
-    # 绑定匹配的段落
+    # Phase 1: 绑定 + Extract + Patch（仅 matched 节点）
     for json_idx, para in matches.items():
-        tree_nodes[json_idx].paragraph = para
+        node = tree_nodes[json_idx]
+        node.paragraph = para
+        if not check and node.type in ("paragraph", "", None):
+            extracted = node.extract(para)
+            node.content.update(extracted)
+            changes = node.patch(para, document)
+            if changes:
+                logger.debug(f"节点 #{json_idx} patch: {', '.join(changes)}")
 
+    # Phase 2: 插入 / 删除
     if insertions:
         if check:
             logger.warning(
@@ -60,7 +62,7 @@ def bind_and_sync(root_node: FormatNode, document: Document, check: bool):
             _sync_deletions(docx_paras, deletions)
 
 
-def _sync_insertions(  # noqa: C901
+def _sync_insertions(
     tree_nodes: list[FormatNode],
     matches: dict[int, "Paragraph"],
     insertions: set[int],
@@ -68,27 +70,25 @@ def _sync_insertions(  # noqa: C901
 ):
     """为 insertions 中的每个节点在 docx 中创建段落。
 
-    按 json_index 降序处理（从后往前），每个新段落插入到最近的
-    已匹配邻接段落之后，确保插入顺序正确。
+    优先使用节点的 render() 方法；若节点未实现则回退到 _build_paragraph_element。
     """
     matched_indices = sorted(matches.keys())
+    # 无匹配锚点时按升序插入（追加到 body 末尾），有锚点时按降序（避免索引偏移）
+    reverse_order = bool(matched_indices)
 
-    for json_idx in sorted(insertions, reverse=True):
-        # 找最近的后续已匹配节点
+    for json_idx in sorted(insertions, reverse=reverse_order):
         next_match = None
         for mi in matched_indices:
             if mi > json_idx:
                 next_match = mi
                 break
 
-        # 找最近的前置已匹配节点
         prev_match = None
         for mi in reversed(matched_indices):
             if mi < json_idx:
                 prev_match = mi
                 break
 
-        # 确定锚点段落
         anchor_para = None
         use_addnext = False
         if prev_match is not None:
@@ -98,8 +98,8 @@ def _sync_insertions(  # noqa: C901
             anchor_para = matches[next_match]
             use_addnext = False
 
-        # 按节点类型构建对应的 XML 元素
-        new_elem = _build_element(tree_nodes[json_idx])
+        node = tree_nodes[json_idx]
+        new_elem = node.render(document)
 
         if anchor_para is not None:
             if use_addnext:
@@ -117,47 +117,49 @@ def _sync_insertions(  # noqa: C901
                 continue
             body_elem.append(new_elem)
 
-        # 包装并绑定（paragraph 类型用 Paragraph，其他类型暂时只存 element 引用）
-        parent = new_elem.getparent()
-        if tree_nodes[json_idx].type == "paragraph":
-            tree_nodes[json_idx].paragraph = Paragraph(new_elem, parent)
-        else:
-            tree_nodes[json_idx].paragraph = Paragraph(new_elem, parent)  # fallback
-        tree_nodes[json_idx]._is_insertion = True
+        # 仅文本类型节点创建 Paragraph 包装（表格/图片不需要）
+        if node.type in ("paragraph", "") or not node.type:
+            node.paragraph = Paragraph(new_elem, document._body)
+        node._is_insertion = True
 
         logger.info(
-            f"已插入{tree_nodes[json_idx].type} #{json_idx}: "
-            f"{tree_nodes[json_idx].value.get('paragraph', '')[:50]}..."
+            f"已插入{node.type} #{json_idx}: {node.value.get('paragraph', '')[:50]}..."
         )
 
 
-def _build_element(node) -> "OxmlElement":
-    """按节点类型构建对应的 OOXML 元素。"""
-    if node.type == "paragraph" or not node.type:
-        return _build_paragraph_element(node)
-    elif node.type == "table":
-        return _build_table_element(node)
-    elif node.type == "image":
-        return _build_image_element(node)
-    else:
-        logger.warning(f"未知节点类型 '{node.type}'，回退为 paragraph")
-        return _build_paragraph_element(node)
+def _sync_deletions(
+    docx_paras: list["Paragraph"],
+    deletions: set[int],
+):
+    """移除 deletions 对应的 docx 段落（降序处理避免索引偏移）。"""
+    for docx_idx in sorted(deletions, reverse=True):
+        elem = docx_paras[docx_idx]._element
+        parent = elem.getparent()
+        if parent is not None:
+            text_preview = docx_paras[docx_idx].text[:50]
+            parent.remove(elem)
+            logger.info(f"已删除段落 #{docx_idx}: {text_preview}...")
 
 
-def _build_paragraph_element(node) -> "OxmlElement":
-    """构建 w:p 段落元素。"""
+# ── 遗留构建函数（非声明式节点类型的回退） ──────────────────────────
+
+
+def _build_paragraph_element(node: FormatNode) -> "OxmlElement":
+    """构建 w:p 段落元素（遗留，新节点应使用 render()）。"""
     new_p = OxmlElement("w:p")
-    new_r = OxmlElement("w:r")
-    new_t = OxmlElement("w:t")
-    new_t.text = node.value.get("paragraph", "")
-    new_t.set(qn("xml:space"), "preserve")
-    new_r.append(new_t)
-    new_p.append(new_r)
+    text = node.value.get("paragraph", "")
+    if text.strip():
+        new_r = OxmlElement("w:r")
+        new_t = OxmlElement("w:t")
+        new_t.text = text
+        new_t.set(qn("xml:space"), "preserve")
+        new_r.append(new_t)
+        new_p.append(new_r)
     return new_p
 
 
-def _build_table_element(node) -> "OxmlElement":
-    """从 node.content 构建 w:tbl 表格元素。"""
+def _build_table_element(node: FormatNode) -> "OxmlElement":
+    """从 node.content 构建 w:tbl 表格元素（遗留）。"""
     tbl = OxmlElement("w:tbl")
     rows = node.content.get("rows", 1)
     cols = node.content.get("cols", 1)
@@ -181,39 +183,3 @@ def _build_table_element(node) -> "OxmlElement":
             tr.append(tc)
         tbl.append(tr)
     return tbl
-
-
-def _build_image_element(node) -> "OxmlElement":
-    """从 node.content 构建 w:drawing 图片元素（内嵌占位图）。"""
-    path = node.content.get("path", "")
-    width = node.content.get("width", 300)
-    height = node.content.get("height", 200)
-
-    drawing = OxmlElement("w:drawing")
-    inline = OxmlElement("wp:inline")
-    extent = OxmlElement("wp:extent")
-    extent.set("cx", str(width * 9525))
-    extent.set("cy", str(height * 9525))
-    inline.append(extent)
-    drawing.append(inline)
-
-    if path:
-        logger.info(f"图片节点引用路径: {path}")
-    return drawing
-
-
-def _sync_deletions(
-    docx_paras: list["Paragraph"],
-    deletions: set[int],
-):
-    """移除 deletions 对应的 docx 段落。
-
-    按 docx_index 降序处理，避免索引偏移影响后续删除。
-    """
-    for docx_idx in sorted(deletions, reverse=True):
-        elem = docx_paras[docx_idx]._element
-        parent = elem.getparent()
-        if parent is not None:
-            text_preview = docx_paras[docx_idx].text[:50]
-            parent.remove(elem)
-            logger.info(f"已删除段落 #{docx_idx}: {text_preview}...")
