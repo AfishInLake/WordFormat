@@ -29,6 +29,9 @@ from wordformat.core import (
     reset_registry,
 )
 
+# ---- 公式渲染 ----
+from wordformat.math import add_display_math, add_inline_math, latex_to_omath
+
 # ---- 编排层 ----
 from wordformat.orchestration import (
     bind_and_sync,
@@ -68,6 +71,10 @@ __all__ = [
     "NodeConfigRoot",
     "init_config",
     "get_config",
+    # math
+    "latex_to_omath",
+    "add_display_math",
+    "add_inline_math",
     # 入口
     "auto_format_thesis_document",
     "set_tag_main",
