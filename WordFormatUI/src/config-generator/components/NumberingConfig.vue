@@ -13,6 +13,8 @@
           <label class="inline-check"><input type="checkbox" v-model="config.level_1.enabled" /><span>启用</span></label>
           <div class="field" :class="{ disabled: !config.level_1.enabled }"><label>编号模板</label><input type="text" v-model="config.level_1.template" :disabled="!config.level_1.enabled" /><span class="hint">如 %1</span></div>
           <div class="field" :class="{ disabled: !config.level_1.enabled }"><label>后缀</label><select v-model="config.level_1.suffix" :disabled="!config.level_1.enabled"><option value="space">空格</option><option value="tab">制表符</option><option value="nothing">无</option></select></div>
+          <div class="field" :class="{ disabled: !config.level_1.enabled }"><label>编号缩进</label><input type="text" v-model="config.level_1.numbering_indent" :disabled="!config.level_1.enabled" /><span class="hint">如 0.75cm</span></div>
+          <div class="field" :class="{ disabled: !config.level_1.enabled }"><label>文本缩进</label><input type="text" v-model="config.level_1.text_indent" :disabled="!config.level_1.enabled" /><span class="hint">如 0.75cm</span></div>
         </div>
       </div>
       <div class="level-item">
@@ -21,6 +23,8 @@
           <label class="inline-check"><input type="checkbox" v-model="config.level_2.enabled" /><span>启用</span></label>
           <div class="field" :class="{ disabled: !config.level_2.enabled }"><label>编号模板</label><input type="text" v-model="config.level_2.template" :disabled="!config.level_2.enabled" /><span class="hint">如 %1.%2</span></div>
           <div class="field" :class="{ disabled: !config.level_2.enabled }"><label>后缀</label><select v-model="config.level_2.suffix" :disabled="!config.level_2.enabled"><option value="space">空格</option><option value="tab">制表符</option><option value="nothing">无</option></select></div>
+          <div class="field" :class="{ disabled: !config.level_2.enabled }"><label>编号缩进</label><input type="text" v-model="config.level_2.numbering_indent" :disabled="!config.level_2.enabled" /><span class="hint">如 0.75cm</span></div>
+          <div class="field" :class="{ disabled: !config.level_2.enabled }"><label>文本缩进</label><input type="text" v-model="config.level_2.text_indent" :disabled="!config.level_2.enabled" /><span class="hint">如 0.75cm</span></div>
         </div>
       </div>
       <div class="level-item">
@@ -29,6 +33,8 @@
           <label class="inline-check"><input type="checkbox" v-model="config.level_3.enabled" /><span>启用</span></label>
           <div class="field" :class="{ disabled: !config.level_3.enabled }"><label>编号模板</label><input type="text" v-model="config.level_3.template" :disabled="!config.level_3.enabled" /><span class="hint">如 %1.%2.%3</span></div>
           <div class="field" :class="{ disabled: !config.level_3.enabled }"><label>后缀</label><select v-model="config.level_3.suffix" :disabled="!config.level_3.enabled"><option value="space">空格</option><option value="tab">制表符</option><option value="nothing">无</option></select></div>
+          <div class="field" :class="{ disabled: !config.level_3.enabled }"><label>编号缩进</label><input type="text" v-model="config.level_3.numbering_indent" :disabled="!config.level_3.enabled" /><span class="hint">如 0.75cm</span></div>
+          <div class="field" :class="{ disabled: !config.level_3.enabled }"><label>文本缩进</label><input type="text" v-model="config.level_3.text_indent" :disabled="!config.level_3.enabled" /><span class="hint">如 0.75cm</span></div>
         </div>
       </div>
       <div class="level-item">
@@ -37,6 +43,8 @@
           <label class="inline-check"><input type="checkbox" v-model="config.references.enabled" /><span>启用</span></label>
           <div class="field" :class="{ disabled: !config.references.enabled }"><label>编号模板</label><input type="text" v-model="config.references.template" :disabled="!config.references.enabled" /><span class="hint">如 [%1]</span></div>
           <div class="field" :class="{ disabled: !config.references.enabled }"><label>后缀</label><select v-model="config.references.suffix" :disabled="!config.references.enabled"><option value="space">空格</option><option value="tab">制表符</option><option value="nothing">无</option></select></div>
+          <div class="field" :class="{ disabled: !config.references.enabled }"><label>编号缩进</label><input type="text" v-model="config.references.numbering_indent" :disabled="!config.references.enabled" /><span class="hint">如 0.75cm</span></div>
+          <div class="field" :class="{ disabled: !config.references.enabled }"><label>文本缩进</label><input type="text" v-model="config.references.text_indent" :disabled="!config.references.enabled" /><span class="hint">如 0.75cm</span></div>
         </div>
       </div>
       <div class="level-item">

@@ -311,8 +311,9 @@ wordf startapi -H 127.0.0.1 -p 8000
         logger.info(f"📄 源文档：{docx.resolve()}")
         logger.info(f"📁 输出目录：{output_dir.resolve()}")
 
-        # 生成并保存
-        data = set_tag_main(docx_path=str(docx), configpath=config)
+        # 生成并保存（图片导出到 output/images/）
+        image_dir = str(output_dir / "images")
+        data = set_tag_main(docx_path=str(docx), configpath=config, image_dir=image_dir)
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 

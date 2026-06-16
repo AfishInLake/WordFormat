@@ -7,11 +7,13 @@
   - table_formatter:  表格内容格式化
 """
 
+from wordformat.media import ImageRegistry  # 向后兼容 re-export
 from wordformat.orchestration.binding import bind_and_sync
 from wordformat.orchestration.style_fixer import fix_all_style_definitions
 from wordformat.orchestration.table_formatter import format_table_content
 
 __all__ = [
+    "ImageRegistry",
     "bind_and_sync",
     "fix_all_style_definitions",
     "format_table_content",

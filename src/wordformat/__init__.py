@@ -32,6 +32,9 @@ from wordformat.core import (
 # ---- 公式渲染 ----
 from wordformat.math import add_display_math, add_inline_math, latex_to_omath
 
+# ---- 媒体层 ----
+from wordformat.media import ImageRegistry, insert_element, merge_docx
+
 # ---- 编排层 ----
 from wordformat.orchestration import (
     bind_and_sync,
@@ -71,6 +74,10 @@ __all__ = [
     "NodeConfigRoot",
     "init_config",
     "get_config",
+    # media
+    "ImageRegistry",
+    "insert_element",
+    "merge_docx",
     # math
     "latex_to_omath",
     "add_display_math",

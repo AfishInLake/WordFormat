@@ -84,12 +84,15 @@ def apply_format_check_to_all_nodes(
 
         if hasattr(node, "check_format"):
             try:
-                # top 节点直接关联的 body_text 不参与格式化（如封面页、原创性声明等）
-                # 但间接关联的 body_text（作为 heading 子节点）正常格式化
-                is_top_direct_body_text = (
-                    parent_category == "top" and category == "body_text"
+                # top 节点直接关联的非标题节点不参与格式化（如封面页、原创性声明等）
+                # 图片、表格、公式等同样跳过，只格式化正文结构下的内容
+                is_top_direct_leaf = parent_category == "top" and category in (
+                    "body_text",
+                    "image",
+                    "table",
+                    "formula",
                 )
-                if category not in VOIDNODELIST and not is_top_direct_body_text:
+                if category not in VOIDNODELIST and not is_top_direct_leaf:
                     node.load_config(config)
 
                     # 对题注节点注入章节号和顺序号

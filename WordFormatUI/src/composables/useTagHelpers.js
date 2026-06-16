@@ -18,6 +18,9 @@ export const CATEGORY_CONFIG = {
     "acknowledgements_title": "段落和“致谢”或“Acknowledgements”等词意思相近",
     "caption_figure": "以“图 X.Y”或“Figure X.Y”开头的图注",
     "caption_table": "以“表 X.Y”或“Table X.Y”开头的表注",
+    "image": "图片段落：文档中的图片/插图元素",
+    "table": "表格段落：文档中的表格元素（非题注）",
+    "formula": "公式段落：文档中的 LaTeX 公式",
     "body_text": "包含完整句子、谓语动词/句号；或含“本章/本文”等明确论述的内容",
     "other": "标记跳过：后端处理时直接忽略该节点（防止误删，仅标记）"
 };
@@ -31,7 +34,7 @@ export const LEVEL_MAP = {
     "heading_mulu": 1,
     "heading_level_1": 1, "heading_level_2": 2, "heading_level_3": 3,
     "abstract_chinese_title_content": 1, "abstract_english_title_content": 1,
-    "caption_figure": 5, "caption_table": 5, "body_text": 5, "other": 5
+    "caption_figure": 5, "caption_table": 5, "image": 5, "table": 5, "formula": 5, "body_text": 5, "other": 5
 };
 
 export const LEVEL_COLORS = ['#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#9ca3af'];

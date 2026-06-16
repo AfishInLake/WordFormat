@@ -91,7 +91,7 @@ def _get_para_alignment_text(item) -> str:
         if text:
             return text
         # 检查是否为图片段落，提取 blob 计算内容 sha256
-        from wordformat.orchestration.image_registry import ImageRegistry
+        from wordformat.media import ImageRegistry
 
         info = ImageRegistry.extract_from_paragraph(item)
         sha = info.get("sha256", "")

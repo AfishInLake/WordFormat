@@ -178,22 +178,30 @@ export const defaultConfig = {
     level_1: {
       enabled: true,
       template: '%1',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: "",
+      text_indent: ""
     },
     level_2: {
       enabled: true,
       template: '%1.%2',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: "",
+      text_indent: ""
     },
     level_3: {
       enabled: true,
       template: '%1.%2.%3',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: "",
+      text_indent: ""
     },
     references: {
       enabled: true,
       template: '[%1]',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: "",
+      text_indent: ""
     },
     captions: {
       enabled: false,

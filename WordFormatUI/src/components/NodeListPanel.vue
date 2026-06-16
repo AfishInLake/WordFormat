@@ -177,6 +177,9 @@ defineEmits(['select-node'])
 .node-tag.caption_figure { background: #1e293b; color: #94a3b8; }
 .node-tag.caption_table { background: #1e293b; color: #94a3b8; }
 .node-tag.body_text { background: #0f172a; color: #94a3b8; }
+.node-tag.image { background: #0f172a; color: #94a3b8; }
+.node-tag.table { background: #0f172a; color: #94a3b8; }
+.node-tag.formula { background: #0f172a; color: #94a3b8; }
 .search-highlight { background-color: #713f12; color: #fde68a; padding: 0 2px; border-radius: 2px; }
 .replace-badge {
   display: inline-flex; align-items: center; justify-content: center;

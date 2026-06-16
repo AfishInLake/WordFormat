@@ -7,7 +7,7 @@ from docx import Document
 from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
-from wordformat.orchestration.image_registry import ImageRegistry
+from wordformat.media import ImageRegistry
 from wordformat.settings import BATCH_SIZE
 from wordformat.utils import get_paragraph_numbering_text, get_paragraph_xml_fingerprint
 
@@ -50,7 +50,7 @@ class DocxBase:
         #     logger.error(f"配置加载失败: {str(e)}")
         #     raise
 
-    def parse(self) -> list[dict]:
+    def parse(self, image_dir: str | None = None) -> list[dict]:
         paragraphs = []
         paragraph_objects = []
         result = []
@@ -115,6 +115,22 @@ class DocxBase:
                         response["meta"]["width_emu"] = info.get("width_emu", 0)
                         response["meta"]["height_emu"] = info.get("height_emu", 0)
                         response["meta"]["alignment"] = info.get("alignment", "center")
+                        # 保存图片文件到 image_dir，af 时可直接引用
+                        if image_dir and info.get("blob"):
+                            import os as _os
+
+                            _os.makedirs(image_dir, exist_ok=True)
+                            sha = info["sha256"]
+                            ext = (
+                                _os.path.splitext(info.get("source", ".png"))[-1]
+                                or ".png"
+                            )
+                            fname = f"{sha[:16]}{ext}"
+                            fpath = _os.path.join(image_dir, fname)
+                            if not _os.path.exists(fpath):
+                                with open(fpath, "wb") as _f:
+                                    _f.write(info["blob"])
+                            response["meta"]["image_path"] = fpath
 
                 # 置信度过低处理
                 if score < 0.6:

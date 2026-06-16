@@ -30,7 +30,7 @@ def bind_and_sync(root_node: FormatNode, document: Document, check: bool):
     for json_idx, para in matches.items():
         node = tree_nodes[json_idx]
         node.paragraph = para
-        if not check and node.type in ("paragraph", "", None):
+        if not check and node.type not in ("table",):
             extracted = node.extract(para)
             node.content.update(extracted)
             changes = node.patch(para, document)
@@ -117,8 +117,8 @@ def _sync_insertions(
                 continue
             body_elem.append(new_elem)
 
-        # 仅文本类型节点创建 Paragraph 包装（表格/图片不需要）
-        if node.type in ("paragraph", "") or not node.type:
+        # 表格节点（w:tbl）不创建 Paragraph 包装；其他类型（w:p 元素）需要
+        if node.type not in ("table",):
             node.paragraph = Paragraph(new_elem, document._body)
         node._is_insertion = True
 

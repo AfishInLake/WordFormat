@@ -1,4 +1,4 @@
-"""FormulaNode — LaTeX 公式渲染为 OMML。"""
+"""FormulaNode — LaTeX 公式渲染为 OMML。render() 管结构，_base() 管段落格式。"""
 
 from __future__ import annotations
 
@@ -13,21 +13,9 @@ if TYPE_CHECKING:
     from docx import Document
     from docx.text.paragraph import Paragraph
 
-MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
-MATH_FONT = "Cambria Math"
-_DEFAULT_SZ = "22"
-
-
-def _w(tag: str) -> str:
-    return f"{{http://schemas.openxmlformats.org/wordprocessingml/2006/main}}{tag}"
-
-
-def _m(tag: str) -> str:
-    return f"{{{MATH_NS}}}{tag}"
-
 
 class FormulaNode(FormatNode):
-    """公式节点 —— LaTeX → OMML，支持行内和块级公式。"""
+    """公式节点 —— LaTeX → OMML，块级居中零缩进，行内随正文。"""
 
     NODE_TYPE = "formula"
     CONFIG_MODEL = None
@@ -45,51 +33,54 @@ class FormulaNode(FormatNode):
         )
         self.type = "formula"
         self.content.setdefault("latex", "")
-        self.content.setdefault("display", True)  # True=块级 $$, False=行内 $
+        self.content.setdefault("display", True)
 
     def load_config(self, full_config) -> None:
-        """公式暂不绑定格式配置。"""
+        """公式暂不绑定 Pydantic 配置，段落样式在 _base() 中处理。"""
+
+    # ── 格式：与其他节点一致的 _base 模式 ──────────────────────────────
 
     def _base(self, doc: Document, p: bool, r: bool) -> None:  # noqa: FBT001
-        """公式格式由 OMML 自行控制。"""
+        """块级公式：居中 + 零缩进。行内公式：不设段落样式。"""
+        if self.paragraph is None:
+            return
+        if not self.content.get("display", True):
+            return  # 行内公式不强制段落样式
 
-    def check_format(self, doc: Document):
-        """跳过格式校验。"""
+        from wordformat.style.check_format import ParagraphStyle
 
-    def apply_format(self, doc: Document):
-        """跳过段落级格式操作。"""
+        ps = ParagraphStyle(
+            alignment="居中对齐",
+            first_line_indent="0字符",
+            left_indent="0字符",
+        )
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
+        if issues:
+            self.add_comment(
+                doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
+            )
+
+    # ── 声明式接口 ──────────────────────────────────────────────────
 
     def extract(self, paragraph: Paragraph) -> dict:
         return {"text": ""}
 
     def render(self, document: Document) -> OxmlElement:
+        """创建 OMML 段落 —— 只负责公式结构，样式由 _base() 处理。"""
         from wordformat.math.omml import latex_to_omath, latex_to_omath_para
 
         latex = self.content.get("latex", "")
         display = self.content.get("display", True)
-
         p_el = OxmlElement("w:p")
-
-        # 块级公式：居中 + 零缩进
-        if display:
-            pPr = OxmlElement("w:pPr")
-            jc = OxmlElement("w:jc")
-            jc.set(qn("w:val"), "center")
-            pPr.append(jc)
-            ind = OxmlElement("w:ind")
-            ind.set(qn("w:firstLine"), "0")
-            ind.set(qn("w:left"), "0")
-            pPr.append(ind)
-            p_el.append(pPr)
 
         if not latex.strip():
             return p_el
 
         try:
-            if display:
-                om = latex_to_omath_para(latex)
-            else:
-                om = latex_to_omath(latex)
+            om = latex_to_omath_para(latex) if display else latex_to_omath(latex)
             if om is not None:
                 p_el.append(om)
                 return p_el
