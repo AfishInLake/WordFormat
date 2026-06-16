@@ -47,6 +47,15 @@ class WarningFieldConfig(BaseModel):
     builtin_style_name: bool = Field(default=True, description="内置样式名称")
 
 
+# -------------------------- 规则引擎基类 --------------------------
+
+
+class BaseRuleConfig(BaseModel):
+    """所有业务规则的基类，enabled 控制规则开关。"""
+
+    enabled: bool = Field(default=True, description="是否启用此规则")
+
+
 # -------------------------- 基础配置模型 --------------------------
 class GlobalFormatConfig(BaseModel):
     """全局基础格式配置模型"""
@@ -99,32 +108,54 @@ class KeywordLabelConfig(GlobalFormatConfig):
     """关键词标签格式配置（"关键词："或"Keywords:"部分的字符格式）"""
 
 
-class KeywordsConfig(GlobalFormatConfig):
-    """关键词配置模型（继承全局格式，用于关键词内容部分）"""
+class KeywordCountRule(BaseRuleConfig):
+    """关键词数量校验规则"""
 
-    label: KeywordLabelConfig = Field(
-        default_factory=KeywordLabelConfig, description="关键词标签的字符格式"
-    )
     count_min: int = Field(default=4, description="最小关键字数")
-    count_max: int = Field(default=4, description="最大关键字数")
-    trailing_punct_forbidden: bool = Field(default=True, description="禁止最后有标点")
+    count_max: int = Field(default=6, description="最大关键字数")
 
     @field_validator("count_min", "count_max")
     @classmethod
-    def validate_keyword_count(cls, v, info):
+    def validate_keyword_count(cls, v):
         """验证关键词数量为正整数"""
         if v <= 0:
             raise ValueError(f"关键词数量 {v} 必须大于0")
         return v
 
     @model_validator(mode="after")
-    def validate_count_range(self) -> "KeywordsConfig":
+    def validate_count_range(self) -> "KeywordCountRule":
         """验证 count_min <= count_max"""
         if self.count_min > self.count_max:
             raise ValueError(
                 f"count_min({self.count_min}) 不能大于 count_max({self.count_max})"
             )
         return self
+
+
+class TrailingPunctRule(BaseRuleConfig):
+    """关键词末尾标点校验规则"""
+
+    forbidden_chars: str = Field(
+        default="；，。、", description="禁止出现在关键词末尾的标点"
+    )
+
+
+class KeywordsRulesConfig(BaseModel):
+    """关键词业务规则集合 —— 所有规则均可通过 enabled 开关控制"""
+
+    keyword_count: KeywordCountRule = Field(default_factory=KeywordCountRule)
+    trailing_punctuation: TrailingPunctRule = Field(default_factory=TrailingPunctRule)
+
+
+class KeywordsConfig(GlobalFormatConfig):
+    """关键词配置模型（继承全局格式，用于关键词内容部分）"""
+
+    label: KeywordLabelConfig = Field(
+        default_factory=KeywordLabelConfig, description="关键词标签的字符格式"
+    )
+    rules: KeywordsRulesConfig = Field(
+        default_factory=KeywordsRulesConfig, description="关键词业务规则配置"
+    )
 
 
 class AbstractTitleConfig(GlobalFormatConfig):
@@ -201,11 +232,39 @@ class BodyTextConfig(GlobalFormatConfig):
     """正文配置（继承全局格式）"""
 
 
+# -------------------------- 题注编号配置模型 --------------------------
+class CaptionNumberingConfig(BaseRuleConfig):
+    """题注编号校验/修正配置模型"""
+
+    enabled: bool = Field(default=False, description="是否启用题注编号校验/修正")
+    separator: str = Field(
+        default=".",
+        description="章节号与题注编号间的分隔符，如 . - : — –",
+    )
+    label_number_space: bool = Field(
+        default=False,
+        description="标签与编号之间是否加空格（图 1.1 vs 图1.1）",
+    )
+
+
+# -------------------------- 题注规则集合 --------------------------
+class CaptionRulesConfig(BaseModel):
+    """题注业务规则集合"""
+
+    caption_numbering: CaptionNumberingConfig = Field(
+        default_factory=CaptionNumberingConfig,
+        description="题注编号校验/修正规则",
+    )
+
+
 # -------------------------- 插图配置模型 --------------------------
 class FiguresConfig(GlobalFormatConfig):
     """插图配置"""
 
     caption_prefix: Optional[str] = Field(default="图", description="图注编号前缀")
+    rules: CaptionRulesConfig = Field(
+        default_factory=CaptionRulesConfig, description="题注业务规则配置"
+    )
 
 
 # -------------------------- 表格配置模型 --------------------------
@@ -219,6 +278,9 @@ class TablesConfig(GlobalFormatConfig):
     caption_prefix: Optional[str] = Field(default="表", description="表注编号前缀")
     content: TableContentConfig = Field(
         default_factory=TableContentConfig, description="表格内容格式"
+    )
+    rules: CaptionRulesConfig = Field(
+        default_factory=CaptionRulesConfig, description="题注业务规则配置"
     )
 
 
@@ -261,21 +323,6 @@ class AcknowledgementsConfig(BaseModel):
     content: AcknowledgementsContentConfig = Field(
         default_factory=AcknowledgementsContentConfig,
         description="致谢内容配置",
-    )
-
-
-# -------------------------- 题注编号配置模型 --------------------------
-class CaptionNumberingConfig(BaseModel):
-    """题注编号校验/修正配置模型"""
-
-    enabled: bool = Field(default=False, description="是否启用题注编号校验/修正")
-    separator: str = Field(
-        default=".",
-        description="章节号与题注编号间的分隔符，如 . - : — –",
-    )
-    label_number_space: bool = Field(
-        default=False,
-        description="标签与编号之间是否加空格（图 1.1 vs 图1.1）",
     )
 
 

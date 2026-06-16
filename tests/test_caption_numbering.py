@@ -546,11 +546,19 @@ global_format:
 figures:
   caption_position: 'below'
   caption_prefix: '图'
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
 tables:
   caption_position: 'above'
   caption_prefix: '表'
   content:
     font_size: '五号'
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
 numbering:
   enabled: false
   captions:
@@ -738,7 +746,7 @@ numbering:
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_disabled_skips_numbering_check(self, caption_yaml):
-        """captions.enabled=False 时不检查编号（但仍注入 chapter/seq）。"""
+        """rules.caption_numbering.enabled=False 时不检查编号（但仍注入 chapter/seq）。"""
         from wordformat.set_style import apply_format_check_to_all_nodes
 
         doc = Document()
@@ -746,7 +754,7 @@ numbering:
         fig = self._make_caption_figure(p)
         heading = self._make_heading_node(children=[fig])
         config = self._init_config(caption_yaml)
-        config.numbering.captions.enabled = False
+        config.figures.rules.caption_numbering.enabled = False
 
         with patch.object(fig, "add_comment") as mock_comment:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)

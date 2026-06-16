@@ -103,6 +103,15 @@ class CaptionFigure(FormatNode[FiguresConfig]):
     NODE_TYPE = "figures"
     CONFIG_MODEL = FiguresConfig
     CONFIG_PATH = "figures"
+    RULES = {"caption_numbering": "_handle_caption_numbering"}
+
+    def _handle_caption_numbering(self, doc, rule_cfg: CaptionNumberingConfig, p: bool):
+        """题注编号校验/修正"""
+        prefix = self.pydantic_config.caption_prefix or "图"
+        if p:
+            _check_caption_numbering(self, doc, prefix, rule_cfg)
+        else:
+            _apply_caption_numbering(self, prefix, rule_cfg)
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -142,16 +151,6 @@ class CaptionFigure(FormatNode[FiguresConfig]):
                 runs=self.paragraph.runs,
                 text=ParagraphStyle.to_string(paragraph_issues),
             )
-
-        # 题注编号校验/修正（仅当 value 为 dict 且有 _numbering_cfg 时才执行）
-        if isinstance(self.value, dict):
-            numbering_cfg = self.value.get("_numbering_cfg")
-            if numbering_cfg and numbering_cfg.enabled:
-                prefix = cfg.caption_prefix or "图"
-                if p:
-                    _check_caption_numbering(self, doc, prefix, numbering_cfg)
-                else:
-                    _apply_caption_numbering(self, prefix, numbering_cfg)
 
 
 class CaptionTable(FormatNode[TablesConfig]):
@@ -160,6 +159,15 @@ class CaptionTable(FormatNode[TablesConfig]):
     NODE_TYPE = "tables"
     CONFIG_MODEL = TablesConfig
     CONFIG_PATH = "tables"
+    RULES = {"caption_numbering": "_handle_caption_numbering"}
+
+    def _handle_caption_numbering(self, doc, rule_cfg: CaptionNumberingConfig, p: bool):
+        """题注编号校验/修正"""
+        prefix = self.pydantic_config.caption_prefix or "表"
+        if p:
+            _check_caption_numbering(self, doc, prefix, rule_cfg)
+        else:
+            _apply_caption_numbering(self, prefix, rule_cfg)
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -199,13 +207,3 @@ class CaptionTable(FormatNode[TablesConfig]):
                 runs=self.paragraph.runs,
                 text=ParagraphStyle.to_string(paragraph_issues),
             )
-
-        # 题注编号校验/修正（仅当 value 为 dict 且有 _numbering_cfg 时才执行）
-        if isinstance(self.value, dict):
-            numbering_cfg = self.value.get("_numbering_cfg")
-            if numbering_cfg and numbering_cfg.enabled:
-                prefix = cfg.caption_prefix or "表"
-                if p:
-                    _check_caption_numbering(self, doc, prefix, numbering_cfg)
-                else:
-                    _apply_caption_numbering(self, prefix, numbering_cfg)

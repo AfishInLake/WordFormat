@@ -59,14 +59,28 @@ abstract:
     english:             # 同上
 ```
 
-keywords 专用字段：
+keywords 除 16 个 GlobalFormat 字段外，附加：
+
+```yaml
+label:                    # KeywordLabelConfig，关键词标签的字符格式
+rules:
+  keyword_count:          # 关键词数量校验
+    enabled: true
+    count_min: 4
+    count_max: 6
+  trailing_punctuation:   # 末尾标点校验（仅中文）
+    enabled: true
+    forbidden_chars: "；，。、"
+```
 
 | 字段 | 类型 | 默认值 |
 |------|------|--------|
 | `label` | GlobalFormat | 关键词标签（"关键词："）的字符格式 |
-| `count_min` | int | `4` |
-| `count_max` | int | `4` |
-| `trailing_punct_forbidden` | bool | `true` |
+| `rules.keyword_count.enabled` | bool | `true` |
+| `rules.keyword_count.count_min` | int | `4` |
+| `rules.keyword_count.count_max` | int | `6` |
+| `rules.trailing_punctuation.enabled` | bool | `true` |
+| `rules.trailing_punctuation.forbidden_chars` | string | `"；，。、"` |
 
 ### headings（标题）
 
@@ -83,7 +97,7 @@ headings:
 
 ### figures（图注）
 
-继承 15 字段 + `caption_prefix`（默认 `图`）。
+继承 16 字段 + `caption_prefix`（默认 `图`）+ `rules`。
 
 ```yaml
 figures:
@@ -93,11 +107,16 @@ figures:
   alignment: '居中对齐'
   first_line_indent: '0字符'
   builtin_style_name: '题注'
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
+      label_number_space: false
 ```
 
 ### tables（表注 + 表格内容）
 
-继承 15 字段 + `caption_prefix`（默认 `表`）+ `content` 子配置（继承 15 字段，控制单元格内文字）。
+继承 16 字段 + `caption_prefix`（默认 `表`）+ `content` 子配置 + `rules`。
 
 ```yaml
 tables:
@@ -108,6 +127,11 @@ tables:
     <<: *global_format
     font_size: '五号'
     line_spacingrule: '单倍行距'
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
+      label_number_space: false
 ```
 
 ### references（参考文献）
@@ -170,11 +194,18 @@ numbering:
 | `style_checks_warning` | bold, italic, underline, font_size, font_name, font_color, alignment, space_before, space_after, line_spacing, line_spacingrule, left_indent, right_indent, first_line_indent, builtin_style_name |
 | `global_format` | 同上 + chinese_font_name, english_font_name, font_size, font_color, bold, italic, underline |
 | `abstract.{zh/en}.{title/content}` | 同 global_format |
-| `abstract.keywords.{zh/en}` | 同 global_format + label(同 global_format) + count_min, count_max, trailing_punct_forbidden |
+| `abstract.keywords.{zh/en}` | 同 global_format + label(同 global_format) + rules |
+| `abstract.keywords.{zh/en}.rules` | keyword_count, trailing_punctuation |
+| `abstract.keywords.{zh/en}.rules.keyword_count` | enabled, count_min, count_max |
+| `abstract.keywords.{zh/en}.rules.trailing_punctuation` | enabled, forbidden_chars |
 | `headings.level_1/2/3` | 同 global_format |
 | `body_text` | 同 global_format |
-| `figures` | 同 global_format + caption_prefix |
-| `tables` | 同 global_format + caption_prefix + content(同 global_format) |
+| `figures` | 同 global_format + caption_prefix + rules |
+| `figures.rules` | caption_numbering |
+| `figures.rules.caption_numbering` | enabled, separator, label_number_space |
+| `tables` | 同 global_format + caption_prefix + content(同 global_format) + rules |
+| `tables.rules` | caption_numbering |
+| `tables.rules.caption_numbering` | enabled, separator, label_number_space |
 | `references.title` | 同 global_format |
 | `references.content` | 同 global_format |
 | `acknowledgements.title/content` | 同 global_format |

@@ -112,10 +112,15 @@ abstract:
         chinese_font_name: '黑体'
         font_size: '四号'
         bold: true
-      # -- 关键词数量和标点校验 --
-      count_min: 3                   # 最少关键词数
-      count_max: 5                   # 最多关键词数
-      trailing_punct_forbidden: true # 中文关键词末尾是否禁止标点
+      # -- 关键词业务规则（均通过 enabled 开关控制） --
+      rules:
+        keyword_count:
+          enabled: true
+          count_min: 3                   # 最少关键词数
+          count_max: 5                   # 最多关键词数
+        trailing_punctuation:
+          enabled: true
+          forbidden_chars: "；，。、"   # 中文关键词末尾禁止出现的标点
 
     english:
       <<: *global_format
@@ -126,9 +131,11 @@ abstract:
         <<: *global_format
         font_size: '四号'
         bold: true
-      count_min: 3
-      count_max: 5
-      trailing_punct_forbidden: true
+      rules:
+        keyword_count:
+          enabled: true
+          count_min: 3
+          count_max: 5
 
 # ===========================================================================
 # 各级标题（章、节、小节）

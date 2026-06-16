@@ -150,8 +150,13 @@ abstract:
       chinese_font_name: '宋体'
       font_size: '小四'
       bold: false
-      count_min: 3
-      count_max: 5
+      rules:
+        keyword_count:
+          enabled: true
+          count_min: 3
+          count_max: 5
+        trailing_punctuation:
+          enabled: true
     english:
       label:
         font_size: '三号'
@@ -160,8 +165,11 @@ abstract:
       first_line_indent: '0字符'
       font_size: '小四'
       bold: false
-      count_min: 3
-      count_max: 5
+      rules:
+        keyword_count:
+          enabled: true
+          count_min: 3
+          count_max: 5
 headings:
   level_1:
     alignment: '居中对齐'

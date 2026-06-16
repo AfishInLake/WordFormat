@@ -4,7 +4,12 @@ from typing import Literal
 
 from docx.oxml.ns import qn
 
-from wordformat.config.datamodel import KeywordsConfig, NodeConfigRoot
+from wordformat.config.datamodel import (
+    KeywordCountRule,
+    KeywordsConfig,
+    NodeConfigRoot,
+    TrailingPunctRule,
+)
 from wordformat.rules.node import FormatNode
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
@@ -114,6 +119,7 @@ class KeywordsEN(BaseKeywordsNode):
 
     LANG = "en"
     NODE_TYPE = "abstract.keywords.english"
+    RULES = {"keyword_count": "_check_keyword_count"}
 
     def _check_keyword_label(self, run) -> bool:
         """检查run是否包含英文关键词标签（Keywords/KEY WORDS）"""
@@ -124,6 +130,20 @@ class KeywordsEN(BaseKeywordsNode):
         """英文标签拆分模式：匹配 'Keywords:' 或 'Keywords ' 及其变体"""
         return re.compile(r"Keywords?\s*[:：]?\s*", re.IGNORECASE)
 
+    def _check_keyword_count(self, doc, rule_cfg: KeywordCountRule, p: bool = False):
+        """校验英文关键词数量"""
+        keyword_text = "".join([run.text for run in self.paragraph.runs])
+        keyword_list = re.split(
+            r"[,;]", re.sub(r"Keywords?:", "", keyword_text, flags=re.IGNORECASE)
+        )
+        keyword_list = [k.strip() for k in keyword_list if k.strip()]
+        if len(keyword_list) < rule_cfg.count_min:
+            issue = f"英文关键词数量不足（最少{rule_cfg.count_min}个，当前{len(keyword_list)}个）"
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
+        if len(keyword_list) > rule_cfg.count_max:
+            issue = f"英文关键词数量超限（最多{rule_cfg.count_max}个，当前{len(keyword_list)}个）"
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
+
     def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
         校验英文关键词格式：
@@ -132,7 +152,7 @@ class KeywordsEN(BaseKeywordsNode):
         """
         cfg = self.pydantic_config
 
-        # 2. 段落样式检查
+        # 1. 段落样式检查
         paragraph_issues = self._check_paragraph_style(cfg, p)
         if paragraph_issues:
             self.add_comment(
@@ -141,11 +161,11 @@ class KeywordsEN(BaseKeywordsNode):
                 text=paragraph_issues,
             )
 
-        # 3. 拆分标签和内容混合的 run（仅在格式化模式下执行）
+        # 2. 拆分标签和内容混合的 run（仅在格式化模式下执行）
         if not p:
             self._split_mixed_runs()
 
-        # 4. 字符样式检查（区分标签/内容）
+        # 3. 字符样式检查（区分标签/内容）
         label_cfg = cfg.label
         label_style = CharacterStyle(
             font_name_cn=label_cfg.chinese_font_name,
@@ -166,13 +186,11 @@ class KeywordsEN(BaseKeywordsNode):
             underline=cfg.underline,
         )
 
-        # 4. 遍历run校验
         for run in self.paragraph.runs:
             if not run.text.strip():
                 continue
 
             if self._check_keyword_label(run):
-                # 检查标签样式
                 if r:
                     diff = label_style.diff_from_run(run)
                 else:
@@ -184,7 +202,6 @@ class KeywordsEN(BaseKeywordsNode):
                         text=CharacterStyle.to_string(diff),
                     )
             else:
-                # 检查内容样式
                 if r:
                     diff = content_style.diff_from_run(run)
                 else:
@@ -196,20 +213,6 @@ class KeywordsEN(BaseKeywordsNode):
                         text=CharacterStyle.to_string(diff),
                     )
 
-        # 5. 校验关键词数量（KeywordsConfig特有配置）
-        keyword_text = "".join([run.text for run in self.paragraph.runs])
-        # 提取英文关键词（按逗号/分号分割）
-        keyword_list = re.split(
-            r"[,;]", re.sub(r"Keywords?:", "", keyword_text, flags=re.IGNORECASE)
-        )
-        keyword_list = [k.strip() for k in keyword_list if k.strip()]
-        if len(keyword_list) < cfg.count_min:
-            issue = f"英文关键词数量不足（最少{cfg.count_min}个，当前{len(keyword_list)}个）"
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-        if len(keyword_list) > cfg.count_max:
-            issue = f"英文关键词数量超限（最多{cfg.count_max}个，当前{len(keyword_list)}个）"
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-
 
 # 第三步：中文关键词节点（专属逻辑）
 class KeywordsCN(BaseKeywordsNode):
@@ -217,6 +220,10 @@ class KeywordsCN(BaseKeywordsNode):
 
     LANG = "cn"
     NODE_TYPE = "abstract.keywords.chinese"
+    RULES = {
+        "keyword_count": "_check_keyword_count",
+        "trailing_punctuation": "_check_trailing_punctuation",
+    }
 
     def _check_keyword_label(self, run) -> bool:
         """检查run是否包含中文关键词标签（关键词）"""
@@ -229,14 +236,40 @@ class KeywordsCN(BaseKeywordsNode):
             r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*"
         )
 
+    def _check_keyword_count(self, doc, rule_cfg: KeywordCountRule, p: bool = False):
+        """校验中文关键词数量"""
+        keyword_text = "".join([run.text for run in self.paragraph.runs])
+        keyword_list = re.split(r"；", re.sub(r"关键词[:：]", "", keyword_text))
+        keyword_list = [k.strip() for k in keyword_list if k.strip()]
+        if len(keyword_list) < rule_cfg.count_min:
+            issue = f"中文关键词数量不足（最少{rule_cfg.count_min}个，当前{len(keyword_list)}个）"
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
+        if len(keyword_list) > rule_cfg.count_max:
+            issue = f"中文关键词数量超限（最多{rule_cfg.count_max}个，当前{len(keyword_list)}个）"
+            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
+
+    def _check_trailing_punctuation(
+        self, doc, rule_cfg: TrailingPunctRule, p: bool = False
+    ):
+        """校验中文关键词末尾标点"""
+        keyword_text = "".join([run.text for run in self.paragraph.runs])
+        if (
+            keyword_text.strip()
+            and keyword_text.strip()[-1] in rule_cfg.forbidden_chars
+        ):
+            self.add_comment(
+                doc=doc,
+                runs=self.paragraph.runs,
+                text="中文关键词末尾禁止出现标点符号",
+            )
+
     def _base(self, doc, p: bool, r: bool):  # noqa C901
         """
         校验中文关键词格式：
         - 段落整体格式（对齐、行距等）
         - "关键词："部分加粗，其余内容不加粗
-        - 校验关键词数量、末尾标点
         """
-        # 1. 空值校验
+        # 空值校验
         if self.pydantic_config is None:
             self.add_comment(
                 doc=doc, runs=self.paragraph.runs, text="中文关键词配置未加载，跳过检查"
@@ -245,7 +278,7 @@ class KeywordsCN(BaseKeywordsNode):
 
         cfg = self.pydantic_config
 
-        # 2. 段落样式检查（复用基类方法）
+        # 段落样式检查
         paragraph_issues = self._check_paragraph_style(cfg, p)
         if paragraph_issues:
             self.add_comment(
@@ -254,11 +287,11 @@ class KeywordsCN(BaseKeywordsNode):
                 text=paragraph_issues,
             )
 
-        # 3. 拆分标签和内容混合的 run（仅在格式化模式下执行）
+        # 拆分标签和内容混合的 run（仅在格式化模式下执行）
         if not p:
             self._split_mixed_runs()
 
-        # 4. 字符样式检查（区分标签/内容）
+        # 字符样式检查（区分标签/内容）
         label_cfg = cfg.label
         label_style = CharacterStyle(
             font_name_cn=label_cfg.chinese_font_name,
@@ -279,13 +312,11 @@ class KeywordsCN(BaseKeywordsNode):
             underline=cfg.underline,
         )
 
-        # 4. 遍历run校验
         for run in self.paragraph.runs:
             if not run.text.strip():
                 continue
 
             if self._check_keyword_label(run):
-                # 检查标签样式
                 if r:
                     diff = label_style.diff_from_run(run)
                 else:
@@ -297,7 +328,6 @@ class KeywordsCN(BaseKeywordsNode):
                         text=CharacterStyle.to_string(diff),
                     )
             else:
-                # 检查内容样式
                 if r:
                     diff = content_style.diff_from_run(run)
                 else:
@@ -308,26 +338,3 @@ class KeywordsCN(BaseKeywordsNode):
                         runs=run,
                         text=CharacterStyle.to_string(diff),
                     )
-
-        # 5. 专属校验：关键词数量 + 末尾标点（KeywordsConfig特有配置）
-        keyword_text = "".join([run.text for run in self.paragraph.runs])
-        # 提取中文关键词（按分号分割）
-        keyword_list = re.split(r"；", re.sub(r"关键词[:：]", "", keyword_text))
-        keyword_list = [k.strip() for k in keyword_list if k.strip()]
-
-        # 数量校验
-        if len(keyword_list) < cfg.count_min:
-            issue = f"中文关键词数量不足（最少{cfg.count_min}个，当前{len(keyword_list)}个）"
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-        if len(keyword_list) > cfg.count_max:
-            issue = f"中文关键词数量超限（最多{cfg.count_max}个，当前{len(keyword_list)}个）"
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-
-        # 末尾标点校验
-        if (
-            cfg.trailing_punct_forbidden
-            and keyword_text.strip()
-            and keyword_text.strip()[-1] in "；，。、"
-        ):
-            issue = "中文关键词末尾禁止出现标点符号"
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)

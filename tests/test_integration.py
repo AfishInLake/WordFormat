@@ -29,6 +29,7 @@ from wordformat.config.config import (
     clear_config,
 )
 from wordformat.config.datamodel import (
+    KeywordCountRule,
     KeywordsConfig,
     GlobalFormatConfig,
     FontSizeType,
@@ -120,14 +121,14 @@ class TestDataModelValidation:
     def test_keywords_count_positive(self):
         """count_min/count_max 必须大于 0"""
         with pytest.raises(ValueError):
-            KeywordsConfig(count_min=0)
+            KeywordCountRule(count_min=0)
         with pytest.raises(ValueError):
-            KeywordsConfig(count_max=-1)
+            KeywordCountRule(count_max=-1)
 
     def test_keywords_count_min_le_max(self):
         """count_min 不应大于 count_max"""
         with pytest.raises(ValidationError):
-            KeywordsConfig(count_min=10, count_max=3)
+            KeywordCountRule(count_min=10, count_max=3)
 
     def test_font_size_range_validation(self):
         """字号数值验证：负数应触发 ValidationError"""
@@ -1201,7 +1202,7 @@ class TestKeywordsENBase:
         node._base(doc, p=True, r=True)
 
     def test_keyword_count_validation_min(self, sample_yaml_config):
-        """Keyword count < count_min triggers warning (line 152)"""
+        """Keyword count < count_min triggers warning (via _run_rules)"""
         from wordformat.config.config import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
@@ -1213,11 +1214,11 @@ class TestKeywordsENBase:
         label_run.font.bold = True
         content_run = p.add_run("AI")
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         # count_min is 3, only 1 keyword -> should trigger count warning
 
     def test_keyword_count_validation_max(self, sample_yaml_config):
-        """Keyword count > count_max triggers warning (line 153)"""
+        """Keyword count > count_max triggers warning (via _run_rules)"""
         from wordformat.config.config import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
@@ -1229,7 +1230,7 @@ class TestKeywordsENBase:
         label_run.font.bold = True
         content_run = p.add_run("AI, ML, NLP, CV, DB, SE")
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         # count_max is 5, 6 keywords -> should trigger count warning
 
 
@@ -1309,7 +1310,7 @@ class TestKeywordsCNBase:
         node._base(doc, p=True, r=True)
 
     def test_keyword_count_and_trailing_punctuation(self, sample_yaml_config):
-        """Keyword count validation + trailing punctuation check (lines 234-239)"""
+        """Keyword count validation + trailing punctuation check (via _run_rules)"""
         from wordformat.config.config import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
@@ -1319,8 +1320,8 @@ class TestKeywordsCNBase:
         p = doc.add_paragraph()
         run = p.add_run("关键词：人工智能；机器学习；")
         node.paragraph = p
-        node._base(doc, p=True, r=True)
-        # trailing_punct_forbidden should be True by default
+        node.check_format(doc)
+        # trailing_punctuation.enabled should be True by default
         # Text ends with ； which should trigger trailing punctuation warning
 
 

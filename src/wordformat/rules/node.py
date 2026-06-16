@@ -92,6 +92,9 @@ class FormatNode(TreeNode, Generic[T]):
 
     CONFIG_MODEL: Type[T]
 
+    # 子类声明：规则名 → handler 方法名，框架自动按 config 启用/禁用调度
+    RULES: dict[str, str] = {}
+
     def __init__(
         self,
         value,
@@ -158,14 +161,55 @@ class FormatNode(TreeNode, Generic[T]):
     def _base(self, doc, p: bool, r: bool):
         raise NotImplementedError("Subclasses should implement this!")
 
+    def _run_rules(self, doc: Document, p: bool) -> None:
+        """自动调度业务规则：遍历 RULES，读配置，若 enabled 则执行 handler。
+
+        p=True 表示检查模式，p=False 表示应用模式。handler 签名为
+        (doc, rule_cfg, p)，p 默认 False 以兼容不需要区分模式的 handler。
+
+        仅子类声明了 RULES 且有对应配置时才执行。提供双向验证：
+        - 配置有规则但无 handler → warning
+        - RULES 声明了但配置无对应项 → warning
+        """
+        if not self.RULES:
+            return
+
+        rules_config = getattr(self._pydantic_config, "rules", None)
+        if rules_config is None:
+            logger.warning(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
+            return
+
+        declared_rules = set(self.RULES.keys())
+        config_rules = set(type(rules_config).model_fields.keys())
+
+        orphan_handlers = declared_rules - config_rules
+        orphan_configs = config_rules - declared_rules
+        if orphan_handlers:
+            logger.warning(
+                f"[{self.NODE_TYPE}] RULES 声明了 {orphan_handlers} 但配置无对应项"
+            )
+        if orphan_configs:
+            logger.warning(
+                f"[{self.NODE_TYPE}] 配置有 {orphan_configs} 但无对应 handler"
+            )
+
+        for rule_name, handler_name in self.RULES.items():
+            rule_cfg = getattr(rules_config, rule_name, None)
+            if rule_cfg is None or not rule_cfg.enabled:
+                continue
+            handler = getattr(self, handler_name)
+            handler(doc, rule_cfg, p)
+
     def check_format(self, doc: Document):
-        """虚方法：由子类实现具体的格式检查逻辑"""
+        """格式检查：先执行样式检查，再自动调度业务规则"""
         self._base(doc, p=True, r=True)
+        self._run_rules(doc, p=True)
 
     def apply_format(self, doc: Document):
-        """虚方法：由子类实现具体的格式应用逻辑"""
+        """格式应用：先清理、应用样式，再自动调度业务规则"""
         self._clean_paragraph_edge_spaces()
         self._base(doc, p=False, r=False)
+        self._run_rules(doc, p=False)
 
     def apply_replace(self, doc: Document = None) -> bool:
         """替换段落文本内容（由 JSON 的 replace 字段驱动）。

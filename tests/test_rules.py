@@ -261,8 +261,8 @@ class TestLoadConfig:
         node.load_config(raw)
         assert node._pydantic_config is not None
         # dict 路径下 LANG='cn' 找不到 YAML 中的 'chinese' 键，使用默认值
-        assert node._pydantic_config.count_min == 4
-        assert node._pydantic_config.count_max == 4
+        assert node._pydantic_config.rules.keyword_count.count_min == 4
+        assert node._pydantic_config.rules.keyword_count.count_max == 6
 
     def test_keywords_en_from_dict(self, config_path):
         """KeywordsEN 支持从 dict 加载配置。"""
@@ -368,7 +368,7 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         # 应至少有一条数量不足的 comment
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
         assert any("数量不足" in t for t in texts)
@@ -381,7 +381,7 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
         assert any("数量超限" in t for t in texts)
 
@@ -393,7 +393,7 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
         assert any("末尾禁止" in t for t in texts)
 
@@ -405,7 +405,7 @@ class TestKeywordsLogic:
         node = KeywordsEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
         assert any("数量不足" in t for t in texts)
 

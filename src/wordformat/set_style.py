@@ -409,8 +409,6 @@ def apply_format_check_to_all_nodes(
                             seq = counter[chapter]
                         node.value["chapter_number"] = chapter
                         node.value["sequence_number"] = seq
-                        if hasattr(config, "numbering"):
-                            node.value["_numbering_cfg"] = config.numbering.captions
 
                     if node.paragraph:
                         # 先执行内容替换（check/format 两种模式均执行）
