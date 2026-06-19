@@ -209,26 +209,13 @@ def paragraph_get_space_after(paragraph) -> float | None:
 
 
 def paragraph_get_line_spacing(paragraph):  # noqa c901
-    """
-    获取段落的行距（仅当为“倍数”类型时返回 float，否则返回 None）。
-
-    支持的倍数类型：
-      - SINGLE         → 1.0
-      - ONE_POINT_FIVE → 1.5
-      - DOUBLE         → 2.0
-      - MULTIPLE       → 自定义 float（如 2.3）
-
-    不支持的类型（返回 None）：
-      - AT_LEAST
-      - EXACTLY
-      - 其他异常情况
-    """
+    """Return line spacing as float; fallback to style chain."""
     try:
-        fmt = paragraph.paragraph_format
-        rule = fmt.line_spacing_rule
-        spacing = fmt.line_spacing
+        from wordformat.style.style_enum import _get_with_style_fallback
 
-        # 映射预设规则到倍数值
+        rule = _get_with_style_fallback(paragraph, "line_spacing_rule", None)
+        if rule is None:
+            return None
         if rule == WD_LINE_SPACING.SINGLE:
             return 1.0
         elif rule == WD_LINE_SPACING.ONE_POINT_FIVE:
@@ -236,53 +223,44 @@ def paragraph_get_line_spacing(paragraph):  # noqa c901
         elif rule == WD_LINE_SPACING.DOUBLE:
             return 2.0
         elif rule == WD_LINE_SPACING.MULTIPLE:
-            # spacing 应为 float（如 2.3）
+            spacing = _get_with_style_fallback(paragraph, "line_spacing", None)
             if isinstance(spacing, (int, float)) and spacing > 0:
                 return float(spacing)
-            else:
-                # 异常值兜底
-                return None
-        else:
-            # AT_LEAST, EXACTLY 等固定值类型，不视为“倍数行距”
-            return None
-
+        return None
     except (AttributeError, TypeError):
-        # 段落格式异常
         return None
 
 
 def paragraph_get_first_line_indent(paragraph: Paragraph) -> float | None:  # noqa c901
-    """
-    精准获取首行缩进，优先解析XML字符单位（firstLineChars），不兼容物理单位
-    :param para: 目标段落对象
-    :return: 字符数为浮点数
-    """
-    try:
-        p = paragraph._element
-        pPr = p.find(qn("w:pPr"))
-        if pPr is None:
-            return None
+    """获取首行缩进(字符单位)。优先段落自身，无则查样式链。"""
 
-        # 获取XML中的ind节点（缩进核心节点）
-        ind = pPr.find(qn("w:ind"))
+    def _read(pPr_elem):
+        ind = pPr_elem.find(qn("w:ind"))
         if ind is None:
             return None
-
-        # 步骤1：优先解析字符单位 firstLineChars（核心：值=字符数×100）
-        first_line_chars = ind.get(qn("w:firstLineChars"))
-        if first_line_chars and first_line_chars.lstrip("-").isdigit():
-            chars_num = int(first_line_chars) / 100  # 200 → 2.0字符
-            return chars_num
-
-        # 步骤2：解析悬挂缩进 hangingChars（返回负值表示悬挂缩进）
-        hanging_chars = ind.get(qn("w:hangingChars"))
-        if hanging_chars and hanging_chars.isdigit():
-            chars_num = -int(hanging_chars) / 100  # 220 → -2.2字符
-            return chars_num
-
-        # 无任何缩进设置
+        v = ind.get(qn("w:firstLineChars"))
+        if v and v.lstrip("-").isdigit():
+            return int(v) / 100
+        v = ind.get(qn("w:hangingChars"))
+        if v and v.isdigit():
+            return -int(v) / 100
         return None
 
+    try:
+        pPr = paragraph._element.find(qn("w:pPr"))
+        if pPr is not None:
+            val = _read(pPr)
+            if val is not None:
+                return val
+        style = paragraph.style
+        while style is not None:
+            sPr = style.element.find(qn("w:pPr"))
+            if sPr is not None:
+                val = _read(sPr)
+                if val is not None:
+                    return val
+            style = style.base_style
+        return None
     except Exception as e:
         logger.error(f"获取首行缩进失败：{e}")
         return None

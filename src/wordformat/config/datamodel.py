@@ -227,9 +227,26 @@ class HeadingsConfig(BaseModel):
     )
 
 
+# -------------------------- 正文规则 --------------------------
+class PunctuationRule(BaseRuleConfig):
+    """半角/全角标点符号校验规则"""
+
+    enabled: bool = Field(default=True, description="是否启用标点符号校验")
+
+
+class BodyTextRulesConfig(BaseModel):
+    """正文业务规则集合"""
+
+    punctuation: PunctuationRule = Field(default_factory=PunctuationRule)
+
+
 # -------------------------- 正文配置模型 --------------------------
 class BodyTextConfig(GlobalFormatConfig):
     """正文配置（继承全局格式）"""
+
+    rules: BodyTextRulesConfig = Field(
+        default_factory=BodyTextRulesConfig, description="正文业务规则配置"
+    )
 
 
 # -------------------------- 题注编号配置模型 --------------------------
@@ -258,10 +275,17 @@ class CaptionRulesConfig(BaseModel):
 
 
 # -------------------------- 插图配置模型 --------------------------
+class ImageFormatConfig(GlobalFormatConfig):
+    """图片段落格式配置（包含内联图片的段落，非题注）"""
+
+
 class FiguresConfig(GlobalFormatConfig):
-    """插图配置"""
+    """插图配置（题注格式 + 图片段落格式）"""
 
     caption_prefix: Optional[str] = Field(default="图", description="图注编号前缀")
+    image: ImageFormatConfig = Field(
+        default_factory=ImageFormatConfig, description="图片段落格式"
+    )
     rules: CaptionRulesConfig = Field(
         default_factory=CaptionRulesConfig, description="题注业务规则配置"
     )
@@ -272,10 +296,17 @@ class TableContentConfig(GlobalFormatConfig):
     """表格内容格式配置（表格内单元格文字的字体、字号、行距等）"""
 
 
+class TableObjectConfig(GlobalFormatConfig):
+    """表格对象格式配置（表格整体对齐、环绕等）"""
+
+
 class TablesConfig(GlobalFormatConfig):
-    """表格配置（题注格式 + 表格内容格式）"""
+    """表格配置（题注格式 + 表格对象格式 + 表格内容格式）"""
 
     caption_prefix: Optional[str] = Field(default="表", description="表注编号前缀")
+    object: TableObjectConfig = Field(
+        default_factory=TableObjectConfig, description="表格对象格式"
+    )
     content: TableContentConfig = Field(
         default_factory=TableContentConfig, description="表格内容格式"
     )
@@ -394,6 +425,9 @@ class NumberingConfig(BaseModel):
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
 
+    template_name: str = Field(
+        default="未知模板", description="模板名称（用于检测报告中显示）"
+    )
     style_checks_warning: WarningFieldConfig = Field(
         default_factory=WarningFieldConfig, description="警告字段配置"
     )

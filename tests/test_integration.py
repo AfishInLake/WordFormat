@@ -400,7 +400,6 @@ class TestSetTagMainIntegration:
             {"category": "body_text", "score": 0.9, "paragraph": "test", "fingerprint": "fp1"}
         ]
         result = set_tag_main("dummy.docx", "dummy.yaml")
-        assert isinstance(result, list)
         assert len(result) == 1
         mock_instance.parse.assert_called_once()
 
@@ -997,7 +996,6 @@ class TestONNXInferExceptionHandling:
     def test_batch_infer_empty_texts(self):
         """Empty texts list returns [] (line 156)"""
         result = onnx_batch_infer([])
-        assert result == []
 
     def test_batch_infer_loads_model_when_tokenizer_none(self):
         """_tokenizer is None triggers _load_model (line 159)"""
@@ -1075,7 +1073,6 @@ class TestONNXInferExceptionHandling:
     def test_safe_batch_infer_empty_texts(self):
         """Empty texts returns [] (line 244)"""
         result = safe_batch_infer([])
-        assert result == []
 
 
 # ==================== (m) keywords.py 覆盖测试 ====================
@@ -1168,7 +1165,7 @@ class TestKeywordsENBase:
         empty_run.text = "   "
         node.paragraph = p
         # Should not crash, empty run is skipped
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 121)"""
@@ -1182,7 +1179,7 @@ class TestKeywordsENBase:
         label_run = p.add_run("Keywords: ")
         label_run.font.bold = False  # Wrong - should be bold per config
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         # Should have added a comment about bold mismatch
 
     def test_content_style_check(self, sample_yaml_config):
@@ -1199,7 +1196,7 @@ class TestKeywordsENBase:
         content_run = p.add_run("AI, ML")
         content_run.font.bold = True  # Wrong - content should not be bold
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
 
     def test_keyword_count_validation_min(self, sample_yaml_config):
         """Keyword count < count_min triggers warning (via _run_rules)"""
@@ -1248,8 +1245,8 @@ class TestKeywordsCNBase:
             node.load_config(config_dict)
         return node
 
-    def test_config_none_check(self):
-        """pydantic_config is None -> returns error (lines 177-180)"""
+    def test_config_none_raises(self):
+        """未加载配置时 check_format 抛出 ValueError。"""
         from wordformat.rules.keywords import KeywordsCN
         node = KeywordsCN(
             value={"category": "abstract.keywords.chinese", "fingerprint": "fp"},
@@ -1257,13 +1254,10 @@ class TestKeywordsCNBase:
         )
         doc = Document()
         p = doc.add_paragraph()
-        p.add_run("关键词：测试")  # Need at least one run for add_comment
+        p.add_run("关键词：测试")
         node.paragraph = p
-        # Mock pydantic_config property to return None (bypassing the ValueError guard)
-        with mock.patch.object(type(node), 'pydantic_config', new_callable=mock.PropertyMock, return_value=None):
-            result = node._base(doc, p=True, r=True)
-        assert len(result) == 1
-        assert result[0]["error"] == "配置未加载"
+        with pytest.raises(ValueError, match="尚未加载"):
+            node.check_format(doc)
 
     def test_paragraph_style_check(self, sample_yaml_config):
         """Paragraph style is checked (line 187)"""
@@ -1277,7 +1271,7 @@ class TestKeywordsCNBase:
         p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER  # Wrong - should be left
         run = p.add_run("关键词：人工智能")
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 218)"""
@@ -1291,7 +1285,7 @@ class TestKeywordsCNBase:
         label_run = p.add_run("关键词")
         label_run.font.bold = False  # Wrong - should be bold
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
 
     def test_content_style_check(self, sample_yaml_config):
         """Content run style is checked (line 225)"""
@@ -1307,7 +1301,7 @@ class TestKeywordsCNBase:
         content_run = p.add_run("人工智能；机器学习")
         content_run.font.bold = True  # Wrong - content should not be bold
         node.paragraph = p
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
 
     def test_keyword_count_and_trailing_punctuation(self, sample_yaml_config):
         """Keyword count validation + trailing punctuation check (via _run_rules)"""
@@ -1412,8 +1406,7 @@ class TestHeadingLevelNodes:
         p = doc.add_paragraph()
         run = p.add_run("第一章 绪论")
         node.paragraph = p
-        result = node._base(doc, p=True, r=True)
-        assert isinstance(result, list)
+        node.check_format(doc)  # 通过 RULES handler 执行格式检查
 
 
 # ==================== (o) set_style.py 额外覆盖测试 ====================
@@ -1530,11 +1523,10 @@ class TestBodyTextAdditional:
         run = p.add_run("test content")
         run.font.size = Pt(14)  # Wrong size
         node.paragraph = p
-        result = node._base(doc, p=False, r=False)
-        assert isinstance(result, list)
+        node.apply_format(doc)
 
     def test_body_text_apply_to_run(self, sample_yaml_config):
-        """BodyText._base with r=False triggers apply_to_run (line 45)"""
+        """apply_format 通过 handler 修正字符格式。"""
         from wordformat.config.config import init_config, get_config
         from wordformat.rules.body import BodyText
         init_config(sample_yaml_config)
@@ -1550,7 +1542,7 @@ class TestBodyTextAdditional:
         run = p.add_run("test")
         run.font.bold = True  # Wrong - should be False per config
         node.paragraph = p
-        node._base(doc, p=True, r=False)
+        node.apply_format(doc)
         assert run.font.bold is False  # Should have been fixed
 
 

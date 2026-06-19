@@ -410,6 +410,10 @@ def apply_format_check_to_all_nodes(
                         node.value["chapter_number"] = chapter
                         node.value["sequence_number"] = seq
 
+                    # 给所有节点注入章节号（BodyText 引用上标需要）
+                    if isinstance(node.value, dict):
+                        node.value.setdefault("chapter_number", current_chapter)
+
                     if node.paragraph:
                         # 先执行内容替换（check/format 两种模式均执行）
                         node.apply_replace(document)
@@ -432,20 +436,34 @@ def apply_format_check_to_all_nodes(
     traverse(root_node)
 
 
+def _clear_matched_flags(root_node):
+    """清除树中所有节点的 _matched 标记，每次匹配前调用。"""
+    from collections import deque
+
+    q = deque([root_node])
+    while q:
+        n = q.popleft()
+        if hasattr(n, "_matched"):
+            del n._matched
+        q.extend(n.children)
+
+
 def xg(root_node, paragraph):
     """
-    根据段落对象查找对应的节点
-    :param root_node: 树的根节点
-    :param paragraph: docx文档的段落对象
-    :return: 找到的节点
+    根据 XML 指纹匹配树节点。已匹配过的节点不再参与后续匹配，
+    防止多个相同指纹的段落（如空段）绑到同一个节点。
     """
+    fp = get_paragraph_xml_fingerprint(paragraph)
 
     def condition(node):
-        if getattr(node, "fingerprint", False):
-            return node.fingerprint == get_paragraph_xml_fingerprint(paragraph)
+        if getattr(node, "fingerprint", False) and not getattr(node, "_matched", False):
+            return node.fingerprint == fp
         return False
 
-    return find_and_modify_first(root=root_node, condition=condition)
+    node = find_and_modify_first(root=root_node, condition=condition)
+    if node:
+        node._matched = True
+    return node
 
 
 def format_table_content(
@@ -490,12 +508,12 @@ def format_table_content(
                         para_issues = ps.diff_from_paragraph(paragraph)
                     else:
                         para_issues = ps.apply_to_paragraph(paragraph)
-                    para_text = ParagraphStyle.to_string(para_issues)
+                    para_text = ParagraphStyle.to_string(para_issues, target="表格内容")
                     if para_text.strip():
                         document.add_comment(
                             runs=paragraph.runs,
                             text=para_text,
-                            author="论文解析器",
+                            author="Wordformat",
                             initials="afish",
                         )
 
@@ -507,14 +525,142 @@ def format_table_content(
                             diff = cstyle.diff_from_run(run)
                         else:
                             diff = cstyle.apply_to_run(run)
-                        run_text = CharacterStyle.to_string(diff)
+                        run_text = CharacterStyle.to_string(diff, target="表格内容")
                         if run_text.strip():
                             document.add_comment(
                                 runs=run,
                                 text=run_text,
-                                author="论文解析器",
+                                author="Wordformat",
                                 initials="afish",
                             )
+
+
+def _build_check_summary(root_node, document, config_model) -> str:
+    """遍历树和错误统计，生成检测报告摘要文本。"""
+    from wordformat.rules.node import FormatNode
+
+    stats = FormatNode._error_stats
+    total = stats["total"]
+
+    # 遍历树，收集文档级统计
+    import re
+
+    def _collect_section(node, sections):
+        cls_name = type(node).__name__
+        para = node.paragraph
+        if para and para.text.strip():
+            text = para.text.strip()
+            if cls_name == "AbstractContentCN":
+                chinese_only = "".join(ch for ch in text if "一" <= ch <= "鿿")
+                if chinese_only:
+                    sections["abstract_cn_chars"] = sections.get(
+                        "abstract_cn_chars", 0
+                    ) + len(chinese_only)
+            elif cls_name == "AbstractContentEN":
+                sections["abstract_en_words"] = sections.get(
+                    "abstract_en_words", 0
+                ) + len(text.split())
+            elif cls_name == "KeywordsCN":
+                kw_text = re.sub(r"关键词[:：]?\s*", "", text)
+                kws = [k.strip() for k in re.split(r"[；;]", kw_text) if k.strip()]
+                if kws:
+                    sections["keyword_cn_count"] = len(kws)
+            elif cls_name == "KeywordsEN":
+                kw_text = re.sub(r"Keywords?:?\s*", "", text, flags=re.IGNORECASE)
+                kws = [k.strip() for k in re.split(r"[,;]", kw_text) if k.strip()]
+                if kws:
+                    sections["keyword_en_count"] = len(kws)
+            elif cls_name == "ReferenceEntry":
+                has_chinese = any("一" <= ch <= "鿿" for ch in text)
+                if has_chinese:
+                    sections["ref_cn"] = sections.get("ref_cn", 0) + 1
+                else:
+                    sections["ref_en"] = sections.get("ref_en", 0) + 1
+        # 处理混合节点：AbstractTitleContentCN/EN 的子 BodyText 是摘要正文
+        if cls_name == "AbstractTitleContentCN":
+            for child in node.children:
+                cp = child.paragraph
+                if cp and cp.text.strip():
+                    cn = "".join(ch for ch in cp.text.strip() if "一" <= ch <= "鿿")
+                    cnt = len(cn)
+                    cur = sections.get("abstract_cn_chars", 0)
+                    sections["abstract_cn_chars"] = cur + cnt
+        elif cls_name == "AbstractTitleContentEN":
+            for child in node.children:
+                cp = child.paragraph
+                if cp and cp.text.strip():
+                    cnt = len(cp.text.strip().split())
+                    sections["abstract_en_words"] = (
+                        sections.get("abstract_en_words", 0) + cnt
+                    )
+        for child in node.children:
+            _collect_section(child, sections)
+
+    sections: dict = {}
+    _collect_section(root_node, sections)
+
+    # 计算万字差错率
+    total_chars = sum(
+        len(p.text) for p in document.paragraphs if p.text and p.text.strip()
+    )
+    error_rate = (total / max(total_chars, 1)) * 10000 if total else 0
+
+    # 模板名（从 config 读取）
+    template_name = getattr(config_model, "template_name", None) or "未知模板"
+
+    lines = [
+        "检测结果：",
+        f"检测模板：《{template_name}》",
+        f"检测错误数：{total}，万字差错率：{error_rate:.1f}",
+        f"严重错误：{stats.get('严重', 0)}，一般错误：{stats.get('一般', 0)}，提醒：{stats.get('提醒', 0)}",
+    ]
+
+    # 字数问题
+    word_issues = []
+    if sections.get("abstract_cn_chars"):
+        word_issues.append(
+            f"中文摘要：规范：300字左右，原文：{sections['abstract_cn_chars']}字"
+        )
+    if sections.get("abstract_en_words"):
+        word_issues.append(
+            f"英文摘要：规范：300字左右，原文：{sections['abstract_en_words']}词"
+        )
+    if sections.get("keyword_cn_count"):
+        word_issues.append(
+            f"中文关键词：规范：3-5个，原文：{sections['keyword_cn_count']}个"
+        )
+    if sections.get("keyword_en_count"):
+        word_issues.append(
+            f"英文关键词：规范：3-5个，原文：{sections['keyword_en_count']}个"
+        )
+    ref_cn = sections.get("ref_cn", 0)
+    ref_en = sections.get("ref_en", 0)
+    if ref_cn or ref_en:
+        word_issues.append(
+            f"参考文献：规范：不少于15条，原文：中文{ref_cn}条;外文{ref_en}条"
+        )
+    if word_issues:
+        lines.append("字数问题：")
+        lines.extend(word_issues)
+
+    lines.append("说明：")
+    lines.append(
+        "1.请确保文档中正确使用换行符，硬回车（Enter）：指换行且生成新段落；软回车（Shift+Enter）：指换行但不生成新段落。"
+    )
+    lines.append("2.图片请使用“嵌入型”环绕方式，表格为无环绕方式。")
+    lines.append("3.提醒不计算错误。")
+
+    return "\n".join(lines)
+
+
+def _add_summary_comment(document, summary: str) -> None:
+    """将检测报告摘要作为批注添加到文档第一段。空段临时塞空 run 做锚点。"""
+    para = document.paragraphs[0]
+    if not para.runs:
+        para.add_run("")
+    document.add_comment(
+        runs=para.runs, text=summary, author="Wordformat", initials="afish"
+    )
 
 
 def auto_format_thesis_document(
@@ -585,9 +731,8 @@ def auto_format_thesis_document(
             style_list.append(style.name)
         logger.info(f"可用的样式有：{style_list}")
 
+    _clear_matched_flags(root_node)
     for paragraph in document.paragraphs:
-        if not paragraph.text:
-            continue
         node = xg(root_node, paragraph)
         if node:
             node.paragraph = paragraph
@@ -607,10 +752,18 @@ def auto_format_thesis_document(
         _fix_all_style_definitions(document, config_model)
 
     # 执行格式化
+    if check:
+        FormatNode.reset_stats()
     apply_format_check_to_all_nodes(root_node, document, config_model, check)
 
-    # 表格内容格式化
-    format_table_content(document, config_model, check)
+    # 表格内容格式化（已移除：表格内格式由 Word 表格样式控制，不做段落/字符级检查）
+    # format_table_content(document, config_model, check)
+
+    # 检测报告摘要（仅 check 模式）
+    if check:
+        summary = _build_check_summary(root_node, document, config_model)
+        if summary:
+            _add_summary_comment(document, summary)
 
     # 处理标题自动编号（仅在格式化模式下执行，检查模式不修改编号）
     if (

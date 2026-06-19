@@ -92,8 +92,21 @@ class FormatNode(TreeNode, Generic[T]):
 
     CONFIG_MODEL: Type[T]
 
+    # 全局错误统计（类变量，一次 check 周期内累加）
+    _error_stats: dict[str, int] = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
+
+    # 中文标签，用作批注的 [位置] 部分
+    NODE_LABEL: str = ""
+
     # 子类声明：规则名 → handler 方法名，框架自动按 config 启用/禁用调度
+    # 只放需要 YAML 配置控制的业务规则。段落/字符格式由 DEFAULT_RULES 自动处理
     RULES: dict[str, str] = {}
+
+    # 框架自动注入的默认规则，不依赖配置，所有节点默认启用
+    DEFAULT_RULES: dict[str, str] = {
+        "paragraph_style": "_handle_paragraph_style",
+        "character_style": "_handle_character_style",
+    }
 
     def __init__(
         self,
@@ -107,6 +120,9 @@ class FormatNode(TreeNode, Generic[T]):
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
         self._pydantic_config: Optional[T] = None  # Pydantic配置对象
+        self._comment_texts: list[
+            tuple
+        ] = []  # (runs, text) 缓冲，flush 时按 runs 分组合并
 
     @property
     def pydantic_config(self) -> T:
@@ -159,57 +175,196 @@ class FormatNode(TreeNode, Generic[T]):
         self.paragraph = paragraph
 
     def _base(self, doc, p: bool, r: bool):
-        raise NotImplementedError("Subclasses should implement this!")
+        """子类可覆写以添加自定义逻辑（如拆分混合 run）。标准节点无需覆写。"""
 
     def _run_rules(self, doc: Document, p: bool) -> None:
-        """自动调度业务规则：遍历 RULES，读配置，若 enabled 则执行 handler。
+        """自动调度所有规则：DEFAULT_RULES（无需配置）+ RULES（需 YAML 配置）。
 
         p=True 表示检查模式，p=False 表示应用模式。handler 签名为
         (doc, rule_cfg, p)，p 默认 False 以兼容不需要区分模式的 handler。
 
-        仅子类声明了 RULES 且有对应配置时才执行。提供双向验证：
+        DEFAULT_RULES 总是执行，RULES 仅当配置 enabled=true 时执行。提供双向验证：
         - 配置有规则但无 handler → warning
         - RULES 声明了但配置无对应项 → warning
         """
-        if not self.RULES:
+        all_rules = {**self.DEFAULT_RULES, **self.RULES}
+        if not all_rules:
             return
 
         rules_config = getattr(self._pydantic_config, "rules", None)
-        if rules_config is None:
-            logger.warning(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
-            return
 
-        declared_rules = set(self.RULES.keys())
-        config_rules = set(type(rules_config).model_fields.keys())
+        # 双向验证（仅检查自定义 RULES）
+        if self.RULES:
+            if rules_config is None:
+                logger.warning(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
+            else:
+                declared_rules = set(self.RULES.keys())
+                config_rules = set(type(rules_config).model_fields.keys())
+                orphan_handlers = declared_rules - config_rules
+                orphan_configs = config_rules - declared_rules
+                if orphan_handlers:
+                    logger.warning(
+                        f"[{self.NODE_TYPE}] RULES 声明了 {orphan_handlers} 但配置无对应项"
+                    )
+                if orphan_configs:
+                    logger.warning(
+                        f"[{self.NODE_TYPE}] 配置有 {orphan_configs} 但无对应 handler"
+                    )
 
-        orphan_handlers = declared_rules - config_rules
-        orphan_configs = config_rules - declared_rules
-        if orphan_handlers:
-            logger.warning(
-                f"[{self.NODE_TYPE}] RULES 声明了 {orphan_handlers} 但配置无对应项"
-            )
-        if orphan_configs:
-            logger.warning(
-                f"[{self.NODE_TYPE}] 配置有 {orphan_configs} 但无对应 handler"
-            )
+        for rule_name, handler_name in all_rules.items():
+            # 默认规则无配置，总是执行
+            if rule_name in self.DEFAULT_RULES:
+                handler = getattr(self, handler_name)
+                handler(doc, None, p)
+                continue
 
-        for rule_name, handler_name in self.RULES.items():
+            # 自定义规则：读配置，检查 enabled
+            if rules_config is None:
+                continue
             rule_cfg = getattr(rules_config, rule_name, None)
             if rule_cfg is None or not rule_cfg.enabled:
                 continue
             handler = getattr(self, handler_name)
             handler(doc, rule_cfg, p)
 
+    # ------------------------------------------------------------------
+    # 默认规则 handler：段落样式 + 字符样式
+    # ------------------------------------------------------------------
+
+    def _handle_paragraph_style(self, doc, rule_cfg, p: bool):
+        """默认段落样式检查/应用。配置需继承 GlobalFormatConfig。"""
+        if self.paragraph is None or not self.paragraph.runs:
+            return
+        from wordformat.style.check_format import ParagraphStyle
+
+        cfg = self.pydantic_config
+        if not hasattr(cfg, "alignment"):
+            return
+        ps = ParagraphStyle.from_config(cfg)
+        if p:
+            issues = ps.diff_from_paragraph(self.paragraph)
+        else:
+            issues = ps.apply_to_paragraph(self.paragraph)
+        if issues:
+            self.add_comment(
+                doc=doc,
+                runs=self.paragraph.runs,
+                text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
+            )
+
+    def _handle_character_style(self, doc, rule_cfg, p: bool):
+        """默认字符样式检查/应用。配置需继承 GlobalFormatConfig。"""
+        if not self.paragraph.runs:
+            return
+        from wordformat.style.check_format import CharacterStyle
+
+        cfg = self.pydantic_config
+        if not hasattr(cfg, "chinese_font_name"):
+            return
+        cstyle = CharacterStyle(
+            font_name_cn=cfg.chinese_font_name,
+            font_name_en=cfg.english_font_name,
+            font_size=cfg.font_size,
+            font_color=cfg.font_color,
+            bold=cfg.bold,
+            italic=cfg.italic,
+            underline=cfg.underline,
+        )
+        for run in self.paragraph.runs:
+            if not run.text.strip():
+                continue
+            if p:
+                diff = cstyle.diff_from_run(run)
+            else:
+                diff = cstyle.apply_to_run(run)
+            if diff:
+                self.add_comment(
+                    doc=doc,
+                    runs=run,
+                    text=CharacterStyle.to_string(diff, target=self.NODE_LABEL),
+                )
+
+    def _collect_comment(self, runs, text: str) -> None:
+        """将批注文本加入缓冲区，(runs, text) 成对存储。"""
+        if text.strip():
+            self._comment_texts.append((runs, text.strip()))
+
+    def _flush_comments(self, doc: Document) -> None:
+        """将缓冲的批注按锚点分组写入。段落级合并为一条，run 级按 run 分开。"""
+        if not self._comment_texts or not self.paragraph.runs:
+            self._comment_texts.clear()
+            return
+        groups = self._group_comments()
+        self._write_comment_groups(doc, groups)
+        self._comment_texts.clear()
+
+    def _group_comments(self) -> dict[tuple, tuple[tuple, list[str]]]:
+        """按 runs 分组批注文本。段落级用 ('__para__',)，run 级用索引 i。"""
+        para_runs = list(self.paragraph.runs)
+        groups: dict[tuple, tuple[tuple, list[str]]] = {}
+
+        def _key(runs):
+            if isinstance(runs, Sequence) and len(runs) == len(para_runs):
+                return ("__para__",)
+            r = runs[0] if isinstance(runs, Sequence) else runs
+            for i, pr in enumerate(para_runs):
+                if r is pr or r._element is pr._element:
+                    return (i,)
+            return (id(runs),)
+
+        for runs, text in self._comment_texts:
+            k = _key(runs)
+            if k not in groups:
+                groups[k] = (runs, [])
+            groups[k][1].append(text)
+        return groups
+
+    def _write_comment_groups(self, doc, groups) -> None:
+        """将分组后的批注写入文档并更新统计。"""
+        from wordformat.style.comment_format import SEVERITY_ORDER, get_severity
+
+        for runs, texts in groups.values():
+            merged = "\n".join(texts)
+            doc.add_comment(
+                runs=runs, text=merged, author="Wordformat", initials="afish"
+            )
+            # 提醒级批注用蓝色字体
+            max_sev = "提醒"
+            for t in texts:
+                sev = get_severity(t)
+                if SEVERITY_ORDER.get(sev, 3) < SEVERITY_ORDER.get(max_sev, 3):
+                    max_sev = sev
+            if max_sev == "提醒":
+                _color_last_comment(doc, "0000FF")
+            FormatNode._error_stats["total"] += 1
+            FormatNode._error_stats[max_sev] = (
+                FormatNode._error_stats.get(max_sev, 0) + 1
+            )
+            for t in texts:
+                sev = get_severity(t)
+                if SEVERITY_ORDER.get(sev, 3) < SEVERITY_ORDER.get(max_sev, 3):
+                    max_sev = sev
+            FormatNode._error_stats[max_sev] = (
+                FormatNode._error_stats.get(max_sev, 0) + 1
+            )
+
+    @classmethod
+    def reset_stats(cls) -> None:
+        """重置全局错误统计。"""
+        cls._error_stats = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
+
     def check_format(self, doc: Document):
         """格式检查：先执行样式检查，再自动调度业务规则"""
         self._base(doc, p=True, r=True)
         self._run_rules(doc, p=True)
+        self._flush_comments(doc)
 
     def apply_format(self, doc: Document):
         """格式应用：先清理、应用样式，再自动调度业务规则"""
         self._clean_paragraph_edge_spaces()
         self._base(doc, p=False, r=False)
         self._run_rules(doc, p=False)
+        self._flush_comments(doc)
 
     def apply_replace(self, doc: Document = None) -> bool:
         """替换段落文本内容（由 JSON 的 replace 字段驱动）。
@@ -282,5 +437,42 @@ class FormatNode(TreeNode, Generic[T]):
                 break
 
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
-        if text.strip():
-            doc.add_comment(runs=runs, text=text, author="论文解析器", initials="afish")
+        """追加批注到缓冲区，按锚点 run 分组，flush 时同组合并为一条。"""
+        self._collect_comment(runs, text)
+
+
+def _color_last_comment(doc, hex_color: str) -> None:
+    """将文档最后一条批注的文字颜色设为指定色（如 0000FF 蓝色）。"""
+    try:
+        comments = doc._part.comments
+        if comments is None:
+            return
+        last = comments[-1]
+        for p in last._element.findall(
+            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        ):
+            for r in p.findall(
+                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
+            ):
+                rPr = r.find(
+                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rPr"
+                )
+                if rPr is None:
+                    from docx.oxml import OxmlElement
+
+                    rPr = OxmlElement("w:rPr")
+                    r.insert(0, rPr)
+                color = rPr.find(
+                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}color"
+                )
+                if color is None:
+                    from docx.oxml import OxmlElement
+
+                    color = OxmlElement("w:color")
+                    rPr.append(color)
+                color.set(
+                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val",
+                    hex_color,
+                )
+    except Exception:
+        pass

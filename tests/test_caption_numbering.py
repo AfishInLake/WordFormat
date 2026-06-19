@@ -280,7 +280,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "章节号应为1" in mock_comment.call_args[0][2]
+        assert "章节号错误" in mock_comment.call_args[0][2]
 
     def test_wrong_separator_adds_comment(self):
         from wordformat.rules.caption import _check_caption_numbering
@@ -294,7 +294,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "分隔符" in mock_comment.call_args[0][2]
+        assert "分隔符错误" in mock_comment.call_args[0][2]
 
     def test_wrong_label_adds_comment(self):
         from wordformat.rules.caption import _check_caption_numbering
@@ -308,7 +308,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "标签" in mock_comment.call_args[0][2]
+        assert "标签错误" in mock_comment.call_args[0][2]
 
     def test_wrong_sequence_adds_comment(self):
         from wordformat.rules.caption import _check_caption_numbering
@@ -322,7 +322,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "题注编号应为2" in mock_comment.call_args[0][2]
+        assert "编号错误" in mock_comment.call_args[0][2]
 
     def test_unparseable_adds_comment(self):
         from wordformat.rules.caption import _check_caption_numbering
@@ -336,7 +336,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "无法识别" in mock_comment.call_args[0][2]
+        assert "格式错误" in mock_comment.call_args[0][2]
 
     def test_label_space_enabled_no_space_in_text(self):
         """label_number_space=true，题注无空格 → 添加批注。"""
@@ -351,7 +351,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "标签与编号间应为有空格" in mock_comment.call_args[0][2]
+        assert "间距错误" in mock_comment.call_args[0][2]
 
     def test_label_space_disabled_with_space_in_text(self):
         """label_number_space=false，题注有空格 → 添加批注。"""
@@ -366,7 +366,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "图", cfg)
 
         mock_comment.assert_called_once()
-        assert "应为无空格" in mock_comment.call_args[0][2]
+        assert "间距错误" in mock_comment.call_args[0][2]
 
     def test_disabled_does_nothing(self):
         """配置禁用时不检查。此逻辑在 _base() 中判断，这里验证 disabled 的 cfg 不触发。"""
@@ -424,7 +424,7 @@ class TestCheckCaptionNumbering:
             _check_caption_numbering(node, doc, "表", cfg)
 
         mock_comment.assert_called_once()
-        assert "标签与编号间应为有空格" in mock_comment.call_args[0][2]
+        assert "间距错误" in mock_comment.call_args[0][2]
 
 
 # ======================== _apply_caption_numbering ========================
@@ -635,10 +635,10 @@ numbering:
         mock_cs.diff_from_run.return_value = {}
         mock_cs.apply_to_run.return_value = {}
         with patch(
-            "wordformat.rules.caption.ParagraphStyle.from_config",
+            "wordformat.style.check_format.ParagraphStyle.from_config",
             return_value=mock_ps,
         ), patch(
-            "wordformat.rules.caption.CharacterStyle",
+            "wordformat.style.check_format.CharacterStyle",
             return_value=mock_cs,
         ):
             yield
@@ -674,7 +674,7 @@ numbering:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
 
         mock_comment.assert_called_once()
-        assert "章节号应为1" in mock_comment.call_args[0][2]
+        assert "章节号错误" in mock_comment.call_args[0][2]
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_apply_mode_rewrites_caption(self, caption_yaml):

@@ -72,6 +72,15 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
 
     _LABEL_MAP = {}
 
+    @classmethod
+    def _missing_(cls, value):
+        """处理非预定义枚举值（如自定义样式名、任意字体名）。"""
+        member = object.__new__(cls)
+        member._name_ = str(value)
+        member._value_ = value
+        member.__init__(value)
+        return member
+
     def __init__(self, value):
         self.value = value  # 获取的原始值
         self.original_unit = None  # 解析的单位
@@ -170,7 +179,9 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         if isinstance(other, self.__class__):
             return self.rel_value == other.rel_value
         if isinstance(self.rel_value, str):
-            return self.value.lower() == other
+            return str(self.rel_value).lower() == str(other).lower()
+        if other is None:
+            return self.rel_value == 0
         return self.rel_value == other
 
 
@@ -474,6 +485,23 @@ class SpaceAfter(Spacing):
         return None
 
 
+def _get_with_style_fallback(paragraph, attr: str, default):
+    """从段落或样式链读取属性值。"""
+    val = getattr(paragraph.paragraph_format, attr, None)
+    if val is not None:
+        return val
+    style = paragraph.style
+    while style is not None:
+        try:
+            val = getattr(style.paragraph_format, attr, None)
+            if val is not None:
+                return val
+        except AttributeError:
+            pass
+        style = style.base_style
+    return default
+
+
 class LineSpacingRule(UnitLabelEnum):
     """
     设置行距选项
@@ -497,9 +525,18 @@ class LineSpacingRule(UnitLabelEnum):
             raise ValueError(f"无效的行距选项: '{self.value}'")
 
     def get_from_paragraph(self, paragraph: Paragraph):
-        # 默认单倍行距
-        linespacingrule = paragraph.paragraph_format.line_spacing_rule
-        return linespacingrule if linespacingrule else WD_LINE_SPACING.MULTIPLE
+        rule = _get_with_style_fallback(
+            paragraph, "line_spacing_rule", WD_LINE_SPACING.MULTIPLE
+        )
+        if rule == WD_LINE_SPACING.MULTIPLE:
+            spacing = _get_with_style_fallback(paragraph, "line_spacing", None)
+            if spacing == 1.0:
+                return WD_LINE_SPACING.SINGLE
+            if spacing == 1.5:
+                return WD_LINE_SPACING.ONE_POINT_FIVE
+            if spacing == 2.0:
+                return WD_LINE_SPACING.DOUBLE
+        return rule
 
 
 class LineSpacing(UnitLabelEnum):

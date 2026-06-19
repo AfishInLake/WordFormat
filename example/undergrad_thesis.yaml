@@ -14,25 +14,27 @@
 #   对齐：左对齐 / 居中对齐 / 右对齐 / 两端对齐 / 分散对齐
 # ===========================================================================
 
+template_name: "山西晋中理工学院（毕业设计）"
+
 # ---------------------------------------------------------------------------
 # 预警开关：控制各字段差异是否在批注中显示（false=不显示该类型差异）
 # ---------------------------------------------------------------------------
 style_checks_warning:
-  bold: false
+  bold: true
   italic: false
   underline: false
-  font_size: false
-  font_name: false
+  font_size: true
+  font_name: true
   font_color: false
-  alignment: false
-  space_before: false
-  space_after: false
-  line_spacing: false
-  line_spacingrule: false
-  left_indent: false
-  right_indent: false
-  first_line_indent: false
-  builtin_style_name: false
+  alignment: true
+  space_before: true
+  space_after: true
+  line_spacing: true
+  line_spacingrule: true
+  left_indent: true
+  right_indent: true
+  first_line_indent: true
+  builtin_style_name: true
 
 # ---------------------------------------------------------------------------
 # 全局基础格式（其他节通过 <<: *global_format 继承后再覆写）
@@ -71,7 +73,7 @@ abstract:
       alignment: '居中对齐'
       first_line_indent: '0字符'
       chinese_font_name: '黑体'
-      font_size: '小二'
+      font_size: '四号'
       bold: false
 
     # -- 中文摘要正文 --
@@ -88,8 +90,8 @@ abstract:
       <<: *global_format
       alignment: '居中对齐'
       first_line_indent: '0字符'
-      font_size: '小四'
-      bold: true
+      font_size: '四号'
+      bold: false
 
     # -- 英文摘要正文 --
     english_content:
@@ -103,15 +105,15 @@ abstract:
     chinese:
       # 从 global_format 继承，再覆写关键词特有字段
       <<: *global_format
-      alignment: '左对齐'
-      first_line_indent: '0字符'
-      font_size: '四号'
+      alignment: '两端对齐'
+      first_line_indent: '2字符'
+      font_size: '小四'
       # -- 关键词标签（"关键词："）的字符格式 --
       label:
         <<: *global_format
         chinese_font_name: '黑体'
         font_size: '四号'
-        bold: true
+        bold: false
       # -- 关键词业务规则（均通过 enabled 开关控制） --
       rules:
         keyword_count:
@@ -124,13 +126,13 @@ abstract:
 
     english:
       <<: *global_format
-      alignment: '左对齐'
-      first_line_indent: '0字符'
-      font_size: '四号'
+      alignment: '两端对齐'
+      first_line_indent: '2字符'
+      font_size: '小四'
       label:
         <<: *global_format
         font_size: '四号'
-        bold: true
+        bold: false
       rules:
         keyword_count:
           enabled: true
@@ -161,8 +163,8 @@ headings:
     chinese_font_name: '黑体'
     font_size: '三号'
     bold: false
-    space_before: "0.5行"
-    space_after: "0.5行"
+    space_before: "0行"
+    space_after: "0行"
     builtin_style_name: 'Heading 2'
 
   # -- 三级标题（1.1.1）--
@@ -173,8 +175,8 @@ headings:
     chinese_font_name: '黑体'
     font_size: '小四'
     bold: false
-    space_before: "0.5行"
-    space_after: "0.5行"
+    space_before: "0行"
+    space_after: "0行"
     builtin_style_name: 'Heading 3'
 
 # ===========================================================================
@@ -182,6 +184,9 @@ headings:
 # ===========================================================================
 body_text:
   <<: *global_format
+  rules:
+    punctuation:
+      enabled: true
 
 # ===========================================================================
 # 插图题注（Figure）
@@ -194,9 +199,19 @@ figures:
   first_line_indent: '0字符'
   # -- 插图特有字段 --
   caption_prefix: '图'              # 图注编号前缀
+  # -- 图片段落格式（包含内联图片的段落）--
+  image:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
+      label_number_space: false
 
 # ===========================================================================
-# 表格（题注 + 表格内容）
+# 表格（题注 + 表格对象 + 表格内容）
 # ===========================================================================
 tables:
   <<: *global_format
@@ -206,6 +221,11 @@ tables:
   first_line_indent: '0字符'
   # -- 表格题注特有字段 --
   caption_prefix: '表'              # 表注编号前缀
+  # -- 表格对象格式（表格整体对齐、环绕）--
+  object:
+    <<: *global_format
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
   # -- 表格内容格式（单元格内文字）--
   content:
     <<: *global_format
@@ -217,6 +237,11 @@ tables:
     first_line_indent: '0字符'
     space_before: "0行"
     space_after: "0行"
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
+      label_number_space: false
 
 # ===========================================================================
 # 参考文献
