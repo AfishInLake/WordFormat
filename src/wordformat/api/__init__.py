@@ -274,6 +274,55 @@ def download_file(filename: str):
         raise HTTPException(status_code=500, detail=f"文件下载失败：{str(e)}") from e
 
 
+# ---------------------- 配置文件管理 ----------------------
+CONFIGS_DIR = BASE_DIR / "configs"
+CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.get("/configs", summary="获取可用配置文件列表")
+def list_configs():
+    """返回 configs 目录下的所有 YAML 文件名。"""
+    try:
+        files = [f.name for f in CONFIGS_DIR.glob("*.yaml") if f.is_file()] + [
+            f.name for f in CONFIGS_DIR.glob("*.yml") if f.is_file()
+        ]
+        return {"code": 200, "data": sorted(set(files))}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/configs/{filename}", summary="读取指定配置文件内容")
+def read_config(filename: str):
+    """返回配置文件 YAML 内容。"""
+    file_path = CONFIGS_DIR / filename
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail=f"配置文件 {filename} 不存在")
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            return {"code": 200, "data": f.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class SaveConfigRequest(BaseModel):
+    filename: str
+    content: str
+
+
+@app.post("/configs/save", summary="保存配置文件到 configs 目录")
+def save_config(req: SaveConfigRequest):
+    """将 YAML 内容保存到 configs 目录。"""
+    if not req.filename.endswith((".yaml", ".yml")):
+        req.filename += ".yaml"
+    file_path = CONFIGS_DIR / req.filename
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(req.content)
+        return {"code": 200, "msg": f"配置已保存到 configs/{req.filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # ---------------------- 前端静态文件（Vue SPA）---------------------
 # 路由优先级：API 路由（已定义）> 静态文件
 # html=True 会自动将 / 映射到 index.html

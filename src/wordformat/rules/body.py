@@ -9,21 +9,122 @@ from copy import deepcopy
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from wordformat.config.datamodel import BodyTextConfig
+from wordformat.config.datamodel import BodyTextConfig, PunctuationRule
 from wordformat.rules.node import FormatNode
-from wordformat.style.check_format import CharacterStyle, ParagraphStyle
 
 # 匹配正文中的参考文献交叉引用标记
 # 支持: [1] [1,2] [1-3] [1,2,3-5] [1，2] [1、2] [1, 2]
 _CITATION_PATTERN = re.compile(r"\[[\d\-,—、，\s]+\]")
+
+# 半角标点 → 对应全角标点
+_HALF_TO_FULL = {
+    ",": "，",
+    ".": "。",
+    ";": "；",
+    ":": "：",
+    "(": "（",
+    ")": "）",
+    "[": "【",
+    "]": "】",
+    '"': "“",
+    "'": "‘",
+    "!": "！",
+    "?": "？",
+}
+# 匹配中文上下文中的半角标点（段首/中文后 + 标点 + 中文/段尾）
+_PUNCT_PATTERN = re.compile(r"(^|[一-鿿])([,.;:()\[\]\"\'\!\?])([一-鿿]|$)")
+
+
+def _split_run_at(paragraph, start: int, end: int):
+    """拆分段落 run，返回只含 [start, end) 字符的独立 run。"""
+    from docx.oxml import OxmlElement
+
+    para_elem = paragraph._element
+    cum = 0
+    for r_elem in para_elem.findall(qn("w:r")):
+        t_elem = r_elem.find(qn("w:t"))
+        if t_elem is None or t_elem.text is None:
+            continue
+        rl = len(t_elem.text)
+        r_start, r_end = cum, cum + rl
+        if r_start <= start and end <= r_end:
+            i0 = start - r_start
+            i1 = end - r_start
+            before_text = t_elem.text[:i0]
+            punct_text = t_elem.text[i0:i1]
+            after_text = t_elem.text[i1:]
+            # 修改原 run 为标点前的文本
+            t_elem.text = before_text
+            if before_text and before_text != before_text.strip():
+                t_elem.set(qn("xml:space"), "preserve")
+            # 创建标点 run
+            rPr = r_elem.find(qn("w:rPr"))
+            punct_r = OxmlElement("w:r")
+            if rPr is not None:
+                punct_r.append(deepcopy(rPr))
+            punct_t = OxmlElement("w:t")
+            punct_t.text = punct_text
+            punct_t.set(qn("xml:space"), "preserve")
+            punct_r.append(punct_t)
+            r_elem.addnext(punct_r)
+            # 创建标点后的 run
+            if after_text:
+                after_r = OxmlElement("w:r")
+                if rPr is not None:
+                    after_r.append(deepcopy(rPr))
+                after_t = OxmlElement("w:t")
+                after_t.text = after_text
+                after_t.set(qn("xml:space"), "preserve")
+                after_r.append(after_t)
+                punct_r.addnext(after_r)
+            # 返回新 run 对象
+            for r in paragraph.runs:
+                if r._element is punct_r:
+                    return r
+            return None
+        cum += rl
+    return None
 
 
 class BodyText(FormatNode[BodyTextConfig]):
     """正文节点"""
 
     NODE_TYPE = "body_text"
+    NODE_LABEL = "正文段落"
     CONFIG_MODEL = BodyTextConfig
     CONFIG_PATH = "body_text"
+    RULES = {"punctuation": "_check_punctuation"}
+
+    def _check_punctuation(self, doc, rule_cfg: PunctuationRule, p: bool = False):
+        """检测中文正文中的半角标点，锚在具体字符上（拆分 run）。"""
+        if self.paragraph is None:
+            return
+        # 找出引用标记区间，跳过引用内的标点
+        cite_ranges = [
+            (m.start(), m.end())
+            for m in _CITATION_PATTERN.finditer(self.paragraph.text)
+        ]
+        para_text = self.paragraph.text
+        for m in _PUNCT_PATTERN.finditer(para_text):
+            p0, p1 = m.start(2), m.end(2)
+            if any(cs <= p0 < ce for cs, ce in cite_ranges):
+                continue
+            half = m.group(2)
+            full = _HALF_TO_FULL.get(half, half)
+            # 拆分 run，使标点独占一个 run
+            target_run = _split_run_at(self.paragraph, p0, p1)
+            if target_run is None:
+                target_run = (
+                    self.paragraph.runs[0]
+                    if self.paragraph.runs
+                    else self.paragraph.runs
+                )
+            msg = (
+                f"{self.NODE_LABEL}-提醒-标点符号问题："
+                f'使用了半角英文标点符号"{half}(英文)"，'
+                f'规范：应使用全角中文标点符号"{full}(中文)"'
+            )
+            self.add_comment(doc=doc, runs=target_run, text=msg)
 
     def apply_replace(self, doc=None) -> bool:
         """文本替换后清除引用标记格式。
@@ -44,51 +145,17 @@ class BodyText(FormatNode[BodyTextConfig]):
 
         return replaced
 
-    def _base(self, doc, p: bool, r: bool):
-        """检查正文段落的字符与段落格式是否符合规范。"""
-        cfg = self.pydantic_config
-        ps = ParagraphStyle.from_config(cfg)
-        if p:
-            paragraph_issues = ps.diff_from_paragraph(self.paragraph)
-        else:
-            paragraph_issues = ps.apply_to_paragraph(self.paragraph)
-
-        cstyle = CharacterStyle(
-            font_name_cn=cfg.chinese_font_name,
-            font_name_en=cfg.english_font_name,
-            font_size=cfg.font_size,
-            font_color=cfg.font_color,
-            bold=cfg.bold,
-            italic=cfg.italic,
-            underline=cfg.underline,
-        )
-
-        for run in self.paragraph.runs:
-            if r:
-                diff_result = cstyle.diff_from_run(run)
-            else:
-                diff_result = cstyle.apply_to_run(run)
-            if diff_result:
-                self.add_comment(
-                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
-                )
-
-        if paragraph_issues:
-            self.add_comment(
-                doc=doc,
-                runs=self.paragraph.runs,
-                text=ParagraphStyle.to_string(paragraph_issues),
-            )
-
-        return []
-
     def apply_format(self, doc):
-        """格式化正文段落，之后将引用标记自动设为上标。"""
+        """格式化正文段落，引用标记上标仅限第一章。"""
         super().apply_format(doc)
-        self._apply_citation_superscript()
+        chapter = (
+            self.value.get("chapter_number", 0) if isinstance(self.value, dict) else 0
+        )
+        if chapter == 1:
+            self._apply_citation_superscript()
 
     # ------------------------------------------------------------------
-    # 引用上标
+    # 引用上标（仅第一章）
     # ------------------------------------------------------------------
 
     def _apply_citation_superscript(self):

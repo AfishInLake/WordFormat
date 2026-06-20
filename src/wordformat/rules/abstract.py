@@ -17,43 +17,16 @@ class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
     """摘要标题中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_title"
+    NODE_LABEL = "中文摘要标题"
     CONFIG_MODEL = AbstractTitleConfig
     CONFIG_PATH = "abstract.chinese.chinese_title"
-
-    def _base(self, doc, p: bool, r: bool):
-        cfg = self.pydantic_config
-        ps = ParagraphStyle.from_config(cfg)
-        if p:
-            issues = ps.diff_from_paragraph(self.paragraph)
-        else:
-            issues = ps.apply_to_paragraph(self.paragraph)
-        cstyle = CharacterStyle(
-            font_name_cn=cfg.chinese_font_name,
-            font_name_en=cfg.english_font_name,
-            font_size=cfg.font_size,
-            font_color=cfg.font_color,
-            bold=cfg.bold,
-            italic=cfg.italic,
-            underline=cfg.underline,
-        )
-
-        for run in self.paragraph.runs:
-            if r:
-                diff_result = cstyle.diff_from_run(run)
-            else:
-                diff_result = cstyle.apply_to_run(run)
-            self.add_comment(
-                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
-            )
-        self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
-        )
 
 
 class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
     """摘要标题正文混合中文节点"""
 
     NODE_TYPE = "abstract.chinese"
+    NODE_LABEL = "中文摘要"
     CONFIG_MODEL = AbstractChineseConfig
     CONFIG_PATH = "abstract.chinese"
 
@@ -108,10 +81,14 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
                 else:
                     diff_result = C.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
+                doc=doc,
+                runs=run,
+                text=CharacterStyle.to_string(diff_result, target=self.NODE_LABEL),
             )
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
+            doc=doc,
+            runs=self.paragraph.runs,
+            text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
         )
 
 
@@ -119,6 +96,7 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
     """摘要内容中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_content"
+    NODE_LABEL = "中文摘要正文"
     CONFIG_MODEL = AbstractChineseConfig
     CONFIG_PATH = "abstract.chinese"
 
@@ -144,10 +122,14 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
             else:
                 diff_result = cstyle.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
+                doc=doc,
+                runs=run,
+                text=CharacterStyle.to_string(diff_result, target=self.NODE_LABEL),
             )
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
+            doc=doc,
+            runs=self.paragraph.runs,
+            text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
         )
 
 
@@ -155,48 +137,16 @@ class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
     """摘要标题英文节点"""
 
     NODE_TYPE = "abstract.english.english_title"
+    NODE_LABEL = "英文摘要标题"
     CONFIG_MODEL = AbstractTitleConfig
     CONFIG_PATH = "abstract.english.english_title"
-
-    def _base(self, doc, p: bool, r: bool):
-        cfg = self.pydantic_config
-        ps = ParagraphStyle.from_config(cfg)
-        if p:
-            issues = ps.diff_from_paragraph(self.paragraph)
-        else:
-            issues = ps.apply_to_paragraph(self.paragraph)
-        cstyle = CharacterStyle(
-            font_name_cn=cfg.chinese_font_name,
-            font_name_en=cfg.english_font_name,
-            font_size=cfg.font_size,
-            font_color=cfg.font_color,
-            bold=cfg.bold,
-            italic=cfg.italic,
-            underline=cfg.underline,
-        )
-
-        for run in self.paragraph.runs:
-            if r:
-                diff_result = cstyle.diff_from_run(run)
-            else:
-                diff_result = cstyle.apply_to_run(run)
-            if diff_result:
-                self.add_comment(
-                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
-                )
-        if issues:
-            self.add_comment(
-                doc=doc,
-                runs=self.paragraph.runs,
-                text="".join(str(dr) for dr in issues),
-            )
-        return []
 
 
 class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
     """摘要标题正文混合英文节点"""
 
     NODE_TYPE = "abstract.english"
+    NODE_LABEL = "英文摘要"
     CONFIG_MODEL = AbstractEnglishConfig
     CONFIG_PATH = "abstract.english"
 
@@ -278,11 +228,15 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
             else:
                 diff_result = c.apply_to_run(run)
             self.add_comment(
-                doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
+                doc=doc,
+                runs=run,
+                text=CharacterStyle.to_string(diff_result, target=self.NODE_LABEL),
             )
             cum += len(text_clean)
         self.add_comment(
-            doc=doc, runs=self.paragraph.runs, text=ParagraphStyle.to_string(issues)
+            doc=doc,
+            runs=self.paragraph.runs,
+            text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
         )
 
 
@@ -290,6 +244,7 @@ class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
     """摘要内容英文节点"""
 
     NODE_TYPE = "abstract.english.english_content"
+    NODE_LABEL = "英文摘要正文"
     CONFIG_MODEL = AbstractEnglishConfig
     CONFIG_PATH = "abstract.english"
 
@@ -316,7 +271,9 @@ class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
                 diff_result = cstyle.apply_to_run(run)
             if diff_result:  # 可选：仅当有差异时才添加批注
                 self.add_comment(
-                    doc=doc, runs=run, text=CharacterStyle.to_string(diff_result)
+                    doc=doc,
+                    runs=run,
+                    text=CharacterStyle.to_string(diff_result, target=self.NODE_LABEL),
                 )
         if issues:
             self.add_comment(

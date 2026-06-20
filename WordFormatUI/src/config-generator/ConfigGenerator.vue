@@ -2,6 +2,14 @@
   <div class="config-generator">
     <div class="app-content">
       <div class="config-sections">
+        <!-- 模板名称 -->
+        <ConfigSection title="模板信息">
+          <div class="form-item" style="margin-bottom:10px">
+            <label>模板名称:</label>
+            <input type="text" v-model="userConfig.template_name" style="width:300px">
+          </div>
+        </ConfigSection>
+
         <!-- 警告字段配置 -->
         <ConfigSection title="警告字段配置">
           <WarningFieldsConfig :config="userConfig.style_checks_warning" />

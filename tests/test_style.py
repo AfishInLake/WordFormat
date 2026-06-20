@@ -133,7 +133,7 @@ class TestCharacterStyle:
     def test_diff_font_size_and_name_cn(self, doc, mock_warning):
         _set_warning(mock_warning)
         cs = CharacterStyle(font_size="小四", font_name_cn="宋体")
-        run = doc.add_paragraph().add_run("t")
+        run = doc.add_paragraph().add_run("测试")
         run.font.size = Pt(14)
         run_set_font_name(run, "黑体")
         types = [d.diff_type for d in cs.diff_from_run(run)]
@@ -151,9 +151,9 @@ class TestCharacterStyle:
         _clear_warning()
 
     def test_to_string_filters_by_warning(self, mock_warning, mock_warning_off):
-        diffs = [DIFFResult(diff_type="bold", comment="b")]
+        diffs = [DIFFResult(diff_type="bold", current_value=True, expected_value=False)]
         _set_warning(mock_warning)
-        assert "b" in CharacterStyle.to_string(diffs)
+        assert "加粗错误" in CharacterStyle.to_string(diffs)
         _set_warning(mock_warning_off)
         assert CharacterStyle.to_string(diffs) == ""
         _clear_warning()
@@ -184,12 +184,12 @@ class TestParagraphStyle:
         assert "alignment" in [d.diff_type for d in ParagraphStyle(alignment="左对齐").diff_from_paragraph(p)]
         _clear_warning()
 
-    def test_diff_builtin_style_case_mismatch(self, doc, mock_warning):
-        """BuiltInStyle('正文').rel_value='Normal' but get_from_paragraph returns 'normal'."""
+    def test_diff_builtin_style_name_match(self, doc, mock_warning):
+        """BuiltInStyle('正文').rel_value='Normal' 与 'normal' 应视为一致。"""
         _set_warning(mock_warning)
         p = doc.add_paragraph()
         types = [d.diff_type for d in ParagraphStyle(builtin_style_name="正文").diff_from_paragraph(p)]
-        assert "builtin_style_name" in types
+        assert "builtin_style_name" not in types  # 英文"normal" = 中文"正文"
         _clear_warning()
 
     def test_to_string_line_spacing_rule_key_bug(self, doc, mock_warning):
@@ -2266,7 +2266,7 @@ class TestCharacterStyleApplyToRunFontNameCn:
         _set_warning(mock_warning)
         cs = CharacterStyle(font_name_cn="黑体")
         p = doc.add_paragraph()
-        run = p.add_run("test")
+        run = p.add_run("测试")
         # Default CN font is 宋体, so 黑体 should trigger a fix
         run_set_font_name(run, "宋体")
         result = cs.apply_to_run(run)
@@ -2279,27 +2279,28 @@ class TestCharacterStyleToStringNone:
     """Cover line 244: CharacterStyle.to_string with style_checks_warning is None"""
 
     def test_to_string_warning_none(self):
-        """When style_checks_warning is None, return all diffs joined (line 244)"""
+        """style_checks_warning=None 时返回所有 diff 的标准格式文本。"""
         import wordformat.style.check_format as m
         m.style_checks_warning = None
         diffs = [
-            DIFFResult(diff_type="bold", comment="bold_issue"),
-            DIFFResult(diff_type="italic", comment="italic_issue"),
+            DIFFResult(diff_type="bold", current_value=True, expected_value=False),
+            DIFFResult(diff_type="italic", current_value=True, expected_value=False),
         ]
-        result = CharacterStyle.to_string(diffs)
-        assert "bold_issue" in result
-        assert "italic_issue" in result
+        result = CharacterStyle.to_string(diffs, target="测试")
+        assert "加粗错误" in result
+        assert "斜体错误" in result
+        assert "测试" in result
 
 
 class TestCharacterStyleToStringBoldFilter:
     """Cover line 250: CharacterStyle.to_string with style_checks_warning.bold = True"""
 
     def test_to_string_bold_filtered_in(self, mock_warning):
-        """warning.bold=True includes bold diffs (line 250)"""
+        """warning.bold=True 时 bold diff 被包含。"""
         _set_warning(mock_warning)
-        diffs = [DIFFResult(diff_type="bold", comment="b")]
-        result = CharacterStyle.to_string(diffs)
-        assert "b" in result
+        diffs = [DIFFResult(diff_type="bold", current_value=True, expected_value=False)]
+        result = CharacterStyle.to_string(diffs, target="测试")
+        assert "加粗错误" in result
         _clear_warning()
 
 
@@ -2307,35 +2308,35 @@ class TestCharacterStyleToStringVariousFilters:
     """Cover lines 252, 254, 256: CharacterStyle.to_string with italic/underline/font_size/font_color/font_name filters"""
 
     def test_to_string_italic_filtered(self, mock_warning):
-        """warning.italic=True includes italic diffs (line 252)"""
+        """warning.italic=True 时 italic diff 被包含。"""
         _set_warning(mock_warning)
-        diffs = [DIFFResult(diff_type="italic", comment="i")]
+        diffs = [DIFFResult(diff_type="italic", current_value=True, expected_value=False)]
         result = CharacterStyle.to_string(diffs)
-        assert "i" in result
+        assert "斜体错误" in result
         _clear_warning()
 
     def test_to_string_font_size_filtered(self, mock_warning):
-        """warning.font_size=True includes font_size diffs (line 254)"""
+        """warning.font_size=True 时 font_size diff 被包含。"""
         _set_warning(mock_warning)
-        diffs = [DIFFResult(diff_type="font_size", comment="fs")]
+        diffs = [DIFFResult(diff_type="font_size", current_value=10.0, expected_value=12.0)]
         result = CharacterStyle.to_string(diffs)
-        assert "fs" in result
+        assert "字号错误" in result
         _clear_warning()
 
     def test_to_string_font_color_filtered(self, mock_warning):
-        """warning.font_color=True includes font_color diffs (line 256)"""
+        """warning.font_color=True 时 font_color diff 被包含。"""
         _set_warning(mock_warning)
-        diffs = [DIFFResult(diff_type="font_color", comment="fc")]
+        diffs = [DIFFResult(diff_type="font_color", current_value="红色", expected_value="黑色")]
         result = CharacterStyle.to_string(diffs)
-        assert "fc" in result
+        assert "字体颜色错误" in result
         _clear_warning()
 
     def test_to_string_font_name_filtered(self, mock_warning):
-        """warning.font_name=True includes font_name_cn/en diffs (lines 257-261)"""
+        """warning.font_name=True 时 font_name_cn diff 被包含。"""
         _set_warning(mock_warning)
-        diffs = [DIFFResult(diff_type="font_name_cn", comment="fnc")]
+        diffs = [DIFFResult(diff_type="font_name_cn", current_value="宋体", expected_value="黑体")]
         result = CharacterStyle.to_string(diffs)
-        assert "fnc" in result
+        assert "中文字体错误" in result
         _clear_warning()
 
 
@@ -2343,13 +2344,13 @@ class TestParagraphStyleToStringNone:
     """Cover line 478: ParagraphStyle.to_string with style_checks_warning is None"""
 
     def test_to_string_warning_none(self):
-        """When style_checks_warning is None, return all diffs joined (line 478)"""
+        """style_checks_warning=None 时返回所有 diff 的标准格式文本。"""
         import wordformat.style.check_format as m
         m.style_checks_warning = None
         diffs = [
-            DIFFResult(diff_type="alignment", comment="align_issue"),
-            DIFFResult(diff_type="space_before", comment="sb_issue"),
+            DIFFResult(diff_type="alignment", current_value="左对齐", expected_value="居中对齐"),
+            DIFFResult(diff_type="space_before", current_value="0行", expected_value="0.5行"),
         ]
         result = ParagraphStyle.to_string(diffs)
-        assert "align_issue" in result
-        assert "sb_issue" in result
+        assert "对齐错误" in result
+        assert "段前间距错误" in result

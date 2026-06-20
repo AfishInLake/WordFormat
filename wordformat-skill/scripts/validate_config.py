@@ -105,10 +105,8 @@ ABSTRACT_EN_FIELDS = GLOBAL_FORMAT_FIELDS
 
 # abstract.keywords.chinese / english 合法字段
 KEYWORDS_FIELDS = GLOBAL_FORMAT_FIELDS | {
-    "keywords_bold",
-    "count_min",
-    "count_max",
-    "trailing_punct_forbidden",
+    "label",
+    "rules",
 }
 
 # headings 各级别合法字段
@@ -117,11 +115,14 @@ HEADING_FIELDS = GLOBAL_FORMAT_FIELDS
 # figures 合法字段
 FIGURES_FIELDS = GLOBAL_FORMAT_FIELDS | {
     "caption_prefix",
+    "rules",
 }
 
 # tables 合法字段
 TABLES_FIELDS = GLOBAL_FORMAT_FIELDS | {
     "caption_prefix",
+    "content",
+    "rules",
 }
 
 # references.title 合法字段

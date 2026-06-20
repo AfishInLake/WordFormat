@@ -73,11 +73,11 @@ def _load_root_config(config_path):
 
 
 @pytest.fixture
-def root_config(config_path):
-    """从 example/undergrad_thesis.yaml 加载真实 NodeConfigRoot。"""
+def root_config(sample_yaml_config):
+    """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
     from wordformat.config.config import init_config
-    init_config(config_path)
-    return _load_root_config(config_path)
+    init_config(sample_yaml_config)
+    return _load_root_config(sample_yaml_config)
 
 
 # ===========================================================================
@@ -109,7 +109,7 @@ class TestHeadingCoverageBoost:
         node.load_config(root_config)
 
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
 
         # builtin_style_name 已设置为 Heading 1（python-docx 存储为 "Heading1"）
         assert p.style.name == "Heading 1"
@@ -141,7 +141,7 @@ class TestHeadingCoverageBoost:
         node.load_config(root_config)
 
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
 
         # python-docx 通过 paragraph.style = "Heading 2" 更新了样式
         assert p.style.name == "Heading 2"
@@ -280,7 +280,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
 
     def test_apply_to_paragraph_path_en(self, root_config):
         """覆盖行 56 (EN): apply_to_paragraph 路径（p=False）。
@@ -293,7 +293,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
 
     def test_split_mixed_runs_cn(self, root_config):
         """覆盖行 69-106: _split_mixed_runs 拆分标签和内容混合的 run。
@@ -306,7 +306,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
 
         # 拆分后应有多个 run
         assert len(p.runs) >= 2
@@ -319,7 +319,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
 
         assert len(p.runs) >= 2
 
@@ -344,7 +344,7 @@ class TestKeywordsCoverageBoost:
         node.load_config(root_config)
         initial_run_count = len(p.runs)
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         # 格式化模式下拆分后 run 数量应增加
         assert len(p.runs) >= initial_run_count
 
@@ -361,7 +361,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_en_content_apply_to_run(self, root_config):
@@ -379,7 +379,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_cn_label_apply_to_run(self, root_config):
@@ -393,7 +393,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_cn_content_apply_to_run(self, root_config):
@@ -408,7 +408,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_cn_split_mixed_runs_format_mode(self, root_config):
@@ -419,7 +419,7 @@ class TestKeywordsCoverageBoost:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment"):
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert len(p.runs) >= 2
 
     def test_cn_get_label_split_pattern(self, root_config):

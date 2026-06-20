@@ -442,7 +442,7 @@ watch(isFileLoaded, (loaded) => {
 .header-bar { background-color: #1e293b; border-bottom: 1px solid #334155; padding: 0.75rem 1.5rem; }
 .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; max-width: 1280px; margin: 0 auto; width: 100%; }
 .header-left { display: flex; flex-direction: column; gap: 0.25rem; }
-.tool-title { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin: 0; font-family: 'Crimson Pro', serif; }
+.tool-title { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin: 0; font-family: 'Georgia, Times New Roman', serif; }
 .stats-info { font-size: 0.8125rem; color: #64748b; }
 .stats-info span { font-weight: 600; color: #22c55e; }
 .header-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }

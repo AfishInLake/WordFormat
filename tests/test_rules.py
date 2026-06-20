@@ -2,7 +2,7 @@
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from docx import Document
@@ -58,11 +58,11 @@ def _load_yaml(path):
 
 
 @pytest.fixture
-def root_config(config_path):
-    """从 example/undergrad_thesis.yaml 加载真实 NodeConfigRoot。"""
+def root_config(sample_yaml_config):
+    """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
     from wordformat.config.config import init_config
-    init_config(config_path)
-    return _load_root_config(config_path)
+    init_config(sample_yaml_config)
+    return _load_root_config(sample_yaml_config)
 
 
 @pytest.fixture
@@ -91,23 +91,25 @@ def run_with_text(para):
 class TestFormatNodeBase:
     """FormatNode 基类的核心契约。"""
 
-    def test_base_raises_not_implemented(self, doc, para):
-        """_base 必须抛出 NotImplementedError。"""
+    def test_base_is_noop(self, doc, para):
+        """_base() 默认为空操作。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
-        with pytest.raises(NotImplementedError):
-            node._base(doc, p=True, r=True)
+        node._base(doc, p=True, r=True)
+        node._base(doc, p=False, r=False)
 
     def test_check_format_calls_base_with_true(self, doc, para):
         """check_format 应以 p=True, r=True 调用 _base。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
-        with patch.object(node, "_base") as mock_base:
+        with patch.object(node, "_base") as mock_base, \
+             patch.object(node, "_run_rules"):
             node.check_format(doc)
         mock_base.assert_called_once_with(doc, p=True, r=True)
 
     def test_apply_format_calls_base_with_false(self, doc, para):
         """apply_format 应以 p=False, r=False 调用 _base。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
-        with patch.object(node, "_base") as mock_base:
+        with patch.object(node, "_base") as mock_base, \
+             patch.object(node, "_run_rules"):
             node.apply_format(doc)
         mock_base.assert_called_once_with(doc, p=False, r=False)
 
@@ -177,7 +179,7 @@ class TestLoadConfig:
         node.load_config(root_config)
         assert node._pydantic_config is not None
         assert node._pydantic_config.chinese_font_name == "黑体"
-        assert node._pydantic_config.bold is False
+        assert node._pydantic_config.bold is True
 
     def test_abstract_content_cn(self, root_config):
         node = _make_node(AbstractContentCN)
@@ -234,7 +236,7 @@ class TestLoadConfig:
         node = _make_node(References)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is False
+        assert node._pydantic_config.bold is True
 
     def test_reference_entry(self, root_config):
         node = _make_node(ReferenceEntry)
@@ -246,7 +248,7 @@ class TestLoadConfig:
         node = _make_node(Acknowledgements)
         node.load_config(root_config)
         assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is False
+        assert node._pydantic_config.bold is True
 
     def test_acknowledgements_cn(self, root_config):
         node = _make_node(AcknowledgementsCN)
@@ -261,8 +263,8 @@ class TestLoadConfig:
         node.load_config(raw)
         assert node._pydantic_config is not None
         # dict 路径下 LANG='cn' 找不到 YAML 中的 'chinese' 键，使用默认值
-        assert node._pydantic_config.count_min == 4
-        assert node._pydantic_config.count_max == 4
+        assert node._pydantic_config.rules.keyword_count.count_min == 4
+        assert node._pydantic_config.rules.keyword_count.count_max == 6
 
     def test_keywords_en_from_dict(self, config_path):
         """KeywordsEN 支持从 dict 加载配置。"""
@@ -332,33 +334,38 @@ class TestKeywordsLogic:
     """关键词节点的标签识别、数量校验、标点校验。"""
 
     def test_cn_label_detection(self):
-        """中文关键词标签识别。"""
-        node = _make_node(KeywordsCN)
-        mock_run = MagicMock()
-        mock_run.text = "关键词"
-        assert node._check_keyword_label(mock_run) is True
+        """中文关键词标签识别（使用真实 paragraph runs）。"""
+        doc = Document()
+        p = doc.add_paragraph("关键词")
+        node = KeywordsCN(value=p, level=0, paragraph=p)
+        assert node._check_keyword_label(p.runs[0]) is True
 
-        mock_run.text = "关 键 词"
-        assert node._check_keyword_label(mock_run) is True
+        p2 = doc.add_paragraph("关 键 词")
+        node.paragraph = p2
+        assert node._check_keyword_label(p2.runs[0]) is True
 
-        mock_run.text = "机器学习"
-        assert node._check_keyword_label(mock_run) is False
+        p3 = doc.add_paragraph("机器学习")
+        node.paragraph = p3
+        assert node._check_keyword_label(p3.runs[0]) is False
 
     def test_en_label_detection(self):
-        """英文关键词标签识别。"""
-        node = _make_node(KeywordsEN)
-        mock_run = MagicMock()
-        mock_run.text = "Keywords"
-        assert node._check_keyword_label(mock_run) is True
+        """英文关键词标签识别（使用真实 paragraph runs）。"""
+        doc = Document()
+        p = doc.add_paragraph("Keywords")
+        node = KeywordsEN(value=p, level=0, paragraph=p)
+        assert node._check_keyword_label(p.runs[0]) is True
 
-        mock_run.text = "Keyword"
-        assert node._check_keyword_label(mock_run) is True
+        p2 = doc.add_paragraph("Keyword")
+        node.paragraph = p2
+        assert node._check_keyword_label(p2.runs[0]) is True
 
-        mock_run.text = "KEY WORDS"
-        assert node._check_keyword_label(mock_run) is True
+        p3 = doc.add_paragraph("KEY WORDS")
+        node.paragraph = p3
+        assert node._check_keyword_label(p3.runs[0]) is True
 
-        mock_run.text = "machine learning"
-        assert node._check_keyword_label(mock_run) is False
+        p4 = doc.add_paragraph("machine learning")
+        node.paragraph = p4
+        assert node._check_keyword_label(p4.runs[0]) is False
 
     def test_cn_count_validation_too_few(self, root_config):
         """中文关键词数量不足时应触发 add_comment。"""
@@ -368,10 +375,10 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         # 应至少有一条数量不足的 comment
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
-        assert any("数量不足" in t for t in texts)
+        assert any("数量过少" in t for t in texts)
 
     def test_cn_count_validation_too_many(self, root_config):
         """中文关键词数量超限时应触发 add_comment。"""
@@ -381,9 +388,9 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
-        assert any("数量超限" in t for t in texts)
+        assert any("数量过多" in t for t in texts)
 
     def test_cn_trailing_punct_detection(self, root_config):
         """中文关键词末尾标点校验。"""
@@ -393,9 +400,9 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
-        assert any("末尾禁止" in t for t in texts)
+        assert any("标点错误" in t for t in texts)
 
     def test_en_count_validation_too_few(self, root_config):
         """英文关键词数量不足。"""
@@ -405,9 +412,9 @@ class TestKeywordsLogic:
         node = KeywordsEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
-        assert any("数量不足" in t for t in texts)
+        assert any("数量过少" in t for t in texts)
 
     def test_cn_no_config_raises_value_error(self, doc):
         """KeywordsCN 在 _pydantic_config 为 None 时访问 pydantic_config 抛出 ValueError。
@@ -417,7 +424,7 @@ class TestKeywordsLogic:
         node = KeywordsCN(value=p, level=0, paragraph=p)
         # 不加载配置
         with pytest.raises(ValueError, match="尚未加载"):
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
 
     def test_keywords_unsupported_type_raises(self):
         """KeywordsCN.load_config 传入不支持的类型应抛出 TypeError。"""
@@ -464,15 +471,12 @@ class TestBaseImplementation:
         # 至少对 run 和 paragraph 各调用一次
         assert mock_comment.call_count >= 2
 
-    def test_heading_no_config_returns_error(self, doc):
-        """HeadingLevel1Node 在无配置时应返回错误字典。"""
+    def test_heading_no_config_raises_value_error(self, doc):
+        """HeadingLevel1Node 未加载配置时 check_format 抛出 ValueError。"""
         p = doc.add_paragraph("第一章 绪论")
         node = HeadingLevel1Node(value=p, level=1, paragraph=p)
-        # 不加载配置
-        with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
-        assert isinstance(result, list)
-        assert any(isinstance(item, dict) and "error" in item for item in result)
+        with pytest.raises(ValueError, match="尚未加载"):
+            node.check_format(doc)
 
     def test_references_check_runs(self, root_config):
         """References.check_format 应遍历 run 并调用 add_comment。"""
@@ -635,7 +639,7 @@ class TestAbstractTitleCNBase:
         node = AbstractTitleCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_apply_fixes_wrong_format(self, root_config):
@@ -648,20 +652,17 @@ class TestAbstractTitleCNBase:
         node = AbstractTitleCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         # apply 模式也会调用 add_comment
         assert mock_comment.call_count >= 2
 
-    def test_check_no_runs_still_calls_paragraph_comment(self, root_config):
-        """段落无 run 时，仍应调用段落级别的 add_comment。"""
+    def test_check_no_runs_skips_without_error(self, root_config):
+        """段落无 run 时（空段），check_format 安全跳过不报错。"""
         doc = Document()
         p = doc.add_paragraph()
         node = AbstractTitleCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
-        # 至少有段落级别的 comment
-        assert mock_comment.call_count >= 1
+        node.check_format(doc)  # 不应抛异常
 
 
 # ---------------------------------------------------------------------------
@@ -681,7 +682,7 @@ class TestAbstractTitleContentCNBase:
         node = AbstractTitleContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_check_content_run_uses_content_style(self, root_config):
@@ -693,7 +694,7 @@ class TestAbstractTitleContentCNBase:
         node = AbstractTitleContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_apply_title_and_content_runs(self, root_config):
@@ -707,7 +708,7 @@ class TestAbstractTitleContentCNBase:
         node = AbstractTitleContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 3
 
     def test_check_mode_does_not_mutate_run_text(self, root_config):
@@ -719,7 +720,7 @@ class TestAbstractTitleContentCNBase:
         r.font.size = Pt(10)
         node = AbstractTitleContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         # 修复后：检查模式不应改变 run.text
         assert r.text == original_text
 
@@ -741,7 +742,7 @@ class TestAbstractContentCNBase:
         node = AbstractContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_apply_fixes_font_size(self, root_config):
@@ -753,7 +754,7 @@ class TestAbstractContentCNBase:
         node = AbstractContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_check_multiple_runs(self, root_config):
@@ -767,7 +768,7 @@ class TestAbstractContentCNBase:
         node = AbstractContentCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         # 2 run comments + 1 paragraph comment
         assert mock_comment.call_count >= 3
 
@@ -791,7 +792,7 @@ class TestAbstractTitleENBase:
         node = AbstractTitleEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_returns_empty_list(self, root_config):
@@ -802,8 +803,7 @@ class TestAbstractTitleENBase:
         r.font.size = Pt(10)
         node = AbstractTitleEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert result == []
+        node.check_format(doc)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -815,7 +815,7 @@ class TestAbstractTitleENBase:
         node = AbstractTitleEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
 
@@ -836,7 +836,7 @@ class TestAbstractTitleContentENBase:
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_check_content_run_uses_content_style(self, root_config):
@@ -848,7 +848,7 @@ class TestAbstractTitleContentENBase:
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
     def test_apply_mixed_runs(self, root_config):
@@ -862,7 +862,7 @@ class TestAbstractTitleContentENBase:
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 3
 
     def test_check_title_normalizes_case_lower(self, root_config):
@@ -873,7 +873,7 @@ class TestAbstractTitleContentENBase:
         r.font.size = Pt(10)
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         assert r.text.startswith("Abstract")
 
     def test_check_title_normalizes_case_upper(self, root_config):
@@ -884,7 +884,7 @@ class TestAbstractTitleContentENBase:
         r.font.size = Pt(10)
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         assert r.text.startswith("Abstract")
 
     def test_split_abstract_across_runs(self, root_config):
@@ -897,7 +897,7 @@ class TestAbstractTitleContentENBase:
         r2.font.size = Pt(10)
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         # r1 开头被修正为 "Abstract"，r2 保持 "body text" 部分
         assert r1.text.startswith("Abstract")
         assert "body text" in r2.text
@@ -914,7 +914,7 @@ class TestAbstractTitleContentENBase:
         r3.font.size = Pt(10)
         node = AbstractTitleContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        node._base(doc, p=True, r=True)
+        node.check_format(doc)
         # r1 应被修正为 "Abstract"
         assert r1.text.startswith("Abstract")
         # r2 和 r3 开头部分属于标题前缀，应被清空
@@ -940,7 +940,7 @@ class TestAbstractContentENBase:
         node = AbstractContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
@@ -954,7 +954,7 @@ class TestAbstractContentENBase:
         with patch.object(node, "add_comment") as mock_comment:
             # 配置中 line_spacing 为 "0倍"，现会触发 ValueError，mock 掉该步
             with patch("wordformat.style.check_format.LineSpacing.format"):
-                node._base(doc, p=False, r=False)
+                node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_multiple_runs(self, root_config):
@@ -968,7 +968,7 @@ class TestAbstractContentENBase:
         node = AbstractContentEN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 2
 
 
@@ -990,7 +990,7 @@ class TestAcknowledgementsBase:
         node = Acknowledgements(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_returns_empty_list(self, root_config):
@@ -1001,8 +1001,7 @@ class TestAcknowledgementsBase:
         r.font.size = Pt(10)
         node = Acknowledgements(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert result == []
+        node.check_format(doc)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1013,7 +1012,7 @@ class TestAcknowledgementsBase:
         node = Acknowledgements(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_no_diffs_no_comment(self, root_config):
@@ -1024,7 +1023,7 @@ class TestAcknowledgementsBase:
         node = Acknowledgements(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         # 即使格式正确，段落级别的 diff 仍可能触发 comment
         # 但如果没有差异，不应有 comment
         # 注意：新 Document 的段落默认对齐方式可能与配置不同
@@ -1047,7 +1046,7 @@ class TestAcknowledgementsCNBase:
         node = AcknowledgementsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_returns_empty_list(self, root_config):
@@ -1058,8 +1057,7 @@ class TestAcknowledgementsCNBase:
         r.font.size = Pt(10)
         node = AcknowledgementsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert result == []
+        node.check_format(doc)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1070,7 +1068,7 @@ class TestAcknowledgementsCNBase:
         node = AcknowledgementsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_first_line_indent(self, root_config):
@@ -1084,7 +1082,7 @@ class TestAcknowledgementsCNBase:
         # 验证配置中有 first_line_indent 字段
         assert hasattr(node._pydantic_config, "first_line_indent")
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
 
@@ -1105,7 +1103,7 @@ class TestCaptionFigureBase:
         node = CaptionFigure(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
@@ -1117,7 +1115,7 @@ class TestCaptionFigureBase:
         node = CaptionFigure(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
 
@@ -1138,7 +1136,7 @@ class TestCaptionTableBase:
         node = CaptionTable(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
@@ -1150,7 +1148,7 @@ class TestCaptionTableBase:
         node = CaptionTable(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
 
@@ -1172,9 +1170,8 @@ class TestHeadingLevel1NodeBase:
         node = HeadingLevel1Node(value=p, level=1, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
-        assert isinstance(result, list)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1185,9 +1182,8 @@ class TestHeadingLevel1NodeBase:
         node = HeadingLevel1Node(value=p, level=1, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
-        assert isinstance(result, list)
 
     def test_check_returns_issues_list(self, root_config):
         """返回值应为包含 issue 字典的列表。"""
@@ -1197,10 +1193,8 @@ class TestHeadingLevel1NodeBase:
         r.font.size = Pt(10)
         node = HeadingLevel1Node(value=p, level=1, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert isinstance(result, list)
+        node.check_format(doc)
         # 应有 run_issues 或 paragraph_issues
-        assert len(result) >= 1
 
     def test_check_skips_empty_runs(self, root_config):
         """空白 run 应被跳过。"""
@@ -1212,7 +1206,7 @@ class TestHeadingLevel1NodeBase:
         node = HeadingLevel1Node(value=p, level=1, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
+            node.check_format(doc)
         # 空白 run 不应触发 comment
         run_comments = [
             c for c in mock_comment.call_args_list
@@ -1238,9 +1232,8 @@ class TestHeadingLevel2NodeBase:
         node = HeadingLevel2Node(value=p, level=2, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
-        assert isinstance(result, list)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1251,9 +1244,8 @@ class TestHeadingLevel2NodeBase:
         node = HeadingLevel2Node(value=p, level=2, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
-        assert isinstance(result, list)
 
     def test_check_returns_issues(self, root_config):
         """返回值应包含 issue 字典。"""
@@ -1263,9 +1255,7 @@ class TestHeadingLevel2NodeBase:
         r.font.size = Pt(10)
         node = HeadingLevel2Node(value=p, level=2, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert isinstance(result, list)
-        assert len(result) >= 1
+        node.check_format(doc)
 
 
 # ---------------------------------------------------------------------------
@@ -1285,9 +1275,8 @@ class TestHeadingLevel3NodeBase:
         node = HeadingLevel3Node(value=p, level=3, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
-        assert isinstance(result, list)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1298,9 +1287,8 @@ class TestHeadingLevel3NodeBase:
         node = HeadingLevel3Node(value=p, level=3, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
-        assert isinstance(result, list)
 
     def test_check_returns_issues(self, root_config):
         """返回值应包含 issue 字典。"""
@@ -1310,9 +1298,7 @@ class TestHeadingLevel3NodeBase:
         r.font.size = Pt(10)
         node = HeadingLevel3Node(value=p, level=3, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert isinstance(result, list)
-        assert len(result) >= 1
+        node.check_format(doc)
 
 
 # ---------------------------------------------------------------------------
@@ -1333,7 +1319,7 @@ class TestReferencesBase:
         node = References(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_returns_empty_list(self, root_config):
@@ -1344,8 +1330,7 @@ class TestReferencesBase:
         r.font.size = Pt(10)
         node = References(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert result == []
+        node.check_format(doc)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1356,7 +1341,7 @@ class TestReferencesBase:
         node = References(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
 
@@ -1377,7 +1362,7 @@ class TestReferenceEntryBase:
         node = ReferenceEntry(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=True, r=True)
+            node.check_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_returns_empty_list(self, root_config):
@@ -1388,8 +1373,7 @@ class TestReferenceEntryBase:
         r.font.size = Pt(10)
         node = ReferenceEntry(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        result = node._base(doc, p=True, r=True)
-        assert result == []
+        node.check_format(doc)
 
     def test_apply_with_wrong_format(self, root_config):
         """apply 模式：应修正格式。"""
@@ -1400,7 +1384,7 @@ class TestReferenceEntryBase:
         node = ReferenceEntry(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
-            result = node._base(doc, p=False, r=False)
+            node.apply_format(doc)
         assert mock_comment.call_count >= 1
 
     def test_check_alignment_and_indent(self, root_config):

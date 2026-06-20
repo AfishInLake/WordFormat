@@ -544,30 +544,40 @@ class TestFormatNode:
         node.update_paragraph(p)
         assert node.paragraph is p
 
-    def test_base_raises_not_implemented(self, doc):
+    def test_base_is_noop(self, doc):
+        """_base() 默认为空操作。"""
         node = FormatNode(value="test", level=1)
-        with pytest.raises(NotImplementedError, match="Subclasses should implement"):
-            node._base(doc, p=True, r=True)
+        node._base(doc, p=True, r=True)
+        node._base(doc, p=False, r=False)
 
     def test_check_format_raises(self, doc):
-        node = FormatNode(value="test", level=1)
-        with pytest.raises(NotImplementedError):
+        """未加载配置时 check_format 通过 handler 触发 ValueError。"""
+        p = doc.add_paragraph("test")
+        node = FormatNode(value="test", level=1, paragraph=p)
+        with pytest.raises(ValueError, match="尚未加载"):
             node.check_format(doc)
 
     def test_apply_format_raises(self, doc):
-        node = FormatNode(value="test", level=1)
-        with pytest.raises(NotImplementedError):
+        """未加载配置时 apply_format 通过 handler 触发 ValueError。"""
+        p = doc.add_paragraph("test")
+        node = FormatNode(value="test", level=1, paragraph=p)
+        with pytest.raises(ValueError, match="尚未加载"):
             node.apply_format(doc)
 
-    def test_add_comment_with_text(self, doc):
+    def test_add_comment_buffers(self, doc):
+        """add_comment 缓冲文本，_flush_comments 合并写入。"""
         node = FormatNode(value="test", level=1)
         p = doc.add_paragraph("hello")
-        run = p.runs[0]
+        node.paragraph = p
+        node.add_comment(doc, p.runs[0], "格式错误")
+        node.add_comment(doc, p.runs[0], "字体问题")
         with patch.object(doc, "add_comment") as mock_add:
-            node.add_comment(doc, run, "格式错误")
-            mock_add.assert_called_once_with(
-                runs=run, text="格式错误", author="论文解析器", initials="afish"
-            )
+            node._flush_comments(doc)
+        mock_add.assert_called_once()
+        merged = mock_add.call_args[1]["text"]
+        assert "格式错误" in merged
+        assert "字体问题" in merged
+        assert merged.count("\n") == 1
 
     def test_add_comment_empty_text_skipped(self, doc):
         node = FormatNode(value="test", level=1)

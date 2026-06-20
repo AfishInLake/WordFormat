@@ -36,102 +36,122 @@ def validate_file(
 
 
 def _show_config():
-    """输出所有可配置字段及其说明"""
-    from wordformat.config.datamodel import (
-        CaptionNumberingConfig,
-        GlobalFormatConfig,
-        KeywordsConfig,
-        NumberingConfig,
-        NumberingLevelConfig,
-        WarningFieldConfig,
-    )
+    """根据 NodeConfigRoot Pydantic 模型自动生成所有可配置字段的参考说明。
 
-    def _fields(cls):
-        return [(n, i) for n, i in cls.model_fields.items()]
+    递归遍历模型结构，无需手动维护字段列表。新增/删除配置字段时自动反映。
+    """
+    from pydantic import BaseModel
 
-    def _desc(info):
-        return (info.description or "").replace("\n", " ")
+    from wordformat.config.datamodel import NodeConfigRoot
 
-    def _default(info):
+    def _default_str(info):
         if info.default is not None:
             return repr(info.default)
         if info.default_factory is not None:
             return "(子配置)"
         return "—"
 
-    def _print_fields(fields, indent=2):
-        prefix = " " * indent
-        for name, info in fields:
-            print(f"{prefix}{name:<28s} {_desc(info):<40s} 默认: {_default(info)}")
+    def _desc(info):
+        return (info.description or "").replace("\n", " ")
 
-    gf = _fields(GlobalFormatConfig)
-    wf = _fields(WarningFieldConfig)
-    kw_extra = [
-        (n, i) for n, i in _fields(KeywordsConfig) if n not in {f[0] for f in gf}
-    ]
-    nc = _fields(NumberingConfig)
-    ncp = _fields(CaptionNumberingConfig)
-    nl = _fields(NumberingLevelConfig)
-
-    # 段落节点名列表（从 NodeConfigRoot 直接读）
-    paragraph_nodes = [
-        ("global_format", "全局基础格式"),
-        ("abstract.chinese.chinese_title", "中文摘要标题"),
-        ("abstract.chinese.chinese_content", "中文摘要正文"),
-        ("abstract.english.english_title", "英文摘要标题"),
-        ("abstract.english.english_content", "英文摘要正文"),
-        ("abstract.keywords.chinese", "中文关键词"),
-        ("abstract.keywords.english", "英文关键词"),
-        ("headings.level_1", "一级标题"),
-        ("headings.level_2", "二级标题"),
-        ("headings.level_3", "三级标题"),
-        ("body_text", "正文"),
-        ("figures", "图注"),
-        ("tables", "表注"),
-        ("references.title", "参考文献标题"),
-        ("references.content", "参考文献内容"),
-        ("acknowledgements.title", "致谢标题"),
-        ("acknowledgements.content", "致谢内容"),
-    ]
-
-    # 每个节点的额外字段
-    extras = {
-        "figures": [("caption_prefix", "图注编号前缀", "'图'")],
-        "tables": [
-            ("caption_prefix", "表注编号前缀", "'表'"),
-            ("content", "表格内容格式（子配置，字段同 global_format）", "(子配置)"),
-        ],
-        "abstract.keywords.chinese": [(n, _desc(i), _default(i)) for n, i in kw_extra],
-        "abstract.keywords.english": [(n, _desc(i), _default(i)) for n, i in kw_extra],
+    # 已知的基础类型名称，遇到这些就停止递进
+    LEAF_TYPES = {
+        "GlobalFormatConfig",
+        "BodyTextConfig",
+        "HeadingLevelConfig",
+        "AbstractTitleConfig",
+        "AbstractContentConfig",
+        "KeywordLabelConfig",
+        "KeywordsConfig",
+        "ReferencesTitleConfig",
+        "ReferencesContentConfig",
+        "AcknowledgementsTitleConfig",
+        "AcknowledgementsContentConfig",
+        "TableContentConfig",
+        "WarningFieldConfig",
+        "CaptionNumberingConfig",
+        "NumberingLevelConfig",
+        "KeywordCountRule",
+        "TrailingPunctRule",
+        "KeywordsRulesConfig",
+        "CaptionRulesConfig",
     }
 
-    print("config.yaml 完整字段参考\n")
+    def _resolve_type(annotation):
+        """解析 typing 注解，返回实际类型。"""
+        origin = getattr(annotation, "__origin__", None)
+        if origin is dict:
+            args = getattr(annotation, "__args__", ())
+            if len(args) == 2:
+                return _resolve_type(args[1])
+            return None
+        args = getattr(annotation, "__args__", None)
+        if args:
+            non_none = [a for a in args if a is not type(None)]
+            if non_none:
+                return _resolve_type(non_none[0])
+            return None
+        if isinstance(annotation, type):
+            return annotation
+        return None
 
-    for path, label in paragraph_nodes:
-        print(f"[{path}] — {label}")
-        _print_fields(gf)
-        for name, desc, default in extras.get(path, []):
-            print(f"  {name:<28s} {desc:<40s} 默认: {default}")
-        print()
+    def _is_basemodel_subclass(t):
+        return isinstance(t, type) and issubclass(t, BaseModel)
 
-    print("[style_checks_warning] — 格式警告开关")
-    _print_fields(wf)
+    def _walk(cls, path="", depth=0):
+        """递归打印模型字段。"""
+        for name, info in cls.model_fields.items():
+            field_path = f"{path}.{name}" if path else name
+            target = _resolve_type(info.annotation)
+            desc_text = _desc(info)
+
+            if target is None:
+                continue
+
+            target_name = getattr(target, "__name__", "")
+
+            if _is_basemodel_subclass(target) and target_name not in LEAF_TYPES:
+                # 容器模型：打印节标题后递归
+                label = desc_text or target_name
+                print(f"\n{'  ' * depth}[{field_path}] — {label}")
+                _walk(target, field_path, depth + 1)
+            elif _is_basemodel_subclass(target) and target_name in LEAF_TYPES:
+                # 叶子配置模型：展开打印字段，不递归
+                label = desc_text or target_name
+                print(f"\n{'  ' * depth}[{field_path}] — {label}")
+                _print_leaf_fields(target, depth + 1)
+            elif target is str:
+                print(
+                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
+                )
+            elif target is bool:
+                print(
+                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
+                )
+            elif target is int:
+                print(
+                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
+                )
+            elif target is float:
+                print(
+                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
+                )
+
+    def _print_leaf_fields(cls, depth):
+        for name, info in cls.model_fields.items():
+            target = _resolve_type(info.annotation)
+            if _is_basemodel_subclass(target):
+                # 嵌套的叶子模型（如 label, content）
+                print(f"{'  ' * depth}  [{name}] — {_desc(info)}")
+                _print_leaf_fields(target, depth + 1)
+            else:
+                print(
+                    f"{'  ' * depth}  {name:<28s} {_desc(info):<50s} 默认: {_default_str(info)}"
+                )
+
+    print("config.yaml 完整字段参考（自动生成自 NodeConfigRoot 模型）\n")
+    _walk(NodeConfigRoot)
     print()
-
-    print("[numbering] — 自动编号总开关（仅 wordf af 模式生效）")
-    for n, i in nc:
-        if n not in ("level_1", "level_2", "level_3", "references", "captions"):
-            print(f"  {n:<28s} {_desc(i):<40s} 默认: {_default(i)}")
-    print()
-
-    print("[numbering.captions] — 题注编号")
-    _print_fields(ncp)
-    print()
-
-    for key in ("level_1", "level_2", "level_3", "references"):
-        print(f"[numbering.{key}] — 编号配置")
-        _print_fields(nl)
-        print()
 
 
 def main():

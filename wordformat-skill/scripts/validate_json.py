@@ -39,6 +39,8 @@ VALID_CATEGORIES = {
     "acknowledgements_title",
     "caption_figure",
     "caption_table",
+    "figure_image",
+    "table_object",
     "body_text",
     "other",
 }

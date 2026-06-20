@@ -91,9 +91,14 @@ abstract:
         chinese_font_name: '黑体'
         font_size: '四号'
         bold: true
-      count_min: 3
-      count_max: 5
-      trailing_punct_forbidden: true
+      rules:                          # 业务规则（均通过 enabled 开关控制）
+        keyword_count:
+          enabled: true
+          count_min: 3
+          count_max: 5
+        trailing_punctuation:
+          enabled: true
+          forbidden_chars: "；，。、"
     english:
       <<: *global_format
       alignment: '左对齐'
@@ -103,9 +108,11 @@ abstract:
         <<: *global_format
         font_size: '四号'
         bold: true
-      count_min: 3
-      count_max: 5
-      trailing_punct_forbidden: true
+      rules:
+        keyword_count:
+          enabled: true
+          count_min: 3
+          count_max: 5
 ```
 
 ### 4. 各级标题格式（headings）
@@ -151,25 +158,28 @@ body_text:
 ```
 
 ### 6. 插图格式（figures）
-配置图片及其题注的格式，题注默认位于图片下方。
+配置图片及其题注的格式和编号规则。
 ```yaml
 figures:
   <<: *global_format
-  caption_position: 'below'
   caption_prefix: '图'
   font_size: '五号'
   builtin_style_name: '题注'
   alignment: '居中对齐'
   first_line_indent: '0字符'
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
+      label_number_space: false
 ```
 
 ### 7. 表格格式（tables）
-配置表格题注及表格内容（单元格内文字）的格式。题注默认位于表格上方，`content` 子配置控制表格内文字。
+配置表格题注及表格内容（单元格内文字）的格式和编号规则。`content` 子配置控制表格内文字。
 
 ```yaml
 tables:
   <<: *global_format
-  caption_position: 'above'
   caption_prefix: '表'
   font_size: '五号'
   builtin_style_name: '题注'
@@ -185,6 +195,11 @@ tables:
     first_line_indent: '0字符'
     space_before: "0行"
     space_after: "0行"
+  rules:
+    caption_numbering:
+      enabled: true
+      separator: '.'
+      label_number_space: false
 ```
 
 ### 8. 参考文献格式（references）
@@ -313,19 +328,26 @@ numbering:
 ### 关键词专用字段
 | 配置项 | 说明 | 取值 |
 |-------|------|--------|
-| label | 关键词标签（"关键词：" / "Keywords:"）的字符格式 | 子配置（继承 global_format 的 15 个字段） |
+| label | 关键词标签（"关键词：" / "Keywords:"）的字符格式 | 子配置（继承 global_format 的 16 个字段） |
 | label.bold | 标签是否加粗 | true/false |
 | label.chinese_font_name | 标签中文字体 | 宋体、黑体 等 |
 | label.font_size | 标签字号 | 四号、小四 等 |
-| count_min | 最少关键词数量 | 正整数 |
-| count_max | 最多关键词数量 | 正整数 |
-| trailing_punct_forbidden | 是否禁止末尾标点 | true/false |
+| rules.keyword_count | 关键词数量校验规则 | 子配置 |
+| rules.keyword_count.enabled | 是否启用数量校验 | true/false |
+| rules.keyword_count.count_min | 最少关键词数量 | 正整数 |
+| rules.keyword_count.count_max | 最多关键词数量 | 正整数 |
+| rules.trailing_punctuation | 末尾标点校验规则（仅中文） | 子配置 |
+| rules.trailing_punctuation.enabled | 是否启用末尾标点校验 | true/false |
+| rules.trailing_punctuation.forbidden_chars | 禁止出现在末尾的标点 | 字符串 |
 
-### 图表专用字段
+### 题注专用字段
 | 配置项 | 说明 | 可选值 |
 |-------|------|--------|
-| caption_position | 题注位置 | above（上方）、below（下方） |
 | caption_prefix | 题注前缀 | 图、表 |
+| rules.caption_numbering | 题注编号校验/修正规则 | 子配置 |
+| rules.caption_numbering.enabled | 是否启用编号校验 | true/false |
+| rules.caption_numbering.separator | 章节号与编号间分隔符 | . - : — – |
+| rules.caption_numbering.label_number_space | 标签与编号间是否加空格 | true/false |
 
 ### 参考文献专用字段
 | 配置项 | 说明 | 示例 |

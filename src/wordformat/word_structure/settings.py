@@ -13,12 +13,14 @@ from wordformat.rules import (
     BodyText,
     CaptionFigure,
     CaptionTable,
+    FigureImage,
     HeadingLevel1Node,
     HeadingLevel2Node,
     HeadingLevel3Node,
     KeywordsCN,
     KeywordsEN,
     References,
+    TableObject,
 )
 
 # 标签节点映射
@@ -38,7 +40,10 @@ CATEGORY_TO_CLASS = {
     "acknowledgements_title": Acknowledgements,
     "caption_figure": CaptionFigure,
     "caption_table": CaptionTable,
+    "figure_image": FigureImage,
+    "table_object": TableObject,
     "body_text": BodyText,
+    "other": BodyText,  # 封面/声明等无需格式化的内容
 }
 LEVEL_MAP = {
     "heading_level_1": 1,
