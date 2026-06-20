@@ -28,22 +28,23 @@ export const createConfigWithGlobalInheritance = (baseConfig = {}) => {
 
 // 默认配置
 export const defaultConfig = {
+  template_name: "未知模板",
   style_checks_warning: {
-    bold: false,
+    bold: true,
     italic: false,
     underline: false,
-    font_size: false,
-    font_name: false,
+    font_size: true,
+    font_name: true,
     font_color: false,
-    alignment: false,
-    space_before: false,
-    space_after: false,
-    line_spacing: false,
-    line_spacingrule: false,
-    left_indent: false,
-    right_indent: false,
-    first_line_indent: false,
-    builtin_style_name: false
+    alignment: true,
+    space_before: true,
+    space_after: true,
+    line_spacing: true,
+    line_spacingrule: true,
+    left_indent: true,
+    right_indent: true,
+    first_line_indent: true,
+    builtin_style_name: true
   },
   global_format: {
     ...defaultGlobalFormat
@@ -64,7 +65,8 @@ export const defaultConfig = {
       english_title: createConfigWithGlobalInheritance({
         alignment: "居中对齐",
         first_line_indent: "0字符",
-        font_size: "四号"
+        font_size: "四号",
+        bold: false
       }),
       english_content: createConfigWithGlobalInheritance({
         alignment: "两端对齐"
@@ -72,23 +74,30 @@ export const defaultConfig = {
     },
     keywords: {
       chinese: createConfigWithGlobalInheritance({
+        alignment: "两端对齐",
+        first_line_indent: "2字符",
+        font_size: "小四",
         label: createConfigWithGlobalInheritance({
           chinese_font_name: '黑体',
           font_size: '四号',
           bold: false
         }),
-        count_min: 3,
-        count_max: 5,
-        trailing_punct_forbidden: true
+        rules: {
+          keyword_count: { enabled: true, count_min: 3, count_max: 5 },
+          trailing_punctuation: { enabled: true, forbidden_chars: "；，。、" }
+        }
       }),
       english: createConfigWithGlobalInheritance({
+        alignment: "两端对齐",
+        first_line_indent: "2字符",
+        font_size: "小四",
         label: createConfigWithGlobalInheritance({
           font_size: '四号',
           bold: false
         }),
-        count_min: 3,
-        count_max: 5,
-        trailing_punct_forbidden: true
+        rules: {
+          keyword_count: { enabled: true, count_min: 3, count_max: 5 }
+        }
       })
     }
   },
@@ -121,13 +130,24 @@ export const defaultConfig = {
       builtin_style_name: "Heading 3"
     })
   },
-  body_text: createConfigWithGlobalInheritance(),
+  body_text: createConfigWithGlobalInheritance({
+    rules: {
+      punctuation: { enabled: true }
+    }
+  }),
   figures: createConfigWithGlobalInheritance({
     alignment: "居中对齐",
     first_line_indent: "0字符",
     font_size: "五号",
     builtin_style_name: "题注",
-    caption_prefix: "图"
+    caption_prefix: "图",
+    image: createConfigWithGlobalInheritance({
+      alignment: "居中对齐",
+      first_line_indent: "0字符"
+    }),
+    rules: {
+      caption_numbering: { enabled: true, separator: '.', label_number_space: false }
+    }
   }),
   tables: createConfigWithGlobalInheritance({
     alignment: "居中对齐",
@@ -135,16 +155,23 @@ export const defaultConfig = {
     font_size: "五号",
     builtin_style_name: "题注",
     caption_prefix: "表",
+    object: createConfigWithGlobalInheritance({
+      alignment: "居中对齐",
+      first_line_indent: "0字符"
+    }),
     content: createConfigWithGlobalInheritance({
       chinese_font_name: '宋体',
       english_font_name: 'Times New Roman',
       font_size: '五号',
-      line_spacingrule: '1.5倍行距',
+      line_spacingrule: '单倍行距',
       alignment: '居中对齐',
       first_line_indent: '0字符',
       space_before: "0行",
       space_after: "0行"
-    })
+    }),
+    rules: {
+      caption_numbering: { enabled: true, separator: '.', label_number_space: false }
+    }
   }),
   references: {
     title: createConfigWithGlobalInheritance({

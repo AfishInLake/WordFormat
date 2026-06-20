@@ -22,15 +22,18 @@
     <h4>中文关键词</h4>
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div class="form-item">
+        <label><input type="checkbox" v-model="config.keywords.chinese.rules.keyword_count.enabled"> 启用数量检查</label>
+      </div>
+      <div class="form-item">
         <label>最少数量:</label>
-        <input type="number" v-model.number="config.keywords.chinese.count_min">
+        <input type="number" v-model.number="config.keywords.chinese.rules.keyword_count.count_min">
       </div>
       <div class="form-item">
         <label>最大数量:</label>
-        <input type="number" v-model.number="config.keywords.chinese.count_max">
+        <input type="number" v-model.number="config.keywords.chinese.rules.keyword_count.count_max">
       </div>
       <div class="form-item">
-        <label><input type="checkbox" v-model="config.keywords.chinese.trailing_punct_forbidden"> 禁止末尾标点</label>
+        <label><input type="checkbox" v-model="config.keywords.chinese.rules.trailing_punctuation.enabled"> 禁止末尾标点</label>
       </div>
     </div>
     <h5 class="subsection-title">中文关键词内容格式</h5>
@@ -42,15 +45,15 @@
     <h4 class="mt-4">英文关键词</h4>
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div class="form-item">
+        <label><input type="checkbox" v-model="config.keywords.english.rules.keyword_count.enabled"> 启用数量检查</label>
+      </div>
+      <div class="form-item">
         <label>最少数量:</label>
-        <input type="number" v-model.number="config.keywords.english.count_min">
+        <input type="number" v-model.number="config.keywords.english.rules.keyword_count.count_min">
       </div>
       <div class="form-item">
         <label>最大数量:</label>
-        <input type="number" v-model.number="config.keywords.english.count_max">
-      </div>
-      <div class="form-item">
-        <label><input type="checkbox" v-model="config.keywords.english.trailing_punct_forbidden"> 禁止末尾标点</label>
+        <input type="number" v-model.number="config.keywords.english.rules.keyword_count.count_max">
       </div>
     </div>
     <h5 class="subsection-title">英文关键词内容格式</h5>
