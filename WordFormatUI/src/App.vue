@@ -16,6 +16,9 @@
             <button class="btn secondary-btn" @click="loadConfig">
               加载配置
             </button>
+            <button class="btn secondary-btn" @click="saveConfigToServer" :disabled="!generatedConfig">
+              保存到服务器
+            </button>
           </div>
 
           <!-- 标签页切换 -->
@@ -34,16 +37,20 @@
       </div>
     </div>
 
-    <!-- 内容区域 -->
-    <div class="content-area">
-      <!-- 配置生成器 -->
-      <ConfigGenerator ref="configGeneratorRef" v-show="activeTab === 'config'" @config-updated="handleConfigUpdated"/>
+    <!-- 主区域：侧边栏 + 内容 -->
+    <div class="main-area">
+      <ConfigSidebar v-if="activeTab === 'config'" @config-selected="onServerConfigSelected" />
 
-      <!-- 文档标签核对工具 -->
-      <DocTagChecker v-show="activeTab === 'checker'" :generated-config="generatedConfig"/>
+      <div class="content-area">
+        <!-- 配置生成器 -->
+        <ConfigGenerator ref="configGeneratorRef" v-show="activeTab === 'config'" @config-updated="handleConfigUpdated"/>
 
-      <!-- 设置页面 -->
-      <SettingsPage v-show="activeTab === 'settings'" />
+        <!-- 文档标签核对工具 -->
+        <DocTagChecker v-show="activeTab === 'checker'" :generated-config="generatedConfig"/>
+
+        <!-- 设置页面 -->
+        <SettingsPage v-show="activeTab === 'settings'" />
+      </div>
     </div>
 
     <!-- 隐藏的 file input 用于加载配置 -->
@@ -62,6 +69,7 @@ import {ref, onMounted} from 'vue';
 import GlobalToast from "./components/GlobalToast.vue";
 import DocTagChecker from "./components/DocTagChecker.vue";
 import ConfigGenerator from "./config-generator/ConfigGenerator.vue";
+import ConfigSidebar from "./components/ConfigSidebar.vue";
 import SettingsPage from "./components/SettingsPage.vue";
 import yaml from 'js-yaml';
 import {defaultConfig, mergeWithDefaults} from "./config-generator/utils";
@@ -146,6 +154,45 @@ const onConfigFileSelected = async (e) => {
   } finally {
     // 重置 input 以便重复选择同一文件
     e.target.value = '';
+  }
+};
+
+// 保存配置到服务器 configs 目录
+const API_BASE = window.__API_BASE__ || '';
+const saveConfigToServer = async () => {
+  if (!generatedConfig.value) return;
+  try {
+    const yamlContent = yaml.dump(generatedConfig.value, { indent: 2, skipInvalid: true });
+    const fn = prompt('请输入配置文件名（如 my-thesis.yaml）：', 'custom.yaml');
+    if (!fn) return;
+    const res = await fetch(`${API_BASE}/configs/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: fn, content: yamlContent }),
+    });
+    const json = await res.json();
+    if (json.code === 200) {
+      toastRef.value?.toast.success(json.msg);
+    } else {
+      toastRef.value?.toast.error(json.msg || '保存失败');
+    }
+  } catch (error) {
+    toastRef.value?.toast.error('保存配置失败：' + error.message);
+  }
+};
+
+// 从服务器侧边栏加载配置
+const onServerConfigSelected = ({ filename, content }) => {
+  try {
+    const config = yaml.load(content);
+    const merged = mergeWithDefaults(config, defaultConfig);
+    generatedConfig.value = merged;
+    if (configGeneratorRef.value) {
+      configGeneratorRef.value.importConfig(merged);
+    }
+    toastRef.value?.toast.success(`已加载配置: ${filename}`);
+  } catch (error) {
+    toastRef.value?.toast.error('解析配置失败：' + error.message);
   }
 };
 
@@ -279,6 +326,13 @@ body {
 .nav-tab.active {
   background-color: #22c55e;
   color: #052e16;
+}
+
+/* ── 主区域（侧边栏 + 内容）── */
+.main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
 /* ── 内容区域 ── */
