@@ -105,19 +105,34 @@ class DocxBase:
 
 def _fix_known_categories(result: list[dict]) -> None:
     """用已知文本模式修正常见 AI 分类错误。"""
-    patterns = [
-        # (正则, 修正分类)
+    abstract_patterns = [
         (r"^(摘要)\s*$", "abstract_chinese_title"),
         (r"^(Abstract)\s*$", "abstract_english_title"),
         (r"^摘要\s*[:：]", "abstract_chinese_title_content"),
         (r"^Abstract\s*[:：]?", "abstract_english_title_content"),
     ]
-    for item in result:
-        if item["category"] not in ("body_text",):
-            continue  # 已是正确类别，不干涉
+    # 找到第一个摘要段落的位置，之前的内容全部标为 other（封面/声明）
+    abstract_start = None
+    for i, item in enumerate(result):
         text = (item.get("paragraph") or "").strip()
-        for pat, cat in patterns:
-            if re.match(pat, text):
-                item["category"] = cat
-                item["comment"] = f"模式修正为 {cat}（原：body_text）"
-                break
+        if re.match(r"^(摘要|Abstract)", text):
+            abstract_start = i
+            break
+    if abstract_start is not None:
+        for i in range(abstract_start):
+            result[i]["category"] = "other"
+            result[i]["comment"] = (
+                f"摘要前内容，跳过检查（原：{result[i]['category']}）"
+            )
+            result[i]["score"] = 1.0
+    # 摘要修正
+    for item in result:
+        if item["category"] == "other":
+            continue
+        text = (item.get("paragraph") or "").strip()
+        if item["category"] == "body_text":
+            for pat, cat in abstract_patterns:
+                if re.match(pat, text):
+                    item["category"] = cat
+                    item["comment"] = f"模式修正为 {cat}"
+                    break

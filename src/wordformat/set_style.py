@@ -425,8 +425,8 @@ def apply_format_check_to_all_nodes(
                 logger.warning(f"Node {node} not format, because: {str(e)}")
                 raise e
 
-        # 目录和附录的子节点跳过格式化（top 节点本身跳过格式化，但子节点需要遍历）
-        SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu"}
+        # 目录、附录、封面/声明的子节点跳过格式化
+        SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu", "other"}
         if category not in SKIP_CHILDREN_CATEGORIES:
             for child in node.children:
                 traverse(

@@ -43,6 +43,7 @@ CATEGORY_TO_CLASS = {
     "figure_image": FigureImage,
     "table_object": TableObject,
     "body_text": BodyText,
+    "other": BodyText,  # 封面/声明等无需格式化的内容
 }
 LEVEL_MAP = {
     "heading_level_1": 1,

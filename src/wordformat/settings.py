@@ -44,4 +44,5 @@ VOIDNODELIST = [
     "top",
     "heading_mulu",
     "heading_fulu",
+    "other",  # 封面、声明页等无需格式化的内容
 ]
