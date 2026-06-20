@@ -2,7 +2,7 @@
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from docx import Document
@@ -334,33 +334,38 @@ class TestKeywordsLogic:
     """关键词节点的标签识别、数量校验、标点校验。"""
 
     def test_cn_label_detection(self):
-        """中文关键词标签识别。"""
-        node = _make_node(KeywordsCN)
-        mock_run = MagicMock()
-        mock_run.text = "关键词"
-        assert node._check_keyword_label(mock_run) is True
+        """中文关键词标签识别（使用真实 paragraph runs）。"""
+        doc = Document()
+        p = doc.add_paragraph("关键词")
+        node = KeywordsCN(value=p, level=0, paragraph=p)
+        assert node._check_keyword_label(p.runs[0]) is True
 
-        mock_run.text = "关 键 词"
-        assert node._check_keyword_label(mock_run) is True
+        p2 = doc.add_paragraph("关 键 词")
+        node.paragraph = p2
+        assert node._check_keyword_label(p2.runs[0]) is True
 
-        mock_run.text = "机器学习"
-        assert node._check_keyword_label(mock_run) is False
+        p3 = doc.add_paragraph("机器学习")
+        node.paragraph = p3
+        assert node._check_keyword_label(p3.runs[0]) is False
 
     def test_en_label_detection(self):
-        """英文关键词标签识别。"""
-        node = _make_node(KeywordsEN)
-        mock_run = MagicMock()
-        mock_run.text = "Keywords"
-        assert node._check_keyword_label(mock_run) is True
+        """英文关键词标签识别（使用真实 paragraph runs）。"""
+        doc = Document()
+        p = doc.add_paragraph("Keywords")
+        node = KeywordsEN(value=p, level=0, paragraph=p)
+        assert node._check_keyword_label(p.runs[0]) is True
 
-        mock_run.text = "Keyword"
-        assert node._check_keyword_label(mock_run) is True
+        p2 = doc.add_paragraph("Keyword")
+        node.paragraph = p2
+        assert node._check_keyword_label(p2.runs[0]) is True
 
-        mock_run.text = "KEY WORDS"
-        assert node._check_keyword_label(mock_run) is True
+        p3 = doc.add_paragraph("KEY WORDS")
+        node.paragraph = p3
+        assert node._check_keyword_label(p3.runs[0]) is True
 
-        mock_run.text = "machine learning"
-        assert node._check_keyword_label(mock_run) is False
+        p4 = doc.add_paragraph("machine learning")
+        node.paragraph = p4
+        assert node._check_keyword_label(p4.runs[0]) is False
 
     def test_cn_count_validation_too_few(self, root_config):
         """中文关键词数量不足时应触发 add_comment。"""

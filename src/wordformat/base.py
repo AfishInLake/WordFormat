@@ -3,6 +3,8 @@
 # @Author  : afish
 # @File    : DocxBase.py
 
+import re
+
 from docx import Document
 from loguru import logger
 
@@ -96,4 +98,26 @@ class DocxBase:
                 result[idx] = response
 
         assert all(r is not None for r in result), "存在未处理的段落"
+        # 后处理：已知模式的段落强制修正分类
+        _fix_known_categories(result)
         return result
+
+
+def _fix_known_categories(result: list[dict]) -> None:
+    """用已知文本模式修正常见 AI 分类错误。"""
+    patterns = [
+        # (正则, 修正分类)
+        (r"^(摘要)\s*$", "abstract_chinese_title"),
+        (r"^(Abstract)\s*$", "abstract_english_title"),
+        (r"^摘要\s*[:：]", "abstract_chinese_title_content"),
+        (r"^Abstract\s*[:：]?", "abstract_english_title_content"),
+    ]
+    for item in result:
+        if item["category"] not in ("body_text",):
+            continue  # 已是正确类别，不干涉
+        text = (item.get("paragraph") or "").strip()
+        for pat, cat in patterns:
+            if re.match(pat, text):
+                item["category"] = cat
+                item["comment"] = f"模式修正为 {cat}（原：body_text）"
+                break

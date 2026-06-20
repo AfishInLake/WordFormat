@@ -196,18 +196,18 @@ class FormatNode(TreeNode, Generic[T]):
         # 双向验证（仅检查自定义 RULES）
         if self.RULES:
             if rules_config is None:
-                logger.warning(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
+                logger.debug(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
             else:
                 declared_rules = set(self.RULES.keys())
                 config_rules = set(type(rules_config).model_fields.keys())
                 orphan_handlers = declared_rules - config_rules
                 orphan_configs = config_rules - declared_rules
                 if orphan_handlers:
-                    logger.warning(
+                    logger.debug(
                         f"[{self.NODE_TYPE}] RULES 声明了 {orphan_handlers} 但配置无对应项"
                     )
                 if orphan_configs:
-                    logger.warning(
+                    logger.debug(
                         f"[{self.NODE_TYPE}] 配置有 {orphan_configs} 但无对应 handler"
                     )
 

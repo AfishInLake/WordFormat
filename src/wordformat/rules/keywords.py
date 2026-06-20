@@ -123,9 +123,24 @@ class KeywordsEN(BaseKeywordsNode):
     RULES = {"keyword_count": "_check_keyword_count"}
 
     def _check_keyword_label(self, run) -> bool:
-        """检查run是否包含英文关键词标签（Keywords/KEY WORDS）"""
-        pattern = r"Keywords?|KEY\s*WORDS"
-        return bool(re.search(pattern, run.text, re.IGNORECASE))
+        """判断 run 是否属于英文关键词标签部分。"""
+        if not run.text.strip():
+            return False
+        if self.paragraph is None:
+            return bool(re.search(r"Keywords?|KEY\s*WORDS", run.text, re.IGNORECASE))
+        full = "".join(r.text for r in self.paragraph.runs)
+        m = re.match(r"Keywords?\s*[:：]?\s*|KEY\s*WORDS\s*", full, re.IGNORECASE)
+        if not m:
+            return False
+        label_end = m.end()
+        # 找出当前 run 在全文中的位置（用 XML 元素 identity 比较）
+        pos = 0
+        for r in self.paragraph.runs:
+            rl = len(r.text)
+            if r._element is run._element:
+                return pos < label_end
+            pos += rl
+        return False
 
     def _get_label_split_pattern(self) -> re.Pattern | None:
         """英文标签拆分模式：匹配 'Keywords:' 或 'Keywords ' 及其变体"""
@@ -215,9 +230,27 @@ class KeywordsCN(BaseKeywordsNode):
     }
 
     def _check_keyword_label(self, run) -> bool:
-        """检查run是否包含中文关键词标签（关键词）"""
-        pattern = r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词"
-        return bool(re.search(pattern, run.text))
+        """判断 run 是否属于中文关键词标签部分（防拆分）。"""
+        if not run.text.strip():
+            return False
+        if self.paragraph is None:
+            p = r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词"
+            return bool(re.search(p, run.text))
+        full = "".join(r.text for r in self.paragraph.runs)
+        m = re.search(
+            r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*",
+            full,
+        )
+        if not m:
+            return False
+        label_end = m.end()
+        pos = 0
+        for r in self.paragraph.runs:
+            rl = len(r.text)
+            if r._element is run._element:
+                return pos < label_end
+            pos += rl
+        return False
 
     def _get_label_split_pattern(self) -> re.Pattern | None:
         """中文标签拆分模式：匹配 '关键词：' 或 '关键词:' 及其变体"""

@@ -276,9 +276,10 @@ class CharacterStyle:
                 )
             )
 
-        # 6. 东亚字体
+        # 6. 东亚字体（仅当 run 含中文字符时才检查）
         font_name = run_get_font_name(run) or ""
-        if str(font_name).lower() != str(self.font_name_cn).lower():
+        has_cjk = any("一" <= ch <= "鿿" for ch in run.text)
+        if has_cjk and str(font_name).lower() != str(self.font_name_cn).lower():
             diffs.append(
                 DIFFResult(
                     "font_name_cn",

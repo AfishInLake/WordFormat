@@ -133,7 +133,7 @@ class TestCharacterStyle:
     def test_diff_font_size_and_name_cn(self, doc, mock_warning):
         _set_warning(mock_warning)
         cs = CharacterStyle(font_size="小四", font_name_cn="宋体")
-        run = doc.add_paragraph().add_run("t")
+        run = doc.add_paragraph().add_run("测试")
         run.font.size = Pt(14)
         run_set_font_name(run, "黑体")
         types = [d.diff_type for d in cs.diff_from_run(run)]
@@ -2266,7 +2266,7 @@ class TestCharacterStyleApplyToRunFontNameCn:
         _set_warning(mock_warning)
         cs = CharacterStyle(font_name_cn="黑体")
         p = doc.add_paragraph()
-        run = p.add_run("test")
+        run = p.add_run("测试")
         # Default CN font is 宋体, so 黑体 should trigger a fix
         run_set_font_name(run, "宋体")
         result = cs.apply_to_run(run)
