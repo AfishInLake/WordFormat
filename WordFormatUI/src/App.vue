@@ -207,7 +207,7 @@ const onServerConfigSelected = ({ filename, content }) => {
 body {
   background-color: #0f172a;
   color: #e2e8f0;
-  font-family: 'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -240,7 +240,7 @@ body {
 }
 
 .app-title {
-  font-family: 'Crimson Pro', serif;
+  font-family: 'Georgia', 'Times New Roman', serif;
   font-size: 1.4rem;
   font-weight: 600;
   color: #f1f5f9;

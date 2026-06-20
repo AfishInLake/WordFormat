@@ -57,7 +57,7 @@ function resetDefaults() { resetSettings(); host.value = backendSettings.host; p
 <style scoped>
 .settings-page { max-width: 520px; margin: 0 auto; }
 .settings-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 2rem; }
-.settings-title { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.35rem; font-family: 'Crimson Pro', serif; }
+.settings-title { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.35rem; font-family: 'Georgia, Times New Roman', serif; }
 .settings-desc { font-size: 0.8125rem; color: #64748b; margin-bottom: 1.5rem; }
 .connection-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8125rem; margin-bottom: 1.5rem; }
 .connection-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
