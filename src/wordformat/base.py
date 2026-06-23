@@ -136,3 +136,60 @@ def _fix_known_categories(result: list[dict]) -> None:
                     item["category"] = cat
                     item["comment"] = f"模式修正为 {cat}"
                     break
+    # 序列修正：用类别相邻关系纠正明显不合理分类
+    _fix_sequence(result)
+
+
+def _fix_sequence(result: list[dict]) -> None:  # noqa C901
+    """用段落类别间的合法转移关系修正序列错误。
+
+    例如："参考文献"后面的 body_text 不可能是正文，应该是参考文献条目。
+    """
+    n = len(result)
+    if n == 0:
+        return
+
+    def _text(i):
+        return (result[i].get("paragraph") or "").strip()
+
+    def _cat(i):
+        return result[i].get("category", "")
+
+    def _set(i, cat, reason):
+        old = result[i]["category"]
+        result[i]["category"] = cat
+        result[i]["comment"] = f"{reason}（原：{old}）"
+        result[i]["score"] = 1.0
+
+    # 规则1：关键词后面的 body_text → 如果是英文关键词附近，修正为英文关键词
+    i = 0
+    while i < n:
+        if "keywords_chinese" in _cat(i) and i + 1 < n:
+            j = i + 1
+            while j < n and _cat(j) in ("body_text",):
+                if re.search(r"Keywords?|KEY\s*WORDS", _text(j), re.IGNORECASE):
+                    _set(j, "keywords_english", "关键词序列修正：英文关键词")
+                    break
+                j += 1
+        i += 1
+
+    # 规则2：独立"参考文献"行 → references_title
+    for i in range(n):
+        t = _text(i)
+        if re.match(r"^参考文献\s*$", t) and _cat(i) != "references_title":
+            _set(i, "references_title", "序列修正：参考文献标题")
+
+    # 规则3：独立"致谢"行 → acknowledgements_title
+    for i in range(n):
+        t = _text(i)
+        if re.match(r"^致\s*谢\s*$", t) and _cat(i) != "acknowledgements_title":
+            _set(i, "acknowledgements_title", "序列修正：致谢标题")
+
+    # 规则4：keywords + 后面紧跟 keyword-like 内容 → 标记为关键词
+    for i in range(n):
+        if "keywords" in _cat(i) and i + 1 < n and _cat(i + 1) == "body_text":
+            t = _text(i + 1)
+            # 含分号分隔的短词 → 关键词
+            if re.search(r"[；;,]", t) and len(t) < 200:
+                if "keyword" not in _cat(i + 1):
+                    _set(i + 1, _cat(i), "序列修正：关键词延续")
