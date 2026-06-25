@@ -46,10 +46,6 @@
               <div class="property-value">{{ currentNode.score.toFixed(4) }}（判定阈值：{{ scoreThreshold }}）</div>
             </div>
             <div class="property-item">
-              <div class="property-label">节点指纹</div>
-              <div class="property-value fingerprint-value">{{ currentNode.fingerprint || '[无指纹]' }}</div>
-            </div>
-            <div class="property-item">
               <div class="property-label">节点注释</div>
               <div class="property-value">{{ currentNode.comment || '[无注释]' }}</div>
             </div>
@@ -148,75 +144,73 @@ const resultText = computed(() => {
 </script>
 
 <style scoped>
-.node-detail-section { margin-left: auto; }
-.detail-card {
-  position: sticky;
-  top: 84px;
-  max-height: calc(100vh - 120px);
-  min-height: auto;
+.node-detail-section {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background-color: #1e293b;
-  border: 1px solid #334155;
+  background-color: var(--paper);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
+}
+.detail-card {
+  display: flex;
+  flex-direction: column;
 }
 .detail-title {
   font-size: 14px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--text);
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
 }
 .no-select-tip {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; flex: 1; color: #64748b; gap: 0.75rem; padding: 6rem 0;
+  justify-content: center; flex: 1; color: var(--text-muted); gap: 0.75rem; padding: 6rem 0;
 }
-.no-select-icon { width: 48px; height: 48px; color: #334155; }
+.no-select-icon { width: 48px; height: 48px; color: var(--border); }
 .property-card {
-  border: 1px solid #334155; border-radius: 6px; overflow: hidden; margin-bottom: 8px;
+  border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 8px;
 }
 .property-card-header {
   padding: 6px 8px; font-size: 12px; font-weight: 500;
-  background-color: #0f172a; color: #94a3b8;
-  border-bottom: 1px solid #334155;
+  background-color: var(--ink); color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
 }
 .property-card-body {
   padding: 8px; display: flex; flex-direction: column; gap: 0.75rem;
 }
 .property-item { display: flex; flex-direction: column; gap: 2px; }
-.property-label { font-size: 12px; font-weight: 500; color: #64748b; }
-.label-tip { font-size: 11px; font-weight: 400; color: #475569; }
+.property-label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.label-tip { font-size: 11px; font-weight: 400; color: var(--text-muted); }
 .property-value {
-  font-size: 13px; color: #e2e8f0;
+  font-size: 13px; color: var(--text);
   padding: 6px 8px; border-radius: 6px;
-  border: 1px solid #334155; background-color: #0f172a;
+  border: 1px solid var(--border); background-color: var(--ink);
   line-height: 1.4; word-break: break-all;
 }
 .content-value { max-height: 8rem; overflow-y: auto; }
-.replace-label { color: #4ade80; font-weight: 600; }
-.replace-value { border-color: #166534; background-color: #052e16; color: #6ee7b7; }
+.replace-label { color: var(--green); font-weight: 600; }
+.replace-value { border-color: var(--green-dim); background-color: var(--green-dim); color: var(--text); }
 .status-value { border: none; padding: 6px 8px; }
-.status-normal { background-color: #052e16; color: #4ade80; }
-.status-error { background-color: #450a0a; color: #fca5a5; }
-.status-other { background-color: #1e293b; color: #94a3b8; }
+.status-normal { background-color: var(--green-dim); color: var(--green); }
+.status-error { background-color: var(--red-dim); color: var(--red); }
+.status-other { background-color: var(--surface); color: var(--text-secondary); }
 .category-select {
   width: 100%; font-size: 13px; padding: 6px 8px;
-  border-radius: 6px; border: 1px solid #475569;
-  background: #0f172a; color: #e2e8f0; cursor: pointer;
+  border-radius: 6px; border: 1px solid var(--border-hover);
+  background: var(--ink); color: var(--text); cursor: pointer;
   margin: 4px 0; box-sizing: border-box;
 }
-.category-select:focus { outline: 1px solid #22c55e; border-color: #22c55e; }
-.category-desc { font-size: 11px; color: #64748b; line-height: 1.4; padding: 4px 0 0; }
+.category-select:focus { outline: 1px solid var(--brass); border-color: var(--brass); }
+.category-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; padding: 4px 0 0; }
 .check-result { padding: 6px 8px; border-radius: 6px; font-size: 13px; text-align: center; margin-top: 8px; }
-.result-normal { background-color: #052e16; color: #4ade80; }
-.result-error { background-color: #450a0a; color: #fca5a5; }
-.result-other { background-color: #1e293b; color: #94a3b8; }
+.result-normal { background-color: var(--green-dim); color: var(--green); }
+.result-error { background-color: var(--red-dim); color: var(--red); }
+.result-other { background-color: var(--surface); color: var(--text-secondary); }
 .flex { display: flex; }
 .items-center { align-items: center; }
 .mr-2 { margin-right: 0.5rem; }
 .mt-4 { margin-top: 1rem; }
-.fingerprint-value { font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace; font-size: 11px; }
 </style>

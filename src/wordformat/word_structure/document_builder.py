@@ -9,7 +9,6 @@ from typing import Any
 from loguru import logger
 
 from wordformat.rules.node import FormatNode
-from wordformat.utils import check_duplicate_fingerprints
 from wordformat.word_structure.tree_builder import DocumentTreeBuilder
 
 
@@ -32,7 +31,6 @@ class DocumentBuilder:
     def build_from_json(cls, json_path: str | list, config) -> FormatNode:
         paragraphs = cls.load_paragraphs(json_path)
         logger.debug(f"共有 {len(paragraphs)} 条语料")
-        check_duplicate_fingerprints(paragraphs)  # 检查重复的指纹
         DocumentTreeBuilder.CONFIG = config
         builder = DocumentTreeBuilder()
         builder._config = config

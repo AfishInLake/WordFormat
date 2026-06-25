@@ -1,7 +1,10 @@
 <template>
   <div class="config-section">
     <div class="section-header" @click="toggleSection">
-      <h2>{{ title }}</h2>
+      <div class="section-header-left">
+        <span class="section-rule"></span>
+        <h2>{{ title }}</h2>
+      </div>
       <svg class="toggle-arrow" :class="{ expanded: isExpanded }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
     <div v-if="isExpanded" class="section-content">
@@ -22,44 +25,41 @@ const toggleSection = () => { isExpanded.value = !isExpanded.value }
 
 <style scoped>
 .config-section {
-  margin-bottom: 18px;
-  border: 1px solid #334155;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background-color: #1e293b;
-  transition: border-color 0.2s;
+  background: var(--paper);
+  transition: border-color .15s;
 }
-.config-section:hover { border-color: #475569; }
+.config-section:hover { border-color: var(--border-hover); }
+
 .section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 20px;
-  background-color: #0f172a;
-  cursor: pointer;
-  transition: background-color 0.2s;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px;
+  background: var(--surface);
+  cursor: pointer; user-select: none;
+  transition: background .12s;
 }
-.section-header:hover { background-color: #1e293b; }
+.section-header:hover { background: var(--raised); }
+
+.section-header-left { display: flex; align-items: center; gap: 10px; }
+.section-rule {
+  width: 3px; height: 18px; border-radius: 2px;
+  background: var(--brass); flex-shrink: 0;
+}
+
 .section-header h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #e2e8f0;
+  margin: 0; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: -0.01em;
 }
+
 .toggle-arrow {
-  color: #64748b;
-  transition: transform 0.2s;
-  flex-shrink: 0;
+  color: var(--text-muted); transition: transform .2s cubic-bezier(.4,0,.2,1); flex-shrink: 0;
 }
 .toggle-arrow.expanded { transform: rotate(180deg); }
+
 .section-content {
-  padding: 18px 20px;
-  border-top: 1px solid #334155;
-}
-.section-content h3 {
-  margin-top: 0;
-  margin-bottom: 14px;
-  font-size: 14px;
-  color: #94a3b8;
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
 }
 </style>

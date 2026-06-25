@@ -1,11 +1,14 @@
 <template>
   <div class="yaml-output">
-    <div class="yaml-header">生成的 YAML 配置</div>
+    <div class="yaml-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      配置预览
+    </div>
     <div class="yaml-content"><pre>{{ yamlContent }}</pre></div>
     <div class="yaml-actions">
-      <button @click="copyToClipboard" class="btn btn-green">复制</button>
-      <button @click="importFromFile" class="btn btn-ghost">导入 YAML</button>
-      <button @click="$emit('reset-to-default')" class="btn btn-ghost">重置</button>
+      <button @click="copyToClipboard" class="yaml-btn yaml-btn-primary">复制</button>
+      <button @click="importFromFile" class="yaml-btn">导入</button>
+      <button @click="$emit('reset-to-default')" class="yaml-btn">重置</button>
     </div>
     <input type="file" ref="fileInput" style="display:none" accept=".yaml,.yml" @change="handleFileImport" />
   </div>
@@ -29,14 +32,35 @@ const handleFileImport = (event) => {
 </script>
 
 <style scoped>
-.yaml-output { border: 1px solid #334155; border-radius: 10px; overflow: hidden; }
-.yaml-header { padding: 12px 18px; background: #0f172a; font-size: 14px; font-weight: 600; color: #e2e8f0; }
-.yaml-content { padding: 16px 18px; background: #020617; max-height: 360px; overflow-y: auto; }
-.yaml-content pre { margin: 0; font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.6; color: #94a3b8; white-space: pre; word-wrap: break-word; tab-size: 2; }
-.yaml-actions { padding: 10px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; gap: 8px; }
-.btn { padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all .2s; }
-.btn-green { background: #22c55e; color: #052e16; }
-.btn-green:hover { background: #16a34a; }
-.btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #475569; }
-.btn-ghost:hover { background: #1e293b; color: #e2e8f0; }
+.yaml-output {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: var(--paper);
+}
+.yaml-header {
+  padding: 12px 16px; background: var(--surface);
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.yaml-header svg { color: var(--brass-dim); }
+.yaml-content {
+  padding: 14px 16px; background: var(--ink);
+  max-height: 420px; overflow-y: auto;
+}
+.yaml-content pre {
+  margin: 0; font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px; line-height: 1.7; color: var(--text-secondary); white-space: pre; tab-size: 2;
+}
+.yaml-actions {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px;
+}
+.yaml-btn {
+  padding: 5px 13px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 11.5px; font-weight: 500; cursor: pointer; font-family: inherit;
+  background: transparent; color: var(--text-muted); transition: all .12s;
+}
+.yaml-btn:hover { background: var(--surface); color: var(--text); border-color: var(--border-hover); }
+.yaml-btn-primary { background: var(--brass); border-color: var(--brass); color: var(--ink); font-weight: 600; }
+.yaml-btn-primary:hover { background: #c9a94d; border-color: #c9a94d; }
 </style>

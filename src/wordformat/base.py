@@ -10,7 +10,7 @@ from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
 from wordformat.settings import BATCH_SIZE
-from wordformat.utils import get_paragraph_numbering_text, get_paragraph_xml_fingerprint
+from wordformat.utils import get_paragraph_numbering_text
 
 
 def _para_contains_image(para) -> bool:
@@ -63,7 +63,6 @@ class DocxBase:
                     "score": 1.0,
                     "comment": "图片段落" if has_image else "空段落",
                     "paragraph": "",
-                    "fingerprint": get_paragraph_xml_fingerprint(para),
                 }
 
         # 对非空段进行批量 AI 推理
@@ -82,13 +81,11 @@ class DocxBase:
             ):
                 tag = pred["label"]
                 score = pred["score"]
-                para_obj = all_paras[idx]
                 response = {
                     "category": tag,
                     "score": score,
                     "comment": f"置信度：{score:.4f}",
                     "paragraph": text,
-                    "fingerprint": get_paragraph_xml_fingerprint(para_obj),
                 }
                 if score < 0.6:
                     response["category"] = "body_text"

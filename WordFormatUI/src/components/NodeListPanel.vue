@@ -39,7 +39,6 @@
           <span v-if="node.replace" class="replace-badge" title="有替换内容">R</span>
           <div class="node-meta">
             <span class="node-comment">{{ node.comment || '无注释' }}</span>
-            <span class="node-fingerprint">{{ node.fingerprint?.slice(0, 8) || '无' }}</span>
           </div>
         </div>
       </div>
@@ -63,15 +62,16 @@ defineEmits(['select-node'])
 </script>
 
 <style scoped>
-.node-list-section { width: 100%; flex: 1; }
+.node-list-section { min-height: 0; display: flex; flex-direction: column; }
 .card {
-  background-color: #1e293b;
-  border: 1px solid #334155;
+  background-color: var(--paper);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .node-list {
   display: flex;
@@ -79,28 +79,25 @@ defineEmits(['select-node'])
   gap: 0.125rem;
   overflow-y: auto;
   flex: 1;
-  min-height: calc(100vh - 110px);
 }
 .node-item {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
   margin: 2px 0;
   border-radius: 6px;
-  transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  min-height: 36px;
   padding: 4px 8px;
   cursor: pointer;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  transition: background-color 0.2s ease;
 }
-.node-item:hover { background-color: #334155; }
-.node-item.error { background-color: #450a0a; border-left: 3px solid #ef4444; }
-.node-item.other { background-color: #1e293b; border-left: 3px solid #475569; opacity: 0.7; }
-.node-item.selected { background-color: #1e3a5f; border-left: 3px solid #3b82f6; opacity: 1; }
-.level-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.node-item:hover { background-color: var(--surface); }
+.node-item.error { background-color: var(--red-dim); border-left: 3px solid var(--red); }
+.node-item.other { background-color: var(--paper); border-left: 3px solid var(--border-hover); opacity: 0.7; }
+.node-item.selected { background-color: var(--raised); border-left: 3px solid var(--brass); opacity: 1; }
+.level-dot { width: 8px; height: 8px; margin-top: 0.4em; border-radius: 50%; flex-shrink: 0; }
 .node-tag {
-  min-width: 140px;
+  width: 140px;
+  max-width: 140px;
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 3px;
@@ -111,77 +108,78 @@ defineEmits(['select-node'])
   flex-shrink: 0;
 }
 .node-score {
-  min-width: 60px;
+  width: 60px;
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: #064e3b;
-  color: #6ee7b7;
+  background: var(--green-dim);
+  color: var(--green);
   text-align: center;
   flex-shrink: 0;
 }
 .node-content {
   flex: 1;
+  min-width: 0;
   font-size: 13px;
-  color: #e2e8f0;
+  color: var(--text);
   word-break: break-all;
-  line-height: 1.4;
+  overflow-wrap: break-word;
+  line-height: 1.5;
 }
 .node-meta {
   font-size: 11px;
-  color: #64748b;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-shrink: 0;
+  color: var(--text-muted);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.node-fingerprint { font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace; }
 .init-tip, .loading-tip, .empty-tip {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   flex: 1;
-  color: #64748b;
+  color: var(--text-muted);
   gap: 0.75rem;
   padding: 6rem 0;
 }
-.init-icon { width: 48px; height: 48px; color: #334155; }
-.init-sub-tip { font-size: 12px; color: #475569; margin-top: 0.25rem; text-align: center; line-height: 1.5; }
+.init-icon { width: 48px; height: 48px; color: var(--border); }
+.init-sub-tip { font-size: 12px; color: var(--text-muted); margin-top: 0.25rem; text-align: center; line-height: 1.5; }
 .loading-spinner {
   width: 20px; height: 20px;
-  border: 3px solid #334155;
+  border: 3px solid var(--border);
   border-radius: 50%;
-  border-top-color: #22c55e;
+  border-top-color: var(--brass);
   animation: spin 1s ease-in-out infinite;
 }
 .empty-tip { font-size: 13px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.node-tag.other { background: #334155; color: #94a3b8; font-weight: 500; }
-.node-tag.abstract_chinese_title { background: #064e3b; color: #6ee7b7; }
-.node-tag.abstract_chinese_title_content { background: #0c4a6e; color: #7dd3fc; }
-.node-tag.abstract_english_title { background: #4c1d95; color: #c4b5fd; }
-.node-tag.abstract_english_title_content { background: #581c87; color: #d8b4fe; }
-.node-tag.keywords_chinese { background: #713f12; color: #fde68a; }
-.node-tag.keywords_english { background: #7f1d1d; color: #fecaca; }
-.node-tag.chinese_title { background: #0c4a6e; color: #7dd3fc; }
-.node-tag.english_title { background: #064e3b; color: #6ee7b7; }
-.node-tag.heading_level_1 { background: #312e81; color: #c7d2fe; }
-.node-tag.heading_level_2 { background: #4c1d95; color: #d8b4fe; }
-.node-tag.heading_level_3 { background: #581c87; color: #e9d5ff; }
-.node-tag.heading_mulu { background: #713f12; color: #fde68a; }
-.node-tag.heading_fulu { background: #1e293b; color: #94a3b8; }
-.node-tag.references_title { background: #164e63; color: #67e8f9; }
-.node-tag.acknowledgements_title { background: #064e3b; color: #6ee7b7; }
-.node-tag.caption_figure { background: #1e293b; color: #94a3b8; }
-.node-tag.caption_table { background: #1e293b; color: #94a3b8; }
-.node-tag.body_text { background: #0f172a; color: #94a3b8; }
-.search-highlight { background-color: #713f12; color: #fde68a; padding: 0 2px; border-radius: 2px; }
+.node-tag.other { background: var(--surface); color: var(--text-muted); }
+.node-tag.abstract_chinese_title { background: #1a3d2e; color: #6ee7b7; }
+.node-tag.abstract_chinese_title_content { background: #1a3540; color: #7dd3fc; }
+.node-tag.abstract_english_title { background: #2d1a4a; color: #c4b5fd; }
+.node-tag.abstract_english_title_content { background: #341a4a; color: #d8b4fe; }
+.node-tag.keywords_chinese { background: #3d2a12; color: #fde68a; }
+.node-tag.keywords_english { background: #3d1a1a; color: #fecaca; }
+.node-tag.chinese_title { background: #1a3540; color: #7dd3fc; }
+.node-tag.english_title { background: #1a3d2e; color: #6ee7b7; }
+.node-tag.heading_level_1 { background: #1f1d3d; color: #c7d2fe; }
+.node-tag.heading_level_2 { background: #2d1a4a; color: #d8b4fe; }
+.node-tag.heading_level_3 { background: #341a4a; color: #e9d5ff; }
+.node-tag.heading_mulu { background: #3d2a12; color: #fde68a; }
+.node-tag.heading_fulu { background: var(--surface); color: var(--text-muted); }
+.node-tag.references_title { background: #1a3038; color: #67e8f9; }
+.node-tag.acknowledgements_title { background: #1a3d2e; color: #6ee7b7; }
+.node-tag.caption_figure { background: var(--surface); color: var(--text-muted); }
+.node-tag.caption_table { background: var(--surface); color: var(--text-muted); }
+.node-tag.body_text { background: var(--ink); color: var(--text-muted); }
+.search-highlight { background-color: var(--brass-dim); color: var(--text); padding: 0 2px; border-radius: 2px; }
 .replace-badge {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border-radius: 50%;
-  background: #22c55e; color: #052e16; font-size: 11px; font-weight: 700;
-  flex-shrink: 0; cursor: default;
+  background: var(--brass); color: var(--ink); font-size: 11px; font-weight: 700;
+  flex-shrink: 0;
 }
 </style>

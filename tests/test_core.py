@@ -21,7 +21,6 @@ from wordformat.numbering import (
     process_heading_numbering,
 )
 from wordformat.utils import (
-    check_duplicate_fingerprints,
     get_file_name,
     ensure_is_directory,
     ensure_directory_exists,
@@ -261,35 +260,6 @@ class TestPrintTree:
         assert "child2" in output
 
 
-# ============================================================
-# utils.py — check_duplicate_fingerprints
-# ============================================================
-
-
-class TestCheckDuplicateFingerprints:
-    def test_no_duplicates(self):
-        data = [
-            {"fingerprint": "aaa"},
-            {"fingerprint": "bbb"},
-        ]
-        # 不应抛出异常
-        check_duplicate_fingerprints(data)
-
-    def test_has_duplicates(self):
-        data = [
-            {"fingerprint": "aaa"},
-            {"fingerprint": "aaa"},
-        ]
-        # 不抛异常，仅打日志
-        check_duplicate_fingerprints(data)
-
-    def test_missing_fingerprint_raises(self):
-        data = [{"category": "body_text"}]
-        with pytest.raises(ValueError, match="fingerprint"):
-            check_duplicate_fingerprints(data)
-
-    def test_empty_list(self):
-        check_duplicate_fingerprints([])
 
 
 # ============================================================
@@ -455,17 +425,13 @@ class TestTreeNode:
         assert node.value == "hello"
         assert node.children == []
 
-    def test_init_with_dict_value_and_fingerprint(self):
-        node = TreeNode({"category": "body_text", "fingerprint": "abc123"})
-        assert node.fingerprint == "abc123"
-
-    def test_init_with_top_category_skips_fingerprint(self):
-        node = TreeNode({"category": "top"})
+    def test_init_fingerprint_is_none(self):
+        """fingerprint 已废弃，始终为 None。"""
+        node = TreeNode({"category": "body_text"})
         assert node.fingerprint is None
 
-    def test_init_missing_fingerprint_raises(self):
-        with pytest.raises(ValueError, match="fingerprint"):
-            TreeNode({"category": "body_text"})
+        node2 = TreeNode({"category": "body_text", "fingerprint": "abc123"})
+        assert node2.fingerprint is None
 
     def test_config_default_empty(self):
         node = TreeNode("x")
@@ -505,9 +471,9 @@ class TestTreeNode:
         node = TreeNode("test_val")
         assert repr(node) == "TreeNode(test_val)"
 
-    def test_fingerprint_attribute_exists_for_non_dict(self):
+    def test_fingerprint_attribute_is_none_for_non_dict(self):
         node = TreeNode("simple_string")
-        assert hasattr(node, "fingerprint")
+        assert node.fingerprint is None
 
 
 # ============================================================
@@ -2040,7 +2006,6 @@ class TestDocxBase:
         assert len(result) == 3
         assert result[0]["category"] == "heading_level_1"
         assert result[1]["category"] == "body_text"
-        assert "fingerprint" in result[0]
         assert "paragraph" in result[0]
         assert "score" in result[0]
 

@@ -25,7 +25,7 @@ class TreeNode:
         self.value = value
         self.__config = {}
         self.children: list[TreeNode] = []
-        self.__set_fingerprint()
+        self.fingerprint = None
 
     @property
     def config(self):
@@ -59,16 +59,6 @@ class TreeNode:
         except (KeyError, TypeError):
             # 路径不存在或结构不匹配，返回空配置
             self.__config = {}
-
-    def __set_fingerprint(self):
-        self.fingerprint = None  # 初始化为 None
-        if self.value and isinstance(self.value, dict):
-            if self.value.get("category") == "top":
-                return
-            try:
-                self.fingerprint = self.value["fingerprint"]
-            except KeyError as err:
-                raise ValueError(f"{self.value} must have a 'fingerprint' key") from err
 
     def add_child(self, child_value: Any) -> "TreeNode":
         """添加一个子节点，并返回该子节点（便于链式调用）"""
