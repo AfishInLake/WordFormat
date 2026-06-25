@@ -96,7 +96,8 @@ export const defaultConfig = {
           bold: false
         }),
         rules: {
-          keyword_count: { enabled: true, count_min: 3, count_max: 5 }
+          keyword_count: { enabled: true, count_min: 3, count_max: 5 },
+          trailing_punctuation: { enabled: false, forbidden_chars: ".,;:" }
         }
       })
     }
@@ -205,22 +206,30 @@ export const defaultConfig = {
     level_1: {
       enabled: true,
       template: '%1',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: null,
+      text_indent: null
     },
     level_2: {
       enabled: true,
       template: '%1.%2',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: null,
+      text_indent: null
     },
     level_3: {
       enabled: true,
       template: '%1.%2.%3',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: null,
+      text_indent: null
     },
     references: {
       enabled: true,
       template: '[%1]',
-      suffix: 'space'
+      suffix: 'space',
+      numbering_indent: null,
+      text_indent: null
     },
     captions: {
       enabled: false,
@@ -276,16 +285,12 @@ export const applyGlobalFormatToAll = (userConfig) => {
   userConfig.abstract.keywords.english = {
     ...userConfig.global_format,
     label: userConfig.abstract.keywords.english.label,
-    count_min: userConfig.abstract.keywords.english.count_min,
-    count_max: userConfig.abstract.keywords.english.count_max,
-    trailing_punct_forbidden: userConfig.abstract.keywords.english.trailing_punct_forbidden
+    rules: userConfig.abstract.keywords.english.rules
   }
   userConfig.abstract.keywords.chinese = {
     ...userConfig.global_format,
     label: userConfig.abstract.keywords.chinese.label,
-    count_min: userConfig.abstract.keywords.chinese.count_min,
-    count_max: userConfig.abstract.keywords.chinese.count_max,
-    trailing_punct_forbidden: userConfig.abstract.keywords.chinese.trailing_punct_forbidden
+    rules: userConfig.abstract.keywords.chinese.rules
   }
 
   // 标题配置

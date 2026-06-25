@@ -35,16 +35,16 @@ function toggleAll() { const n = !allChecked.value; FIELDS.forEach(f => { props.
 </script>
 
 <style scoped>
-.select-all-bar { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
-.select-all-label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: #22c55e; }
-.select-all-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #22c55e; }
-.form-item { margin-bottom: 8px; display: flex; flex-direction: row; align-items: center; gap: 4px; }
-.form-item label { font-weight: 500; color: #94a3b8; font-size: 13px; white-space: nowrap; cursor: pointer; }
-.form-item input[type="checkbox"] { margin-right: 6px; accent-color: #22c55e; }
+.select-all-bar { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.select-all-label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--brass); user-select: none; }
+.select-all-label input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--brass); }
+.form-item { margin-bottom: 7px; display: flex; flex-direction: row; align-items: center; gap: 4px; }
+.form-item label { font-weight: 500; color: var(--text-secondary); font-size: 13px; white-space: nowrap; cursor: pointer; user-select: none; }
+.form-item input[type="checkbox"] { margin-right: 6px; accent-color: var(--brass); width: 14px; height: 14px; cursor: pointer; }
 .grid { display: grid; }
-.grid-cols-3 { grid-template-columns: repeat(6, 1fr); }
-.gap-2 { gap: 6px; }
-@media (min-width: 1024px) { .grid-cols-3 { grid-template-columns: repeat(7, 1fr); } }
-@media (min-width: 1200px) { .grid-cols-3 { grid-template-columns: repeat(8, 1fr); } }
+.grid-cols-3 { grid-template-columns: repeat(5, 1fr); }
+.gap-2 { gap: 4px; }
+@media (min-width: 1024px) { .grid-cols-3 { grid-template-columns: repeat(6, 1fr); } }
+@media (min-width: 1400px) { .grid-cols-3 { grid-template-columns: repeat(7, 1fr); } }
 @media (max-width: 768px) { .grid-cols-3 { grid-template-columns: repeat(2, 1fr); } }
 </style>

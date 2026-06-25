@@ -14,8 +14,8 @@ defineEmits(['check-format', 'apply-format'])
 .format-btn-group { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .btn { padding: 6px 12px; font-size: 12px; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; transition: all .2s; font-family: inherit; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-amber { background: #d97706; color: #fef3c7; }
-.btn-amber:hover:not(:disabled) { background: #b45309; }
-.btn-green { background: #22c55e; color: #052e16; }
-.btn-green:hover:not(:disabled) { background: #16a34a; }
+.btn-amber { background: var(--brass); color: var(--ink); font-weight: 600; }
+.btn-amber:hover:not(:disabled) { background: var(--brass-dim); }
+.btn-green { background: var(--green); color: var(--ink); font-weight: 600; }
+.btn-green:hover:not(:disabled) { background: var(--green-dim); }
 </style>

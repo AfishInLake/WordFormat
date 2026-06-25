@@ -21,12 +21,9 @@ from wordformat.rules import (
 )
 from wordformat.settings import VOIDNODELIST
 from wordformat.style.check_format import CharacterStyle, ParagraphStyle
-from wordformat.utils import ensure_directory_exists, get_paragraph_xml_fingerprint
+from wordformat.utils import ensure_directory_exists
 from wordformat.word_structure.document_builder import DocumentBuilder
-from wordformat.word_structure.utils import (
-    find_and_modify_first,
-    promote_bodytext_in_subtrees_of_type,
-)
+from wordformat.word_structure.utils import promote_bodytext_in_subtrees_of_type
 
 
 def _collect_all_style_configs(config_model) -> dict:
@@ -436,34 +433,17 @@ def apply_format_check_to_all_nodes(
     traverse(root_node)
 
 
-def _clear_matched_flags(root_node):
-    """清除树中所有节点的 _matched 标记，每次匹配前调用。"""
-    from collections import deque
+def _flatten_tree_nodes(root_node):
+    """DFS 前序遍历展平树中所有节点（排除虚拟根节点），顺序与文档段落一致。"""
+    result = []
 
-    q = deque([root_node])
-    while q:
-        n = q.popleft()
-        if hasattr(n, "_matched"):
-            del n._matched
-        q.extend(n.children)
+    def dfs(node):
+        for child in node.children:
+            result.append(child)
+            dfs(child)
 
-
-def xg(root_node, paragraph):
-    """
-    根据 XML 指纹匹配树节点。已匹配过的节点不再参与后续匹配，
-    防止多个相同指纹的段落（如空段）绑到同一个节点。
-    """
-    fp = get_paragraph_xml_fingerprint(paragraph)
-
-    def condition(node):
-        if getattr(node, "fingerprint", False) and not getattr(node, "_matched", False):
-            return node.fingerprint == fp
-        return False
-
-    node = find_and_modify_first(root=root_node, condition=condition)
-    if node:
-        node._matched = True
-    return node
+    dfs(root_node)
+    return result
 
 
 def format_table_content(
@@ -731,11 +711,9 @@ def auto_format_thesis_document(
             style_list.append(style.name)
         logger.info(f"可用的样式有：{style_list}")
 
-    _clear_matched_flags(root_node)
-    for paragraph in document.paragraphs:
-        node = xg(root_node, paragraph)
-        if node:
-            node.paragraph = paragraph
+    nodes = _flatten_tree_nodes(root_node)
+    for node, paragraph in zip(nodes, document.paragraphs, strict=False):
+        node.paragraph = paragraph
 
     # 替换摘要节点
     subtress_dict = {

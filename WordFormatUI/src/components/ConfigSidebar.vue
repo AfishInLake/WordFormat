@@ -14,8 +14,8 @@
       >
         <span class="config-name">{{ cfg }}</span>
       </div>
-      <div v-if="loading" class="loading-text">加载中...</div>
-      <div v-if="!loading && configs.length === 0" class="empty-text">
+      <div v-if="loading" class="status-text">加载中...</div>
+      <div v-if="!loading && configs.length === 0" class="status-text">
         暂无配置文件<br/>将 YAML 放入 configs/ 目录
       </div>
     </div>
@@ -37,14 +37,9 @@ async function fetchConfigs() {
   try {
     const res = await fetch(`${API_BASE}/configs`)
     const json = await res.json()
-    if (json.code === 200) {
-      configs.value = json.data || []
-    }
-  } catch (e) {
-    console.error('获取配置列表失败:', e)
-  } finally {
-    loading.value = false
-  }
+    if (json.code === 200) { configs.value = json.data || [] }
+  } catch (e) { console.error('获取配置列表失败:', e) }
+  finally { loading.value = false }
 }
 
 async function selectConfig(filename) {
@@ -55,9 +50,7 @@ async function selectConfig(filename) {
       activeConfig.value = filename
       emit('config-selected', { filename, content: json.data })
     }
-  } catch (e) {
-    console.error('读取配置失败:', e)
-  }
+  } catch (e) { console.error('读取配置失败:', e) }
 }
 
 onMounted(fetchConfigs)
@@ -65,49 +58,23 @@ onMounted(fetchConfigs)
 
 <style scoped>
 .config-sidebar {
-  width: 200px;
-  min-width: 180px;
-  background: #1e293b;
-  border-right: 1px solid #334155;
+  width: 200px; min-width: 180px;
+  background: var(--paper);
+  border-right: 1px solid var(--border);
   padding: 1rem 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  height: 100%; display: flex; flex-direction: column;
 }
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem 0.5rem;
-}
-.sidebar-header h3 {
-  font-size: 0.85rem;
-  color: #94a3b8;
-  font-weight: 600;
-}
-.btn-refresh {
-  background: none;
-  border: 1px solid #475569;
-  color: #94a3b8;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 0 6px;
-}
-.btn-refresh:hover { color: #e2e8f0; background: #334155; }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 0 1rem 0.5rem; }
+.sidebar-header h3 { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.btn-refresh { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 4px; cursor: pointer; font-size: 0.9rem; padding: 0 5px; line-height: 1.3; }
+.btn-refresh:hover { color: var(--text); background: var(--surface); }
 .config-list { flex: 1; overflow-y: auto; padding: 0 0.5rem; }
 .config-item {
-  padding: 0.4rem 0.75rem;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  color: #cbd5e1;
-  margin-bottom: 2px;
-  transition: background 0.15s;
+  padding: 0.35rem 0.7rem; cursor: pointer; border-radius: 5px;
+  font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 2px;
+  transition: background .1s;
 }
-.config-item:hover { background: #334155; }
-.config-item.active { background: #22c55e; color: #052e16; font-weight: 600; }
-.loading-text, .empty-text {
-  padding: 0.5rem; font-size: 0.75rem; color: #64748b; text-align: center;
-}
+.config-item:hover { background: var(--surface); }
+.config-item.active { background: var(--brass); color: var(--ink); font-weight: 600; }
+.status-text { padding: 0.5rem; font-size: 0.7rem; color: var(--text-muted); text-align: center; line-height: 1.5; }
 </style>

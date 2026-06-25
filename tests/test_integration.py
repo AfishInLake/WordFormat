@@ -43,15 +43,12 @@ from wordformat.agent.onnx_infer import (
     onnx_batch_infer,
     safe_batch_infer,
 )
-from wordformat.set_style import apply_format_check_to_all_nodes, xg
+from wordformat.set_style import apply_format_check_to_all_nodes
 from wordformat.set_tag import set_tag_main
 from wordformat.word_structure.node_factory import create_node
 from wordformat.word_structure.tree_builder import DocumentTreeBuilder
 from wordformat.word_structure.document_builder import DocumentBuilder
-from wordformat.word_structure.utils import (
-    find_and_modify_first,
-    promote_bodytext_in_subtrees_of_type,
-)
+from wordformat.word_structure.utils import promote_bodytext_in_subtrees_of_type
 from wordformat.rules.node import FormatNode
 from wordformat.rules.body import BodyText
 
@@ -473,28 +470,22 @@ class TestSetStyleIntegration:
         apply_format_check_to_all_nodes(root, doc, {}, check=False)
         assert call_log == ["apply"]
 
-    def test_xg_finds_matching_node(self):
-        """xg 根据指纹匹配节点"""
-        from wordformat.utils import get_paragraph_xml_fingerprint
-
-        doc = Document()
-        para = doc.add_paragraph("match me")
-        fp = get_paragraph_xml_fingerprint(para)
+    def test_flatten_tree_nodes_matches_doc_order(self):
+        """DFS 展平的节点顺序与 document.paragraphs 一致。"""
+        from wordformat.set_style import _flatten_tree_nodes
 
         root = FormatNode(value={"category": "top"}, level=0)
-        child = FormatNode(value={"category": "body_text", "fingerprint": fp}, level=1)
-        root.add_child_node(child)
+        a = FormatNode(value={"category": "abstract_chinese_title"}, level=1)
+        b = FormatNode(value={"category": "body_text"}, level=1)
+        c = FormatNode(value={"category": "heading_level_1"}, level=1)
+        d = FormatNode(value={"category": "body_text"}, level=1)
+        root.add_child_node(a)
+        root.add_child_node(b)
+        root.add_child_node(c)
+        c.add_child_node(d)
 
-        found = xg(root, para)
-        assert found is child
-
-    def test_xg_returns_none_on_no_match(self):
-        doc = Document()
-        para = doc.add_paragraph("no match")
-        root = FormatNode(value={"category": "top"}, level=0)
-        child = FormatNode(value={"category": "body_text", "fingerprint": "wrong_fp"}, level=1)
-        root.add_child_node(child)
-        assert xg(root, para) is None
+        nodes = _flatten_tree_nodes(root)
+        assert nodes == [a, b, c, d]
 
 
 # ==================== (h) CLI 集成测试 ====================

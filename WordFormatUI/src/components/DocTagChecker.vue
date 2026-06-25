@@ -213,10 +213,12 @@ const callGenerateJsonApi = async () => {
     )
 
     if (res.data && Array.isArray(res.data.json_data)) {
-      nodeData.value = res.data.json_data.map((node, idx) => ({
-        ...node,
-        id: idx // 用于追踪（非必须）
-      }))
+      nodeData.value = res.data.json_data
+        .filter(node => node.category !== 'figure_image')
+        .map((node, idx) => ({
+          ...node,
+          id: idx
+        }))
       isFileLoaded.value = true
       selectedNodeIndex.value = -1
     } else {
@@ -415,11 +417,13 @@ const handleJsonImport = async (e) => {
       alert('JSON 格式错误：期望一个节点数组')
       return
     }
-    // 补全缺失的 id 字段
-    nodeData.value = json.map((node, idx) => ({
-      ...node,
-      id: node.id ?? idx
-    }))
+    // 补全缺失的 id 字段，并过滤无内容的 figure_image
+    nodeData.value = json
+      .filter(node => node.category !== 'figure_image')
+      .map((node, idx) => ({
+        ...node,
+        id: node.id ?? idx
+      }))
     isFileLoaded.value = true
     selectedNodeIndex.value = -1
     alert(`导入成功：${nodeData.value.length} 个节点`)
@@ -438,24 +442,24 @@ watch(isFileLoaded, (loaded) => {
 </script>
 
 <style scoped>
-.doc-tag-check-container { width: 100%; min-height: 100vh; display: flex; flex-direction: column; background-color: #0f172a; }
-.header-bar { background-color: #1e293b; border-bottom: 1px solid #334155; padding: 0.75rem 1.5rem; }
+.doc-tag-check-container { width: 100%; height: 100vh; display: flex; flex-direction: column; background-color: var(--ink); }
+.header-bar { background-color: var(--paper); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; }
 .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; max-width: 1280px; margin: 0 auto; width: 100%; }
 .header-left { display: flex; flex-direction: column; gap: 0.25rem; }
-.tool-title { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin: 0; font-family: 'Georgia, Times New Roman', serif; }
-.stats-info { font-size: 0.8125rem; color: #64748b; }
-.stats-info span { font-weight: 600; color: #22c55e; }
+.tool-title { font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 0; font-family: 'Georgia, Times New Roman', serif; }
+.stats-info { font-size: 0.8125rem; color: var(--text-muted); }
+.stats-info span { font-weight: 600; color: var(--green); }
 .header-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .search-box { position: relative; display: flex; align-items: center; }
-.search-input { padding: 6px 28px 6px 10px; font-size: 13px; border: 1px solid #475569; border-radius: 6px; width: 180px; outline: none; background: #0f172a; color: #e2e8f0; font-family: inherit; }
-.search-input:focus { border-color: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.15); }
-.search-icon { position: absolute; right: 8px; width: 16px; height: 16px; color: #64748b; pointer-events: none; }
+.search-input { padding: 6px 28px 6px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; width: 180px; outline: none; background: var(--ink); color: var(--text); font-family: inherit; }
+.search-input:focus { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(184,153,59,.15); }
+.search-icon { position: absolute; right: 8px; width: 16px; height: 16px; color: var(--text-muted); pointer-events: none; }
 .btn { padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; transition: all .2s; white-space: nowrap; font-family: inherit; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.primary-btn { background-color: #22c55e; color: #052e16; }
-.primary-btn:hover:not(:disabled) { background-color: #16a34a; }
-.secondary-btn { background-color: #334155; color: #cbd5e1; border: 1px solid #475569; }
-.secondary-btn:hover:not(:disabled) { background-color: #475569; border-color: #64748b; }
-.main-content { flex: 1; display: grid; grid-template-columns: 1fr 400px; gap: 1.5rem; padding: 1.5rem; width: 100%; max-width: 1280px; margin: 0 auto; }
+.primary-btn { background-color: var(--brass); color: var(--ink); font-weight: 600; }
+.primary-btn:hover:not(:disabled) { background-color: var(--brass-dim); }
+.secondary-btn { background-color: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+.secondary-btn:hover:not(:disabled) { background-color: var(--raised); border-color: var(--border-hover); color: var(--text); }
+.main-content { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 400px; gap: 1.5rem; padding: 1.5rem; width: 100%; max-width: 1280px; margin: 0 auto; }
 @media (max-width: 992px) { .main-content { grid-template-columns: 1fr; } }
 </style>

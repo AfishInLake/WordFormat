@@ -33,6 +33,11 @@
 
         <!-- 正文配置 -->
         <ConfigSection title="正文配置">
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="form-item">
+              <label><input type="checkbox" v-model="userConfig.body_text.rules.punctuation.enabled"> 启用标点符号校验</label>
+            </div>
+          </div>
           <FormatConfig :config="userConfig.body_text" />
         </ConfigSection>
 
@@ -155,7 +160,13 @@ defineExpose({
 .config-generator { width: 100%; }
 .app-content { display: flex; gap: 20px; width: 100%; }
 .config-sections { flex: 1; min-width: 0; }
-.yaml-preview { width: 380px; min-width: 280px; position: sticky; top: 84px; align-self: flex-start; max-height: calc(100vh - 110px); overflow-y: auto; }
+.yaml-preview { width: 380px; min-width: 260px; position: sticky; top: 72px; align-self: flex-start; max-height: calc(100vh - 100px); overflow-y: auto; }
+
+.form-item { margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+.form-item label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-item input[type="text"] { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--ink); color: var(--text); outline: none; flex: 1; max-width: 300px; }
+.form-item input[type="text"]:focus { border-color: var(--brass); }
+
 @media (max-width: 1200px) { .app-content { flex-direction: column; } .yaml-preview { width: 100%; position: static; max-height: none; } }
 @media (max-width: 768px) { .app-content { gap: 10px; } }
 </style>

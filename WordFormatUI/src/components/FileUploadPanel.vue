@@ -28,11 +28,11 @@ const onYamlChange = (e) => emit('update:yamlFile', e.target.files[0])
 
 <style scoped>
 .upload-group { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.upload-btn { padding: 6px 12px; font-size: 12px; font-weight: 500; border: 1px solid #475569; border-radius: 6px; background: #1e293b; color: #cbd5e1; cursor: pointer; transition: all .2s; font-family: inherit; }
-.upload-btn:hover { background: #334155; border-color: #64748b; color: #e2e8f0; }
+.upload-btn { padding: 6px 12px; font-size: 12px; font-weight: 500; border: 1px solid var(--border-hover); border-radius: 6px; background: var(--surface); color: var(--text-secondary); cursor: pointer; transition: all .2s; font-family: inherit; }
+.upload-btn:hover { background: var(--raised); border-color: var(--border-hover); color: var(--text); }
 .file-hidden { display: none; }
-.file-tip { font-size: 11px; color: #64748b; white-space: nowrap; }
-.go-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; background: #22c55e; color: #052e16; cursor: pointer; transition: all .2s; font-family: inherit; }
-.go-btn:hover:not(:disabled) { background: #16a34a; }
+.file-tip { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.go-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; background: var(--brass); color: var(--ink); cursor: pointer; transition: all .2s; font-family: inherit; }
+.go-btn:hover:not(:disabled) { background: var(--brass-dim); }
 .go-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

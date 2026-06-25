@@ -21,7 +21,7 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn btn-green" @click="testConnection" :disabled="testing">{{ testing ? '测试中...' : '测试连接' }}</button>
+        <button class="btn btn-primary" @click="testConnection" :disabled="testing">{{ testing ? '测试中...' : '测试连接' }}</button>
         <button class="btn btn-ghost" @click="resetDefaults">恢复默认</button>
       </div>
     </div>
@@ -56,24 +56,24 @@ function resetDefaults() { resetSettings(); host.value = backendSettings.host; p
 
 <style scoped>
 .settings-page { max-width: 520px; margin: 0 auto; }
-.settings-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 2rem; }
-.settings-title { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.35rem; font-family: 'Georgia, Times New Roman', serif; }
-.settings-desc { font-size: 0.8125rem; color: #64748b; margin-bottom: 1.5rem; }
-.connection-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8125rem; margin-bottom: 1.5rem; }
-.connection-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.bar-untested { background: #0f172a; border: 1px solid #334155; color: #64748b; } .bar-untested .connection-dot { background: #64748b; }
-.bar-ok { background: #052e16; border: 1px solid #166534; color: #4ade80; } .bar-ok .connection-dot { background: #22c55e; }
-.bar-fail { background: #450a0a; border: 1px solid #7f1d1d; color: #fca5a5; } .bar-fail .connection-dot { background: #ef4444; }
-.connection-url { margin-left: auto; font-family: monospace; font-size: 0.75rem; opacity: 0.8; }
-.form-group { margin-bottom: 1rem; }
-.form-label { display: block; font-size: 0.8125rem; font-weight: 500; color: #94a3b8; margin-bottom: 0.375rem; }
-.form-input { width: 100%; padding: 0.625rem 0.75rem; font-size: 0.875rem; border: 1px solid #475569; border-radius: 8px; outline: none; background: #0f172a; color: #e2e8f0; transition: border-color .2s; font-family: inherit; box-sizing: border-box; }
-.form-input:focus { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.15); }
-.form-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
-.btn { padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; transition: all .2s; font-family: inherit; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-green { background: #22c55e; color: #052e16; }
-.btn-green:hover:not(:disabled) { background: #16a34a; }
-.btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #475569; }
-.btn-ghost:hover { background: #1e293b; color: #e2e8f0; }
+.settings-card { background: var(--paper); border: 1px solid var(--border); border-radius: 10px; padding: 2rem; }
+.settings-title { font-size: 1.05rem; font-weight: 600; color: var(--text); margin-bottom: 0.3rem; }
+.settings-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem; }
+.connection-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.9rem; border-radius: 7px; font-size: 0.78rem; margin-bottom: 1.25rem; }
+.connection-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.bar-untested { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); } .bar-untested .connection-dot { background: var(--text-muted); }
+.bar-ok { background: var(--green-dim); border: 1px solid var(--green); color: #6ee7b7; } .bar-ok .connection-dot { background: var(--green); }
+.bar-fail { background: var(--red-dim); border: 1px solid var(--red); color: #fca5a5; } .bar-fail .connection-dot { background: var(--red); }
+.connection-url { margin-left: auto; font-family: 'SF Mono', Menlo, Monaco, monospace; font-size: 0.72rem; opacity: 0.7; }
+.form-group { margin-bottom: 0.9rem; }
+.form-label { display: block; font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.3rem; }
+.form-input { width: 100%; padding: 0.55rem 0.7rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 7px; outline: none; background: var(--ink); color: var(--text); transition: border-color .12s; font-family: inherit; box-sizing: border-box; }
+.form-input:focus { border-color: var(--brass); box-shadow: 0 0 0 3px rgba(184,153,59,.08); }
+.form-actions { display: flex; gap: 0.65rem; margin-top: 1.25rem; }
+.btn { padding: 0.45rem 0.95rem; font-size: 0.78rem; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; transition: all .12s; font-family: inherit; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-primary { background: var(--brass); color: var(--ink); font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: #c9a94d; }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface); color: var(--text); }
 </style>

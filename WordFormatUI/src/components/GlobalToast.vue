@@ -69,25 +69,25 @@ defineExpose({ toast });
   gap: 10px;
   padding: 12px 16px;
   border-radius: 10px;
-  background: #1e293b;
+  background: var(--paper);
   box-shadow: 0 8px 32px rgba(0,0,0,.35);
   min-width: 280px;
   max-width: 480px;
   pointer-events: auto;
   font-size: 14px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
 }
-.toast-msg { flex: 1; color: #e2e8f0; }
+.toast-msg { flex: 1; color: var(--text); }
 .toast-close {
   background: none; border: none; font-size: 22px;
-  cursor: pointer; color: #64748b; padding: 0 4px; line-height: 1;
+  cursor: pointer; color: var(--text-muted); padding: 0 4px; line-height: 1;
 }
-.toast-close:hover { color: #e2e8f0; }
+.toast-close:hover { color: var(--text); }
 
-.toast-info    { border-left: 4px solid #3b82f6; }
-.toast-success { border-left: 4px solid #22c55e; }
-.toast-warn    { border-left: 4px solid #f59e0b; }
-.toast-error   { border-left: 4px solid #ef4444; }
+.toast-info    { border-left: 4px solid var(--brass); }
+.toast-success { border-left: 4px solid var(--green); }
+.toast-warn    { border-left: 4px solid var(--brass-dim); }
+.toast-error   { border-left: 4px solid var(--red); }
 
 .toast-enter-active { transition: all .3s ease; }
 .toast-leave-active { transition: all .2s ease; }
