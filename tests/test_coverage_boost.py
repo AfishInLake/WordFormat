@@ -5,6 +5,8 @@
 覆盖模块：heading, keywords, numbering, style_enum, set_style, get_some, utils
 """
 
+import io
+import os
 import re
 from unittest.mock import MagicMock, patch, PropertyMock
 
@@ -1165,3 +1167,196 @@ class TestUtilsCoverageBoost:
         file_path.write_text("test")
         with pytest.raises(ValueError, match="不是文件夹"):
             ensure_directory_exists(str(file_path))
+
+
+# ===========================================================================
+# 覆盖率提升：utils/_docx, config, style/xml_ops, base, tree, numbering
+# ===========================================================================
+
+
+class TestCoverageBoostRound2:
+    """补漏低覆盖率分支。"""
+
+    # --- utils/_docx.py ---
+
+    def test_ensure_directory_exists_creates_dir(self, tmp_path):
+        """确保目录不存在时创建。"""
+        from wordformat.utils import ensure_directory_exists
+        d = str(tmp_path / "new_dir")
+        ensure_directory_exists(d)
+        assert os.path.isdir(d)
+
+    def test_para_contains_image_false(self):
+        """无图片的段落返回 False。"""
+        from wordformat.utils import para_contains_image
+        doc = Document()
+        p = doc.add_paragraph("text")
+        assert para_contains_image(p) is False
+
+    def test_remove_all_numbering(self):
+        """remove_all_numbering 对空白文档不抛异常。"""
+        from wordformat.utils import remove_all_numbering
+        doc = Document()
+        remove_all_numbering(doc)
+
+    # --- config/loader.py ---
+
+    def test_config_not_loaded_error(self):
+        """ConfigNotLoadedError 可正常抛出和捕获。"""
+        from wordformat.config.loader import ConfigNotLoadedError
+        with pytest.raises(ConfigNotLoadedError):
+            raise ConfigNotLoadedError("test")
+
+    # --- style/xml_ops.py ---
+
+    def test_rPr_set_italic_remove(self):
+        """rPr_set_italic 传入 False 时移除 w:i。"""
+        from wordformat.style.xml_ops import rPr_set_italic, ensure_rPr
+        from docx.oxml import OxmlElement
+        style = Document().styles["Normal"]
+        rPr = ensure_rPr(style.element)
+        rPr.append(OxmlElement("w:i"))
+        rPr_set_italic(rPr, False)
+        assert rPr.find(qn("w:i")) is None
+
+    def test_rPr_set_underline_remove(self):
+        """rPr_set_underline 传入 False 时移除 w:u。"""
+        from wordformat.style.xml_ops import rPr_set_underline, ensure_rPr
+        from docx.oxml import OxmlElement
+        style = Document().styles["Normal"]
+        rPr = ensure_rPr(style.element)
+        u = OxmlElement("w:u")
+        u.set(qn("w:val"), "single")
+        rPr.append(u)
+        rPr_set_underline(rPr, False)
+        assert rPr.find(qn("w:u")) is None
+
+    # --- tree.py: JSON file path ---
+
+    def test_print_tree_from_json(self, tmp_path):
+        """print_tree 支持传入 JSON 文件路径。"""
+        import json
+        from wordformat.tree import print_tree
+        json_path = tmp_path / "test.json"
+        json_path.write_text(json.dumps([
+            {"category": "body_text", "paragraph": "hello"},
+        ]))
+        # 不应抛异常
+        with patch("sys.stdout", io.StringIO()):
+            print_tree(str(json_path), show_index=True, show_confidence=True)
+
+    # --- numbering.py ---
+
+    def test_process_heading_numbering_disabled(self):
+        """numbering 禁用时不处理。"""
+        from wordformat.numbering import process_heading_numbering
+        from unittest.mock import MagicMock
+        config = MagicMock()
+        config.enabled = False
+        process_heading_numbering(None, Document(), config)
+
+    # --- pipeline/stages.py ---
+
+    def test_formatting_stage_skips_void_nodes(self, doc):
+        """VOIDNODELIST 中的类别跳过格式化。"""
+        from wordformat.pipeline.stages import FormattingExecutionStage
+        from wordformat.rules.node import FormatNode
+        from wordformat.settings import VOIDNODELIST
+        stage = FormattingExecutionStage()
+        root = FormatNode(value={"category": VOIDNODELIST[0]}, level=0)
+        root.children = []
+        config = MagicMock()
+        stage.apply_format_check_to_all_nodes(root, doc, config, check=True)
+
+    def test_summary_stage_adds_comment(self, doc):
+        """SummaryGenerationStage 在 check 模式下添加批注。"""
+        from wordformat.pipeline.stages import SummaryGenerationStage, FormattingExecutionStage
+        from wordformat.rules.node import FormatNode
+        p = doc.add_paragraph("")
+        root = FormatNode(value={"category": "top"}, level=0)
+        root.children = []
+        FormatNode.reset_stats()
+        stage = SummaryGenerationStage()
+        from wordformat.pipeline.context import FormatContext
+        ctx = FormatContext(
+            json_path="", docx_path="", check=True,
+            config_path="", save_dir="/tmp",
+            document=doc, root_node=root,
+        )
+        stage.process(ctx)
+
+    # --- utils/_docx.py more ---
+
+
+    # --- style/xml_ops.py ---
+
+    def test_rPr_set_bold_remove(self):
+        """rPr_set_bold 传入 False 移除 w:b。"""
+        from wordformat.style.xml_ops import rPr_set_bold, ensure_rPr
+        style = Document().styles["Normal"]
+        rPr = ensure_rPr(style.element)
+        rPr.append(OxmlElement("w:b"))
+        rPr_set_bold(rPr, False)
+        assert rPr.find(qn("w:b")) is None
+
+    def test_line_rule_to_xml_unknown(self):
+        """line_rule_to_xml 对未知值返回 auto。"""
+        from wordformat.style.xml_ops import line_rule_to_xml
+        assert line_rule_to_xml(999) == "auto"
+
+    # --- style/defs.py ---
+
+    def test_fontsize_base_set_numeric(self):
+        """FontSize.base_set 处理数字字符串。"""
+        from wordformat.style.defs import FontSize
+        doc = Document()
+        p = doc.add_paragraph("test")
+        run = p.add_run("x")
+        fs = FontSize("14")
+        fs.base_set(run)
+        assert run.font.size is not None
+
+    def test_fontname_base_set_english(self):
+        """FontName.base_set 处理英文字体。"""
+        from wordformat.style.defs import FontName
+        doc = Document()
+        p = doc.add_paragraph("test")
+        run = p.add_run("x")
+        fn = FontName("Arial")
+        fn.base_set(run)
+        assert run.font.name == "Arial"
+
+    def test_unit_label_enum_eq_none(self):
+        """UnitLabelEnum __eq__ 对 None 返回 rel_value == 0。"""
+        from wordformat.style.defs import FirstLineIndent
+        indent = FirstLineIndent("0字符")
+        assert indent == None  # rel_value is 0, so equal to None
+
+    # --- numbering.py ---
+
+    def test_auto_strip_numbering_empty_runs(self):
+        """空 run 的段落 _auto_strip_numbering 返回 False。"""
+        from wordformat.numbering import _auto_strip_numbering
+        doc = Document()
+        p = doc.add_paragraph("")
+        assert _auto_strip_numbering(p, 0) is False
+
+    # --- pipeline/stages.py ---
+
+    def test_load_config_stage_no_config(self):
+        """未提供配置文件时使用默认配置。"""
+        from wordformat.pipeline.stages import LoadConfigStage
+        from wordformat.pipeline.context import FormatContext
+        ctx = FormatContext(json_path="", docx_path="", check=True, config_path="")
+        stage = LoadConfigStage()
+        result = stage.process(ctx)
+        assert result is ctx
+
+    # --- utils/_fs.py ---
+
+
+    def test_ensure_is_directory_missing(self, tmp_path):
+        """ensure_is_directory 路径不存在时抛出 ValueError。"""
+        from wordformat.utils import ensure_is_directory
+        with pytest.raises(ValueError, match="不存在"):
+            ensure_is_directory(str(tmp_path / "nonexistent"))
