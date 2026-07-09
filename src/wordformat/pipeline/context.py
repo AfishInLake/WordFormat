@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : Structure.py
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -23,7 +23,7 @@ class FormatContext:
     # 运行时对象（由各阶段填充）
     document: DocumentObject | None = None
     root_node: FormatNode = None
-    config_model: NodeConfigRoot = NodeConfigRoot()
+    config_model: NodeConfigRoot = field(default_factory=NodeConfigRoot)
     output_path: Path | str = ""
 
 
