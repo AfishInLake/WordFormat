@@ -8,36 +8,34 @@ from pathlib import Path
 from loguru import logger
 
 
-def setup_logger():
-    """配置日志"""
-    # 确定基础目录
-    if getattr(sys, "frozen", False):
-        BASE_DIR = Path(sys.executable).parent
-    else:
-        BASE_DIR = Path(__file__).parent.parent.parent
+def setup_logger(log_dir: str | None = None):
+    """配置日志。
 
-    LOG_FILE = BASE_DIR / "api.log"
-
-    # 移除默认输出
+    Args:
+        log_dir: 日志文件目录。为 None 时仅输出到控制台（测试/开发模式）。
+    """
     logger.remove()
 
-    # 添加文件输出
-    # 注意：不使用 enqueue=True，因为在沙箱环境中 multiprocessing.SimpleQueue()
-    # 会因缺少 /dev/shm 而失败（FileNotFoundError）
-    logger.add(
-        LOG_FILE,  # 日志文件
-        rotation="500 MB",  # 按大小分割
-        retention="7 days",  # 保留7天
-        encoding="utf-8",
-        backtrace=True,  # 显示完整堆栈
-        diagnose=True,  # 显示变量信息
-    )
+    # 文件输出（仅指定目录时启用）
+    if log_dir:
+        log_path = Path(log_dir) / "api.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.add(
+            str(log_path),
+            rotation="500 MB",
+            retention="7 days",
+            encoding="utf-8",
+            level="DEBUG",
+            backtrace=True,
+            diagnose=True,
+        )
 
-    # 添加控制台输出（非 -w 模式）
+    # 控制台输出：仅 INFO 及以上（DEBUG 不刷屏）
     if not sys.stdout.closed:
         logger.add(
             sys.stdout,
             colorize=True,
+            level="INFO",
             format=(
                 "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
                 "<level>{level: <8}</level> | "

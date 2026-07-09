@@ -14,7 +14,6 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
-EXAMPLE_CONFIG = PROJECT_ROOT / "example" / "undergrad_thesis.yaml"
 
 
 # ==================== Document Fixtures ====================
@@ -78,32 +77,7 @@ def temp_json(tmp_path):
 
 # ==================== Config Fixtures ====================
 
-@pytest.fixture
-def config_path():
-    """返回示例配置文件路径"""
-    return str(EXAMPLE_CONFIG)
-
-
-@pytest.fixture
-def mock_config():
-    """创建一个 mock 配置对象，模拟 NodeConfigRoot"""
-    config = MagicMock()
-    config.style_checks_warning = MagicMock(
-        bold=True, italic=True, underline=True,
-        font_size=True, font_name=True, font_color=True,
-        alignment=True, space_before=True, space_after=True,
-        line_spacing=True, line_spacingrule=True,
-        left_indent=True, right_indent=True,
-        first_line_indent=True, builtin_style_name=True,
-    )
-    config.numbering = MagicMock(enabled=False)
-    return config
-
-
-@pytest.fixture
-def sample_yaml_config(tmp_path):
-    """创建一个最小化的 YAML 配置文件"""
-    yaml_content = """
+_INLINE_YAML = """\
 global_format:
   alignment: '两端对齐'
   space_before: "0.5行"
@@ -219,8 +193,38 @@ acknowledgements:
     alignment: '两端对齐'
     first_line_indent: '2字符'
 """
+
+@pytest.fixture
+def config_path(tmp_path):
+    """用内联 YAML 生成临时配置文件，不依赖外部文件。"""
+    config_file = tmp_path / "test_config.yaml"
+    config_file.write_text(_INLINE_YAML, encoding="utf-8")
+    return str(config_file)
+
+
+@pytest.fixture
+def mock_config():
+    """创建一个 mock 配置对象，模拟 NodeConfigRoot"""
+    config = MagicMock()
+    config.style_checks_warning = MagicMock(
+        bold=True, italic=True, underline=True,
+        font_size=True, font_name=True, font_color=True,
+        alignment=True, space_before=True, space_after=True,
+        line_spacing=True, line_spacingrule=True,
+        left_indent=True, right_indent=True,
+        first_line_indent=True, builtin_style_name=True,
+    )
+    config.numbering = MagicMock(enabled=False)
+    return config
+
+
+
+
+@pytest.fixture
+def sample_yaml_config(tmp_path):
+    """用内联 YAML 生成临时配置文件。"""
     path = tmp_path / "test_config.yaml"
-    path.write_text(yaml_content, encoding="utf-8")
+    path.write_text(_INLINE_YAML, encoding="utf-8")
     return str(path)
 
 
@@ -248,7 +252,7 @@ def mock_onnx_single():
 @pytest.fixture(autouse=True)
 def reset_config():
     """每个测试前后自动清理配置状态"""
-    from wordformat.config.config import clear_config
+    from wordformat.config.loader import clear_config
     clear_config()
     yield
     clear_config()
@@ -257,8 +261,8 @@ def reset_config():
 @pytest.fixture(autouse=True)
 def reset_style_warning():
     """每个测试前后重置 style_checks_warning 全局变量"""
-    from wordformat.style import check_format
-    original = check_format.style_checks_warning
-    check_format.style_checks_warning = None
+    from wordformat.style import diff
+    original = diff.style_checks_warning
+    diff.style_checks_warning = None
     yield
-    check_format.style_checks_warning = original
+    diff.style_checks_warning = original

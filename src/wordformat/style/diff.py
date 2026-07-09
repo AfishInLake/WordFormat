@@ -9,15 +9,16 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.config.config import get_config
-from wordformat.config.datamodel import WarningFieldConfig
-from wordformat.style.get_some import (
+from wordformat.config.loader import get_config
+from wordformat.config.models import WarningFieldConfig
+from wordformat.style.reader import (
     run_get_font_color,
     run_get_font_name,
     run_get_font_size_pt,
 )
+from wordformat.utils import has_chinese
 
-from .style_enum import (
+from .defs import (
     Alignment,
     BuiltInStyle,
     FirstLineIndent,
@@ -51,26 +52,9 @@ def _char_warning_enabled(diff_type: str) -> bool:
     return mapping.get(diff_type, True)
 
 
-# 磅值 → 中文字号反向映射
-_FONT_SIZE_PT_LABELS: dict[float, str] = {
-    26: "一号",
-    24: "小一",
-    22: "二号",
-    18: "小二",
-    16: "三号",
-    15: "小三",
-    14: "四号",
-    12: "小四",
-    10.5: "五号",
-    9: "小五",
-    7.5: "六号",
-    5.5: "七号",
-}
-
-
 def _pt_to_label(pt: float) -> str:
     """磅值 → 中文标签。精确匹配显示字号，否则直接显示 Xpt。"""
-    return _FONT_SIZE_PT_LABELS.get(pt, f"{pt}pt")
+    return FontSize._LABEL_MAP_REVERSE.get(pt, f"{pt}pt")
 
 
 def _format_char_value(diff_type: str, value) -> str:
@@ -278,7 +262,7 @@ class CharacterStyle:
 
         # 6. 东亚字体（仅当 run 含中文字符时才检查）
         font_name = run_get_font_name(run) or ""
-        has_cjk = any("一" <= ch <= "鿿" for ch in run.text)
+        has_cjk = has_chinese(run.text)
         if has_cjk and str(font_name).lower() != str(self.font_name_cn).lower():
             diffs.append(
                 DIFFResult(
@@ -346,7 +330,7 @@ class CharacterStyle:
     @staticmethod
     def to_string(value: list[DIFFResult], target: str = "") -> str:
         """将 DIFFResult 列表转为标准格式批注文本。"""
-        from .comment_format import CHAR_DIFF_LABELS, format_comment
+        from .comments import CHAR_DIFF_LABELS, format_comment
 
         t = []
         for diff in value:
@@ -585,7 +569,7 @@ class ParagraphStyle:
     @staticmethod
     def to_string(value: list[DIFFResult], target: str = "") -> str:
         """将 DIFFResult 列表转为标准格式批注文本。"""
-        from .comment_format import PARA_DIFF_LABELS, format_comment
+        from .comments import PARA_DIFF_LABELS, format_comment
 
         t = []
         for diff in value:

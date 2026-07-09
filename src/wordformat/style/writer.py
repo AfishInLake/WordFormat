@@ -89,7 +89,7 @@ def set_paragraph_space_after_by_lines(paragraph: Paragraph, lines: float) -> No
     _paragraph_space_by_lines(paragraph, after_lines=lines)
 
 
-class _SetSpacing:
+class SetSpacing:
     """设置间距距函数"""
 
     @staticmethod
@@ -150,7 +150,7 @@ class _SetSpacing:
                     r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
                 )
                 p.append(pPr)
-            _SetSpacing._set_hang_on_pPr(pPr, spacing_type, value)
+            SetSpacing._set_hang_on_pPr(pPr, spacing_type, value)
         except Exception as e:
             logger.error(f"设置段落{spacing_type}间距{value}行失败: {e}")
 
@@ -163,7 +163,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: PT/磅数值
         """
-        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
+        SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Pt(target_value)
         else:
@@ -178,7 +178,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: 厘米数值
         """
-        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
+        SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Cm(target_value)
         else:
@@ -193,7 +193,7 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: 英寸数值
         """
-        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
+        SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Inches(target_value)
         else:
@@ -208,14 +208,14 @@ class _SetSpacing:
             spacing_type: 间距类型（"before"=段前，"after"=段后）
             target_value: 毫米数值
         """
-        _SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
+        SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
             paragraph.paragraph_format.space_before = Mm(target_value)
         else:
             paragraph.paragraph_format.space_after = Mm(target_value)
 
 
-class _SetLineSpacing:
+class SetLineSpacing:
     """
     设置段落行距
     """
@@ -279,7 +279,7 @@ class _SetLineSpacing:
         paragraph.paragraph_format.line_spacing = Mm(value)
 
 
-class _SetIndent:
+class SetIndent:
     """
     缩进 文本之前(R)/ 文本之后(X):
     """
@@ -319,7 +319,7 @@ class _SetIndent:
         """
         try:
             pPr = paragraph._element.get_or_add_pPr()
-            _SetIndent._set_char_on_pPr(pPr, indent_type, value)
+            SetIndent._set_char_on_pPr(pPr, indent_type, value)
             return True
         except Exception as e:
             logger.error(f"设置字符缩进失败 (type={indent_type}, value={value}): {e}")
@@ -335,7 +335,7 @@ class _SetIndent:
             value: PT/磅数值
         """
         value = Pt(value)
-        _SetIndent._apply_indent(paragraph, indent_type, value)
+        SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
     def set_cm(paragraph: Paragraph, indent_type: str, value: float):
@@ -347,7 +347,7 @@ class _SetIndent:
             value: 厘米数值
         """
         value = Cm(value)
-        _SetIndent._apply_indent(paragraph, indent_type, value)
+        SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
     def set_inch(paragraph: Paragraph, indent_type: str, value: float):
@@ -359,7 +359,7 @@ class _SetIndent:
             value: 英寸数值
         """
         value = Inches(value)
-        _SetIndent._apply_indent(paragraph, indent_type, value)
+        SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
     def set_mm(paragraph: Paragraph, indent_type: str, value: float):
@@ -371,7 +371,7 @@ class _SetIndent:
             value: 毫米数值
         """
         value = Mm(value)
-        _SetIndent._apply_indent(paragraph, indent_type, value)
+        SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
     def _apply_indent(paragraph: Paragraph, indent_type: str, value):
@@ -388,7 +388,7 @@ class _SetIndent:
             )
 
 
-class _SetFirstLineIndent:
+class SetFirstLineIndent:
     """
     缩进 特殊格式：首行缩进(>0)/悬挂缩进(<0)
     """
@@ -420,7 +420,7 @@ class _SetFirstLineIndent:
         同时保留左缩进（left）和右缩进（right）
         """
         pPr = paragraph._element.get_or_add_pPr()
-        _SetFirstLineIndent._clear_ind_on_pPr(pPr)
+        SetFirstLineIndent._clear_ind_on_pPr(pPr)
 
     @staticmethod
     def _set_char_on_pPr(pPr, value: float, existing_left=None, existing_right=None):
@@ -463,7 +463,7 @@ class _SetFirstLineIndent:
         :param value: 缩进值（正数为首行缩进，负数为悬挂缩进，如 -2.2 表示悬挂 2.2 字符）
         :return: 设置成功返回 True，失败返回 False
         """
-        _SetFirstLineIndent.clear(paragraph)
+        SetFirstLineIndent.clear(paragraph)
         try:
             pPr = paragraph._element.get_or_add_pPr()
             existing_left = None
@@ -473,7 +473,7 @@ class _SetFirstLineIndent:
                 existing_left = ind.get(qn("w:left"))
                 existing_right = ind.get(qn("w:right"))
                 pPr.remove(ind)
-            _SetFirstLineIndent._set_char_on_pPr(
+            SetFirstLineIndent._set_char_on_pPr(
                 pPr, value, existing_left, existing_right
             )
             return True
@@ -489,7 +489,7 @@ class _SetFirstLineIndent:
         :param value: 缩进值（英寸单位为浮点数，如0.5）
         :return: 设置成功返回True，失败返回False
         """
-        _SetFirstLineIndent.clear(paragraph)
+        SetFirstLineIndent.clear(paragraph)
         # 强制清除firstLineChars，避免优先级冲突
         pPr = paragraph._element.get_or_add_pPr()
         ind = pPr.find(qn("w:ind"))
@@ -505,7 +505,7 @@ class _SetFirstLineIndent:
         :param value: 缩进值（毫米单位为浮点数，如5.0）
         :return:
         """
-        _SetFirstLineIndent.clear(paragraph)
+        SetFirstLineIndent.clear(paragraph)
         # 强制清除firstLineChars，避免优先级冲突
         pPr = paragraph._element.get_or_add_pPr()
         ind = pPr.find(qn("w:ind"))
@@ -521,7 +521,7 @@ class _SetFirstLineIndent:
         :param value: 缩进值（磅单位为浮点数，如0.5）
         :return:
         """
-        _SetFirstLineIndent.clear(paragraph)
+        SetFirstLineIndent.clear(paragraph)
         # 强制清除firstLineChars，避免优先级冲突
         pPr = paragraph._element.get_or_add_pPr()
         ind = pPr.find(qn("w:ind"))
@@ -537,7 +537,7 @@ class _SetFirstLineIndent:
         :param value: 缩进值（厘米单位为浮点数，如0.5）
         :return:
         """
-        _SetFirstLineIndent.clear(paragraph)
+        SetFirstLineIndent.clear(paragraph)
         # 强制清除firstLineChars，避免优先级冲突
         pPr = paragraph._element.get_or_add_pPr()
         ind = pPr.find(qn("w:ind"))

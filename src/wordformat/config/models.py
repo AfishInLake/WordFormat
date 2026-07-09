@@ -7,7 +7,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from wordformat.style.style_enum import ChineseFontType, FontSizeLabel
+from wordformat.style.defs import ChineseFontType, FontSizeLabel
 
 # -------------------------- 基础类型定义 --------------------------
 # 对齐方式类型
@@ -422,8 +422,49 @@ class NumberingConfig(BaseModel):
 
 
 # -------------------------- 根配置模型 --------------------------
+def _resolve_builtin_style_name(cfg) -> str | None:
+    """将 builtin_style_name 字段解析为英文样式名（如 '正文' → 'Normal'）。"""
+    from wordformat.style.defs import BuiltInStyle
+
+    raw = getattr(cfg, "builtin_style_name", None)
+    if not raw:
+        return None
+    try:
+        return BuiltInStyle(raw).rel_value
+    except Exception:
+        return raw
+
+
+def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
+    """递归遍历配置树，将 GlobalFormatConfig 按样式名收集到 style_map。"""
+    if isinstance(obj, GlobalFormatConfig):
+        eng_name = _resolve_builtin_style_name(obj)
+        if eng_name:
+            style_map[eng_name] = obj
+        return
+    if not isinstance(obj, BaseModel):
+        return
+    for val in (getattr(obj, f_name) for f_name in type(obj).model_fields):
+        if isinstance(val, BaseModel):
+            _walk_config_for_styles(val, style_map)
+        elif isinstance(val, dict):
+            for v in val.values():
+                if isinstance(v, BaseModel):
+                    _walk_config_for_styles(v, style_map)
+
+
 class NodeConfigRoot(BaseModel):
     """配置根节点模型"""
+
+    def collect_style_configs(self) -> dict[str, object]:
+        """遍历配置树，收集 (英文样式名 → GlobalFormatConfig) 映射。
+
+        配置优先级：后序覆盖前序。global_format 先被遍历，
+        具体段后遍历，同一样式名时具体配置覆盖全局配置。
+        """
+        style_map: dict[str, object] = {}
+        _walk_config_for_styles(self, style_map)
+        return style_map
 
     template_name: str = Field(
         default="未知模板", description="模板名称（用于检测报告中显示）"

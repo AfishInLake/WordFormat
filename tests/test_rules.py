@@ -1,7 +1,6 @@
 """
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
-import re
 from unittest.mock import patch
 
 import pytest
@@ -9,7 +8,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from wordformat.config.datamodel import NodeConfigRoot
+from wordformat.config.models import NodeConfigRoot
 from wordformat.rules import (
     AbstractContentCN,
     AbstractContentEN,
@@ -31,7 +30,6 @@ from wordformat.rules import (
     ReferenceEntry,
     References,
 )
-from wordformat.rules.keywords import BaseKeywordsNode
 from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
@@ -60,7 +58,7 @@ def _load_yaml(path):
 @pytest.fixture
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
-    from wordformat.config.config import init_config
+    from wordformat.config.loader import init_config
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -101,7 +99,7 @@ class TestFormatNodeBase:
         """check_format 应以 p=True, r=True 调用 _base。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
         with patch.object(node, "_base") as mock_base, \
-             patch.object(node, "_run_rules"):
+                patch.object(node, "_run_rules"):
             node.check_format(doc)
         mock_base.assert_called_once_with(doc, p=True, r=True)
 
@@ -109,7 +107,7 @@ class TestFormatNodeBase:
         """apply_format 应以 p=False, r=False 调用 _base。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
         with patch.object(node, "_base") as mock_base, \
-             patch.object(node, "_run_rules"):
+                patch.object(node, "_run_rules"):
             node.apply_format(doc)
         mock_base.assert_called_once_with(doc, p=False, r=False)
 
@@ -121,6 +119,7 @@ class TestFormatNodeBase:
 
     def test_unknown_config_type_raises(self, root_config, para):
         """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
+
         # 创建一个没有 CONFIG_PATH 的子类
         class FakeNode(FormatNodeBase):
             CONFIG_MODEL = type("TotallyUnknownConfig", (), {})
@@ -226,7 +225,7 @@ class TestLoadConfig:
 
     def test_table_content_config_default(self):
         """TablesConfig 的 content 有默认值。"""
-        from wordformat.config.datamodel import TablesConfig
+        from wordformat.config.models import TablesConfig
 
         cfg = TablesConfig()
         assert cfg.content is not None
@@ -953,7 +952,7 @@ class TestAbstractContentENBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             # 配置中 line_spacing 为 "0倍"，现会触发 ValueError，mock 掉该步
-            with patch("wordformat.style.check_format.LineSpacing.format"):
+            with patch("wordformat.style.diff.LineSpacing.format"):
                 node.apply_format(doc)
         assert mock_comment.call_count >= 1
 

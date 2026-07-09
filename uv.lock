@@ -652,6 +652,27 @@ wheels = [
 ]
 
 [[package]]
+name = "markdown-it-py"
+version = "4.2.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "mdurl" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz", hash = "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49", size = 82454, upload-time = "2026-05-07T12:08:28.36Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl", hash = "sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a", size = 91687, upload-time = "2026-05-07T12:08:27.182Z" },
+]
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
 name = "mpmath"
 version = "1.3.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -1272,6 +1293,19 @@ wheels = [
 ]
 
 [[package]]
+name = "rich"
+version = "15.0.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+    { name = "pygments" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
+]
+
+[[package]]
 name = "ruff"
 version = "0.14.14"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -1540,6 +1574,7 @@ name = "wordformat"
 version = "1.4.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "loguru" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1547,29 +1582,24 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-docx" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "requests" },
+    { name = "rich" },
     { name = "tenacity" },
     { name = "tokenizers" },
+    { name = "uvicorn" },
     { name = "webcolors" },
 ]
 
 [package.optional-dependencies]
-api = [
-    { name = "fastapi" },
-    { name = "python-multipart" },
-    { name = "uvicorn" },
-]
 dev = [
-    { name = "fastapi" },
     { name = "pre-commit" },
     { name = "pyinstaller" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
-    { name = "python-multipart" },
     { name = "ruff" },
-    { name = "uvicorn" },
 ]
 test = [
     { name = "pytest" },
@@ -1579,7 +1609,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.128.1" },
+    { name = "fastapi", specifier = ">=0.128.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "onnxruntime", specifier = ">=1.17.0" },
@@ -1591,14 +1621,15 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=7.0.0" },
     { name = "python-docx", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "python-multipart", marker = "extra == 'api'", specifier = ">=0.0.22" },
+    { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "requests", specifier = ">=2.32.5" },
+    { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.14" },
     { name = "tenacity", specifier = ">=9.1.2" },
     { name = "tokenizers", specifier = ">=0.22.2" },
-    { name = "uvicorn", marker = "extra == 'api'", specifier = ">=0.40.0" },
+    { name = "uvicorn", specifier = ">=0.40.0" },
     { name = "webcolors", specifier = ">=25.10.0" },
-    { name = "wordformat", extras = ["test", "api"], marker = "extra == 'dev'" },
+    { name = "wordformat", extras = ["test"], marker = "extra == 'dev'" },
 ]
-provides-extras = ["api", "test", "dev"]
+provides-extras = ["test", "dev"]

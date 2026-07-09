@@ -14,9 +14,10 @@ from loguru import logger
 from pydantic import BaseModel
 from starlette.responses import FileResponse
 
+from wordformat.classify.tag import set_tag_main
+
 # 复用原有项目的核心函数和校验工具
-from wordformat.set_style import auto_format_thesis_document
-from wordformat.set_tag import set_tag_main
+from wordformat.pipeline.orchestrate import auto_format_thesis_document
 from wordformat.settings import BASE_DIR, SERVER_HOST, VERSION
 
 # ---------------------- 初始化FastAPI应用 ----------------------
@@ -38,14 +39,15 @@ app.add_middleware(
 )
 
 # ---------------------- 全局配置 ----------------------
-# 临时文件目录（存储上传的docx/配置文件、生成的json），自动创建
 TEMP_DIR = BASE_DIR / "temp"
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
-logger.info(f"临时文件目录：{TEMP_DIR}")
-# 输出文件目录（存储校验/格式化后的docx）
 OUTPUT_DIR = BASE_DIR / "output"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-logger.info(f"输出文件目录：{OUTPUT_DIR}")  # 修复原日志笔误
+
+
+def _ensure_dirs() -> None:
+    """按需创建临时/输出目录（避免 import 时产生副作用）。"""
+    for d in (TEMP_DIR, OUTPUT_DIR):
+        if not d.exists():
+            d.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------- 数据模型（接口参数校验） ----------------------
@@ -103,6 +105,7 @@ async def api_generate_json(
     对应原命令行generate-json模式：仅生成JSON，不执行校验/格式化
     - 上传docx和yaml配置文件，服务端自动生成JSON并返回数据
     """
+    _ensure_dirs()
 
     try:
         filename = docx_file.filename.lower()
@@ -148,6 +151,7 @@ async def api_check_format(
     对应原命令行check-format模式：仅执行格式校验，生成【原文件名+--标注版.docx】
     - 基于函数返回的真实路径拼接下载链接，保证路径100%匹配
     """
+    _ensure_dirs()
     try:
         # 1. 保存上传文件（仅返回实际路径）
         docx_path = save_upload_file(docx_file, TEMP_DIR)
@@ -201,6 +205,7 @@ async def api_apply_format(
     对应原命令行apply-format模式：自动应用格式，生成【原文件名+--修改版.docx】
     - 基于函数返回的真实路径拼接下载链接，彻底解决404问题
     """
+    _ensure_dirs()
     try:
         # 1. 保存上传文件（仅返回实际路径）
         docx_path = save_upload_file(docx_file, TEMP_DIR)

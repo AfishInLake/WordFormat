@@ -10,11 +10,14 @@ import time
 from pathlib import Path
 
 from loguru import logger
+from rich.console import Console
 
-from wordformat.set_style import auto_format_thesis_document
-from wordformat.set_tag import set_tag_main
+from wordformat.classify.tag import set_tag_main
+from wordformat.pipeline.orchestrate import auto_format_thesis_document
 from wordformat.settings import VERSION
 from wordformat.tree import print_tree
+
+console = Console()
 
 
 def validate_file(
@@ -42,7 +45,7 @@ def _show_config():
     """
     from pydantic import BaseModel
 
-    from wordformat.config.datamodel import NodeConfigRoot
+    from wordformat.config.models import NodeConfigRoot
 
     def _default_str(info):
         if info.default is not None:
@@ -113,27 +116,27 @@ def _show_config():
             if _is_basemodel_subclass(target) and target_name not in LEAF_TYPES:
                 # 容器模型：打印节标题后递归
                 label = desc_text or target_name
-                print(f"\n{'  ' * depth}[{field_path}] — {label}")
+                console.print(f"\n{'  ' * depth}[{field_path}] — {label}")
                 _walk(target, field_path, depth + 1)
             elif _is_basemodel_subclass(target) and target_name in LEAF_TYPES:
                 # 叶子配置模型：展开打印字段，不递归
                 label = desc_text or target_name
-                print(f"\n{'  ' * depth}[{field_path}] — {label}")
+                console.print(f"\n{'  ' * depth}[{field_path}] — {label}")
                 _print_leaf_fields(target, depth + 1)
             elif target is str:
-                print(
+                console.print(
                     f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
                 )
             elif target is bool:
-                print(
+                console.print(
                     f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
                 )
             elif target is int:
-                print(
+                console.print(
                     f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
                 )
             elif target is float:
-                print(
+                console.print(
                     f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
                 )
 
@@ -142,16 +145,16 @@ def _show_config():
             target = _resolve_type(info.annotation)
             if _is_basemodel_subclass(target):
                 # 嵌套的叶子模型（如 label, content）
-                print(f"{'  ' * depth}  [{name}] — {_desc(info)}")
+                console.print(f"{'  ' * depth}  [{name}] — {_desc(info)}")
                 _print_leaf_fields(target, depth + 1)
             else:
-                print(
+                console.print(
                     f"{'  ' * depth}  {name:<28s} {_desc(info):<50s} 默认: {_default_str(info)}"
                 )
 
-    print("config.yaml 完整字段参考（自动生成自 NodeConfigRoot 模型）\n")
+    console.print("config.yaml 完整字段参考（自动生成自 NodeConfigRoot 模型）\n")
     _walk(NodeConfigRoot)
-    print()
+    console.print()
 
 
 def main():
@@ -159,11 +162,11 @@ def main():
 
     setup_logger()
 
-    print(f"WordFormat v{VERSION}")
+    console.print(f"WordFormat v{VERSION}")
 
     # 无参数直接展示完整帮助
     if len(sys.argv) == 1:
-        print("""📝 论文格式自动工具（极简命令）
+        console.print("""📝 论文格式自动工具（极简命令）
 ==================================================
 【极简命令】
 wordf gj    生成文档JSON结构
@@ -379,7 +382,7 @@ wordf startapi -H 127.0.0.1 -p 8000
 
             import yaml
 
-            from wordformat.config.datamodel import NodeConfigRoot
+            from wordformat.config.models import NodeConfigRoot
 
             cfg = NodeConfigRoot()
             with warnings.catch_warnings():

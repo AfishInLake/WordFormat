@@ -14,7 +14,7 @@ from docx.shared import Pt, Cm, RGBColor
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-from wordformat.config.datamodel import NodeConfigRoot
+from wordformat.config.models import NodeConfigRoot
 from wordformat.rules.heading import (
     HeadingLevel1Node,
     HeadingLevel2Node,
@@ -27,16 +27,20 @@ from wordformat.numbering import (
     _build_numbering_rPr,
     _auto_strip_numbering,
 )
-from wordformat.style.style_enum import (
+from wordformat.style.defs import (
     BuiltInStyle,
     FirstLineIndent,
-    _ensure_style_exists,
+    ensure_style_exists,
 )
-from wordformat.set_style import (
-    _fix_all_style_definitions,
-    apply_format_check_to_all_nodes,
+from wordformat.pipeline.stages import (
+    StyleDefinitionFixStage,
+    FormattingExecutionStage,
 )
-from wordformat.style.get_some import (
+
+_fix_stage = StyleDefinitionFixStage()
+_format_stage = FormattingExecutionStage()
+apply_format_check_to_all_nodes = _format_stage.apply_format_check_to_all_nodes
+from wordformat.style.reader import (
     paragraph_get_space_before,
     paragraph_get_space_after,
     paragraph_get_line_spacing,
@@ -75,7 +79,7 @@ def _load_root_config(config_path):
 @pytest.fixture
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
-    from wordformat.config.config import init_config
+    from wordformat.config.loader import init_config
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -147,10 +151,8 @@ class TestHeadingCoverageBoost:
         assert p.style.name == "Heading 2"
 
     def test_fix_all_style_definitions_collects_all_styles(self, root_config):
-        """_collect_all_style_configs 应收集配置中所有唯一的样式名。"""
-        from wordformat.set_style import _collect_all_style_configs
-
-        style_map = _collect_all_style_configs(root_config)
+        """collect_style_configs 应收集配置中所有唯一的样式名。"""
+        style_map = root_config.collect_style_configs()
         assert len(style_map) > 0
         # 应包含 Normal（body_text 使用）和 Heading 1/2/3
         style_names = list(style_map.keys())
@@ -158,20 +160,18 @@ class TestHeadingCoverageBoost:
 
     def test_fix_all_style_definitions_handles_document(self, root_config):
         """_fix_all_style_definitions 应对文档中存在的样式定义进行修正。"""
-        from wordformat.set_style import _fix_all_style_definitions
-
         doc = Document()
-        _fix_all_style_definitions(doc, root_config)
+        _fix_stage._fix_all_style_definitions(doc, root_config)
         # 不应抛出异常
 
     def test_fix_style_run_properties_clears_theme_color(self, root_config):
         """_fix_style_run_properties 应清除样式定义中的主题色。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
+        
+        from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
         cfg = root_config.headings.level_1
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
         # 手动设置主题色
@@ -184,7 +184,7 @@ class TestHeadingCoverageBoost:
         color.set(qn("w:val"), "4472C4")
         rPr.append(color)
 
-        _fix_style_run_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_run_properties(style, cfg, "Heading 1")
 
         rPr_after = style.element.find(qn("w:rPr"))
         color_after = rPr_after.find(qn("w:color"))
@@ -193,15 +193,15 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_sets_font_name(self, root_config):
         """_fix_style_run_properties 应设置样式定义中的英文字体名。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
+        
+        from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
         cfg = root_config.body_text
-        _ensure_style_exists(doc, "Normal")
+        ensure_style_exists(doc, "Normal")
         style = doc.styles["Normal"]
 
-        _fix_style_run_properties(style, cfg, "Normal")
+        _fix_stage._fix_style_run_properties(style, cfg, "Normal")
 
         rPr = style.element.find(qn("w:rPr"))
         rFonts = rPr.find(qn("w:rFonts"))
@@ -209,16 +209,16 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_sets_bold(self, root_config):
         """_fix_style_run_properties 应设置样式定义中的加粗属性。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
-        from wordformat.config.datamodel import HeadingLevelConfig
+        
+        from wordformat.style.defs import ensure_style_exists
+        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
         cfg = HeadingLevelConfig(bold=True)
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
-        _fix_style_run_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_run_properties(style, cfg, "Heading 1")
 
         rPr = style.element.find(qn("w:rPr"))
         b = rPr.find(qn("w:b"))
@@ -226,16 +226,16 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_removes_italic(self, root_config):
         """_fix_style_run_properties 当 italic=False 时应移除斜体元素。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
-        from wordformat.config.datamodel import HeadingLevelConfig
+        
+        from wordformat.style.defs import ensure_style_exists
+        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
         cfg = HeadingLevelConfig(italic=False)
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
-        _fix_style_run_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_run_properties(style, cfg, "Heading 1")
 
         rPr = style.element.find(qn("w:rPr"))
         i = rPr.find(qn("w:i"))
@@ -243,16 +243,16 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_paragraph_properties_sets_alignment(self, root_config):
         """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""
-        from wordformat.set_style import _fix_style_paragraph_properties
-        from wordformat.style.style_enum import _ensure_style_exists
-        from wordformat.config.datamodel import HeadingLevelConfig
+        
+        from wordformat.style.defs import ensure_style_exists
+        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
         cfg = HeadingLevelConfig(alignment="居中对齐")
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
-        _fix_style_paragraph_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_paragraph_properties(style, cfg, "Heading 1")
 
         pPr = style.element.find(qn("w:pPr"))
         jc = pPr.find(qn("w:jc"))
@@ -663,7 +663,7 @@ class TestStyleEnumCoverageBoost:
         # 先删除 Normal 样式（如果存在），确保需要创建
         # 实际上 Normal 总是存在的，所以用另一个方式触发
         # 使用一个不在映射中的样式名，其 base 默认为 "Normal"
-        _ensure_style_exists(doc, "TestStyleNoBase")
+        ensure_style_exists(doc, "TestStyleNoBase")
         # 清理
         try:
             doc.styles.element.remove(
@@ -685,7 +685,7 @@ class TestStyleEnumCoverageBoost:
         except KeyError:
             pass
 
-        _ensure_style_exists(doc, "Heading 4")
+        ensure_style_exists(doc, "Heading 4")
 
         # 验证 outlineLvl 已设置
         style = doc.styles["Heading 4"]
@@ -699,7 +699,7 @@ class TestStyleEnumCoverageBoost:
         """覆盖行 630-633: 样式已存在时直接返回。"""
         doc = Document()
         # Normal 样式总是存在
-        _ensure_style_exists(doc, "Normal")
+        ensure_style_exists(doc, "Normal")
         # 不应抛出异常
 
     def test_ensure_style_creates_with_base(self):
@@ -713,7 +713,7 @@ class TestStyleEnumCoverageBoost:
         except KeyError:
             pass
 
-        _ensure_style_exists(doc, style_name)
+        ensure_style_exists(doc, style_name)
         style = doc.styles[style_name]
         assert style is not None
         # 清理
@@ -736,18 +736,18 @@ class TestSetStyleCoverageBoost:
         """config_model 无任何有效的 GlobalFormatConfig 时不抛异常。"""
         doc = Document()
         # 使用一个只有 numbering 和 global_format 的空模型
-        from wordformat.config.datamodel import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
+        from wordformat.config.models import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
 
         config_bare = NodeConfigRoot(
             global_format=GlobalFormatConfig(),
             body_text=BodyTextConfig(),
         )
-        _fix_all_style_definitions(doc, config_bare)
+        _fix_stage._fix_all_style_definitions(doc, config_bare)
         # 不应抛出异常
 
     def test_fix_all_style_definitions_theme_color_fix(self):
         """修正主题色的完整流程：有 themeColor 的样式被修正。"""
-        from wordformat.config.datamodel import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
+        from wordformat.config.models import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
 
         doc = Document()
         config_model = NodeConfigRoot(
@@ -772,7 +772,7 @@ class TestSetStyleCoverageBoost:
         except KeyError:
             pass
 
-        _fix_all_style_definitions(doc, config_model)
+        _fix_stage._fix_all_style_definitions(doc, config_model)
 
         # 验证主题色已清除
         rPr_after = style.element.find(qn("w:rPr"))

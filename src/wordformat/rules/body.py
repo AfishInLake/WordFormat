@@ -9,7 +9,7 @@ from copy import deepcopy
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from wordformat.config.datamodel import BodyTextConfig, PunctuationRule
+from wordformat.config.models import BodyTextConfig, PunctuationRule
 from wordformat.rules.node import FormatNode
 
 # 匹配正文中的参考文献交叉引用标记

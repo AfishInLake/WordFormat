@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : references.py
 
-from wordformat.config.datamodel import ReferencesContentConfig, ReferencesTitleConfig
+from wordformat.config.models import ReferencesContentConfig, ReferencesTitleConfig
 from wordformat.rules.node import FormatNode
 
 

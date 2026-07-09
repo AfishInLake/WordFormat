@@ -5,8 +5,8 @@
 # wordformat/tree_builder.py
 
 from wordformat.rules.node import FormatNode
+from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 from wordformat.tree import Stack
-from wordformat.word_structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 
 
 class DocumentTreeBuilder:
@@ -47,7 +47,7 @@ class DocumentTreeBuilder:
         )
 
     def _create_node_from_item(self, item: dict) -> FormatNode | None:
-        from wordformat.word_structure.node_factory import create_node
+        from wordformat.structure.node_factory import create_node
 
         level = self._determine_level(item["category"])
         return create_node(item=item, level=level, config=self._config)
