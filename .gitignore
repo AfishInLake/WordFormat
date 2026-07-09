@@ -21,6 +21,7 @@ tmp/*
 .trae
 output/*
 temp/
+*.bak
 api.log
 dist
 build
