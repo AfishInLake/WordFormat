@@ -5,7 +5,7 @@
 
 from loguru import logger
 
-from wordformat.config.datamodel import HeadingLevelConfig, NodeConfigRoot
+from wordformat.config.models import HeadingLevelConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
 
 

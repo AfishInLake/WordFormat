@@ -7,23 +7,14 @@ from collections.abc import Callable
 
 from wordformat.rules.body import BodyText
 from wordformat.rules.node import FormatNode
+from wordformat.tree import bfs_walk
 
 
 def find_and_modify_first(root: FormatNode, condition: Callable[[FormatNode], bool]):
-    """
-    找到第一个满足 condition 的节点，调用 modifier(node) 修改它，并返回该节点。
-    :param root: 树的根节点（FormatNode 实例）
-    :param condition: 函数，接收 node，返回 bool
-    :return: 被修改的节点（FormatNode） if found, else None
-    """
-    from collections import deque
-
-    queue = deque([root])
-    while queue:
-        node = queue.popleft()
+    """BFS 查找第一个满足 condition 的节点并返回。"""
+    for node in bfs_walk(root):
         if condition(node):
             return node
-        queue.extend(node.children)
     return None
 
 

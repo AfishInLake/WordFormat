@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : acknowledgement.py
 
-from wordformat.config.datamodel import (
+from wordformat.config.models import (
     AcknowledgementsContentConfig,
     AcknowledgementsTitleConfig,
 )

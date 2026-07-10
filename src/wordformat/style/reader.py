@@ -12,6 +12,8 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
+from wordformat.style.units import _get_with_style_fallback
+
 
 def paragraph_get_alignment(paragraph: Paragraph) -> object:
     """
@@ -211,8 +213,6 @@ def paragraph_get_space_after(paragraph) -> float | None:
 def paragraph_get_line_spacing(paragraph):  # noqa c901
     """Return line spacing as float; fallback to style chain."""
     try:
-        from wordformat.style.style_enum import _get_with_style_fallback
-
         rule = _get_with_style_fallback(paragraph, "line_spacing_rule", None)
         if rule is None:
             return None

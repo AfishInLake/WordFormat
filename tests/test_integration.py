@@ -7,7 +7,6 @@ import argparse
 import io
 import os
 import shutil
-import sys
 import tempfile
 import threading
 from unittest import mock
@@ -21,18 +20,16 @@ from pydantic import ValidationError
 from fastapi.testclient import TestClient
 
 from wordformat.cli import validate_file, main
-from wordformat.config.config import (
+from wordformat.config.loader import (
     LazyConfig,
     ConfigNotLoadedError,
     init_config,
     get_config,
     clear_config,
 )
-from wordformat.config.datamodel import (
+from wordformat.config.models import (
     KeywordCountRule,
-    KeywordsConfig,
     GlobalFormatConfig,
-    FontSizeType,
     NodeConfigRoot,
 )
 from wordformat.agent.message import MessageManager
@@ -43,14 +40,17 @@ from wordformat.agent.onnx_infer import (
     onnx_batch_infer,
     safe_batch_infer,
 )
-from wordformat.set_style import apply_format_check_to_all_nodes
-from wordformat.set_tag import set_tag_main
-from wordformat.word_structure.node_factory import create_node
-from wordformat.word_structure.tree_builder import DocumentTreeBuilder
-from wordformat.word_structure.document_builder import DocumentBuilder
-from wordformat.word_structure.utils import promote_bodytext_in_subtrees_of_type
+from wordformat.pipeline.stages import FormattingExecutionStage, ParagraphAlignmentStage
+from wordformat.classify.tag import set_tag_main
+from wordformat.structure.node_factory import create_node
+from wordformat.structure.tree_builder import DocumentTreeBuilder
+from wordformat.structure.document_builder import DocumentBuilder
+from wordformat.structure.utils import promote_bodytext_in_subtrees_of_type
 from wordformat.rules.node import FormatNode
 from wordformat.rules.body import BodyText
+from wordformat.api import save_upload_file, TEMP_DIR
+
+apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
 
 
 # ==================== (a) Config 模块集成测试 ====================
@@ -109,6 +109,7 @@ class TestLazyConfigLifecycle:
         assert all(r is results[0] for r in results)
 
 
+
 # ==================== (b) DataModel 验证测试 ====================
 
 
@@ -151,6 +152,7 @@ class TestDataModelValidation:
         """字号支持中文字号字符串"""
         cfg = GlobalFormatConfig(font_size="小四")
         assert cfg.font_size == "小四"
+
 
 
 # ==================== (c) Agent/Message 测试 ====================
@@ -225,6 +227,7 @@ class TestMessageManagerIntegration:
         assert len(msgs) == 0
 
 
+
 # ==================== (d) Agent/ONNX 推理测试 ====================
 
 
@@ -233,9 +236,9 @@ class TestONNXInferIntegration:
 
     def test_single_infer_success(self):
         with mock.patch("wordformat.agent.onnx_infer._tokenizer") as mock_tok, \
-             mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess, \
-             mock.patch("wordformat.agent.onnx_infer._id2label", {0: "body_text", 1: "heading"}), \
-             mock.patch("wordformat.agent.onnx_infer._load_model"):
+                mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess, \
+                mock.patch("wordformat.agent.onnx_infer._id2label", {0: "body_text", 1: "heading"}), \
+                mock.patch("wordformat.agent.onnx_infer._load_model"):
             enc = mock.MagicMock()
             enc.ids = [1, 2, 3]
             enc.attention_mask = [1, 1, 1]
@@ -248,9 +251,9 @@ class TestONNXInferIntegration:
 
     def test_single_infer_error_returns_empty(self):
         with mock.patch("wordformat.agent.onnx_infer._tokenizer") as mock_tok, \
-             mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess, \
-             mock.patch("wordformat.agent.onnx_infer._id2label", {0: "body_text"}), \
-             mock.patch("wordformat.agent.onnx_infer._load_model"):
+                mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess, \
+                mock.patch("wordformat.agent.onnx_infer._id2label", {0: "body_text"}), \
+                mock.patch("wordformat.agent.onnx_infer._load_model"):
             enc = mock.MagicMock()
             enc.ids = [1, 2, 3]
             enc.attention_mask = [1, 1, 1]
@@ -263,9 +266,9 @@ class TestONNXInferIntegration:
     def test_batch_infer_error_format_matches_single(self):
         """batch 失败与 single 失败应返回相同结构"""
         with mock.patch("wordformat.agent.onnx_infer._tokenizer") as mock_tok, \
-             mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess, \
-             mock.patch("wordformat.agent.onnx_infer._id2label", {0: "body_text"}), \
-             mock.patch("wordformat.agent.onnx_infer._load_model"):
+                mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess, \
+                mock.patch("wordformat.agent.onnx_infer._id2label", {0: "body_text"}), \
+                mock.patch("wordformat.agent.onnx_infer._load_model"):
             enc = mock.MagicMock()
             enc.ids = [1, 2, 3]
             enc.attention_mask = [1, 1, 1]
@@ -284,9 +287,11 @@ class TestONNXInferIntegration:
         assert mock_batch.call_count == 2
 
     def test_provider_selection_priority(self):
-        with mock.patch("onnxruntime.get_available_providers", return_value=["CUDAExecutionProvider", "CPUExecutionProvider"]):
+        with mock.patch("onnxruntime.get_available_providers",
+                        return_value=["CUDAExecutionProvider", "CPUExecutionProvider"]):
             assert _get_best_onnx_providers() == ["CUDAExecutionProvider"]
-        with mock.patch("onnxruntime.get_available_providers", return_value=["DmlExecutionProvider", "CPUExecutionProvider"]):
+        with mock.patch("onnxruntime.get_available_providers",
+                        return_value=["DmlExecutionProvider", "CPUExecutionProvider"]):
             assert _get_best_onnx_providers() == ["DmlExecutionProvider"]
         with mock.patch("onnxruntime.get_available_providers", return_value=["CPUExecutionProvider"]):
             assert _get_best_onnx_providers() == ["CPUExecutionProvider"]
@@ -309,6 +314,7 @@ class TestONNXInferIntegration:
         assert len(errors) == 0
 
 
+
 # ==================== (e) word_structure 集成测试 ====================
 
 
@@ -316,7 +322,7 @@ class TestNodeFactoryIntegration:
     """create_node 创建/拒绝 + 真实 CATEGORY_TO_CLASS"""
 
     def test_create_known_category(self, sample_yaml_config):
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
         item = {
@@ -329,25 +335,26 @@ class TestNodeFactoryIntegration:
         assert hasattr(node, "check_format")
 
     def test_create_unknown_category_returns_none(self, sample_yaml_config):
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
         item = {"category": "nonexistent_type", "paragraph": "x", "fingerprint": "fp_x"}
-        with mock.patch("wordformat.word_structure.node_factory.CATEGORY_TO_CLASS", {}):
+        with mock.patch("wordformat.structure.node_factory.CATEGORY_TO_CLASS", {}):
             assert create_node(item, level=1, config=config) is None
 
     def test_create_missing_category_raises(self, sample_yaml_config):
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
         with pytest.raises(ValueError, match="missing 'category'"):
             create_node({"paragraph": "x"}, level=1, config=config)
 
 
+
 class TestTreeBuilderIntegration:
     """tree_builder 构建树 + 已知 bug"""
 
-    @mock.patch("wordformat.word_structure.node_factory.create_node")
+    @mock.patch("wordformat.structure.node_factory.create_node")
     def test_build_flat_headings(self, mock_create):
         mock_node = mock.MagicMock()
         mock_node.level = 1
@@ -362,11 +369,12 @@ class TestTreeBuilderIntegration:
         assert builder._is_heading_category("body_text") is False
 
 
+
 class TestDocumentBuilderIntegration:
     """DocumentBuilder 加载 JSON 并构建树"""
 
     def test_build_from_json_list(self, sample_yaml_config):
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
         data = [
@@ -384,13 +392,14 @@ class TestDocumentBuilderIntegration:
         assert hasattr(builder, "_config")
 
 
+
 # ==================== (f) set_tag 集成测试 ====================
 
 
 class TestSetTagMainIntegration:
     """mock DocxBase.parse 验证 set_tag_main 调用链"""
 
-    @mock.patch("wordformat.set_tag.DocxBase")
+    @mock.patch("wordformat.classify.tag.DocxBase")
     def test_set_tag_main_calls_parse(self, mock_docx_cls):
         mock_instance = mock_docx_cls.return_value
         mock_instance.parse.return_value = [
@@ -400,11 +409,12 @@ class TestSetTagMainIntegration:
         assert len(result) == 1
         mock_instance.parse.assert_called_once()
 
-    @mock.patch("wordformat.set_tag.DocxBase")
+    @mock.patch("wordformat.classify.tag.DocxBase")
     def test_set_tag_main_passes_args(self, mock_docx_cls):
         mock_docx_cls.return_value.parse.return_value = []
         set_tag_main("path/to/doc.docx", "path/to/cfg.yaml")
         mock_docx_cls.assert_called_once_with("path/to/doc.docx", configpath="path/to/cfg.yaml")
+
 
 
 # ==================== (g) set_style 集成测试 ====================
@@ -472,7 +482,8 @@ class TestSetStyleIntegration:
 
     def test_flatten_tree_nodes_matches_doc_order(self):
         """DFS 展平的节点顺序与 document.paragraphs 一致。"""
-        from wordformat.set_style import _flatten_tree_nodes
+
+        _flatten_tree_nodes = ParagraphAlignmentStage()._flatten_tree_nodes
 
         root = FormatNode(value={"category": "top"}, level=0)
         a = FormatNode(value={"category": "abstract_chinese_title"}, level=1)
@@ -488,125 +499,6 @@ class TestSetStyleIntegration:
         assert nodes == [a, b, c, d]
 
 
-# ==================== (h) CLI 集成测试 ====================
-
-
-class TestCLIIntegration:
-    """validate_file + mock main() 各模式"""
-
-    def test_validate_file_accepts_real_file(self):
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            path = f.name
-        try:
-            result = validate_file(path, "文档")
-            assert result == os.path.abspath(path)
-        finally:
-            os.unlink(path)
-
-    def test_validate_file_rejects_missing(self):
-        with pytest.raises(argparse.ArgumentTypeError):
-            validate_file("/nonexistent/path.txt", "文档")
-
-    def test_validate_file_rejects_directory(self):
-        with tempfile.TemporaryDirectory() as d:
-            with pytest.raises(argparse.ArgumentTypeError):
-                validate_file(d, "文档")
-
-    def test_validate_file_rejects_wrong_extension(self):
-        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
-            path = f.name
-        try:
-            with pytest.raises(argparse.ArgumentTypeError):
-                validate_file(path, "文档", [".docx"])
-        finally:
-            os.unlink(path)
-
-    @mock.patch("sys.argv")
-    def test_main_no_args_prints_help(self, mock_argv):
-        mock_argv.__getitem__.side_effect = lambda i: ["wf"][i]
-        mock_argv.__len__.return_value = 1
-        main()  # 不应抛异常
-
-    @mock.patch("wordformat.cli.set_tag_main", return_value=[])
-    @mock.patch("wordformat.cli.json")
-    @mock.patch("sys.argv")
-    def test_main_gj_mode(self, mock_argv, mock_json, mock_set_tag):
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as df:
-            docx_path = df.name
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as cf:
-            cfg_path = cf.name
-        out_dir = tempfile.mkdtemp()
-        try:
-            mock_argv.__getitem__.side_effect = lambda i: [
-                "wf", "gj", "-d", docx_path, "-c", cfg_path, "-o", out_dir
-            ][i]
-            mock_argv.__len__.return_value = 8
-            main()
-            mock_set_tag.assert_called_once()
-            mock_json.dump.assert_called_once()
-        finally:
-            os.unlink(docx_path)
-            os.unlink(cfg_path)
-            shutil.rmtree(out_dir, ignore_errors=True)
-
-    @mock.patch("wordformat.cli.auto_format_thesis_document")
-    @mock.patch("sys.argv")
-    def test_main_cf_mode(self, mock_argv, mock_auto):
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as df:
-            docx_path = df.name
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as cf:
-            cfg_path = cf.name
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as jf:
-            json_path = jf.name
-        out_dir = tempfile.mkdtemp()
-        try:
-            mock_argv.__getitem__.side_effect = lambda i: [
-                "wf", "cf", "-d", docx_path, "-c", cfg_path, "-f", json_path, "-o", out_dir
-            ][i]
-            mock_argv.__len__.return_value = 10
-            main()
-            mock_auto.assert_called_once_with(
-                jsonpath=json_path, docxpath=docx_path,
-                configpath=cfg_path, savepath=out_dir, check=True,
-            )
-        finally:
-            for p in [docx_path, cfg_path, json_path]:
-                os.unlink(p)
-            os.rmdir(out_dir)
-
-    @mock.patch("wordformat.cli.auto_format_thesis_document")
-    @mock.patch("sys.argv")
-    def test_main_af_mode(self, mock_argv, mock_auto):
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as df:
-            docx_path = df.name
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as cf:
-            cfg_path = cf.name
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as jf:
-            json_path = jf.name
-        out_dir = tempfile.mkdtemp()
-        try:
-            mock_argv.__getitem__.side_effect = lambda i: [
-                "wf", "af", "-d", docx_path, "-c", cfg_path, "-f", json_path, "-o", out_dir
-            ][i]
-            mock_argv.__len__.return_value = 10
-            main()
-            mock_auto.assert_called_once_with(
-                jsonpath=json_path, docxpath=docx_path,
-                configpath=cfg_path, savepath=out_dir, check=False,
-            )
-        finally:
-            for p in [docx_path, cfg_path, json_path]:
-                os.unlink(p)
-            os.rmdir(out_dir)
-
-    @mock.patch("sys.argv")
-    def test_main_startapi_rejects_invalid_port(self, mock_argv):
-        mock_argv.__getitem__.side_effect = lambda i: ["wf", "startapi", "-p", "99999"][i]
-        mock_argv.__len__.return_value = 4
-        with mock.patch.dict("sys.modules", {"uvicorn": mock.MagicMock()}):
-            with pytest.raises(SystemExit):
-                main()
-
 
 # ==================== (i) set_style.py auto_format_thesis_document 覆盖测试 ====================
 
@@ -614,10 +506,10 @@ class TestCLIIntegration:
 class TestAutoFormatThesisDocument:
     """覆盖 set_style.py lines 53-55, 120-176: auto_format_thesis_document 主流程"""
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_check_mode_returns_annotated_path(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """check=True 模式：返回 --标注版.docx 路径 (lines 170-176)"""
         root_node = mock.MagicMock()
@@ -625,17 +517,17 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         result = auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
         )
         assert "--标注版.docx" in result
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_apply_mode_returns_modified_path(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """check=False 模式：返回 --修改版.docx 路径 (line 173)"""
         root_node = mock.MagicMock()
@@ -643,17 +535,17 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         result = auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=False,
         )
         assert "--修改版.docx" in result
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_filters_body_text_nodes(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """body_text 节点不再被过滤，保留在 children 中"""
         body_node = mock.MagicMock()
@@ -666,7 +558,7 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
@@ -674,11 +566,11 @@ class TestAutoFormatThesisDocument:
         # body_text 不再被过滤，所有节点都保留
         assert len(root_node.children) == 2
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
-    @mock.patch("wordformat.set_style.promote_bodytext_in_subtrees_of_type")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.promote_bodytext_in_subtrees_of_type")
     def test_promote_called_for_subtrees(
-        self, mock_promote, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_promote, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """promote_bodytext_in_subtrees_of_type 应被调用 (lines 153-161)"""
         root_node = mock.MagicMock()
@@ -686,17 +578,17 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
         )
         assert mock_promote.call_count == 3  # AbstractTitleCN, AbstractTitleEN, References
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_exception_in_traverse_raises(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """节点处理异常时 raise e (lines 53-55)"""
         root_node = mock.MagicMock()
@@ -704,17 +596,17 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.side_effect = RuntimeError("test error")
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         with pytest.raises(RuntimeError, match="test error"):
             auto_format_thesis_document(
                 jsonpath=temp_docx, docxpath=temp_docx,
                 configpath=config_path, savepath=str(tmp_path), check=True,
             )
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_config_load_failure_raises(
-        self, mock_builder, mock_apply, temp_docx, tmp_path
+            self, mock_builder, mock_apply, temp_docx, tmp_path
     ):
         """配置加载失败时 raise (lines 126-128)"""
         bad_config = str(tmp_path / "nonexistent.yaml")
@@ -722,17 +614,17 @@ class TestAutoFormatThesisDocument:
         root_node.children = []
         mock_builder.build_from_json.return_value = root_node
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         with pytest.raises(Exception):
             auto_format_thesis_document(
                 jsonpath=temp_docx, docxpath=temp_docx,
                 configpath=bad_config, savepath=str(tmp_path), check=True,
             )
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_apply_mode_lists_styles(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """check=False 时列出可用样式 (lines 139-143)"""
         root_node = mock.MagicMock()
@@ -740,12 +632,13 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=False,
         )
         # Should not raise - the styles listing is just logging
+
 
 
 # ==================== (j) word_structure/utils.py promote_bodytext 覆盖测试 ====================
@@ -756,8 +649,6 @@ class TestPromoteBodyTextInSubtrees:
 
     def test_promote_bodytext_to_target(self):
         """BodyText 子节点应被升级为目标类型 (lines 44-53)"""
-        from wordformat.rules.body import BodyText
-        from wordformat.rules.node import FormatNode
 
         # Create a parent node of a specific type
         class ParentType(FormatNode):
@@ -829,6 +720,7 @@ class TestPromoteBodyTextInSubtrees:
         assert isinstance(other.children[0], BodyText)  # unchanged
 
 
+
 # ==================== (k) log_config.py 覆盖测试 ====================
 
 
@@ -875,6 +767,7 @@ class TestLogConfig:
             assert mock_uvicorn_mod.config.LOGGING_CONFIG["version"] == 1
 
 
+
 # ==================== (l) onnx_infer.py 额外覆盖测试 ====================
 
 
@@ -913,10 +806,11 @@ class TestONNXInferExceptionHandling:
                 "id2label": "/fake/id2label.json",
             }
             with mock.patch("wordformat.agent.onnx_infer._get_model_paths", return_value=mock_paths), \
-                 mock.patch("wordformat.agent.onnx_infer._get_best_onnx_providers", return_value=["CUDAExecutionProvider"]), \
-                 mock.patch("tokenizers.Tokenizer") as mock_tok_cls, \
-                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls, \
-                 mock.patch("builtins.open", mock.mock_open(read_data='{"0":"body_text"}')):
+                    mock.patch("wordformat.agent.onnx_infer._get_best_onnx_providers",
+                               return_value=["CUDAExecutionProvider"]), \
+                    mock.patch("tokenizers.Tokenizer") as mock_tok_cls, \
+                    mock.patch("onnxruntime.InferenceSession") as mock_sess_cls, \
+                    mock.patch("builtins.open", mock.mock_open(read_data='{"0":"body_text"}')):
                 mock_sess_cls.side_effect = [RuntimeError("CUDA fail"), mock.MagicMock()]
                 _load_model()
                 # Should have been called twice: first with CUDA (fail), then with CPU (success)
@@ -943,11 +837,11 @@ class TestONNXInferExceptionHandling:
                 "id2label": "/fake/id2label.json",
             }
             with mock.patch("wordformat.agent.onnx_infer._get_model_paths", return_value=mock_paths), \
-                 mock.patch("os.cpu_count", return_value=0), \
-                 mock.patch("tokenizers.Tokenizer") as mock_tok_cls, \
-                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls, \
-                 mock.patch("onnxruntime.SessionOptions") as mock_opts_cls, \
-                 mock.patch("builtins.open", mock.mock_open(read_data='{"0":"body_text"}')):
+                    mock.patch("os.cpu_count", return_value=0), \
+                    mock.patch("tokenizers.Tokenizer") as mock_tok_cls, \
+                    mock.patch("onnxruntime.InferenceSession") as mock_sess_cls, \
+                    mock.patch("onnxruntime.SessionOptions") as mock_opts_cls, \
+                    mock.patch("builtins.open", mock.mock_open(read_data='{"0":"body_text"}')):
                 mock_sess = mock.MagicMock()
                 mock_sess_cls.return_value = mock_sess
                 _load_model()
@@ -1066,6 +960,7 @@ class TestONNXInferExceptionHandling:
         result = safe_batch_infer([])
 
 
+
 # ==================== (m) keywords.py 覆盖测试 ====================
 
 
@@ -1074,7 +969,7 @@ class TestKeywordsBaseGetLangConfig:
 
     def test_get_lang_config_unknown_lang_fallback(self, sample_yaml_config):
         """Unknown LANG falls back to chinese config (line 55)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         from wordformat.rules.keywords import BaseKeywordsNode
 
         init_config(sample_yaml_config)
@@ -1090,6 +985,7 @@ class TestKeywordsBaseGetLangConfig:
         node.load_config(config)
         # Should get chinese config as fallback
         assert node.pydantic_config is not None
+
 
 
 class TestKeywordsENCheckKeywordLabel:
@@ -1129,6 +1025,7 @@ class TestKeywordsENCheckKeywordLabel:
         assert node._check_keyword_label(mock_run) is False
 
 
+
 class TestKeywordsENBase:
     """覆盖 keywords.py lines 114, 121, 130-135, 152-153"""
 
@@ -1145,7 +1042,7 @@ class TestKeywordsENBase:
 
     def test_empty_run_skip(self, sample_yaml_config):
         """Empty run text is skipped (line 114)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1160,7 +1057,7 @@ class TestKeywordsENBase:
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 121)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1175,7 +1072,7 @@ class TestKeywordsENBase:
 
     def test_content_style_check(self, sample_yaml_config):
         """Content run style is checked (lines 130-135)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1191,7 +1088,7 @@ class TestKeywordsENBase:
 
     def test_keyword_count_validation_min(self, sample_yaml_config):
         """Keyword count < count_min triggers warning (via _run_rules)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1207,7 +1104,7 @@ class TestKeywordsENBase:
 
     def test_keyword_count_validation_max(self, sample_yaml_config):
         """Keyword count > count_max triggers warning (via _run_rules)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1220,6 +1117,7 @@ class TestKeywordsENBase:
         node.paragraph = p
         node.check_format(doc)
         # count_max is 5, 6 keywords -> should trigger count warning
+
 
 
 class TestKeywordsCNBase:
@@ -1252,7 +1150,7 @@ class TestKeywordsCNBase:
 
     def test_paragraph_style_check(self, sample_yaml_config):
         """Paragraph style is checked (line 187)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1266,7 +1164,7 @@ class TestKeywordsCNBase:
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 218)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1280,7 +1178,7 @@ class TestKeywordsCNBase:
 
     def test_content_style_check(self, sample_yaml_config):
         """Content run style is checked (line 225)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1296,7 +1194,7 @@ class TestKeywordsCNBase:
 
     def test_keyword_count_and_trailing_punctuation(self, sample_yaml_config):
         """Keyword count validation + trailing punctuation check (via _run_rules)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -1308,6 +1206,7 @@ class TestKeywordsCNBase:
         node.check_format(doc)
         # trailing_punctuation.enabled should be True by default
         # Text ends with ； which should trigger trailing punctuation warning
+
 
 
 # ==================== (n) heading.py 覆盖测试 ====================
@@ -1383,7 +1282,7 @@ class TestHeadingLevelNodes:
 
     def test_heading_base_with_config(self, sample_yaml_config):
         """_base method with loaded config"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         from wordformat.rules.heading import HeadingLevel1Node
         init_config(sample_yaml_config)
         config = get_config()
@@ -1400,16 +1299,17 @@ class TestHeadingLevelNodes:
         node.check_format(doc)  # 通过 RULES handler 执行格式检查
 
 
+
 # ==================== (o) set_style.py 额外覆盖测试 ====================
 
 
 class TestSetStyleAdditionalCoverage:
     """覆盖 set_style.py lines 53-55, 147, 150, 167-168"""
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_exception_in_traverse_logs_and_raises(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """Node exception: logs warning then raises (lines 53-55)"""
         root_node = mock.MagicMock()
@@ -1417,17 +1317,17 @@ class TestSetStyleAdditionalCoverage:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.side_effect = RuntimeError("traverse error")
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         with pytest.raises(RuntimeError, match="traverse error"):
             auto_format_thesis_document(
                 jsonpath=temp_docx, docxpath=temp_docx,
                 configpath=config_path, savepath=str(tmp_path), check=True,
             )
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     def test_body_text_filtering(
-        self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """body_text nodes are no longer filtered out"""
         body_node = mock.MagicMock()
@@ -1439,7 +1339,7 @@ class TestSetStyleAdditionalCoverage:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
@@ -1447,11 +1347,11 @@ class TestSetStyleAdditionalCoverage:
         # body_text 不再被过滤
         assert len(root_node.children) == 2
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
-    @mock.patch("wordformat.set_style.promote_bodytext_in_subtrees_of_type")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.promote_bodytext_in_subtrees_of_type")
     def test_promote_called(
-        self, mock_promote, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_promote, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """promote_bodytext_in_subtrees_of_type is called (line 150)"""
         root_node = mock.MagicMock()
@@ -1459,18 +1359,18 @@ class TestSetStyleAdditionalCoverage:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         auto_format_thesis_document(
             jsonpath=temp_docx, docxpath=temp_docx,
             configpath=config_path, savepath=str(tmp_path), check=True,
         )
         assert mock_promote.call_count == 3
 
-    @mock.patch("wordformat.set_style.apply_format_check_to_all_nodes")
-    @mock.patch("wordformat.set_style.DocumentBuilder")
+    @mock.patch("wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes")
+    @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
     @mock.patch("wordformat.numbering.process_heading_numbering")
     def test_numbering_processing(
-        self, mock_numbering, mock_builder, mock_apply, temp_docx, config_path, tmp_path
+            self, mock_numbering, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
         """Numbering processing when enabled (lines 167-168)"""
         root_node = mock.MagicMock()
@@ -1478,9 +1378,9 @@ class TestSetStyleAdditionalCoverage:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
-        from wordformat.set_style import auto_format_thesis_document
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
         # Mock config with numbering.enabled = True
-        with mock.patch("wordformat.set_style.get_config") as mock_get_cfg:
+        with mock.patch("wordformat.pipeline.stages.get_config") as mock_get_cfg:
             mock_cfg = mock.MagicMock()
             mock_cfg.numbering.enabled = True
             mock_get_cfg.return_value = mock_cfg
@@ -1491,6 +1391,7 @@ class TestSetStyleAdditionalCoverage:
             mock_numbering.assert_called_once()
 
 
+
 # ==================== (p) rules/body.py 额外覆盖测试 ====================
 
 
@@ -1499,7 +1400,7 @@ class TestBodyTextAdditional:
 
     def test_body_text_apply_format(self, sample_yaml_config):
         """BodyText._base with p=False, r=False (line 27)"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         from wordformat.rules.body import BodyText
         init_config(sample_yaml_config)
         config = get_config()
@@ -1518,7 +1419,7 @@ class TestBodyTextAdditional:
 
     def test_body_text_apply_to_run(self, sample_yaml_config):
         """apply_format 通过 handler 修正字符格式。"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         from wordformat.rules.body import BodyText
         init_config(sample_yaml_config)
         config = get_config()
@@ -1535,6 +1436,7 @@ class TestBodyTextAdditional:
         node.paragraph = p
         node.apply_format(doc)
         assert run.font.bold is False  # Should have been fixed
+
 
 
 # ==================== (q) rules/node.py 额外覆盖测试 ====================
@@ -1563,7 +1465,7 @@ class TestFormatNodeAdditional:
     def test_load_config_unknown_type_raises(self):
         """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
         from wordformat.rules.node import FormatNode
-        from wordformat.config.datamodel import BaseModel
+        from wordformat.config.models import BaseModel
 
         class CustomConfig(BaseModel):
             pass
@@ -1578,6 +1480,7 @@ class TestFormatNodeAdditional:
         mock_config = mock.MagicMock()
         node.load_config(mock_config)
         assert node._pydantic_config is None
+
 
 
 # ==================== (r) tree.py 额外覆盖测试 ====================
@@ -1602,6 +1505,7 @@ class TestTreeAdditional:
         print_tree(node)
         captured = capsys.readouterr()
         assert "test" in captured.out
+
 
 
 # ==================== (s) settings.py 额外覆盖测试 ====================
@@ -1634,6 +1538,7 @@ class TestSettingsFrozenPath:
             importlib.reload(settings_mod)
 
 
+
 # ==================== (t) config/config.py 额外覆盖测试 ====================
 
 
@@ -1664,221 +1569,6 @@ class TestConfigAdditional:
         assert lc.config_path == "/some/path.yaml"
 
 
-# ==================== (u) api/__init__.py 覆盖测试 ====================
-
-
-class TestSaveUploadFile:
-    """覆盖 api/__init__.py save_upload_file 函数"""
-
-    def test_save_upload_file_normal(self, tmp_path):
-        """正常保存上传文件"""
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-             mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"), \
-             mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"):
-            from wordformat.api import save_upload_file, TEMP_DIR
-            TEMP_DIR.mkdir(parents=True, exist_ok=True)
-
-            mock_file = mock.MagicMock()
-            mock_file.filename = "test.docx"
-            mock_file.file.read.return_value = b"fake docx content"
-
-            result = save_upload_file(mock_file, TEMP_DIR)
-            assert os.path.exists(result)
-            with open(result, "rb") as f:
-                assert f.read() == b"fake docx content"
-
-    def test_save_upload_file_name_conflict(self, tmp_path):
-        """文件名冲突时自动重命名"""
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-             mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"), \
-             mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"):
-            from wordformat.api import save_upload_file, TEMP_DIR
-            TEMP_DIR.mkdir(parents=True, exist_ok=True)
-
-            # 预先创建同名文件
-            existing_file = TEMP_DIR / "test.docx"
-            existing_file.write_bytes(b"existing content")
-
-            mock_file = mock.MagicMock()
-            mock_file.filename = "test.docx"
-            mock_file.file.read.return_value = b"new content"
-
-            result = save_upload_file(mock_file, TEMP_DIR)
-            assert os.path.exists(result)
-            assert result.endswith("test_1.docx")
-            with open(result, "rb") as f:
-                assert f.read() == b"new content"
-            # 原文件未被覆盖
-            assert existing_file.read_bytes() == b"existing content"
-
-    def test_save_upload_file_multiple_conflicts(self, tmp_path):
-        """多次冲突时递增后缀"""
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-             mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"), \
-             mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"):
-            from wordformat.api import save_upload_file, TEMP_DIR
-            TEMP_DIR.mkdir(parents=True, exist_ok=True)
-
-            (TEMP_DIR / "test.docx").write_bytes(b"a")
-            (TEMP_DIR / "test_1.docx").write_bytes(b"b")
-            (TEMP_DIR / "test_2.docx").write_bytes(b"c")
-
-            mock_file = mock.MagicMock()
-            mock_file.filename = "test.docx"
-            mock_file.file.read.return_value = b"d"
-
-            result = save_upload_file(mock_file, TEMP_DIR)
-            assert result.endswith("test_3.docx")
-
-
-class TestAPIEndpoints:
-    """覆盖 api/__init__.py 所有 API 端点"""
-
-    @pytest.fixture
-    def api_client(self, tmp_path):
-        """创建 TestClient，mock BASE_DIR 使目录创建在 tmp_path"""
-        temp_dir = tmp_path / "temp"
-        output_dir = tmp_path / "output"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-             mock.patch("wordformat.api.TEMP_DIR", temp_dir), \
-             mock.patch("wordformat.api.OUTPUT_DIR", output_dir):
-            from wordformat.api import app
-            client = TestClient(app)
-            yield client, temp_dir, output_dir
-
-    def test_generate_json_success(self, api_client):
-        """POST /generate-json 成功调用 set_tag_main"""
-        client, temp_dir, output_dir = api_client
-
-        mock_result = [{"category": "body_text", "score": 0.9, "paragraph": "test", "fingerprint": "fp1"}]
-        with mock.patch("wordformat.api.set_tag_main", return_value=mock_result):
-            docx_bytes = io.BytesIO(b"fake docx")
-            yaml_bytes = io.BytesIO(b"key: value")
-
-            response = client.post(
-                "/generate-json",
-                files={
-                    "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
-                },
-            )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["code"] == 200
-        assert "json_data" in data["data"]
-
-    def test_generate_json_non_docx_returns_400(self, api_client):
-        """POST /generate-json 上传非 docx 文件返回 code 400"""
-        client, temp_dir, output_dir = api_client
-
-        docx_bytes = io.BytesIO(b"fake content")
-        yaml_bytes = io.BytesIO(b"key: value")
-
-        response = client.post(
-            "/generate-json",
-            files={
-                "docx_file": ("test.pdf", docx_bytes, "application/octet-stream"),
-                "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["code"] == 400
-        assert ".docx" in data["msg"]
-
-    def test_check_format_success(self, api_client):
-        """POST /check-format 成功调用 auto_format_thesis_document(check=True)"""
-        client, temp_dir, output_dir = api_client
-
-        mock_result_path = str(output_dir / "test--标注版.docx")
-        with mock.patch("wordformat.api.auto_format_thesis_document", return_value=mock_result_path):
-            docx_bytes = io.BytesIO(b"fake docx")
-            yaml_bytes = io.BytesIO(b"key: value")
-            json_str = '[{"category": "body_text", "score": 0.9}]'
-
-            response = client.post(
-                "/check-format",
-                files={
-                    "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
-                },
-                data={"json_data": json_str},
-            )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["code"] == 200
-        assert "标注版" in data["data"]["final_filename"]
-        assert "download_url" in data["data"]
-
-    def test_apply_format_success(self, api_client):
-        """POST /apply-format 成功调用 auto_format_thesis_document(check=False)"""
-        client, temp_dir, output_dir = api_client
-
-        mock_result_path = str(output_dir / "test--修改版.docx")
-        with mock.patch("wordformat.api.auto_format_thesis_document", return_value=mock_result_path):
-            docx_bytes = io.BytesIO(b"fake docx")
-            yaml_bytes = io.BytesIO(b"key: value")
-            json_str = '[{"category": "body_text", "score": 0.9}]'
-
-            response = client.post(
-                "/apply-format",
-                files={
-                    "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
-                },
-                data={"json_data": json_str},
-            )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["code"] == 200
-        assert "修改版" in data["data"]["final_filename"]
-        assert "download_url" in data["data"]
-
-    def test_download_file_exists(self, api_client):
-        """GET /download/{filename} 文件存在时返回文件"""
-        client, temp_dir, output_dir = api_client
-
-        # 在 output_dir 创建一个测试文件
-        test_file = output_dir / "result.docx"
-        test_file.write_bytes(b"docx content here")
-
-        response = client.get(f"/download/result.docx")
-        assert response.status_code == 200
-        assert response.content == b"docx content here"
-
-    def test_download_file_not_found(self, api_client):
-        """GET /download/{filename} 文件不存在时返回 404"""
-        client, temp_dir, output_dir = api_client
-
-        response = client.get("/download/nonexistent.docx")
-        # 已修复：重新抛出 HTTPException，正确返回 404
-        assert response.status_code == 404
-
-    def test_generate_json_exception_returns_500(self, api_client):
-        """POST /generate-json 异常时返回 500"""
-        client, temp_dir, output_dir = api_client
-
-        with mock.patch("wordformat.api.set_tag_main", side_effect=RuntimeError("test error")):
-            docx_bytes = io.BytesIO(b"fake docx")
-            yaml_bytes = io.BytesIO(b"key: value")
-
-            response = client.post(
-                "/generate-json",
-                files={
-                    "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
-                },
-            )
-
-        assert response.status_code == 500
-
 
 # ==================== 补充覆盖率：小缺口 ====================
 
@@ -1906,12 +1596,13 @@ class TestDocumentBuilderLoadFromFile:
         assert len(result) == 1
 
 
+
 class TestTreeBuilderAdditionalCoverage:
     """覆盖 tree_builder.py 剩余行"""
 
     def test_build_tree_with_unknown_category_skipped(self, sample_yaml_config):
         """未知类别的节点被跳过（create_node 返回 None）"""
-        from wordformat.config.config import init_config, get_config
+        from wordformat.config.loader import init_config, get_config
         init_config(sample_yaml_config)
         config = get_config()
         builder = DocumentTreeBuilder()
@@ -1936,22 +1627,6 @@ class TestTreeBuilderAdditionalCoverage:
         assert len(root.children) == 1
 
 
-class TestCLIStartApiMode:
-    """覆盖 cli.py startapi 模式（lines 151-169）"""
-
-    def test_startapi_mode_calls_uvicorn(self):
-        """startapi 模式调用 uvicorn.run"""
-        import unittest.mock as um
-        # uvicorn 在函数内部动态导入，需要 mock import
-        with um.patch("sys.argv", ["wf", "startapi"]):
-            with um.patch.dict("sys.modules", {"uvicorn": um.MagicMock()}):
-                with um.patch("wordformat.api.app", um.MagicMock()):
-                    main()
-        # 验证 uvicorn.run 被调用
-        import sys
-        if "uvicorn" in sys.modules:
-            sys.modules["uvicorn"].run.assert_called_once()
-
 
 class TestNumberingAdditionalCoverage:
     """覆盖 numbering.py 剩余行 (49, 262)"""
@@ -1968,8 +1643,9 @@ class TestNumberingAdditionalCoverage:
     def test_process_heading_numbering_disabled(self, doc):
         """numbering config enabled=False，直接返回"""
         from wordformat.numbering import process_heading_numbering
-        from wordformat.config.datamodel import NumberingConfig
+        from wordformat.config.models import NumberingConfig
 
         # 创建 disabled 的 numbering config
         config = NumberingConfig(enabled=False)
         process_heading_numbering(None, doc, config)
+

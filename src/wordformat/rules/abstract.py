@@ -4,13 +4,13 @@
 # @File    : abstract.py
 import re
 
-from wordformat.config.datamodel import (
+from wordformat.config.models import (
     AbstractChineseConfig,
     AbstractEnglishConfig,
     AbstractTitleConfig,
 )
 from wordformat.rules.node import FormatNode
-from wordformat.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
 
 class AbstractTitleCN(FormatNode[AbstractTitleConfig]):

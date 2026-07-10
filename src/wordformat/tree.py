@@ -5,6 +5,8 @@
 from collections.abc import Callable, Iterator
 from typing import Any, Generic, Optional, TypeVar
 
+from rich.tree import Tree as RichTree
+
 from wordformat.rules.node import TreeNode
 
 
@@ -141,72 +143,52 @@ class Stack(Generic[T]):
 
 def print_tree(
     node_or_jsonpath: TreeNode | str,
-    prefix: str = "",
-    is_last: bool = True,
     show_confidence: bool = False,
     show_index: bool = False,
     filter_categories: list[str] | None = None,
-    _counter: list[int] | None = None,
 ) -> None:
-    """
-    以树形结构打印多叉树（类似 Linux 的 tree 命令）
+    """以树形结构打印多叉树（使用 rich 渲染）。
 
     支持直接传入 TreeNode 或 JSON 文件路径。
-
-    Args:
-        node_or_jsonpath: 树节点或 JSON 文件路径
-        prefix: 前缀（递归内部使用）
-        is_last: 是否为同级最后一个节点
-        show_confidence: 是否显示置信度
-        show_index: 是否显示节点序号
-        filter_categories: 仅显示指定类别（None 表示全部显示）
-        _counter: 内部计数器（递归内部使用）
     """
-    # 如果传入的是 JSON 文件路径，先构建树再打印
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+
     if isinstance(node_or_jsonpath, str):
-        import json
+        node_or_jsonpath, paragraphs = _load_tree_from_json(node_or_jsonpath)
 
-        from wordformat.rules.node import TreeNode
-
-        with open(node_or_jsonpath, encoding="utf-8") as f:
-            paragraphs = json.load(f)
-
-        # 直接从 JSON 构建简单树（不依赖 config）
-        root_node = TreeNode({"category": "top", "paragraph": ""})
-        _build_simple_tree(root_node, paragraphs)
-
-        # 统计各类别数量
+        # 统计各类别
         from collections import Counter
 
         cat_counter = Counter()
         for p in paragraphs:
             cat_counter[p.get("category", "unknown")] += 1
 
-        print(f"\n📄 文档结构树 ({len(paragraphs)} 个段落)")
-        print("=" * 60)
-        for cat, count in cat_counter.most_common():
-            print(f"  {cat:<30s} {count:>4d}")
-        print("=" * 60)
-
-        _print_tree_node(
-            root_node,
-            "",
-            True,
-            show_confidence,
-            show_index,
-            filter_categories,
+        console.print(
+            f"\n:page_facing_up: 文档结构树 ([bold]{len(paragraphs)}[/] 个段落)"
         )
-        return
+        table = Table(show_header=False, box=None, padding=(0, 4))
+        for cat, count in cat_counter.most_common():
+            table.add_row(f"  {cat}", f"{count:>4d}")
+        console.print(table)
 
-    # 递归打印节点
-    _print_tree_node(
-        node_or_jsonpath,
-        prefix,
-        is_last,
-        show_confidence,
-        show_index,
-        filter_categories,
+    rich_tree = _build_rich_tree(
+        node_or_jsonpath, show_confidence, show_index, filter_categories
     )
+    console.print(rich_tree)
+
+
+def _load_tree_from_json(json_path: str) -> tuple[TreeNode, list[dict]]:
+    """从 JSON 文件加载段落列表并构建简单树。"""
+    import json
+
+    with open(json_path, encoding="utf-8") as f:
+        paragraphs = json.load(f)
+    root_node = TreeNode({"category": "top", "paragraph": ""})
+    _build_simple_tree(root_node, paragraphs)
+    return root_node, paragraphs
 
 
 def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
@@ -273,82 +255,102 @@ def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
             parent.add_child_node(node)
 
 
-def _print_tree_node(
+def _tree_node_category(value) -> str:
+    """从节点 value 中提取类别字符串。"""
+    if isinstance(value, dict):
+        return value.get("category", "")
+    if hasattr(value, "paragraph") and isinstance(value.paragraph, dict):
+        return value.paragraph.get("category", "")
+    return ""
+
+
+def _format_node_label(
+    value, show_confidence: bool, show_index: bool, counter: int
+) -> str:
+    """格式化单个节点的显示标签。"""
+    idx_str = f"[{counter:>3d}] " if show_index else ""
+    if isinstance(value, dict):
+        cat = value.get("category", "unknown")
+        para = str(value.get("paragraph", ""))[:50]
+        conf = value.get("confidence", None)
+        conf_str = f" ({conf:.0%})" if show_confidence and conf is not None else ""
+        return f"{idx_str}[dim]{cat}[/dim]{conf_str} {para}"
+    if hasattr(value, "paragraph") and isinstance(value.paragraph, dict):
+        cat = value.paragraph.get("category", "unknown")
+        para = str(value.paragraph.get("paragraph", ""))[:50]
+        return f"{idx_str}[dim]{cat}[/dim] {para}"
+    return f"{idx_str}{str(value)[:60]}"
+
+
+def _build_rich_tree(
     node: TreeNode,
-    prefix: str,
-    is_last: bool,
     show_confidence: bool,
     show_index: bool,
     filter_categories: list[str] | None,
     _counter: list[int] | None = None,
-) -> None:
-    """递归打印单个节点及其子树"""
+) -> RichTree | None:
+    """递归构建 rich Tree。"""
+
     if _counter is None:
         _counter = [0]
 
     value = node.value
-    category = ""
+    category = _tree_node_category(value)
 
-    # 提取类别
-    if isinstance(value, dict):
-        category = value.get("category", "")
-    elif hasattr(value, "paragraph") and isinstance(value.paragraph, dict):
-        category = value.paragraph.get("category", "")
-
-    # 过滤类别
-    should_show = True
-    if filter_categories is not None:
-        should_show = category in filter_categories
-        # 如果当前节点被过滤，但其子节点有匹配的，仍需遍历子节点
-        if not should_show:
-            if hasattr(node, "children"):
-                for child in node.children:
-                    _print_tree_node(
-                        child,
-                        prefix,
-                        is_last,
-                        show_confidence,
-                        show_index,
-                        filter_categories,
-                        _counter,
-                    )
-            return
-
-    # 打印当前节点
-    connector = "└── " if is_last else "├── "
-
-    if isinstance(value, dict):
-        cat = value.get("category", "unknown")
-        para = value.get("paragraph", "")[:50]
-        idx_str = f"[{_counter[0]:>3d}] " if show_index else ""
-        conf = value.get("confidence", None)
-        conf_str = f" ({conf:.0%})" if show_confidence and conf is not None else ""
-        display = f"{idx_str}【{cat}】{conf_str} {para}"
-    elif hasattr(value, "paragraph") and isinstance(value.paragraph, dict):
-        cat = value.paragraph.get("category", "unknown")
-        para = value.paragraph.get("paragraph", "")[:50]
-        idx_str = f"[{_counter[0]:>3d}] " if show_index else ""
-        display = f"{idx_str}【{cat}】 {para}"
-    else:
-        idx_str = f"[{_counter[0]:>3d}] " if show_index else ""
-        display = f"{idx_str}{str(value)[:60]}"
-
-    print(prefix + connector + display)  # noqa t201
-    _counter[0] += 1
-
-    # 递归打印子节点
-    if hasattr(node, "children"):
-        children = node.children
-        for i, child in enumerate(children):
-            is_last_child = i == len(children) - 1
-            extension = "    " if is_last else "│   "
-            new_prefix = prefix + extension
-            _print_tree_node(
-                child,
-                new_prefix,
-                is_last_child,
-                show_confidence,
-                show_index,
-                filter_categories,
-                _counter,
+    if filter_categories is not None and category not in filter_categories:
+        # 跳过当前节点但继续递归子节点
+        for child in getattr(node, "children", []):
+            subtree = _build_rich_tree(
+                child, show_confidence, show_index, filter_categories, _counter
             )
+            if subtree is not None:
+                return subtree
+        return None
+
+    label = _format_node_label(value, show_confidence, show_index, _counter[0])
+    _counter[0] += 1
+    rich_node = RichTree(label)
+
+    if hasattr(node, "children"):
+        for child in node.children:
+            child_tree = _build_rich_tree(
+                child, show_confidence, show_index, filter_categories, _counter
+            )
+            if child_tree is not None:
+                rich_node.add(child_tree)
+
+    return rich_node
+
+
+# ---------------------------------------------------------------------------
+# 独立于 Tree 类的通用遍历工具（直接作用于 TreeNode / FormatNode）
+# ---------------------------------------------------------------------------
+
+
+def bfs_walk(root: TreeNode):
+    """BFS 层序遍历生成器，按文档顺序 yield 每个节点（含根节点）。
+
+    用法：
+        for node in bfs_walk(root_node):
+            if isinstance(node, SomeType):
+                ...
+    """
+    from collections import deque
+
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        yield node
+        queue.extend(node.children)
+
+
+def dfs_walk(root: TreeNode):
+    """DFS 前序遍历生成器，yield 每个子节点（不含根节点）。
+
+    用法：
+        for node in dfs_walk(root_node):
+            ...
+    """
+    for child in root.children:
+        yield child
+        yield from dfs_walk(child)

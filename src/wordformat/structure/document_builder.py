@@ -9,7 +9,7 @@ from typing import Any
 from loguru import logger
 
 from wordformat.rules.node import FormatNode
-from wordformat.word_structure.tree_builder import DocumentTreeBuilder
+from wordformat.structure.tree_builder import DocumentTreeBuilder
 
 
 class DocumentBuilder:

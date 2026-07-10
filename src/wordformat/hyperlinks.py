@@ -9,7 +9,6 @@
 """
 
 import re
-from collections import deque
 from copy import deepcopy
 
 from docx.oxml import OxmlElement
@@ -17,6 +16,7 @@ from docx.oxml.ns import qn
 from loguru import logger
 
 from wordformat.rules.body import _CITATION_PATTERN
+from wordformat.tree import bfs_walk
 
 
 def create_citation_hyperlinks(root_node, document):
@@ -65,25 +65,15 @@ def create_citation_hyperlinks(root_node, document):
 
 
 def _collect_nodes_of_type(root_node, node_type, result, collect_body=False):
-    """遍历树，收集指定类型的节点（按文档顺序）。
-
-    Args:
-        root_node: 树根节点
-        node_type: 要收集的节点类型（如 ReferenceEntry），None 时按 collect_body 收集
-        result: 收集结果列表（原地修改）
-        collect_body: 当 node_type 为 None 时，收集 BodyText 节点
-    """
+    """遍历树，收集指定类型的节点（按文档顺序）。"""
     from wordformat.rules.body import BodyText
 
-    queue = deque([root_node])
-    while queue:
-        node = queue.popleft()
+    for node in bfs_walk(root_node):
         if node_type is not None:
             if isinstance(node, node_type):
                 result.append(node)
         elif collect_body and isinstance(node, BodyText):
             result.append(node)
-        queue.extend(node.children)
 
 
 # ---------------------------------------------------------------------------

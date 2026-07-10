@@ -10,17 +10,7 @@ from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
 from wordformat.settings import BATCH_SIZE
-from wordformat.utils import get_paragraph_numbering_text
-
-
-def _para_contains_image(para) -> bool:
-    """检查段落是否包含内联图片（w:drawing）。"""
-    from docx.oxml.ns import qn
-
-    for r in para._element.findall(qn("w:r")):
-        if r.find(qn("w:drawing")) is not None:
-            return True
-    return False
+from wordformat.utils import get_paragraph_numbering_text, para_contains_image
 
 
 class DocxBase:
@@ -57,7 +47,7 @@ class DocxBase:
         result = [None] * len(all_paras)
         for i, para in enumerate(all_paras):
             if i not in text_indices:
-                has_image = _para_contains_image(para)
+                has_image = para_contains_image(para)
                 result[i] = {
                     "category": "figure_image" if has_image else "body_text",
                     "score": 1.0,

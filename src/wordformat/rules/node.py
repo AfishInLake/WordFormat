@@ -13,7 +13,7 @@ from docx.text.run import Run
 from loguru import logger
 from pydantic import ValidationError
 
-from wordformat.config.datamodel import BaseModel, NodeConfigRoot
+from wordformat.config.models import BaseModel, NodeConfigRoot
 
 
 class TreeNode:
@@ -128,7 +128,7 @@ class FormatNode(TreeNode, Generic[T]):
             with open(config_path, encoding="utf-8") as f:
                 raw_config = yaml.safe_load(f)
             # 使用根模型验证整个配置结构
-            from wordformat.config.datamodel import NodeConfigRoot
+            from wordformat.config.models import NodeConfigRoot
 
             root_config = NodeConfigRoot(**raw_config)
             return root_config.model_dump()
@@ -225,7 +225,7 @@ class FormatNode(TreeNode, Generic[T]):
         """默认段落样式检查/应用。配置需继承 GlobalFormatConfig。"""
         if self.paragraph is None or not self.paragraph.runs:
             return
-        from wordformat.style.check_format import ParagraphStyle
+        from wordformat.style.diff import ParagraphStyle
 
         cfg = self.pydantic_config
         if not hasattr(cfg, "alignment"):
@@ -246,7 +246,7 @@ class FormatNode(TreeNode, Generic[T]):
         """默认字符样式检查/应用。配置需继承 GlobalFormatConfig。"""
         if not self.paragraph.runs:
             return
-        from wordformat.style.check_format import CharacterStyle
+        from wordformat.style.diff import CharacterStyle
 
         cfg = self.pydantic_config
         if not hasattr(cfg, "chinese_font_name"):
@@ -311,7 +311,7 @@ class FormatNode(TreeNode, Generic[T]):
 
     def _write_comment_groups(self, doc, groups) -> None:
         """将分组后的批注写入文档并更新统计。"""
-        from wordformat.style.comment_format import SEVERITY_ORDER, get_severity
+        from wordformat.style.comments import SEVERITY_ORDER, get_severity
 
         for runs, texts in groups.values():
             merged = "\n".join(texts)

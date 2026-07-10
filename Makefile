@@ -86,7 +86,7 @@ lint:
 ## tests: Run lint then tests
 tests: lint
 	@echo "Running tests..."
-	@pytest tests/ --cov=wordformat --cov-report=term-missing --cov-fail-under=85
+	@pytest tests/ --cov=wordformat --cov-report=term-missing --cov-fail-under=87
 
 ## export-requirements: Export requirements files from pyproject.toml
 export-requirements:

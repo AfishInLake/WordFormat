@@ -7,7 +7,7 @@ from typing import Any
 from loguru import logger
 
 from wordformat.rules.node import FormatNode
-from wordformat.word_structure.settings import CATEGORY_TO_CLASS
+from wordformat.structure.settings import CATEGORY_TO_CLASS
 
 
 def create_node(

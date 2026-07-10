@@ -4,7 +4,7 @@
 # @File    : caption.py
 
 
-from wordformat.config.datamodel import (
+from wordformat.config.models import (
     CaptionNumberingConfig,
     FiguresConfig,
     TablesConfig,
@@ -43,7 +43,7 @@ def _check_caption_numbering(
         return
 
     parsed = parse_caption_text(text)
-    from wordformat.style.comment_format import format_comment
+    from wordformat.style.comments import format_comment
 
     target = getattr(node, "NODE_LABEL", "题注")
 

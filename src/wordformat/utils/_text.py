@@ -1,43 +1,9 @@
-#! /usr/bin/env python
-# @Time    : 2025/12/22 22:20
-# @Author  : afish
-# @File    : utils.py
-import os
-from typing import Any
+"""文本工具：CJK 字符检测、编号文字、题注解析。"""
 
-import yaml
+import re
+
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
-from loguru import logger
-
-
-def load_yaml_with_merge(file_path: str) -> dict[str, Any]:
-    """
-    加载 YAML 文件，并正确处理 <<: *anchor 合并语法。
-
-    要求 YAML 文件使用标准的 YAML merge key (<<)。
-    """
-    with open(file_path, encoding="utf-8") as f:
-        # 使用 FullLoader 支持 << 合并
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    return config
-
-
-def ensure_is_directory(path):
-    """
-    检查 path 是否为一个已存在的文件夹路径。
-    如果不是（是文件、或路径不存在），则抛出 ValueError。
-    """
-    if not os.path.exists(path):
-        raise ValueError(f"路径不存在: '{path}'")
-    if not os.path.isdir(path):
-        raise ValueError(f"路径不是一个文件夹（它可能是一个文件）: '{path}'")
-
-
-def get_file_name(file_name: str) -> str:
-    basename = os.path.basename(file_name)
-    filename_without_ext, _ = os.path.splitext(basename)  # 提取docx文件名称
-    return filename_without_ext
 
 
 def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
@@ -355,116 +321,78 @@ def _from_chinese_num(chinese: str) -> int:
     return result
 
 
+def _make_caption_result(
+    label, ch_text, ch_num, sep, num_text, num_num, name, is_continued
+):
+    """构建题注解析结果字典。"""
+    return {
+        "label": label,
+        "chapter_text": ch_text,
+        "chapter_num": ch_num,
+        "separator": sep,
+        "number_text": num_text,
+        "number_num": num_num,
+        "name": name.strip(),
+        "is_continued": is_continued,
+    }
+
+
+def _try_parse_num(text: str, parser):
+    """安全解析数字，失败返回 None。"""
+    try:
+        return parser(text)
+    except ValueError:
+        return None
+
+
 def parse_caption_text(text: str) -> dict | None:
     """解析题注文本为结构化组件。
 
     支持格式：[续][标签][章节号][分隔符][题注编号] [题注名称]
-    章节号支持阿拉伯数字、中文数字、罗马数字。
-    分隔符支持 . - : — –
-    支持 "续表"/"续图" 前缀，解析后 is_continued 为 True。
-
-    Returns:
-        {"label", "chapter_text", "separator", "number_text", "name",
-         "chapter_num", "number_num", "is_continued"} 或 None
     """
-    import re
-
     text = text.strip()
     if not text:
         return None
 
-    # 检测 "续" 前缀（续表/续图）
     is_continued = text.startswith("续")
     if is_continued:
         text = text[1:].strip()
-
     if not text:
         return None
 
-    # 分隔符：句点 . 、连字符 - 、冒号 : 、长划线 — (U+2014)、短划线 – (U+2013)
     SEP = r"[.\-:—–]"
-    # 标签后可选空格（支持 "图 1.2 xxx" 和 "图1.2 xxx"）
     LABEL = r"([图表])\s*"
+    CN = r"[一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖拾佰仟]+"
+    ROMAN = r"[IVXLCDMivxlcdm]+"
 
-    # 模式1：图/表 + 阿拉伯数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
-    m = re.match(rf"^{LABEL}(\d+)({SEP})(\d+)[\s　]+(.+)$", text)
-    if m:
-        label, ch_text, sep, num_text, name = m.groups()
-        return {
-            "label": label,
-            "chapter_text": ch_text,
-            "chapter_num": int(ch_text),
-            "separator": sep,
-            "number_text": num_text,
-            "number_num": int(num_text),
-            "name": name.strip(),
-            "is_continued": is_continued,
-        }
+    # 按优先级依次尝试各模式: (pattern, ch_parser, num_parser)
+    patterns = [
+        (rf"^{LABEL}(\d+)({SEP})(\d+)[\s　]+(.+)$", int, int),
+        (rf"^{LABEL}({CN})({SEP})(\d+)[\s　]+(.+)$", _from_chinese_num, int),
+        (rf"^{LABEL}({ROMAN})({SEP})(\d+)[\s　]+(.+)$", _from_roman, int),
+        (
+            rf"^{LABEL}(\d+)({SEP})({CN}|{ROMAN})[\s　]+(.+)$",
+            int,
+            lambda n: _from_chinese_num(n)
+            if any(c in _digit_map for c in n)
+            else _from_roman(n),
+        ),
+    ]
 
-    # 模式2：图/表 + 中文数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
-    chinese_num_chars = r"[一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖拾佰仟]+"
-    m = re.match(rf"^{LABEL}({chinese_num_chars})({SEP})(\d+)[\s　]+(.+)$", text)
-    if m:
-        label, ch_text, sep, num_text, name = m.groups()
-        try:
-            ch_num = _from_chinese_num(ch_text)
-        except ValueError:
-            ch_num = None
-        return {
-            "label": label,
-            "chapter_text": ch_text,
-            "chapter_num": ch_num,
-            "separator": sep,
-            "number_text": num_text,
-            "number_num": int(num_text),
-            "name": name.strip(),
-            "is_continued": is_continued,
-        }
-
-    # 模式3：图/表 + 罗马数字章节 + 分隔符 + 阿拉伯数字编号 + 可选空格 + 名称
-    roman_chars = r"[IVXLCDMivxlcdm]+"
-    m = re.match(rf"^{LABEL}({roman_chars})({SEP})(\d+)[\s　]+(.+)$", text)
-    if m:
-        label, ch_text, sep, num_text, name = m.groups()
-        try:
-            ch_num = _from_roman(ch_text)
-        except ValueError:
-            ch_num = None
-        return {
-            "label": label,
-            "chapter_text": ch_text,
-            "chapter_num": ch_num,
-            "separator": sep,
-            "number_text": num_text,
-            "number_num": int(num_text),
-            "name": name.strip(),
-            "is_continued": is_continued,
-        }
-
-    # 尝试匹配编号部分也使用中文数字或罗马数字
-    m = re.match(
-        rf"^{LABEL}(\d+)({SEP})({chinese_num_chars}|{roman_chars})[\s　]+(.+)$", text
-    )
-    if m:
-        label, ch_text, sep, num_text, name = m.groups()
-        ch_num = int(ch_text)
-        try:
-            is_chinese = any(c in _digit_map for c in num_text)
-            num_num = (
-                _from_chinese_num(num_text) if is_chinese else _from_roman(num_text)
+    for pattern, ch_parser, num_parser in patterns:
+        m = re.match(pattern, text)
+        if m:
+            label, ch_text, sep, num_text, name = m.groups()
+            return _make_caption_result(
+                label,
+                ch_text,
+                _try_parse_num(ch_text, ch_parser),
+                sep,
+                num_text,
+                _try_parse_num(num_text, num_parser),
+                name,
+                is_continued,
             )
-        except ValueError:
-            num_num = None
-        return {
-            "label": label,
-            "chapter_text": ch_text,
-            "chapter_num": ch_num,
-            "separator": sep,
-            "number_text": num_text,
-            "number_num": num_num,
-            "name": name.strip(),
-            "is_continued": is_continued,
-        }
 
     return None
 
@@ -493,51 +421,26 @@ _digit_map = {
 }
 
 
-def remove_all_numbering(doc):
-    """
-    强制解除样式与列表的绑定
-    Args:
-        doc:
-    Returns:
-
-    """
-    title_style_names = ["Heading 1", "Heading 2", "Heading 3"]
-
-    for style_name in title_style_names:
-        if style_name in doc.styles:
-            style = doc.styles[style_name]
-            style_element = style._element
-
-            # 删除 <w:pPr> 中的 numPr（样式级别的编号）
-            pPr = style_element.find(qn("w:pPr"))
-            if pPr is not None:
-                numPr = pPr.find(qn("w:numPr"))
-                if numPr is not None:
-                    pPr.remove(numPr)
-
-                # 可选：也删除 outlineLvl（大纲级别，有时触发编号）
-                outlineLvl = pPr.find(qn("w:outlineLvl"))
-                if outlineLvl is not None:
-                    pPr.remove(outlineLvl)
-
-            logger.debug(f"已解除样式 '{style_name}' 的编号绑定")
+# ---------------------------------------------------------------------------
+# CJK 字符检测工具
+# ---------------------------------------------------------------------------
 
 
-def ensure_directory_exists(path):
-    """
-    检查路径是否存在，如果不存在则创建对应的文件夹。
+def is_chinese_char(ch: str) -> bool:
+    """判定单个字符是否为 CJK 统一表意文字。"""
+    return "一" <= ch <= "鿿"
 
-    参数:
-        path (str): 需要检查或创建的文件夹路径
 
-    说明:
-        - 如果路径已存在且是文件夹，则不做任何操作
-        - 如果路径不存在，则递归创建所有必需的父目录
-        - 如果路径存在但是是文件，则抛出 ValueError
-    """
-    if os.path.exists(path):
-        if not os.path.isdir(path):
-            raise ValueError(f"路径已存在但不是文件夹：'{path}'")
-    else:
-        os.makedirs(path, exist_ok=True)
-        logger.info(f"已创建文件夹：'{path}'")
+def count_chinese_chars(text: str) -> int:
+    """统计文本中 CJK 字符数量。"""
+    return sum(1 for ch in text if is_chinese_char(ch))
+
+
+def extract_chinese_chars(text: str) -> str:
+    """提取文本中的纯 CJK 字符序列。"""
+    return "".join(ch for ch in text if is_chinese_char(ch))
+
+
+def has_chinese(text: str) -> bool:
+    """文本中是否包含至少一个 CJK 字符。"""
+    return any(is_chinese_char(ch) for ch in text)

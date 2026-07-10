@@ -4,14 +4,14 @@ from typing import Literal
 
 from docx.oxml.ns import qn
 
-from wordformat.config.datamodel import (
+from wordformat.config.models import (
     KeywordCountRule,
     KeywordsConfig,
     NodeConfigRoot,
     TrailingPunctRule,
 )
 from wordformat.rules.node import FormatNode
-from wordformat.style.check_format import CharacterStyle, ParagraphStyle
+from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
 
 # 第一步：提取关键词基类，复用通用逻辑
@@ -122,6 +122,15 @@ class KeywordsEN(BaseKeywordsNode):
     NODE_LABEL = "英文关键词"
     RULES = {"keyword_count": "_check_keyword_count"}
 
+    _LABEL_RE = re.compile(r"Keywords?:?\s*", re.IGNORECASE)
+    _SEPARATOR_RE = re.compile(r"[,;]")
+
+    @staticmethod
+    def extract_keywords(text: str) -> list[str]:
+        """从文本中提取英文关键词列表（去除标签前缀）。"""
+        kw_text = KeywordsEN._LABEL_RE.sub("", text)
+        return [k.strip() for k in KeywordsEN._SEPARATOR_RE.split(kw_text) if k.strip()]
+
     def _check_keyword_label(self, run) -> bool:
         """判断 run 是否属于英文关键词标签部分。"""
         if not run.text.strip():
@@ -149,11 +158,8 @@ class KeywordsEN(BaseKeywordsNode):
     def _check_keyword_count(self, doc, rule_cfg: KeywordCountRule, p: bool = False):
         """校验英文关键词数量"""
         keyword_text = "".join([run.text for run in self.paragraph.runs])
-        keyword_list = re.split(
-            r"[,;]", re.sub(r"Keywords?:", "", keyword_text, flags=re.IGNORECASE)
-        )
-        keyword_list = [k.strip() for k in keyword_list if k.strip()]
-        from wordformat.style.comment_format import format_comment
+        keyword_list = KeywordsEN.extract_keywords(keyword_text)
+        from wordformat.style.comments import format_comment
 
         target = self.NODE_LABEL
         if len(keyword_list) < rule_cfg.count_min:
@@ -229,6 +235,15 @@ class KeywordsCN(BaseKeywordsNode):
         "trailing_punctuation": "_check_trailing_punctuation",
     }
 
+    _LABEL_RE = re.compile(r"关键词[:：]?\s*")
+    _SEPARATOR_RE = re.compile(r"[；;]")
+
+    @staticmethod
+    def extract_keywords(text: str) -> list[str]:
+        """从文本中提取中文关键词列表（去除标签前缀）。"""
+        kw_text = KeywordsCN._LABEL_RE.sub("", text)
+        return [k.strip() for k in KeywordsCN._SEPARATOR_RE.split(kw_text) if k.strip()]
+
     def _check_keyword_label(self, run) -> bool:
         """判断 run 是否属于中文关键词标签部分（防拆分）。"""
         if not run.text.strip():
@@ -261,9 +276,8 @@ class KeywordsCN(BaseKeywordsNode):
     def _check_keyword_count(self, doc, rule_cfg: KeywordCountRule, p: bool = False):
         """校验中文关键词数量"""
         keyword_text = "".join([run.text for run in self.paragraph.runs])
-        keyword_list = re.split(r"；", re.sub(r"关键词[:：]", "", keyword_text))
-        keyword_list = [k.strip() for k in keyword_list if k.strip()]
-        from wordformat.style.comment_format import format_comment
+        keyword_list = KeywordsCN.extract_keywords(keyword_text)
+        from wordformat.style.comments import format_comment
 
         target = self.NODE_LABEL
         if len(keyword_list) < rule_cfg.count_min:
@@ -287,7 +301,7 @@ class KeywordsCN(BaseKeywordsNode):
         self, doc, rule_cfg: TrailingPunctRule, p: bool = False
     ):
         """校验中文关键词末尾标点"""
-        from wordformat.style.comment_format import format_comment
+        from wordformat.style.comments import format_comment
 
         keyword_text = "".join([run.text for run in self.paragraph.runs])
         if (

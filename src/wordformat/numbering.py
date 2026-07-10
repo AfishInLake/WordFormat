@@ -19,7 +19,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Mm, Pt
 from loguru import logger
 
-from wordformat.style.utils import extract_unit_from_string
+from wordformat.style.units import extract_unit_from_string
 
 # EMU 到 twips 的换算系数
 _EMU_PER_TWIP = 635
@@ -223,167 +223,76 @@ def _set_indent_value(ind_element, indent_type: str, value_str: str):
 
 # 中文字号到半磅值（half-points）的映射
 # Word 内部字号单位为 half-points（半磅），如 12pt = 24 half-points
-_FONT_SIZE_HALF_PT_MAP = {
-    "一号": 52,
-    "小一": 48,
-    "二号": 44,
-    "小二": 36,
-    "三号": 32,
-    "小三": 30,
-    "四号": 28,
-    "小四": 24,
-    "五号": 21,
-    "小五": 18,
-    "六号": 15,
-    "七号": 11,
-}
-
-
 def _build_numbering_rPr(headings_config, level_key: str):
-    """
-    为编号构建 w:rPr 元素，使编号的字体/字号跟随标题样式。
+    """为编号构建 w:rPr 元素，使编号的字体/字号跟随标题样式。"""
+    from wordformat.style.defs import FontColor, FontSize
+    from wordformat.style.xml_ops import (
+        rPr_set_bold,
+        rPr_set_font,
+        rPr_set_font_color,
+        rPr_set_font_size,
+    )
 
-    Args:
-        headings_config: 标题配置对象（config.headings）
-        level_key: "level_1" / "level_2" / "level_3"
-
-    Returns:
-        w:rPr OxmlElement 或 None
-    """
     level_cfg = getattr(headings_config, level_key, None)
     if level_cfg is None:
         return None
 
-    # 获取字体、字号、颜色、加粗
     chinese_font = getattr(level_cfg, "chinese_font_name", None)
     english_font = getattr(level_cfg, "english_font_name", None)
     font_size = getattr(level_cfg, "font_size", None)
     font_color = getattr(level_cfg, "font_color", None)
     bold = getattr(level_cfg, "bold", None)
 
-    if (
-        not chinese_font
-        and not english_font
-        and not font_size
-        and not font_color
-        and bold is None
-    ):
+    if not any([chinese_font, english_font, font_size, font_color, bold is not None]):
         return None
 
     rPr = OxmlElement("w:rPr")
 
-    # 设置字体
-    rFonts = OxmlElement("w:rFonts")
-    has_font = False
-    if chinese_font:
-        rFonts.set(qn("w:eastAsia"), chinese_font)
-        has_font = True
-    if english_font:
-        rFonts.set(qn("w:ascii"), english_font)
-        rFonts.set(qn("w:hAnsi"), english_font)
-        has_font = True
-    if has_font:
-        rPr.append(rFonts)
+    if chinese_font or english_font:
+        rPr_set_font(rPr, cn_name=chinese_font, en_name=english_font)
 
-    # 设置字号（Word 内部单位为 half-points）
     if font_size:
-        half_pt = _FONT_SIZE_HALF_PT_MAP.get(font_size)
-        if half_pt is None:
-            try:
-                half_pt = int(float(font_size) * 2)
-            except (ValueError, TypeError):
-                half_pt = None
-        if half_pt is not None:
-            sz = OxmlElement("w:sz")
-            sz.set(qn("w:val"), str(half_pt))
-            rPr.append(sz)
-            szCs = OxmlElement("w:szCs")
-            szCs.set(qn("w:val"), str(half_pt))
-            rPr.append(szCs)
-
-    # 设置字体颜色（避免继承主题蓝色）
-    if font_color:
-        from wordformat.style.style_enum import FontColor
-
         try:
-            fc = FontColor(font_color)
-            rgb = fc.rel_value
-            hex_color = f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
-            color = OxmlElement("w:color")
-            color.set(qn("w:val"), hex_color)
-            rPr.append(color)
+            pt_val = FontSize(font_size).rel_value
+            if pt_val == font_size:
+                # 非中文标签（如 "15.5" 或 14），直接作为磅值使用
+                pt_val = float(font_size)
+            rPr_set_font_size(rPr, pt_val)
+        except (ValueError, TypeError):
+            pass
+
+    if font_color:
+        try:
+            rPr_set_font_color(rPr, FontColor(font_color).rel_value)
         except Exception:
             pass
 
-    # 设置加粗
-    if bold is True:
-        b = OxmlElement("w:b")
-        rPr.append(b)
-        bCs = OxmlElement("w:bCs")
-        rPr.append(bCs)
+    if bold is not None:
+        rPr_set_bold(rPr, bold)
 
     return rPr
 
 
-def process_heading_numbering(root_node, document, config, headings_config=None):
-    """
-    处理所有标题节点和参考文献条目节点的编号：自动清除手动编号 + 应用自动编号。
-
-    Args:
-        root_node: 文档树根节点
-        document: docx Document 对象
-        config: NumberingConfig 配置对象
-        headings_config: 标题配置（用于编号字体/字号跟随标题样式）
-    """
-    if not config.enabled:
-        return
-
-    # 创建编号定义（标题 + 参考文献）
-    definitions = create_numbering_definition(document, config, headings_config)
-    heading_num_map = definitions.get("headings", {})
-    reference_num_id = definitions.get("references")
-
-    # 标题节点类型到配置级别和 ilvl 的映射
-    heading_map = {
-        "level_1": ("0", "level_1"),
-        "level_2": ("1", "level_2"),
-        "level_3": ("2", "level_3"),
-    }
-
-    from wordformat.config.datamodel import NumberingLevelConfig
-
-    ref_config = getattr(config, "references", None)
-    ref_enabled = isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled
-
+def _traverse_numbering(
+    node, heading_map, heading_num_map, config, ref_enabled, reference_num_id, counters
+):
+    """递归遍历节点树，应用标题和参考文献编号。"""
     from wordformat.rules.references import ReferenceEntry
 
-    heading_count = 0
-    ref_count = 0
+    category = node.value.get("category", "") if isinstance(node.value, dict) else ""
+    paragraph = getattr(node, "paragraph", None)
 
-    def traverse(node):
-        nonlocal heading_count, ref_count
-        category = (
-            node.value.get("category", "") if isinstance(node.value, dict) else ""
-        )
-
-        paragraph = getattr(node, "paragraph", None)
-        if not paragraph:
-            for child in node.children:
-                traverse(child)
-            return
-
+    if paragraph:
         # 处理标题节点
         for level_key, (ilvl_str, config_key) in heading_map.items():
             if category == f"heading_{level_key}":
                 level_config = getattr(config, config_key, None)
-                if not level_config or not level_config.enabled:
-                    break
-
-                _auto_strip_numbering(paragraph, int(ilvl_str))
-                num_id = heading_num_map.get(config_key)
-                if num_id:
-                    apply_auto_numbering(paragraph, num_id, ilvl_str)
-                heading_count += 1
+                if level_config and level_config.enabled:
+                    _auto_strip_numbering(paragraph, int(ilvl_str))
+                    num_id = heading_num_map.get(config_key)
+                    if num_id:
+                        apply_auto_numbering(paragraph, num_id, ilvl_str)
+                    counters["heading"] += 1
                 break
 
         # 处理参考文献条目节点
@@ -391,13 +300,52 @@ def process_heading_numbering(root_node, document, config, headings_config=None)
             _strip_reference_numbering(paragraph)
             if reference_num_id:
                 apply_auto_numbering(paragraph, reference_num_id, "0")
-            ref_count += 1
+            counters["ref"] += 1
 
-        for child in node.children:
-            traverse(child)
+    for child in node.children:
+        _traverse_numbering(
+            child,
+            heading_map,
+            heading_num_map,
+            config,
+            ref_enabled,
+            reference_num_id,
+            counters,
+        )
 
-    traverse(root_node)
-    logger.info(f"编号处理完成：标题 {heading_count} 个，参考文献条目 {ref_count} 个")
+
+def process_heading_numbering(root_node, document, config, headings_config=None):
+    """处理所有标题和参考文献条目的自动编号。"""
+    if not config.enabled:
+        return
+
+    definitions = create_numbering_definition(document, config, headings_config)
+
+    heading_map = {
+        "level_1": ("0", "level_1"),
+        "level_2": ("1", "level_2"),
+        "level_3": ("2", "level_3"),
+    }
+
+    from wordformat.config.models import NumberingLevelConfig
+
+    ref_config = getattr(config, "references", None)
+    ref_enabled = isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled
+
+    counters = {"heading": 0, "ref": 0}
+    _traverse_numbering(
+        root_node,
+        heading_map,
+        definitions.get("headings", {}),
+        config,
+        ref_enabled,
+        definitions.get("references"),
+        counters,
+    )
+    logger.info(
+        f"编号处理完成：标题 {counters['heading']} 个，"
+        f"参考文献条目 {counters['ref']} 个"
+    )
 
 
 def apply_auto_numbering(paragraph, num_id: str, ilvl: str = "0"):
@@ -530,7 +478,7 @@ def create_numbering_definition(document, config, headings_config=None) -> dict:
     # ========================
     # 2. 参考文献条目编号定义
     # ========================
-    from wordformat.config.datamodel import NumberingLevelConfig
+    from wordformat.config.models import NumberingLevelConfig
 
     ref_config = getattr(config, "references", None)
     if (

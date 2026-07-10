@@ -2,7 +2,6 @@
 # @Time    : 2026/1/26 10:34
 # @Author  : afish
 # @File    : style_enmu.py
-# from src.settings import CHARACTER_STYLE_CHECKS
 import re
 from abc import abstractmethod
 from enum import Enum
@@ -15,7 +14,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.style.get_some import (
+from wordformat.style.reader import (
     GetIndent,
     paragraph_get_alignment,
     paragraph_get_builtin_style_name,
@@ -24,14 +23,14 @@ from wordformat.style.get_some import (
     paragraph_get_space_after,
     paragraph_get_space_before,
 )
-from wordformat.style.set_some import (
-    _SetFirstLineIndent,
-    _SetIndent,
-    _SetLineSpacing,
-    _SetSpacing,
+from wordformat.style.units import _get_with_style_fallback, extract_unit_from_string
+from wordformat.style.writer import (
+    SetFirstLineIndent,
+    SetIndent,
+    SetLineSpacing,
+    SetSpacing,
     run_set_font_name,
 )
-from wordformat.style.utils import extract_unit_from_string
 
 
 class UnitEnumMeta(type):
@@ -274,6 +273,7 @@ class FontSize(UnitLabelEnum):
         "六号": 7.5,
         "七号": 5.5,
     }
+    _LABEL_MAP_REVERSE = {v: k for k, v in _LABEL_MAP.items()}
 
     def base_set(self, docx_obj: Run, **kwargs):
         """仅作为将字符串转化为数值操作"""
@@ -413,11 +413,20 @@ class Alignment(UnitLabelEnum):
     """
 
     _LABEL_MAP = {
-        "左对齐": WD_ALIGN_PARAGRAPH.LEFT,  # 左侧对齐,
-        "居中对齐": WD_ALIGN_PARAGRAPH.CENTER,  # 居中对齐,
-        "右对齐": WD_ALIGN_PARAGRAPH.RIGHT,  # 右侧对齐,
-        "两端对齐": WD_ALIGN_PARAGRAPH.JUSTIFY,  # 两端对齐,
-        "分散对齐": WD_ALIGN_PARAGRAPH.DISTRIBUTE,  # 分散对齐（较少用）
+        "左对齐": WD_ALIGN_PARAGRAPH.LEFT,
+        "居中对齐": WD_ALIGN_PARAGRAPH.CENTER,
+        "右对齐": WD_ALIGN_PARAGRAPH.RIGHT,
+        "两端对齐": WD_ALIGN_PARAGRAPH.JUSTIFY,
+        "分散对齐": WD_ALIGN_PARAGRAPH.DISTRIBUTE,
+    }
+
+    # WD_ALIGN_PARAGRAPH → OOXML w:jc/@val
+    XML_VAL_MAP = {
+        WD_ALIGN_PARAGRAPH.LEFT: "left",
+        WD_ALIGN_PARAGRAPH.CENTER: "center",
+        WD_ALIGN_PARAGRAPH.RIGHT: "right",
+        WD_ALIGN_PARAGRAPH.JUSTIFY: "both",
+        WD_ALIGN_PARAGRAPH.DISTRIBUTE: "distribute",
     }
 
     def base_set(self, docx_obj: Paragraph, **kwargs):
@@ -447,18 +456,16 @@ class Spacing(UnitLabelEnum):
     """
 
     class Meta:
-        hang = _SetSpacing.set_hang
-        pt = _SetSpacing.set_pt
-        mm = _SetSpacing.set_mm
-        cm = _SetSpacing.set_cm
-        inch = _SetSpacing.set_inch
+        hang = SetSpacing.set_hang
+        pt = SetSpacing.set_pt
+        mm = SetSpacing.set_mm
+        cm = SetSpacing.set_cm
+        inch = SetSpacing.set_inch
 
     def get_from_paragraph(self, paragraph: Paragraph) -> float | None:
-        unit = self.rel_unit
-        if unit == "hang":
-            # 注意：需要区分 space_before / space_after！
-            # 所以这个方法需要知道是 before 还是 after
-            raise NotImplementedError("Spacing 需要知道是 before 还是 after")
+        # 注意：需要区分 space_before / space_after！
+        # 所以这个方法需要知道是 before 还是 after
+        raise NotImplementedError("Spacing 需要知道是 before 还是 after")
 
 
 class SpaceBefore(Spacing):
@@ -485,23 +492,6 @@ class SpaceAfter(Spacing):
         return None
 
 
-def _get_with_style_fallback(paragraph, attr: str, default):
-    """从段落或样式链读取属性值。"""
-    val = getattr(paragraph.paragraph_format, attr, None)
-    if val is not None:
-        return val
-    style = paragraph.style
-    while style is not None:
-        try:
-            val = getattr(style.paragraph_format, attr, None)
-            if val is not None:
-                return val
-        except AttributeError:
-            pass
-        style = style.base_style
-    return default
-
-
 class LineSpacingRule(UnitLabelEnum):
     """
     设置行距选项
@@ -514,6 +504,16 @@ class LineSpacingRule(UnitLabelEnum):
         "最小值": WD_LINE_SPACING.AT_LEAST,
         "固定值": WD_LINE_SPACING.EXACTLY,
         "多倍行距": WD_LINE_SPACING.MULTIPLE,
+    }
+
+    # WD_LINE_SPACING → OOXML w:spacing/@w:lineRule
+    XML_RULE_MAP = {
+        WD_LINE_SPACING.SINGLE: "auto",
+        WD_LINE_SPACING.ONE_POINT_FIVE: "auto",
+        WD_LINE_SPACING.DOUBLE: "auto",
+        WD_LINE_SPACING.AT_LEAST: "atLeast",
+        WD_LINE_SPACING.EXACTLY: "exact",
+        WD_LINE_SPACING.MULTIPLE: "auto",
     }
 
     def base_set(self, docx_obj: Paragraph, **kwargs):
@@ -551,10 +551,10 @@ class LineSpacing(UnitLabelEnum):
     """
 
     class Meta:
-        pt = _SetLineSpacing.set_pt
-        mm = _SetLineSpacing.set_mm
-        cm = _SetLineSpacing.set_cm
-        inch = _SetLineSpacing.set_inch
+        pt = SetLineSpacing.set_pt
+        mm = SetLineSpacing.set_mm
+        cm = SetLineSpacing.set_cm
+        inch = SetLineSpacing.set_inch
 
     def base_set(self, docx_obj: Paragraph, **kwargs):
         """仅设置倍为单位的数据"""
@@ -581,11 +581,11 @@ class Indent(UnitLabelEnum):
     """
 
     class Meta:
-        char = _SetIndent.set_char
-        pt = _SetIndent.set_pt
-        mm = _SetIndent.set_mm
-        cm = _SetIndent.set_cm
-        inch = _SetIndent.set_inch
+        char = SetIndent.set_char
+        pt = SetIndent.set_pt
+        mm = SetIndent.set_mm
+        cm = SetIndent.set_cm
+        inch = SetIndent.set_inch
 
 
 class LeftIndent(Indent):
@@ -618,11 +618,11 @@ class FirstLineIndent(UnitLabelEnum):
     """
 
     class Meta:
-        char = _SetFirstLineIndent.set_char
-        pt = _SetFirstLineIndent.set_pt
-        mm = _SetFirstLineIndent.set_mm
-        cm = _SetFirstLineIndent.set_cm
-        inch = _SetFirstLineIndent.set_inch
+        char = SetFirstLineIndent.set_char
+        pt = SetFirstLineIndent.set_pt
+        mm = SetFirstLineIndent.set_mm
+        cm = SetFirstLineIndent.set_cm
+        inch = SetFirstLineIndent.set_inch
 
     def get_from_paragraph(self, paragraph: Paragraph) -> float | None:
         unit = self.rel_unit
@@ -674,7 +674,7 @@ class BuiltInStyle(UnitLabelEnum):
         except KeyError:
             # 样式不存在，创建新样式
             doc = docx_obj.part.document
-            _ensure_style_exists(doc, style_name)
+            ensure_style_exists(doc, style_name)
             docx_obj.style = style_name
 
     def get_from_paragraph(self, paragraph: Paragraph):
@@ -703,7 +703,7 @@ _BUILTIN_STYLE_OUTLINE_LVL = {
 }
 
 
-def _ensure_style_exists(doc, style_name: str):
+def ensure_style_exists(doc, style_name: str):
     """
     确保文档中存在指定名称的样式，不存在则创建。
 

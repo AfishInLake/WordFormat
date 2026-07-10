@@ -1,8 +1,8 @@
 """图片段落和表格对象节点。"""
 
-from wordformat.config.datamodel import ImageFormatConfig, TableObjectConfig
+from wordformat.config.models import ImageFormatConfig, TableObjectConfig
 from wordformat.rules.node import FormatNode
-from wordformat.style.comment_format import format_comment
+from wordformat.style.comments import format_comment
 
 
 class FigureImage(FormatNode[ImageFormatConfig]):
@@ -19,8 +19,8 @@ class FigureImage(FormatNode[ImageFormatConfig]):
 
     def _base(self, doc, p: bool, r: bool):
         """仅检查对齐和首行缩进。"""
-        from wordformat.style.check_format import _format_para_value
-        from wordformat.style.style_enum import Alignment, FirstLineIndent
+        from wordformat.style.defs import Alignment, FirstLineIndent
+        from wordformat.style.diff import _format_para_value
 
         cfg = self.pydantic_config
         expected_align = Alignment(str(cfg.alignment))

@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from wordformat.utils import load_yaml_with_merge
 
-from .datamodel import NodeConfigRoot
+from .models import NodeConfigRoot
 
 # 单例配置存储（私有变量，仅通过接口访问）
 _global_config: Optional[NodeConfigRoot] = None

@@ -5,6 +5,8 @@
 覆盖模块：heading, keywords, numbering, style_enum, set_style, get_some, utils
 """
 
+import io
+import os
 import re
 from unittest.mock import MagicMock, patch, PropertyMock
 
@@ -14,7 +16,7 @@ from docx.shared import Pt, Cm, RGBColor
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-from wordformat.config.datamodel import NodeConfigRoot
+from wordformat.config.models import NodeConfigRoot
 from wordformat.rules.heading import (
     HeadingLevel1Node,
     HeadingLevel2Node,
@@ -27,16 +29,20 @@ from wordformat.numbering import (
     _build_numbering_rPr,
     _auto_strip_numbering,
 )
-from wordformat.style.style_enum import (
+from wordformat.style.defs import (
     BuiltInStyle,
     FirstLineIndent,
-    _ensure_style_exists,
+    ensure_style_exists,
 )
-from wordformat.set_style import (
-    _fix_all_style_definitions,
-    apply_format_check_to_all_nodes,
+from wordformat.pipeline.stages import (
+    StyleDefinitionFixStage,
+    FormattingExecutionStage,
 )
-from wordformat.style.get_some import (
+
+_fix_stage = StyleDefinitionFixStage()
+_format_stage = FormattingExecutionStage()
+apply_format_check_to_all_nodes = _format_stage.apply_format_check_to_all_nodes
+from wordformat.style.reader import (
     paragraph_get_space_before,
     paragraph_get_space_after,
     paragraph_get_line_spacing,
@@ -75,7 +81,7 @@ def _load_root_config(config_path):
 @pytest.fixture
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
-    from wordformat.config.config import init_config
+    from wordformat.config.loader import init_config
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -147,10 +153,8 @@ class TestHeadingCoverageBoost:
         assert p.style.name == "Heading 2"
 
     def test_fix_all_style_definitions_collects_all_styles(self, root_config):
-        """_collect_all_style_configs 应收集配置中所有唯一的样式名。"""
-        from wordformat.set_style import _collect_all_style_configs
-
-        style_map = _collect_all_style_configs(root_config)
+        """collect_style_configs 应收集配置中所有唯一的样式名。"""
+        style_map = root_config.collect_style_configs()
         assert len(style_map) > 0
         # 应包含 Normal（body_text 使用）和 Heading 1/2/3
         style_names = list(style_map.keys())
@@ -158,20 +162,18 @@ class TestHeadingCoverageBoost:
 
     def test_fix_all_style_definitions_handles_document(self, root_config):
         """_fix_all_style_definitions 应对文档中存在的样式定义进行修正。"""
-        from wordformat.set_style import _fix_all_style_definitions
-
         doc = Document()
-        _fix_all_style_definitions(doc, root_config)
+        _fix_stage._fix_all_style_definitions(doc, root_config)
         # 不应抛出异常
 
     def test_fix_style_run_properties_clears_theme_color(self, root_config):
         """_fix_style_run_properties 应清除样式定义中的主题色。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
+        
+        from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
         cfg = root_config.headings.level_1
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
         # 手动设置主题色
@@ -184,7 +186,7 @@ class TestHeadingCoverageBoost:
         color.set(qn("w:val"), "4472C4")
         rPr.append(color)
 
-        _fix_style_run_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_run_properties(style, cfg, "Heading 1")
 
         rPr_after = style.element.find(qn("w:rPr"))
         color_after = rPr_after.find(qn("w:color"))
@@ -193,15 +195,15 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_sets_font_name(self, root_config):
         """_fix_style_run_properties 应设置样式定义中的英文字体名。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
+        
+        from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
         cfg = root_config.body_text
-        _ensure_style_exists(doc, "Normal")
+        ensure_style_exists(doc, "Normal")
         style = doc.styles["Normal"]
 
-        _fix_style_run_properties(style, cfg, "Normal")
+        _fix_stage._fix_style_run_properties(style, cfg, "Normal")
 
         rPr = style.element.find(qn("w:rPr"))
         rFonts = rPr.find(qn("w:rFonts"))
@@ -209,16 +211,16 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_sets_bold(self, root_config):
         """_fix_style_run_properties 应设置样式定义中的加粗属性。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
-        from wordformat.config.datamodel import HeadingLevelConfig
+        
+        from wordformat.style.defs import ensure_style_exists
+        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
         cfg = HeadingLevelConfig(bold=True)
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
-        _fix_style_run_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_run_properties(style, cfg, "Heading 1")
 
         rPr = style.element.find(qn("w:rPr"))
         b = rPr.find(qn("w:b"))
@@ -226,16 +228,16 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_removes_italic(self, root_config):
         """_fix_style_run_properties 当 italic=False 时应移除斜体元素。"""
-        from wordformat.set_style import _fix_style_run_properties
-        from wordformat.style.style_enum import _ensure_style_exists
-        from wordformat.config.datamodel import HeadingLevelConfig
+        
+        from wordformat.style.defs import ensure_style_exists
+        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
         cfg = HeadingLevelConfig(italic=False)
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
-        _fix_style_run_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_run_properties(style, cfg, "Heading 1")
 
         rPr = style.element.find(qn("w:rPr"))
         i = rPr.find(qn("w:i"))
@@ -243,16 +245,16 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_paragraph_properties_sets_alignment(self, root_config):
         """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""
-        from wordformat.set_style import _fix_style_paragraph_properties
-        from wordformat.style.style_enum import _ensure_style_exists
-        from wordformat.config.datamodel import HeadingLevelConfig
+        
+        from wordformat.style.defs import ensure_style_exists
+        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
         cfg = HeadingLevelConfig(alignment="居中对齐")
-        _ensure_style_exists(doc, "Heading 1")
+        ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
-        _fix_style_paragraph_properties(style, cfg, "Heading 1")
+        _fix_stage._fix_style_paragraph_properties(style, cfg, "Heading 1")
 
         pPr = style.element.find(qn("w:pPr"))
         jc = pPr.find(qn("w:jc"))
@@ -663,7 +665,7 @@ class TestStyleEnumCoverageBoost:
         # 先删除 Normal 样式（如果存在），确保需要创建
         # 实际上 Normal 总是存在的，所以用另一个方式触发
         # 使用一个不在映射中的样式名，其 base 默认为 "Normal"
-        _ensure_style_exists(doc, "TestStyleNoBase")
+        ensure_style_exists(doc, "TestStyleNoBase")
         # 清理
         try:
             doc.styles.element.remove(
@@ -685,7 +687,7 @@ class TestStyleEnumCoverageBoost:
         except KeyError:
             pass
 
-        _ensure_style_exists(doc, "Heading 4")
+        ensure_style_exists(doc, "Heading 4")
 
         # 验证 outlineLvl 已设置
         style = doc.styles["Heading 4"]
@@ -699,7 +701,7 @@ class TestStyleEnumCoverageBoost:
         """覆盖行 630-633: 样式已存在时直接返回。"""
         doc = Document()
         # Normal 样式总是存在
-        _ensure_style_exists(doc, "Normal")
+        ensure_style_exists(doc, "Normal")
         # 不应抛出异常
 
     def test_ensure_style_creates_with_base(self):
@@ -713,7 +715,7 @@ class TestStyleEnumCoverageBoost:
         except KeyError:
             pass
 
-        _ensure_style_exists(doc, style_name)
+        ensure_style_exists(doc, style_name)
         style = doc.styles[style_name]
         assert style is not None
         # 清理
@@ -736,18 +738,18 @@ class TestSetStyleCoverageBoost:
         """config_model 无任何有效的 GlobalFormatConfig 时不抛异常。"""
         doc = Document()
         # 使用一个只有 numbering 和 global_format 的空模型
-        from wordformat.config.datamodel import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
+        from wordformat.config.models import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
 
         config_bare = NodeConfigRoot(
             global_format=GlobalFormatConfig(),
             body_text=BodyTextConfig(),
         )
-        _fix_all_style_definitions(doc, config_bare)
+        _fix_stage._fix_all_style_definitions(doc, config_bare)
         # 不应抛出异常
 
     def test_fix_all_style_definitions_theme_color_fix(self):
         """修正主题色的完整流程：有 themeColor 的样式被修正。"""
-        from wordformat.config.datamodel import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
+        from wordformat.config.models import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
 
         doc = Document()
         config_model = NodeConfigRoot(
@@ -772,7 +774,7 @@ class TestSetStyleCoverageBoost:
         except KeyError:
             pass
 
-        _fix_all_style_definitions(doc, config_model)
+        _fix_stage._fix_all_style_definitions(doc, config_model)
 
         # 验证主题色已清除
         rPr_after = style.element.find(qn("w:rPr"))
@@ -1165,3 +1167,196 @@ class TestUtilsCoverageBoost:
         file_path.write_text("test")
         with pytest.raises(ValueError, match="不是文件夹"):
             ensure_directory_exists(str(file_path))
+
+
+# ===========================================================================
+# 覆盖率提升：utils/_docx, config, style/xml_ops, base, tree, numbering
+# ===========================================================================
+
+
+class TestCoverageBoostRound2:
+    """补漏低覆盖率分支。"""
+
+    # --- utils/_docx.py ---
+
+    def test_ensure_directory_exists_creates_dir(self, tmp_path):
+        """确保目录不存在时创建。"""
+        from wordformat.utils import ensure_directory_exists
+        d = str(tmp_path / "new_dir")
+        ensure_directory_exists(d)
+        assert os.path.isdir(d)
+
+    def test_para_contains_image_false(self):
+        """无图片的段落返回 False。"""
+        from wordformat.utils import para_contains_image
+        doc = Document()
+        p = doc.add_paragraph("text")
+        assert para_contains_image(p) is False
+
+    def test_remove_all_numbering(self):
+        """remove_all_numbering 对空白文档不抛异常。"""
+        from wordformat.utils import remove_all_numbering
+        doc = Document()
+        remove_all_numbering(doc)
+
+    # --- config/loader.py ---
+
+    def test_config_not_loaded_error(self):
+        """ConfigNotLoadedError 可正常抛出和捕获。"""
+        from wordformat.config.loader import ConfigNotLoadedError
+        with pytest.raises(ConfigNotLoadedError):
+            raise ConfigNotLoadedError("test")
+
+    # --- style/xml_ops.py ---
+
+    def test_rPr_set_italic_remove(self):
+        """rPr_set_italic 传入 False 时移除 w:i。"""
+        from wordformat.style.xml_ops import rPr_set_italic, ensure_rPr
+        from docx.oxml import OxmlElement
+        style = Document().styles["Normal"]
+        rPr = ensure_rPr(style.element)
+        rPr.append(OxmlElement("w:i"))
+        rPr_set_italic(rPr, False)
+        assert rPr.find(qn("w:i")) is None
+
+    def test_rPr_set_underline_remove(self):
+        """rPr_set_underline 传入 False 时移除 w:u。"""
+        from wordformat.style.xml_ops import rPr_set_underline, ensure_rPr
+        from docx.oxml import OxmlElement
+        style = Document().styles["Normal"]
+        rPr = ensure_rPr(style.element)
+        u = OxmlElement("w:u")
+        u.set(qn("w:val"), "single")
+        rPr.append(u)
+        rPr_set_underline(rPr, False)
+        assert rPr.find(qn("w:u")) is None
+
+    # --- tree.py: JSON file path ---
+
+    def test_print_tree_from_json(self, tmp_path):
+        """print_tree 支持传入 JSON 文件路径。"""
+        import json
+        from wordformat.tree import print_tree
+        json_path = tmp_path / "test.json"
+        json_path.write_text(json.dumps([
+            {"category": "body_text", "paragraph": "hello"},
+        ]))
+        # 不应抛异常
+        with patch("sys.stdout", io.StringIO()):
+            print_tree(str(json_path), show_index=True, show_confidence=True)
+
+    # --- numbering.py ---
+
+    def test_process_heading_numbering_disabled(self):
+        """numbering 禁用时不处理。"""
+        from wordformat.numbering import process_heading_numbering
+        from unittest.mock import MagicMock
+        config = MagicMock()
+        config.enabled = False
+        process_heading_numbering(None, Document(), config)
+
+    # --- pipeline/stages.py ---
+
+    def test_formatting_stage_skips_void_nodes(self, doc):
+        """VOIDNODELIST 中的类别跳过格式化。"""
+        from wordformat.pipeline.stages import FormattingExecutionStage
+        from wordformat.rules.node import FormatNode
+        from wordformat.settings import VOIDNODELIST
+        stage = FormattingExecutionStage()
+        root = FormatNode(value={"category": VOIDNODELIST[0]}, level=0)
+        root.children = []
+        config = MagicMock()
+        stage.apply_format_check_to_all_nodes(root, doc, config, check=True)
+
+    def test_summary_stage_adds_comment(self, doc):
+        """SummaryGenerationStage 在 check 模式下添加批注。"""
+        from wordformat.pipeline.stages import SummaryGenerationStage, FormattingExecutionStage
+        from wordformat.rules.node import FormatNode
+        p = doc.add_paragraph("")
+        root = FormatNode(value={"category": "top"}, level=0)
+        root.children = []
+        FormatNode.reset_stats()
+        stage = SummaryGenerationStage()
+        from wordformat.pipeline.context import FormatContext
+        ctx = FormatContext(
+            json_path="", docx_path="", check=True,
+            config_path="", save_dir="/tmp",
+            document=doc, root_node=root,
+        )
+        stage.process(ctx)
+
+    # --- utils/_docx.py more ---
+
+
+    # --- style/xml_ops.py ---
+
+    def test_rPr_set_bold_remove(self):
+        """rPr_set_bold 传入 False 移除 w:b。"""
+        from wordformat.style.xml_ops import rPr_set_bold, ensure_rPr
+        style = Document().styles["Normal"]
+        rPr = ensure_rPr(style.element)
+        rPr.append(OxmlElement("w:b"))
+        rPr_set_bold(rPr, False)
+        assert rPr.find(qn("w:b")) is None
+
+    def test_line_rule_to_xml_unknown(self):
+        """line_rule_to_xml 对未知值返回 auto。"""
+        from wordformat.style.xml_ops import line_rule_to_xml
+        assert line_rule_to_xml(999) == "auto"
+
+    # --- style/defs.py ---
+
+    def test_fontsize_base_set_numeric(self):
+        """FontSize.base_set 处理数字字符串。"""
+        from wordformat.style.defs import FontSize
+        doc = Document()
+        p = doc.add_paragraph("test")
+        run = p.add_run("x")
+        fs = FontSize("14")
+        fs.base_set(run)
+        assert run.font.size is not None
+
+    def test_fontname_base_set_english(self):
+        """FontName.base_set 处理英文字体。"""
+        from wordformat.style.defs import FontName
+        doc = Document()
+        p = doc.add_paragraph("test")
+        run = p.add_run("x")
+        fn = FontName("Arial")
+        fn.base_set(run)
+        assert run.font.name == "Arial"
+
+    def test_unit_label_enum_eq_none(self):
+        """UnitLabelEnum __eq__ 对 None 返回 rel_value == 0。"""
+        from wordformat.style.defs import FirstLineIndent
+        indent = FirstLineIndent("0字符")
+        assert indent == None  # rel_value is 0, so equal to None
+
+    # --- numbering.py ---
+
+    def test_auto_strip_numbering_empty_runs(self):
+        """空 run 的段落 _auto_strip_numbering 返回 False。"""
+        from wordformat.numbering import _auto_strip_numbering
+        doc = Document()
+        p = doc.add_paragraph("")
+        assert _auto_strip_numbering(p, 0) is False
+
+    # --- pipeline/stages.py ---
+
+    def test_load_config_stage_no_config(self):
+        """未提供配置文件时使用默认配置。"""
+        from wordformat.pipeline.stages import LoadConfigStage
+        from wordformat.pipeline.context import FormatContext
+        ctx = FormatContext(json_path="", docx_path="", check=True, config_path="")
+        stage = LoadConfigStage()
+        result = stage.process(ctx)
+        assert result is ctx
+
+    # --- utils/_fs.py ---
+
+
+    def test_ensure_is_directory_missing(self, tmp_path):
+        """ensure_is_directory 路径不存在时抛出 ValueError。"""
+        from wordformat.utils import ensure_is_directory
+        with pytest.raises(ValueError, match="不存在"):
+            ensure_is_directory(str(tmp_path / "nonexistent"))
