@@ -776,3 +776,51 @@ class TestReplaceParagraphText:
 
 
 # ======================== _check_caption_numbering ========================
+
+
+class TestCaptionEdgeCases:
+    """覆盖 caption.py 边界分支。"""
+
+    def test_replace_paragraph_text_empty_runs(self):
+        """空 runs 列表不抛异常。"""
+        from docx import Document
+        from wordformat.rules.caption import _replace_paragraph_text
+        doc = Document()
+        p = doc.add_paragraph()
+        # 没有 runs — 不应抛异常
+        _replace_paragraph_text(p, "new text")
+
+    def test_check_caption_numbering_no_paragraph(self):
+        """paragraph 为 None 时直接返回。"""
+        from wordformat.rules.caption import _check_caption_numbering, CaptionFigure
+        node = CaptionFigure(value={"category": "test"}, level=0)
+        node.paragraph = None
+        # 不应抛异常
+        _check_caption_numbering(node, None, "图", {"enabled": True, "separator": ".", "label_number_space": False})
+
+    def test_apply_caption_numbering_no_paragraph(self):
+        """paragraph 为 None 时直接返回。"""
+        from wordformat.rules.caption import _apply_caption_numbering, CaptionFigure
+        node = CaptionFigure(value={"category": "test"}, level=0)
+        node.paragraph = None
+        _apply_caption_numbering(node, "图", {"enabled": True, "separator": ".", "label_number_space": False})
+
+
+class TestNodeConfigRoot:
+    """覆盖 config/models.py NodeConfigRoot。"""
+
+    def test_setattr(self):
+        from wordformat.config.models import NodeConfigRoot
+        cfg = NodeConfigRoot()
+        cfg.template_name = "测试"
+        assert cfg["template_name"] == "测试"
+
+    def test_getattr_missing_returns_none(self):
+        from wordformat.config.models import NodeConfigRoot
+        cfg = NodeConfigRoot()
+        assert cfg.nonexistent is None
+
+    def test_model_dump(self):
+        from wordformat.config.models import NodeConfigRoot
+        cfg = NodeConfigRoot(a=1, b=2)
+        assert cfg.model_dump() == {"a": 1, "b": 2}

@@ -415,3 +415,61 @@ class TestFormatNode:
 
 
 
+
+
+class TestDotDict:
+    """覆盖 config/dotdict.py。"""
+
+    def test_setattr(self):
+        from wordformat.config.dotdict import DotDict
+        d = DotDict()
+        d.alignment = "居中"
+        assert d["alignment"] == "居中"
+
+    def test_delattr_existing_key(self):
+        from wordformat.config.dotdict import DotDict
+        d = DotDict(a=1)
+        del d.a
+        assert "a" not in d
+
+    def test_delattr_missing_key_raises(self):
+        from wordformat.config.dotdict import DotDict
+        import pytest
+        d = DotDict()
+        with pytest.raises(AttributeError):
+            del d.nonexistent
+
+    def test_getattr_nested_dict_returns_dotdict(self):
+        from wordformat.config.dotdict import DotDict
+        d = DotDict({"outer": {"inner": 1}})
+        assert isinstance(d.outer, DotDict)
+        assert d.outer.inner == 1
+
+    def test_deep_merge_nested(self):
+        from wordformat.config.dotdict import deep_merge
+        base = {"a": {"b": 1, "c": 2}}
+        override = {"a": {"b": 99}}
+        result = deep_merge(base, override)
+        assert result["a"]["b"] == 99  # overridden
+        assert result["a"]["c"] == 2   # kept
+
+
+class TestExportDefaults:
+    """覆盖 structure/registry.py export_defaults()。"""
+
+    def test_export_returns_dict_with_key_sections(self):
+        from wordformat.structure.registry import export_defaults
+        # 需要先触发 @register（已通过 test 导入完成）
+        from wordformat.rules import (  # noqa: F401
+            AbstractContentCN,
+            AbstractTitleCN,
+            BodyText,
+            HeadingLevel1Node,
+        )
+        data = export_defaults()
+        assert isinstance(data, dict)
+        assert "template_name" in data
+        assert "style_checks_warning" in data
+        assert "abstract" in data
+        assert "headings" in data
+        assert "body_text" in data
