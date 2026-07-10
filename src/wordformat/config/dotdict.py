@@ -12,7 +12,7 @@ class DotDict(dict):
         try:
             val = self[key]
         except KeyError:
-            raise AttributeError(key) from None
+            return None
         if isinstance(val, dict):
             return DotDict(val)
         return val

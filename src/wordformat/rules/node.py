@@ -172,7 +172,7 @@ class FormatNode(TreeNode):
         from wordformat.style.diff import ParagraphStyle
 
         cfg = self.pydantic_config
-        if not hasattr(cfg, "alignment"):
+        if cfg.alignment is None:
             return
         ps = ParagraphStyle.from_config(cfg)
         if p:
@@ -193,7 +193,7 @@ class FormatNode(TreeNode):
         from wordformat.style.diff import CharacterStyle
 
         cfg = self.pydantic_config
-        if not hasattr(cfg, "chinese_font_name"):
+        if cfg.chinese_font_name is None:
             return
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,

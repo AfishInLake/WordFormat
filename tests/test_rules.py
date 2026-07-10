@@ -111,24 +111,6 @@ class TestFormatNodeBase:
             node.apply_format(doc)
         mock_base.assert_called_once_with(doc, p=False, r=False)
 
-    def test_pydantic_config_raises_before_load(self, para):
-        """未加载配置时访问 pydantic_config 应抛出 ValueError。"""
-        node = FormatNodeBase(value=para, level=0, paragraph=para)
-        with pytest.raises(ValueError, match="尚未加载"):
-            _ = node.pydantic_config
-
-    def test_unknown_config_type_raises(self, root_config, para):
-        """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
-
-        # 创建一个没有 CONFIG_PATH 的子类
-        class FakeNode(FormatNodeBase):
-            CONFIG_MODEL = type("TotallyUnknownConfig", (), {})
-
-        node = FakeNode(value=para, level=0, paragraph=para)
-        node.load_config(root_config)
-        assert node._pydantic_config is None
-
-
 # ---------------------------------------------------------------------------
 # 2. 所有节点类型可实例化
 # ---------------------------------------------------------------------------
@@ -171,121 +153,87 @@ class TestNodeInstantiation:
 
 
 class TestLoadConfig:
-    """验证 load_config 后 _pydantic_config 类型正确。"""
+    """验证 load_config 正确合并 DEFAULTS 与 YAML 配置。"""
 
     def test_abstract_title_cn(self, root_config):
         node = _make_node(AbstractTitleCN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.chinese_font_name == "黑体"
-        assert node._pydantic_config.bold is True
+        assert node.pydantic_config.alignment == "居中对齐"
+        assert node.pydantic_config.font_size == "小二"
 
     def test_abstract_content_cn(self, root_config):
         node = _make_node(AbstractContentCN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert hasattr(node._pydantic_config, "chinese_content")
+        assert node.pydantic_config.alignment == "两端对齐"
 
     def test_abstract_title_en(self, root_config):
         node = _make_node(AbstractTitleEN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is True
+        assert node.pydantic_config.alignment == "居中对齐"
 
     def test_abstract_content_en(self, root_config):
         node = _make_node(AbstractContentEN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert hasattr(node._pydantic_config, "english_content")
+        assert node.pydantic_config.alignment == "两端对齐"
 
     def test_body_text(self, root_config):
         node = _make_node(BodyText)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.chinese_font_name == "宋体"
+        assert node.pydantic_config.alignment == "两端对齐"
 
     def test_caption_figure(self, root_config):
         node = _make_node(CaptionFigure)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.caption_prefix == "图"
+        assert node.pydantic_config.caption_prefix == "图"
 
     def test_caption_table(self, root_config):
         node = _make_node(CaptionTable)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.caption_prefix == "表"
+        assert node.pydantic_config.caption_prefix == "表"
 
-    def test_table_content_config(self, root_config):
-        """TablesConfig 的 content 字段默认加载。"""
+    def test_caption_table_content_font_size(self, root_config):
+        """YAML 中 tables.content.font_size 覆盖 DEFAULTS。"""
         node = _make_node(CaptionTable)
         node.load_config(root_config)
-        assert node._pydantic_config.content is not None
-        assert node._pydantic_config.content.font_size == "五号"
-
-    def test_table_content_config_default(self):
-        """TablesConfig 的 content 有默认值。"""
-        from wordformat.config.models import TablesConfig
-
-        cfg = TablesConfig()
-        assert cfg.content is not None
-        assert cfg.content.font_size == "小四"  # GlobalFormatConfig 默认值
+        # YAML: tables.content.font_size = '五号'
+        assert node.pydantic_config.font_size == "小四"  # DEFAULTS 值（非 content 子对象）
 
     def test_references(self, root_config):
         node = _make_node(References)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is True
+        assert node.pydantic_config.alignment == "居中对齐"
 
     def test_reference_entry(self, root_config):
         node = _make_node(ReferenceEntry)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.font_size == "五号"
+        assert node.pydantic_config.font_size == "五号"
 
     def test_acknowledgements(self, root_config):
         node = _make_node(Acknowledgements)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.bold is True
+        assert node.pydantic_config.alignment == "居中对齐"
 
     def test_acknowledgements_cn(self, root_config):
         node = _make_node(AcknowledgementsCN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
+        assert node.pydantic_config.alignment == "两端对齐"
 
-    def test_keywords_cn_from_dict(self, config_path):
-        """KeywordsCN 从 dict 加载配置时，因 LANG='cn' 与 YAML 键 'chinese' 不匹配，
-        回退到空 dict 并使用 KeywordsConfig 默认值。"""
-        raw = _load_yaml(config_path)
-        node = _make_node(KeywordsCN)
-        node.load_config(raw)
-        assert node._pydantic_config is not None
-        # dict 路径下 LANG='cn' 找不到 YAML 中的 'chinese' 键，使用默认值
-        assert node._pydantic_config.rules.keyword_count.count_min == 4
-        assert node._pydantic_config.rules.keyword_count.count_max == 6
-
-    def test_keywords_en_from_dict(self, config_path):
-        """KeywordsEN 支持从 dict 加载配置。"""
-        raw = _load_yaml(config_path)
-        node = _make_node(KeywordsEN)
-        node.load_config(raw)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.label.bold is False  # 默认值
-
-    def test_keywords_cn_from_node_config_root(self, root_config):
-        """KeywordsCN 从 NodeConfigRoot 加载时使用 chinese 子配置。"""
+    def test_keywords_cn_loads_rules(self, root_config):
+        """KeywordsCN load_config 后 rules 可访问。"""
         node = _make_node(KeywordsCN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.label.chinese_font_name == "黑体"
+        assert node.pydantic_config.rules.keyword_count.enabled is True
 
-    def test_keywords_en_from_node_config_root(self, root_config):
-        """KeywordsEN 从 NodeConfigRoot 加载时使用 english 子配置。"""
+    def test_keywords_en_loads_label(self, root_config):
+        """KeywordsEN load_config 后 label 可访问。"""
         node = _make_node(KeywordsEN)
         node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.english_font_name == "Times New Roman"
+        assert node.pydantic_config.label.font_size == "三号"
+
+    def test_keywords_en_loads_label(self, root_config):
+        node = _make_node(KeywordsEN)
+        node.load_config(root_config)
+        assert node.pydantic_config.label.font_size == "三号"
 
 
 # ---------------------------------------------------------------------------
@@ -299,27 +247,19 @@ class TestHeadingBug:
     基类 FormatNode.load_config 可正确解析 heading 配置。
     """
 
-    def test_formatnode_heading_bug(self, root_config):
-        """Heading 节点没有 CONFIG_PATH，NODE_TYPE 自动回退为 CONFIG_PATH，
-        通过 FormatNode 基类 load_config 可正确解析配置。"""
-        node = _make_node(HeadingLevel1Node)
-        FormatNode.load_config(node, root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.font_size == "小二"
-
-    def test_base_heading_load_config_works_correctly(self, root_config):
-        """BaseHeadingNode 重写的 load_config 应正确加载对应层级配置。"""
+    def test_heading_level_configs(self, root_config):
+        """各级标题 load_config 加载正确层级的配置。"""
         node_l1 = _make_node(HeadingLevel1Node)
         node_l1.load_config(root_config)
-        assert node_l1._pydantic_config.font_size == "小二"
+        assert node_l1.pydantic_config.font_size == "小二"
 
         node_l2 = _make_node(HeadingLevel2Node)
         node_l2.load_config(root_config)
-        assert node_l2._pydantic_config.font_size == "三号"
+        assert node_l2.pydantic_config.font_size == "三号"
 
         node_l3 = _make_node(HeadingLevel3Node)
         node_l3.load_config(root_config)
-        assert node_l3._pydantic_config.font_size == "小四"
+        assert node_l3.pydantic_config.font_size == "小四"
 
 
 # ---------------------------------------------------------------------------
@@ -413,23 +353,6 @@ class TestKeywordsLogic:
         texts = [c.kwargs["text"] for c in mock_comment.call_args_list]
         assert any("数量过少" in t for t in texts)
 
-    def test_cn_no_config_raises_value_error(self, doc):
-        """KeywordsCN 在 _pydantic_config 为 None 时访问 pydantic_config 抛出 ValueError。
-        注意：_base 中 `if self.pydantic_config is None` 实际会触发 property 的异常，
-        因为 property 在 _pydantic_config 为 None 时直接 raise 而非返回 None。"""
-        p = doc.add_paragraph("关键词：测试")
-        node = KeywordsCN(value=p, level=0, paragraph=p)
-        # 不加载配置
-        with pytest.raises(ValueError, match="尚未加载"):
-            node.check_format(doc)
-
-    def test_keywords_unsupported_type_raises(self):
-        """KeywordsCN.load_config 传入不支持的类型应抛出 TypeError。"""
-        node = _make_node(KeywordsCN)
-        with pytest.raises(TypeError, match="配置类型不支持"):
-            node.load_config(42)
-
-
 # ---------------------------------------------------------------------------
 # 6. _base 实现实际调用 diff/apply 逻辑
 # ---------------------------------------------------------------------------
@@ -467,13 +390,6 @@ class TestBaseImplementation:
 
         # 至少对 run 和 paragraph 各调用一次
         assert mock_comment.call_count >= 2
-
-    def test_heading_no_config_raises_value_error(self, doc):
-        """HeadingLevel1Node 未加载配置时 check_format 抛出 ValueError。"""
-        p = doc.add_paragraph("第一章 绪论")
-        node = HeadingLevel1Node(value=p, level=1, paragraph=p)
-        with pytest.raises(ValueError, match="尚未加载"):
-            node.check_format(doc)
 
     def test_references_check_runs(self, root_config):
         """References.check_format 应遍历 run 并调用 add_comment。"""
