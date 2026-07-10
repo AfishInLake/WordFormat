@@ -10,6 +10,7 @@ from wordformat.config.models import (
     TablesConfig,
 )
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 from wordformat.utils import parse_caption_text
 
 
@@ -134,13 +135,13 @@ def _apply_caption_numbering(
     _replace_paragraph_text(paragraph, new_text)
 
 
+@register("caption_figure")
 class CaptionFigure(FormatNode[FiguresConfig]):
     """题注-图片"""
 
     NODE_TYPE = "figures"
     NODE_LABEL = "图注"
     CONFIG_MODEL = FiguresConfig
-    CONFIG_PATH = "figures"
     RULES = {"caption_numbering": "_handle_caption_numbering"}
 
     def _handle_caption_numbering(self, doc, rule_cfg: CaptionNumberingConfig, p: bool):
@@ -152,13 +153,13 @@ class CaptionFigure(FormatNode[FiguresConfig]):
             _apply_caption_numbering(self, prefix, rule_cfg)
 
 
+@register("caption_table")
 class CaptionTable(FormatNode[TablesConfig]):
     """题注-表格"""
 
     NODE_TYPE = "tables"
     NODE_LABEL = "表注"
     CONFIG_MODEL = TablesConfig
-    CONFIG_PATH = "tables"
     RULES = {"caption_numbering": "_handle_caption_numbering"}
 
     def _handle_caption_numbering(self, doc, rule_cfg: CaptionNumberingConfig, p: bool):

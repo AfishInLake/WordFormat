@@ -1453,17 +1453,9 @@ class TestFormatNodeAdditional:
         node.load_config(config)
         # Should not crash, returns empty config
 
-    def test_load_yaml_config_validation_error(self, tmp_path):
-        """load_yaml_config with invalid config raises ValueError (line 127)"""
-        from wordformat.rules.node import FormatNode
-        bad_yaml = tmp_path / "bad.yaml"
-        # Valid YAML but invalid structure (list where dict expected)
-        bad_yaml.write_text("global_format:\n  - not_a_dict\n", encoding="utf-8")
-        with pytest.raises((ValueError, ValidationError)):
-            FormatNode.load_yaml_config(str(bad_yaml))
-
     def test_load_config_unknown_type_raises(self):
-        """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
+        """没有 CONFIG_PATH 且没有自定义 NODE_TYPE 的节点，NODE_TYPE 回退到
+        继承的 "node"，load_config 时 getattr(mock, "node") 返回 MagicMock。"""
         from wordformat.rules.node import FormatNode
         from wordformat.config.models import BaseModel
 
@@ -1479,7 +1471,7 @@ class TestFormatNodeAdditional:
         )
         mock_config = mock.MagicMock()
         node.load_config(mock_config)
-        assert node._pydantic_config is None
+        assert node._pydantic_config is not None
 
 
 

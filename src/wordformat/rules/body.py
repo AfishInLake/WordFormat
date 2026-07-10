@@ -11,6 +11,7 @@ from docx.oxml.ns import qn
 
 from wordformat.config.models import BodyTextConfig, PunctuationRule
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 
 # 匹配正文中的参考文献交叉引用标记
 # 支持: [1] [1,2] [1-3] [1,2,3-5] [1，2] [1、2] [1, 2]
@@ -86,13 +87,13 @@ def _split_run_at(paragraph, start: int, end: int):
     return None
 
 
+@register("body_text")
 class BodyText(FormatNode[BodyTextConfig]):
     """正文节点"""
 
     NODE_TYPE = "body_text"
     NODE_LABEL = "正文段落"
     CONFIG_MODEL = BodyTextConfig
-    CONFIG_PATH = "body_text"
     RULES = {"punctuation": "_check_punctuation"}
 
     def _check_punctuation(self, doc, rule_cfg: PunctuationRule, p: bool = False):

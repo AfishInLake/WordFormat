@@ -8,8 +8,10 @@ from wordformat.config.models import (
     AcknowledgementsTitleConfig,
 )
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 
 
+@register("acknowledgements_title", level=1)
 class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
     """致谢节点"""
 
@@ -19,10 +21,10 @@ class Acknowledgements(FormatNode[AcknowledgementsTitleConfig]):
     CONFIG_PATH = "acknowledgements.title"
 
 
+@register("acknowledgements_content")
 class AcknowledgementsCN(FormatNode[AcknowledgementsContentConfig]):
     """致谢内容"""
 
     NODE_TYPE = "acknowledgements.content"
     NODE_LABEL = "致谢内容"
     CONFIG_MODEL = AcknowledgementsContentConfig
-    CONFIG_PATH = "acknowledgements.content"

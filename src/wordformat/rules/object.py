@@ -2,9 +2,11 @@
 
 from wordformat.config.models import ImageFormatConfig, TableObjectConfig
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 from wordformat.style.comments import format_comment
 
 
+@register("figure_image")
 class FigureImage(FormatNode[ImageFormatConfig]):
     """图片段落节点（包含内联图片的段落，非题注）。
 
@@ -52,6 +54,7 @@ class FigureImage(FormatNode[ImageFormatConfig]):
             )
 
 
+@register("table_object")
 class TableObject(FormatNode[TableObjectConfig]):
     """表格对象节点（表格整体格式，非题注）。"""
 

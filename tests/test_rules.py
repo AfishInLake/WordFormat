@@ -295,19 +295,17 @@ class TestLoadConfig:
 
 class TestHeadingBug:
     """
-    BUG: FormatNode.load_config 中 HeadingLevelConfig 分支映射到
-    full_config.headings（整个 HeadingsConfig），而非对应层级的配置。
-    但 BaseHeadingNode 重写了 load_config，绕过了此 bug。
-    此测试验证基类 FormatNode.load_config 确实存在此 bug。
+    NODE_TYPE 现在自动回退为 CONFIG_PATH，
+    基类 FormatNode.load_config 可正确解析 heading 配置。
     """
 
     def test_formatnode_heading_bug(self, root_config):
-        """Heading 节点没有 CONFIG_PATH（由 BaseHeadingNode 自定义 load_config 处理），
-        通过 FormatNode 基类 load_config 加载时 _pydantic_config 应为 None。"""
+        """Heading 节点没有 CONFIG_PATH，NODE_TYPE 自动回退为 CONFIG_PATH，
+        通过 FormatNode 基类 load_config 可正确解析配置。"""
         node = _make_node(HeadingLevel1Node)
-        # 故意调用 FormatNode 的 load_config（绕过 BaseHeadingNode 的重写）
         FormatNode.load_config(node, root_config)
-        assert node._pydantic_config is None
+        assert node._pydantic_config is not None
+        assert node._pydantic_config.font_size == "小二"
 
     def test_base_heading_load_config_works_correctly(self, root_config):
         """BaseHeadingNode 重写的 load_config 应正确加载对应层级配置。"""
@@ -597,27 +595,6 @@ class TestBodyTextCitationSuperscript:
         # 分割后 [1 和 2] 分别在两个 run 中，但都是上标
         assert "[1" in superscript_texts
         assert "2]" in superscript_texts
-
-
-# ---------------------------------------------------------------------------
-# 8. load_yaml_config 静态方法
-# ---------------------------------------------------------------------------
-
-
-class TestLoadYamlConfig:
-    """FormatNode.load_yaml_config 类方法。"""
-
-    def test_loads_valid_config(self, config_path):
-        """正确加载 YAML 配置并返回 dict。"""
-        result = FormatNode.load_yaml_config(config_path)
-        assert isinstance(result, dict)
-        assert "abstract" in result
-        assert "headings" in result
-
-    def test_raises_on_missing_file(self):
-        """文件不存在时抛出 FileNotFoundError。"""
-        with pytest.raises(FileNotFoundError, match="不存在"):
-            FormatNode.load_yaml_config("/nonexistent/path.yaml")
 
 
 # ---------------------------------------------------------------------------

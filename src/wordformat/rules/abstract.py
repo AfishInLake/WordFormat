@@ -10,25 +10,26 @@ from wordformat.config.models import (
     AbstractTitleConfig,
 )
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
 
+@register("abstract_chinese_title", level=1)
 class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
     """摘要标题中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_title"
     NODE_LABEL = "中文摘要标题"
     CONFIG_MODEL = AbstractTitleConfig
-    CONFIG_PATH = "abstract.chinese.chinese_title"
 
 
+@register("abstract_chinese_title_content", level=1)
 class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
     """摘要标题正文混合中文节点"""
 
     NODE_TYPE = "abstract.chinese"
     NODE_LABEL = "中文摘要"
     CONFIG_MODEL = AbstractChineseConfig
-    CONFIG_PATH = "abstract.chinese"
 
     def check_title(self, run) -> bool:
         """检查标题是否包含在正文中"""
@@ -92,6 +93,7 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
         )
 
 
+@register("abstract_chinese_content")
 class AbstractContentCN(FormatNode[AbstractChineseConfig]):
     """摘要内容中文节点"""
 
@@ -133,22 +135,22 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
         )
 
 
+@register("abstract_english_title", level=1)
 class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
     """摘要标题英文节点"""
 
     NODE_TYPE = "abstract.english.english_title"
     NODE_LABEL = "英文摘要标题"
     CONFIG_MODEL = AbstractTitleConfig
-    CONFIG_PATH = "abstract.english.english_title"
 
 
+@register("abstract_english_title_content", level=1)
 class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
     """摘要标题正文混合英文节点"""
 
     NODE_TYPE = "abstract.english"
     NODE_LABEL = "英文摘要"
     CONFIG_MODEL = AbstractEnglishConfig
-    CONFIG_PATH = "abstract.english"
 
     def _check_title_in_full_text(self, runs) -> int:
         """拼接全部 run 文本，返回 "Abstract" 前缀在 clean 文本中的结束位置。
@@ -240,6 +242,7 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
         )
 
 
+@register("abstract_english_content")
 class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
     """摘要内容英文节点"""
 

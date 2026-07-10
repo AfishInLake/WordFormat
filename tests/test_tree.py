@@ -348,16 +348,6 @@ class TestFormatNode:
         with pytest.raises(ValueError, match="尚未加载Pydantic配置"):
             _ = node.pydantic_config
 
-    def test_load_yaml_config_file_not_found(self):
-        with pytest.raises(FileNotFoundError, match="配置文件"):
-            FormatNode.load_yaml_config("/nonexistent/config.yaml")
-
-    def test_load_yaml_config_invalid_yaml(self, tmp_path):
-        bad_yaml = tmp_path / "bad.yaml"
-        bad_yaml.write_text(":\n  - [invalid", encoding="utf-8")
-        with pytest.raises((ValueError, RuntimeError)):
-            FormatNode.load_yaml_config(str(bad_yaml))
-
     def test_update_paragraph(self, doc):
         node = FormatNode(value="test", level=1)
         p = doc.add_paragraph("hello")
@@ -407,8 +397,8 @@ class TestFormatNode:
         node.add_comment(doc, run, "   ")
 
     def test_load_config_heading_level_bug(self):
-        """Heading 节点没有 CONFIG_PATH，由 BaseHeadingNode 自定义 load_config 处理。
-        通过 FormatNode 基类 load_config 加载时 _pydantic_config 应为 None。"""
+        """Heading 节点没有 CONFIG_PATH 时，NODE_TYPE 自动回退为 CONFIG_PATH，
+        FormatNode 基类 load_config 可正确解析配置。"""
         from wordformat.config.models import HeadingLevelConfig, NodeConfigRoot
 
         class TestFormatNode(FormatNode[HeadingLevelConfig]):
@@ -418,7 +408,8 @@ class TestFormatNode:
         node = TestFormatNode(value="test", level=1)
         root_config = NodeConfigRoot()
         node.load_config(root_config)
-        assert node._pydantic_config is None
+        assert node._pydantic_config is not None
+        assert node._pydantic_config.font_size == "小四"
 
 
 

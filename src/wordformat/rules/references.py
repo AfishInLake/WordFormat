@@ -5,8 +5,10 @@
 
 from wordformat.config.models import ReferencesContentConfig, ReferencesTitleConfig
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 
 
+@register("references_title", level=1)
 class References(FormatNode[ReferencesTitleConfig]):
     """参考文献节点"""
 
@@ -16,6 +18,7 @@ class References(FormatNode[ReferencesTitleConfig]):
     CONFIG_PATH = "references.title"
 
 
+@register("references_content")
 class ReferenceEntry(FormatNode[ReferencesContentConfig]):
     """参考文献条目节点"""
 

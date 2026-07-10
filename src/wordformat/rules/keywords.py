@@ -11,6 +11,7 @@ from wordformat.config.models import (
     TrailingPunctRule,
 )
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
 
@@ -114,6 +115,7 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
     # 第二步：英文关键词节点（专属逻辑）
 
 
+@register("keywords_english", level=3)
 class KeywordsEN(BaseKeywordsNode):
     """关键词节点-英文"""
 
@@ -224,6 +226,7 @@ class KeywordsEN(BaseKeywordsNode):
 
 
 # 第三步：中文关键词节点（专属逻辑）
+@register("keywords_chinese", level=3)
 class KeywordsCN(BaseKeywordsNode):
     """关键词节点-中文"""
 

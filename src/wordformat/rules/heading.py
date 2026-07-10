@@ -7,6 +7,7 @@ from loguru import logger
 
 from wordformat.config.models import HeadingLevelConfig, NodeConfigRoot
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 
 
 class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
@@ -57,6 +58,7 @@ class BaseHeadingNode(FormatNode[HeadingLevelConfig]):
 
 
 # 各层级标题节点（无需重写check_format，直接复用基类逻辑）
+@register("heading_level_1", level=1)
 class HeadingLevel1Node(BaseHeadingNode):
     """一级标题节点"""
 
@@ -65,6 +67,7 @@ class HeadingLevel1Node(BaseHeadingNode):
     NODE_LABEL = "一级标题"
 
 
+@register("heading_level_2", level=2)
 class HeadingLevel2Node(BaseHeadingNode):
     """二级标题节点"""
 
@@ -73,6 +76,7 @@ class HeadingLevel2Node(BaseHeadingNode):
     NODE_LABEL = "二级标题"
 
 
+@register("heading_level_3", level=3)
 class HeadingLevel3Node(BaseHeadingNode):
     """三级标题节点"""
 
