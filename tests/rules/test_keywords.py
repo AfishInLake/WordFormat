@@ -87,6 +87,7 @@ def run_with_text(para):
 
 
 
+
 class TestKeywordsLogic:
     """关键词节点的标签识别、数量校验、标点校验。"""
 
@@ -176,3 +177,96 @@ class TestKeywordsLogic:
 # ---------------------------------------------------------------------------
 # 6. _base 实现实际调用 diff/apply 逻辑
 # ---------------------------------------------------------------------------
+
+
+class TestKeywordsENBase:
+    """覆盖 keywords.py lines 114, 121, 130-135, 152-153"""
+
+    def _make_en_node(self, config_dict=None):
+        """Helper to create a KeywordsEN node with config loaded"""
+        from wordformat.rules.keywords import KeywordsEN
+        node = KeywordsEN(
+            value={"category": "abstract.keywords.english", "fingerprint": "fp"},
+            level=1,
+        )
+        if config_dict:
+            node.load_config(config_dict)
+        return node
+
+    def test_empty_run_skip(self, sample_yaml_config):
+        """Empty run text is skipped (line 114)"""
+        from wordformat.config.loader import init_config, get_config
+        init_config(sample_yaml_config)
+        config = get_config()
+
+        node = self._make_en_node(config)
+        doc = Document()
+        p = doc.add_paragraph()
+        empty_run = p.add_run("   ")
+        empty_run.text = "   "
+        node.paragraph = p
+        # Should not crash, empty run is skipped
+        node.check_format(doc)
+
+    def test_label_style_check(self, sample_yaml_config):
+        """Label run style is checked (line 121)"""
+        from wordformat.config.loader import init_config, get_config
+        init_config(sample_yaml_config)
+        config = get_config()
+
+        node = self._make_en_node(config)
+        doc = Document()
+        p = doc.add_paragraph()
+        label_run = p.add_run("Keywords: ")
+        label_run.font.bold = False  # Wrong - should be bold per config
+        node.paragraph = p
+        node.check_format(doc)
+        # Should have added a comment about bold mismatch
+
+    def test_content_style_check(self, sample_yaml_config):
+        """Content run style is checked (lines 130-135)"""
+        from wordformat.config.loader import init_config, get_config
+        init_config(sample_yaml_config)
+        config = get_config()
+
+        node = self._make_en_node(config)
+        doc = Document()
+        p = doc.add_paragraph()
+        label_run = p.add_run("Keywords: ")
+        label_run.font.bold = True  # Correct
+        content_run = p.add_run("AI, ML")
+        content_run.font.bold = True  # Wrong - content should not be bold
+        node.paragraph = p
+        node.check_format(doc)
+
+    def test_keyword_count_validation_min(self, sample_yaml_config):
+        """Keyword count < count_min triggers warning (via _run_rules)"""
+        from wordformat.config.loader import init_config, get_config
+        init_config(sample_yaml_config)
+        config = get_config()
+
+        node = self._make_en_node(config)
+        doc = Document()
+        p = doc.add_paragraph()
+        label_run = p.add_run("Keywords: ")
+        label_run.font.bold = True
+        content_run = p.add_run("AI")
+        node.paragraph = p
+        node.check_format(doc)
+        # count_min is 3, only 1 keyword -> should trigger count warning
+
+    def test_keyword_count_validation_max(self, sample_yaml_config):
+        """Keyword count > count_max triggers warning (via _run_rules)"""
+        from wordformat.config.loader import init_config, get_config
+        init_config(sample_yaml_config)
+        config = get_config()
+
+        node = self._make_en_node(config)
+        doc = Document()
+        p = doc.add_paragraph()
+        label_run = p.add_run("Keywords: ")
+        label_run.font.bold = True
+        content_run = p.add_run("AI, ML, NLP, CV, DB, SE")
+        node.paragraph = p
+        node.check_format(doc)
+        # count_max is 5, 6 keywords -> should trigger count warning

@@ -87,6 +87,7 @@ def run_with_text(para):
 
 
 
+
 class TestFormatNodeBase:
     """FormatNode 基类的核心契约。"""
 
@@ -131,6 +132,7 @@ NODE_CLASSES = [
 
 @pytest.mark.parametrize("cls", NODE_CLASSES, ids=lambda c: c.__name__)
 
+
 class TestNodeInstantiation:
     """每个节点类型都能正确实例化。"""
 
@@ -152,6 +154,7 @@ class TestNodeInstantiation:
 # ---------------------------------------------------------------------------
 # 3. load_config 为每个节点正确设置 _pydantic_config
 # ---------------------------------------------------------------------------
+
 
 
 
@@ -245,6 +248,7 @@ class TestLoadConfig:
 
 
 
+
 class TestBaseImplementation:
     """验证 _base 实现确实执行了 diff_from_run / apply_to_run 逻辑。"""
 
@@ -296,3 +300,4 @@ class TestBaseImplementation:
 # ---------------------------------------------------------------------------
 # 7. BodyText._apply_citation_superscript
 # ---------------------------------------------------------------------------
+

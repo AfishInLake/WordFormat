@@ -87,6 +87,7 @@ def run_with_text(para):
 
 
 
+
 class TestBodyTextCitationSuperscript:
     """测试 BodyText.apply_format 中的引用上标自动设置。"""
 
@@ -192,3 +193,4 @@ class TestBodyTextCitationSuperscript:
 # ---------------------------------------------------------------------------
 # 8. AbstractTitleCN._base 完整 diff/apply 覆盖
 # ---------------------------------------------------------------------------
+

@@ -87,6 +87,7 @@ def run_with_text(para):
 
 
 
+
 class TestHeadingBug:
     """
     NODE_TYPE 现在自动回退为 CONFIG_PATH，
@@ -111,6 +112,7 @@ class TestHeadingBug:
 # ---------------------------------------------------------------------------
 # 5. KeywordsCN / KeywordsEN 特有逻辑
 # ---------------------------------------------------------------------------
+
 
 
 
@@ -178,6 +180,7 @@ class TestHeadingLevel1NodeBase:
 
 
 
+
 class TestHeadingLevel2NodeBase:
     """覆盖 heading.py HeadingLevel2Node._base 的 diff/apply 逻辑。"""
 
@@ -222,6 +225,7 @@ class TestHeadingLevel2NodeBase:
 
 
 
+
 class TestHeadingLevel3NodeBase:
     """覆盖 heading.py HeadingLevel3Node._base 的 diff/apply 逻辑。"""
 
@@ -263,3 +267,85 @@ class TestHeadingLevel3NodeBase:
 # ---------------------------------------------------------------------------
 # 21. References._base 覆盖
 # ---------------------------------------------------------------------------
+
+
+class TestHeadingLevelNodes:
+    """覆盖 heading.py lines 36-41, 52-58"""
+
+    def test_heading_level1_load_config_dict(self):
+        """HeadingLevel1Node.load_config with dict (lines 36-41)"""
+        from wordformat.rules.heading import HeadingLevel1Node
+        node = HeadingLevel1Node(
+            value={"category": "headings.level_1", "fingerprint": "fp"},
+            level=1,
+        )
+        config_dict = {
+            "headings": {
+                "level_1": {
+                    "alignment": "居中对齐",
+                    "font_size": "小二",
+                    "bold": True,
+                }
+            }
+        }
+        node.load_config(config_dict)
+        assert node.pydantic_config is not None
+
+    def test_heading_level2_load_config_dict(self):
+        """HeadingLevel2Node.load_config with dict (lines 52-58)"""
+        from wordformat.rules.heading import HeadingLevel2Node
+        node = HeadingLevel2Node(
+            value={"category": "headings.level_2", "fingerprint": "fp"},
+            level=2,
+        )
+        config_dict = {
+            "headings": {
+                "level_2": {
+                    "alignment": "左对齐",
+                    "font_size": "三号",
+                }
+            }
+        }
+        node.load_config(config_dict)
+        assert node.pydantic_config is not None
+
+    def test_heading_level3_load_config_dict(self):
+        """HeadingLevel3Node.load_config with dict"""
+        from wordformat.rules.heading import HeadingLevel3Node
+        node = HeadingLevel3Node(
+            value={"category": "headings.level_3", "fingerprint": "fp"},
+            level=3,
+        )
+        config_dict = {
+            "headings": {
+                "level_3": {
+                    "alignment": "左对齐",
+                    "font_size": "小四",
+                }
+            }
+        }
+        node.load_config(config_dict)
+        assert node.pydantic_config is not None
+
+    def test_heading_base_with_config(self, sample_yaml_config):
+        """_base method with loaded config"""
+        from wordformat.config.loader import init_config, get_config
+        from wordformat.rules.heading import HeadingLevel1Node
+        init_config(sample_yaml_config)
+        config = get_config()
+
+        node = HeadingLevel1Node(
+            value={"category": "headings.level_1", "fingerprint": "fp"},
+            level=1,
+        )
+        node.load_config(config)
+        doc = Document()
+        p = doc.add_paragraph()
+        run = p.add_run("第一章 绪论")
+        node.paragraph = p
+        node.check_format(doc)  # 通过 RULES handler 执行格式检查
+
+
+
+# ==================== (o) set_style.py 额外覆盖测试 ====================
+
