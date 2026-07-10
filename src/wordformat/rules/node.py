@@ -3,14 +3,14 @@
 # @Author  : afish
 # @File    : node.py
 from collections.abc import Sequence
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import Any
 
 from docx.document import Document
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.config.models import BaseModel
+from wordformat.config.dotdict import DotDict, deep_merge
 
 
 class TreeNode:
@@ -20,50 +20,33 @@ class TreeNode:
 
     def __init__(self, value: Any):
         self.value = value
-        self.__config = {}
+        self._config = DotDict()
         self.children: list[TreeNode] = []
         self.fingerprint = None
 
     @property
     def config(self):
-        return self.__config
+        return self._config
 
-    def load_config(self, full_config: dict | Any) -> None:
-        """
-        根据 NODE_TYPE（点分路径）从 full_config 中提取子配置。
-
-        支持两种输入：
-        - dict：按键逐级查找，结果存入 self.config 属性
-        - Pydantic 模型：按 getattr 逐级查找，结果同时存入 self._pydantic_config
-
-        FormatNode 子类可通过 CONFIG_PATH 类属性覆盖 getattr 查找路径
-        （当 CONFIG_PATH 与 NODE_TYPE 不一致时）。
-        """
-        if isinstance(full_config, dict):
-            path_parts = self.NODE_TYPE.split(".")
-            current = full_config
-            try:
-                for part in path_parts:
-                    if not isinstance(current, dict):
-                        raise KeyError
-                    current = current[part]
-                self.__config = current if isinstance(current, dict) else {}
-            except (KeyError, TypeError):
-                self.__config = {}
-            return
-
-        # Pydantic 模型：getattr 查找，优先 CONFIG_PATH，回退到 NODE_TYPE
-        config_path = type(self).__dict__.get("CONFIG_PATH")
-        if config_path is None:
-            config_path = self.NODE_TYPE
+    def load_config(self, full_config: dict) -> None:
+        """根据 NODE_TYPE 从 full_config 中提取子配置，与 DEFAULTS 合并。"""
+        # 沿 NODE_TYPE 路径逐级查找 YAML 配置
+        path_parts = self.NODE_TYPE.split(".")
+        yaml_node: dict = {}
+        current = full_config
         try:
-            obj = full_config
-            for part in config_path.split("."):
-                obj = getattr(obj, part)
-            self.__config = {}
-            self._pydantic_config = obj
-        except AttributeError:
-            self.__config = {}
+            for part in path_parts:
+                if not isinstance(current, dict):
+                    raise KeyError
+                current = current[part]
+            yaml_node = current if isinstance(current, dict) else {}
+        except (KeyError, TypeError):
+            yaml_node = {}
+
+        # 合并：DEFAULTS 为底，YAML 覆盖
+        defaults = getattr(type(self), "DEFAULTS", {})
+        merged = deep_merge(defaults, yaml_node) if defaults else yaml_node
+        self._config = DotDict(merged)
 
     def add_child(self, child_value: Any) -> "TreeNode":
         """添加一个子节点，并返回该子节点（便于链式调用）"""
@@ -79,13 +62,11 @@ class TreeNode:
         return f"TreeNode({self.value})"
 
 
-T = TypeVar("T", bound=BaseModel)
-
-
-class FormatNode(TreeNode, Generic[T]):
+class FormatNode(TreeNode):
     """所有格式检查节点的基类"""
 
-    CONFIG_MODEL: Type[T]
+    # 子类定义的默认值，load_config 时与 YAML 合并
+    DEFAULTS: dict = {}
 
     # 全局错误统计（类变量，一次 check 周期内累加）
     _error_stats: dict[str, int] = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
@@ -94,7 +75,6 @@ class FormatNode(TreeNode, Generic[T]):
     NODE_LABEL: str = ""
 
     # 子类声明：规则名 → handler 方法名，框架自动按 config 启用/禁用调度
-    # 只放需要 YAML 配置控制的业务规则。段落/字符格式由 DEFAULT_RULES 自动处理
     RULES: dict[str, str] = {}
 
     # 框架自动注入的默认规则，不依赖配置，所有节点默认启用
@@ -110,21 +90,16 @@ class FormatNode(TreeNode, Generic[T]):
         paragraph: Paragraph = None,
         expected_rule: dict[str, Any] = None,
     ):
-        super().__init__(value=value)  # value 就是 paragraph
+        super().__init__(value=value)
         self.level: int | float = level
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
-        self._pydantic_config: Optional[T] = None  # Pydantic配置对象
-        self._comment_texts: list[
-            tuple
-        ] = []  # (runs, text) 缓冲，flush 时按 runs 分组合并
+        self._comment_texts: list[tuple] = []
 
     @property
-    def pydantic_config(self) -> T:
-        """只读属性：获取类型安全的Pydantic配置对象"""
-        if self._pydantic_config is None:
-            raise ValueError(f"节点 {self.NODE_TYPE} 尚未加载Pydantic配置")
-        return self._pydantic_config
+    def pydantic_config(self) -> "DotDict":
+        """返回当前节点的合并配置（DotDict）。"""
+        return self._config
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph
@@ -146,7 +121,7 @@ class FormatNode(TreeNode, Generic[T]):
         if not all_rules:
             return
 
-        rules_config = getattr(self._pydantic_config, "rules", None)
+        rules_config = getattr(self.pydantic_config, "rules", None)
 
         # 双向验证（仅检查自定义 RULES）
         if self.RULES:
@@ -154,7 +129,11 @@ class FormatNode(TreeNode, Generic[T]):
                 logger.debug(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
             else:
                 declared_rules = set(self.RULES.keys())
-                config_rules = set(type(rules_config).model_fields.keys())
+                config_rules = (
+                    set(rules_config.keys())
+                    if isinstance(rules_config, dict)
+                    else set()
+                )
                 orphan_handlers = declared_rules - config_rules
                 orphan_configs = config_rules - declared_rules
                 if orphan_handlers:

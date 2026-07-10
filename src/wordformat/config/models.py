@@ -426,7 +426,11 @@ def _resolve_builtin_style_name(cfg) -> str | None:
     """将 builtin_style_name 字段解析为英文样式名（如 '正文' → 'Normal'）。"""
     from wordformat.style.defs import BuiltInStyle
 
-    raw = getattr(cfg, "builtin_style_name", None)
+    raw = (
+        cfg.get("builtin_style_name")
+        if isinstance(cfg, dict)
+        else getattr(cfg, "builtin_style_name", None)
+    )
     if not raw:
         return None
     try:
@@ -436,65 +440,31 @@ def _resolve_builtin_style_name(cfg) -> str | None:
 
 
 def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
-    """递归遍历配置树，将 GlobalFormatConfig 按样式名收集到 style_map。"""
-    if isinstance(obj, GlobalFormatConfig):
-        eng_name = _resolve_builtin_style_name(obj)
-        if eng_name:
-            style_map[eng_name] = obj
+    """递归遍历配置树，将带 builtin_style_name 的子 dict 收集到 style_map。"""
+    if not isinstance(obj, dict):
         return
-    if not isinstance(obj, BaseModel):
-        return
-    for val in (getattr(obj, f_name) for f_name in type(obj).model_fields):
-        if isinstance(val, BaseModel):
+    eng_name = _resolve_builtin_style_name(obj)
+    if eng_name:
+        style_map[eng_name] = obj
+    for _key, val in obj.items():
+        if isinstance(val, dict):
             _walk_config_for_styles(val, style_map)
-        elif isinstance(val, dict):
-            for v in val.values():
-                if isinstance(v, BaseModel):
-                    _walk_config_for_styles(v, style_map)
 
 
-class NodeConfigRoot(BaseModel):
-    """配置根节点模型"""
+class NodeConfigRoot(dict):
+    """配置根节点 —— 向后兼容的 dict 包装器。
 
-    def collect_style_configs(self) -> dict[str, object]:
-        """遍历配置树，收集 (英文样式名 → GlobalFormatConfig) 映射。
+    之前是 Pydantic 模型，现已改为纯 dict，保留 model_dump() 和
+    collect_style_configs() 以兼容尚未迁移的代码。
+    """
 
-        配置优先级：后序覆盖前序。global_format 先被遍历，
-        具体段后遍历，同一样式名时具体配置覆盖全局配置。
-        """
-        style_map: dict[str, object] = {}
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def model_dump(self) -> dict:
+        return dict(self)
+
+    def collect_style_configs(self) -> dict[str, dict]:
+        style_map: dict[str, dict] = {}
         _walk_config_for_styles(self, style_map)
         return style_map
-
-    template_name: str = Field(
-        default="未知模板", description="模板名称（用于检测报告中显示）"
-    )
-    style_checks_warning: WarningFieldConfig = Field(
-        default_factory=WarningFieldConfig, description="警告字段配置"
-    )
-    global_format: GlobalFormatConfig = Field(
-        default_factory=GlobalFormatConfig, description="默认格式配置"
-    )
-    abstract: AbstractConfig = Field(
-        default_factory=AbstractConfig, description="摘要总配置"
-    )
-    headings: HeadingsConfig = Field(
-        default_factory=HeadingsConfig, description="标题配置"
-    )
-    body_text: BodyTextConfig = Field(
-        default_factory=BodyTextConfig, description="正文配置"
-    )
-    figures: FiguresConfig = Field(
-        default_factory=FiguresConfig, description="插图配置"
-    )
-    tables: TablesConfig = Field(default_factory=TablesConfig, description="表格配置")
-    references: ReferencesConfig = Field(
-        default_factory=ReferencesConfig, description="参考文献总配置"
-    )
-    acknowledgements: AcknowledgementsConfig = Field(
-        default_factory=AcknowledgementsConfig,
-        description="致谢总配置",
-    )
-    numbering: NumberingConfig = Field(
-        default_factory=NumberingConfig, description="标题自动编号配置"
-    )

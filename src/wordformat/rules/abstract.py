@@ -4,32 +4,64 @@
 # @File    : abstract.py
 import re
 
-from wordformat.config.models import (
-    AbstractChineseConfig,
-    AbstractEnglishConfig,
-    AbstractTitleConfig,
-)
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
+# 全局格式默认值（所有节点以此为底，按需覆盖）
+_BASE = {
+    "alignment": "左对齐",
+    "space_before": "0.5行",
+    "space_after": "0.5行",
+    "line_spacingrule": "单倍行距",
+    "line_spacing": "1.5倍",
+    "left_indent": "0字符",
+    "right_indent": "0字符",
+    "first_line_indent": "2字符",
+    "builtin_style_name": "正文",
+    "chinese_font_name": "宋体",
+    "english_font_name": "Times New Roman",
+    "font_size": "小四",
+    "font_color": "黑色",
+    "bold": False,
+    "italic": False,
+    "underline": False,
+}
+
 
 @register("abstract_chinese_title", level=1)
-class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
+class AbstractTitleCN(FormatNode):
     """摘要标题中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_title"
     NODE_LABEL = "中文摘要标题"
-    CONFIG_MODEL = AbstractTitleConfig
+    DEFAULTS = {
+        **_BASE,
+        "alignment": "居中对齐",
+        "first_line_indent": "0字符",
+        "chinese_font_name": "黑体",
+        "font_size": "小二",
+        "bold": True,
+    }
 
 
 @register("abstract_chinese_title_content", level=1)
-class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
+class AbstractTitleContentCN(FormatNode):
     """摘要标题正文混合中文节点"""
 
     NODE_TYPE = "abstract.chinese"
     NODE_LABEL = "中文摘要"
-    CONFIG_MODEL = AbstractChineseConfig
+    DEFAULTS = {
+        "chinese_title": {
+            **_BASE,
+            "alignment": "居中对齐",
+            "first_line_indent": "0字符",
+            "chinese_font_name": "黑体",
+            "font_size": "小二",
+            "bold": True,
+        },
+        "chinese_content": {**_BASE, "alignment": "两端对齐"},
+    }
 
     def check_title(self, run) -> bool:
         """检查标题是否包含在正文中"""
@@ -94,16 +126,15 @@ class AbstractTitleContentCN(FormatNode[AbstractChineseConfig]):
 
 
 @register("abstract_chinese_content")
-class AbstractContentCN(FormatNode[AbstractChineseConfig]):
+class AbstractContentCN(FormatNode):
     """摘要内容中文节点"""
 
     NODE_TYPE = "abstract.chinese.chinese_content"
     NODE_LABEL = "中文摘要正文"
-    CONFIG_MODEL = AbstractChineseConfig
-    CONFIG_PATH = "abstract.chinese"
+    DEFAULTS = {**_BASE, "alignment": "两端对齐"}
 
     def _base(self, doc, p: bool, r: bool):
-        cfg = self.pydantic_config.chinese_content
+        cfg = self.pydantic_config
         ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
@@ -136,21 +167,36 @@ class AbstractContentCN(FormatNode[AbstractChineseConfig]):
 
 
 @register("abstract_english_title", level=1)
-class AbstractTitleEN(FormatNode[AbstractTitleConfig]):
+class AbstractTitleEN(FormatNode):
     """摘要标题英文节点"""
 
     NODE_TYPE = "abstract.english.english_title"
     NODE_LABEL = "英文摘要标题"
-    CONFIG_MODEL = AbstractTitleConfig
+    DEFAULTS = {
+        **_BASE,
+        "alignment": "居中对齐",
+        "first_line_indent": "0字符",
+        "font_size": "四号",
+        "bold": True,
+    }
 
 
 @register("abstract_english_title_content", level=1)
-class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
+class AbstractTitleContentEN(FormatNode):
     """摘要标题正文混合英文节点"""
 
     NODE_TYPE = "abstract.english"
     NODE_LABEL = "英文摘要"
-    CONFIG_MODEL = AbstractEnglishConfig
+    DEFAULTS = {
+        "english_title": {
+            **_BASE,
+            "alignment": "居中对齐",
+            "first_line_indent": "0字符",
+            "font_size": "四号",
+            "bold": True,
+        },
+        "english_content": {**_BASE, "alignment": "两端对齐"},
+    }
 
     def _check_title_in_full_text(self, runs) -> int:
         """拼接全部 run 文本，返回 "Abstract" 前缀在 clean 文本中的结束位置。
@@ -243,16 +289,15 @@ class AbstractTitleContentEN(FormatNode[AbstractEnglishConfig]):
 
 
 @register("abstract_english_content")
-class AbstractContentEN(FormatNode[AbstractEnglishConfig]):
+class AbstractContentEN(FormatNode):
     """摘要内容英文节点"""
 
     NODE_TYPE = "abstract.english.english_content"
     NODE_LABEL = "英文摘要正文"
-    CONFIG_MODEL = AbstractEnglishConfig
-    CONFIG_PATH = "abstract.english"
+    DEFAULTS = {**_BASE, "alignment": "两端对齐"}
 
     def _base(self, doc, p: bool, r: bool):
-        cfg = self.pydantic_config.english_content
+        cfg = self.pydantic_config
         ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)

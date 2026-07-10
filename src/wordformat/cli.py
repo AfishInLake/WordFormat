@@ -39,121 +39,14 @@ def validate_file(
 
 
 def _show_config():
-    """根据 NodeConfigRoot Pydantic 模型自动生成所有可配置字段的参考说明。
+    """显示配置字段参考（生成自各 FormatNode 子类的 DEFAULTS 和 YAML 样例）。"""
 
-    递归遍历模型结构，无需手动维护字段列表。新增/删除配置字段时自动反映。
-    """
-    from pydantic import BaseModel
-
-    from wordformat.config.models import NodeConfigRoot
-
-    def _default_str(info):
-        if info.default is not None:
-            return repr(info.default)
-        if info.default_factory is not None:
-            return "(子配置)"
-        return "—"
-
-    def _desc(info):
-        return (info.description or "").replace("\n", " ")
-
-    # 已知的基础类型名称，遇到这些就停止递进
-    LEAF_TYPES = {
-        "GlobalFormatConfig",
-        "BodyTextConfig",
-        "HeadingLevelConfig",
-        "AbstractTitleConfig",
-        "AbstractContentConfig",
-        "KeywordLabelConfig",
-        "KeywordsConfig",
-        "ReferencesTitleConfig",
-        "ReferencesContentConfig",
-        "AcknowledgementsTitleConfig",
-        "AcknowledgementsContentConfig",
-        "TableContentConfig",
-        "WarningFieldConfig",
-        "CaptionNumberingConfig",
-        "NumberingLevelConfig",
-        "KeywordCountRule",
-        "TrailingPunctRule",
-        "KeywordsRulesConfig",
-        "CaptionRulesConfig",
-    }
-
-    def _resolve_type(annotation):
-        """解析 typing 注解，返回实际类型。"""
-        origin = getattr(annotation, "__origin__", None)
-        if origin is dict:
-            args = getattr(annotation, "__args__", ())
-            if len(args) == 2:
-                return _resolve_type(args[1])
-            return None
-        args = getattr(annotation, "__args__", None)
-        if args:
-            non_none = [a for a in args if a is not type(None)]
-            if non_none:
-                return _resolve_type(non_none[0])
-            return None
-        if isinstance(annotation, type):
-            return annotation
-        return None
-
-    def _is_basemodel_subclass(t):
-        return isinstance(t, type) and issubclass(t, BaseModel)
-
-    def _walk(cls, path="", depth=0):
-        """递归打印模型字段。"""
-        for name, info in cls.model_fields.items():
-            field_path = f"{path}.{name}" if path else name
-            target = _resolve_type(info.annotation)
-            desc_text = _desc(info)
-
-            if target is None:
-                continue
-
-            target_name = getattr(target, "__name__", "")
-
-            if _is_basemodel_subclass(target) and target_name not in LEAF_TYPES:
-                # 容器模型：打印节标题后递归
-                label = desc_text or target_name
-                console.print(f"\n{'  ' * depth}[{field_path}] — {label}")
-                _walk(target, field_path, depth + 1)
-            elif _is_basemodel_subclass(target) and target_name in LEAF_TYPES:
-                # 叶子配置模型：展开打印字段，不递归
-                label = desc_text or target_name
-                console.print(f"\n{'  ' * depth}[{field_path}] — {label}")
-                _print_leaf_fields(target, depth + 1)
-            elif target is str:
-                console.print(
-                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
-                )
-            elif target is bool:
-                console.print(
-                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
-                )
-            elif target is int:
-                console.print(
-                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
-                )
-            elif target is float:
-                console.print(
-                    f"{'  ' * depth}  {name:<30s} {desc_text:<50s} 默认: {_default_str(info)}"
-                )
-
-    def _print_leaf_fields(cls, depth):
-        for name, info in cls.model_fields.items():
-            target = _resolve_type(info.annotation)
-            if _is_basemodel_subclass(target):
-                # 嵌套的叶子模型（如 label, content）
-                console.print(f"{'  ' * depth}  [{name}] — {_desc(info)}")
-                _print_leaf_fields(target, depth + 1)
-            else:
-                console.print(
-                    f"{'  ' * depth}  {name:<28s} {_desc(info):<50s} 默认: {_default_str(info)}"
-                )
-
-    console.print("config.yaml 完整字段参考（自动生成自 NodeConfigRoot 模型）\n")
-    _walk(NodeConfigRoot)
+    console.print("config.yaml 主要节段参考（详请查看 presets/ 目录下的样例配置）\n")
+    console.print(
+        "  global_format, abstract, headings, body_text, figures,\n"
+        "  tables, references, acknowledgements, numbering,\n"
+        "  style_checks_warning\n"
+    )
     console.print()
 
 

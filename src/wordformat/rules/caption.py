@@ -4,11 +4,7 @@
 # @File    : caption.py
 
 
-from wordformat.config.models import (
-    CaptionNumberingConfig,
-    FiguresConfig,
-    TablesConfig,
-)
+from wordformat.config.dotdict import BASE_FORMAT
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.utils import parse_caption_text
@@ -28,7 +24,7 @@ def _check_caption_numbering(
     node: FormatNode,
     document,
     expected_label: str,
-    numbering_cfg: CaptionNumberingConfig,
+    numbering_cfg,
 ) -> None:
     """检查题注编号格式，有问题则添加批注。"""
     paragraph = node.paragraph
@@ -111,7 +107,7 @@ def _check_caption_numbering(
 def _apply_caption_numbering(
     node: FormatNode,
     expected_label: str,
-    numbering_cfg: CaptionNumberingConfig,
+    numbering_cfg,
 ) -> None:
     """修正题注编号：按正确格式重写题注文本。"""
     paragraph = node.paragraph
@@ -136,15 +132,25 @@ def _apply_caption_numbering(
 
 
 @register("caption_figure")
-class CaptionFigure(FormatNode[FiguresConfig]):
+class CaptionFigure(FormatNode):
     """题注-图片"""
 
     NODE_TYPE = "figures"
     NODE_LABEL = "图注"
-    CONFIG_MODEL = FiguresConfig
+    DEFAULTS = {
+        **BASE_FORMAT,
+        "caption_prefix": "图",
+        "rules": {
+            "caption_numbering": {
+                "enabled": True,
+                "separator": ".",
+                "label_number_space": False,
+            }
+        },
+    }
     RULES = {"caption_numbering": "_handle_caption_numbering"}
 
-    def _handle_caption_numbering(self, doc, rule_cfg: CaptionNumberingConfig, p: bool):
+    def _handle_caption_numbering(self, doc, rule_cfg, p: bool):
         """题注编号校验/修正"""
         prefix = self.pydantic_config.caption_prefix or "图"
         if p:
@@ -154,15 +160,25 @@ class CaptionFigure(FormatNode[FiguresConfig]):
 
 
 @register("caption_table")
-class CaptionTable(FormatNode[TablesConfig]):
+class CaptionTable(FormatNode):
     """题注-表格"""
 
     NODE_TYPE = "tables"
     NODE_LABEL = "表注"
-    CONFIG_MODEL = TablesConfig
+    DEFAULTS = {
+        **BASE_FORMAT,
+        "caption_prefix": "表",
+        "rules": {
+            "caption_numbering": {
+                "enabled": True,
+                "separator": ".",
+                "label_number_space": False,
+            }
+        },
+    }
     RULES = {"caption_numbering": "_handle_caption_numbering"}
 
-    def _handle_caption_numbering(self, doc, rule_cfg: CaptionNumberingConfig, p: bool):
+    def _handle_caption_numbering(self, doc, rule_cfg, p: bool):
         """题注编号校验/修正"""
         prefix = self.pydantic_config.caption_prefix or "表"
         if p:

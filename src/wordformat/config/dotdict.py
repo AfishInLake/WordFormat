@@ -12,7 +12,7 @@ class DotDict(dict):
         try:
             val = self[key]
         except KeyError:
-            return None
+            raise AttributeError(key) from None
         if isinstance(val, dict):
             return DotDict(val)
         return val
@@ -25,6 +25,27 @@ class DotDict(dict):
             del self[key]
         except KeyError as e:
             raise AttributeError(key) from e
+
+
+# 全局格式默认值，所有节点以此为底
+BASE_FORMAT: dict[str, object] = {
+    "alignment": "左对齐",
+    "space_before": "0.5行",
+    "space_after": "0.5行",
+    "line_spacingrule": "单倍行距",
+    "line_spacing": "1.5倍",
+    "left_indent": "0字符",
+    "right_indent": "0字符",
+    "first_line_indent": "2字符",
+    "builtin_style_name": "正文",
+    "chinese_font_name": "宋体",
+    "english_font_name": "Times New Roman",
+    "font_size": "小四",
+    "font_color": "黑色",
+    "bold": False,
+    "italic": False,
+    "underline": False,
+}
 
 
 def deep_merge(base: dict, override: dict) -> dict:

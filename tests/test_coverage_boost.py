@@ -75,7 +75,7 @@ def _load_yaml(path):
 
 
 def _load_root_config(config_path):
-    return NodeConfigRoot(**_load_yaml(config_path))
+    return _load_yaml(config_path)
 
 
 @pytest.fixture

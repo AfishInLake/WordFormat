@@ -12,6 +12,7 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from wordformat.tree import Tree, Stack, print_tree
+from wordformat.config.dotdict import DotDict
 from wordformat.rules.node import TreeNode, FormatNode
 from wordformat.numbering import (
     _auto_strip_numbering,
@@ -341,12 +342,14 @@ class TestFormatNode:
         assert node.level == 1
         assert node.paragraph is None
         assert node.expected_rule is None
-        assert node._pydantic_config is None
+        assert isinstance(node.pydantic_config, DotDict)
+        assert len(node.pydantic_config) == 0
 
     def test_pydantic_config_raises_before_load(self):
         node = FormatNode(value="test", level=1)
-        with pytest.raises(ValueError, match="尚未加载Pydantic配置"):
-            _ = node.pydantic_config
+        # 未加载配置时 pydantic_config 返回空 DotDict（不再抛异常）
+        cfg = node.pydantic_config
+        assert isinstance(cfg, DotDict)
 
     def test_update_paragraph(self, doc):
         node = FormatNode(value="test", level=1)
@@ -360,19 +363,17 @@ class TestFormatNode:
         node._base(doc, p=True, r=True)
         node._base(doc, p=False, r=False)
 
-    def test_check_format_raises(self, doc):
-        """未加载配置时 check_format 通过 handler 触发 ValueError。"""
+    def test_check_format_no_config(self, doc):
+        """未加载配置时 check_format 不抛异常（handler 跳过）。"""
         p = doc.add_paragraph("test")
         node = FormatNode(value="test", level=1, paragraph=p)
-        with pytest.raises(ValueError, match="尚未加载"):
-            node.check_format(doc)
+        node.check_format(doc)  # 不应抛异常
 
-    def test_apply_format_raises(self, doc):
-        """未加载配置时 apply_format 通过 handler 触发 ValueError。"""
+    def test_apply_format_no_config(self, doc):
+        """未加载配置时 apply_format 不抛异常（handler 跳过）。"""
         p = doc.add_paragraph("test")
         node = FormatNode(value="test", level=1, paragraph=p)
-        with pytest.raises(ValueError, match="尚未加载"):
-            node.apply_format(doc)
+        node.apply_format(doc)  # 不应抛异常
 
     def test_add_comment_buffers(self, doc):
         """add_comment 缓冲文本，_flush_comments 合并写入。"""
@@ -396,20 +397,21 @@ class TestFormatNode:
         # 空文本不应调用 add_comment
         node.add_comment(doc, run, "   ")
 
-    def test_load_config_heading_level_bug(self):
-        """Heading 节点没有 CONFIG_PATH 时，NODE_TYPE 自动回退为 CONFIG_PATH，
-        FormatNode 基类 load_config 可正确解析配置。"""
-        from wordformat.config.models import HeadingLevelConfig, NodeConfigRoot
-
-        class TestFormatNode(FormatNode[HeadingLevelConfig]):
+    def test_load_config_with_node_type(self):
+        """load_config 沿 NODE_TYPE 路径提取 dict 并与 DEFAULTS 合并。"""
+        class TestNode(FormatNode):
             NODE_TYPE = "headings.level_1"
-            CONFIG_MODEL = HeadingLevelConfig
+            DEFAULTS = {"font_size": "小二", "alignment": "居中对齐"}
 
-        node = TestFormatNode(value="test", level=1)
-        root_config = NodeConfigRoot()
-        node.load_config(root_config)
-        assert node._pydantic_config is not None
-        assert node._pydantic_config.font_size == "小四"
+        node = TestNode(value="test", level=1)
+        node.load_config({
+            "headings": {
+                "level_1": {"font_size": "三号", "chinese_font_name": "黑体"}
+            }
+        })
+        assert node.pydantic_config.font_size == "三号"  # YAML 覆盖
+        assert node.pydantic_config.alignment == "居中对齐"  # DEFAULTS
+        assert node.pydantic_config.chinese_font_name == "黑体"  # YAML
 
 
 

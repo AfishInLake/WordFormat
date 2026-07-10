@@ -45,8 +45,8 @@ def _make_node(cls, text="测试文本"):
 
 
 def _load_root_config(config_path):
-    """从 YAML 路径加载 NodeConfigRoot。"""
-    return NodeConfigRoot(**_load_yaml(config_path))
+    """从 YAML 路径加载配置 dict。"""
+    return _load_yaml(config_path)
 
 
 def _load_yaml(path):
@@ -155,9 +155,9 @@ class TestNodeInstantiation:
         assert node.paragraph is not None
         assert node.level == 0
 
-    def test_has_config_model(self, cls):
-        assert hasattr(cls, "CONFIG_MODEL")
-        assert cls.CONFIG_MODEL is not None
+    def test_has_defaults(self, cls):
+        assert hasattr(cls, "DEFAULTS")
+        assert isinstance(cls.DEFAULTS, dict)
 
     def test_has_node_type(self, cls):
         assert hasattr(cls, "NODE_TYPE")

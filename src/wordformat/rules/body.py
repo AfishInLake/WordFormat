@@ -9,7 +9,6 @@ from copy import deepcopy
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from wordformat.config.models import BodyTextConfig, PunctuationRule
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 
@@ -88,15 +87,33 @@ def _split_run_at(paragraph, start: int, end: int):
 
 
 @register("body_text")
-class BodyText(FormatNode[BodyTextConfig]):
+class BodyText(FormatNode):
     """正文节点"""
 
     NODE_TYPE = "body_text"
     NODE_LABEL = "正文段落"
-    CONFIG_MODEL = BodyTextConfig
+    DEFAULTS = {
+        "alignment": "两端对齐",
+        "space_before": "0.5行",
+        "space_after": "0.5行",
+        "line_spacingrule": "单倍行距",
+        "line_spacing": "1.5倍",
+        "left_indent": "0字符",
+        "right_indent": "0字符",
+        "first_line_indent": "2字符",
+        "builtin_style_name": "正文",
+        "chinese_font_name": "宋体",
+        "english_font_name": "Times New Roman",
+        "font_size": "小四",
+        "font_color": "黑色",
+        "bold": False,
+        "italic": False,
+        "underline": False,
+        "rules": {"punctuation": {"enabled": True}},
+    }
     RULES = {"punctuation": "_check_punctuation"}
 
-    def _check_punctuation(self, doc, rule_cfg: PunctuationRule, p: bool = False):
+    def _check_punctuation(self, doc, rule_cfg, p: bool = False):
         """检测中文正文中的半角标点，锚在具体字符上（拆分 run）。"""
         if self.paragraph is None:
             return

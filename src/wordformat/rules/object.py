@@ -1,22 +1,20 @@
 """图片段落和表格对象节点。"""
 
-from wordformat.config.models import ImageFormatConfig, TableObjectConfig
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.comments import format_comment
 
 
 @register("figure_image")
-class FigureImage(FormatNode[ImageFormatConfig]):
+class FigureImage(FormatNode):
     """图片段落节点（包含内联图片的段落，非题注）。
 
     只检查对齐和首行缩进，不检查行距、字体等。
     """
 
     NODE_TYPE = "figure_image"
-    CONFIG_MODEL = ImageFormatConfig
-    CONFIG_PATH = "figures.image"
     NODE_LABEL = "图片段落"
+    DEFAULTS = {}
     DEFAULT_RULES = {}
 
     def _base(self, doc, p: bool, r: bool):
@@ -55,11 +53,10 @@ class FigureImage(FormatNode[ImageFormatConfig]):
 
 
 @register("table_object")
-class TableObject(FormatNode[TableObjectConfig]):
+class TableObject(FormatNode):
     """表格对象节点（表格整体格式，非题注）。"""
 
     NODE_TYPE = "table_object"
-    CONFIG_MODEL = TableObjectConfig
-    CONFIG_PATH = "tables.object"
     NODE_LABEL = "表格对象"
+    DEFAULTS = {}
     DEFAULT_RULES = {}  # 表格对象格式由 Word 表格属性控制

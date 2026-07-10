@@ -9,8 +9,8 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
+from wordformat.config.dotdict import DotDict
 from wordformat.config.loader import get_config
-from wordformat.config.models import WarningFieldConfig
 from wordformat.style.reader import (
     run_get_font_color,
     run_get_font_name,
@@ -33,7 +33,24 @@ from .defs import (
     SpaceBefore,
 )
 
-style_checks_warning: WarningFieldConfig | None = None
+_WARNING_DEFAULTS = {
+    "bold": True,
+    "italic": True,
+    "underline": True,
+    "font_size": True,
+    "font_name": False,
+    "font_color": False,
+    "alignment": True,
+    "space_before": True,
+    "space_after": True,
+    "line_spacing": True,
+    "line_spacingrule": True,
+    "left_indent": True,
+    "right_indent": True,
+    "first_line_indent": True,
+    "builtin_style_name": True,
+}
+style_checks_warning: DotDict | None = None
 
 
 def _char_warning_enabled(diff_type: str) -> bool:
@@ -183,7 +200,9 @@ class CharacterStyle:
         self.italic: bool = italic
         self.underline: bool = underline
         if globals()["style_checks_warning"] is None:
-            globals()["style_checks_warning"] = get_config().style_checks_warning
+            globals()["style_checks_warning"] = DotDict(
+                {**_WARNING_DEFAULTS, **get_config().get("style_checks_warning", {})}
+            )
 
     def diff_from_run(self, run: Run) -> list[DIFFResult]:  # noqa c901
         """
@@ -388,7 +407,9 @@ class ParagraphStyle:
         self.right_indent: RightIndent = RightIndent(right_indent)
         self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
         if globals()["style_checks_warning"] is None:
-            globals()["style_checks_warning"] = get_config().style_checks_warning
+            globals()["style_checks_warning"] = DotDict(
+                {**_WARNING_DEFAULTS, **get_config().get("style_checks_warning", {})}
+            )
 
     def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
         """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果"""
