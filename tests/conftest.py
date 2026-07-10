@@ -268,9 +268,9 @@ def reset_config():
 
 @pytest.fixture(autouse=True)
 def reset_style_warning():
-    """每个测试前后重置 style_checks_warning 全局变量"""
+    """每个测试前后重置警告缓存。"""
     from wordformat.style import diff
-    original = diff.style_checks_warning
-    diff.style_checks_warning = None
+    original = diff._warnings_cache
+    diff._warnings_cache = None
     yield
-    diff.style_checks_warning = original
+    diff._warnings_cache = original

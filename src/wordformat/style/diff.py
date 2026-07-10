@@ -10,7 +10,6 @@ from docx.text.run import Run
 from loguru import logger
 
 from wordformat.config.dotdict import DotDict
-from wordformat.config.loader import get_config
 from wordformat.style.reader import (
     run_get_font_color,
     run_get_font_name,
@@ -50,21 +49,41 @@ _WARNING_DEFAULTS = {
     "first_line_indent": True,
     "builtin_style_name": True,
 }
-style_checks_warning: DotDict | None = None
+
+
+def _load_warnings() -> DotDict:
+    try:
+        from wordformat.config.loader import get_config
+
+        return DotDict(
+            {**_WARNING_DEFAULTS, **get_config().get("style_checks_warning", {})}
+        )
+    except Exception:
+        return DotDict(_WARNING_DEFAULTS)
+
+
+_warnings_cache: DotDict | None = None
+
+
+def _get_warnings() -> DotDict:
+    global _warnings_cache
+    if _warnings_cache is None:
+        _warnings_cache = _load_warnings()
+    return _warnings_cache
 
 
 def _char_warning_enabled(diff_type: str) -> bool:
-    """判断某个字符 diff_type 是否在 WarningFieldConfig 中开启。"""
-    if style_checks_warning is None:
+    warnings = _get_warnings()
+    if warnings is None:
         return True
     mapping = {
-        "bold": style_checks_warning.bold,
-        "italic": style_checks_warning.italic,
-        "underline": style_checks_warning.underline,
-        "font_size": style_checks_warning.font_size,
-        "font_color": style_checks_warning.font_color,
-        "font_name_cn": style_checks_warning.font_name,
-        "font_name_en": style_checks_warning.font_name,
+        "bold": warnings.bold,
+        "italic": warnings.italic,
+        "underline": warnings.underline,
+        "font_size": warnings.font_size,
+        "font_color": warnings.font_color,
+        "font_name_cn": warnings.font_name,
+        "font_name_en": warnings.font_name,
     }
     return mapping.get(diff_type, True)
 
@@ -127,19 +146,19 @@ def _format_para_value(diff_type: str, value) -> str:
 
 
 def _para_warning_enabled(diff_type: str) -> bool:
-    """判断某个段落 diff_type 是否在 WarningFieldConfig 中开启。"""
-    if style_checks_warning is None:
+    warnings = _get_warnings()
+    if warnings is None:
         return True
     mapping = {
-        "alignment": style_checks_warning.alignment,
-        "space_before": style_checks_warning.space_before,
-        "space_after": style_checks_warning.space_after,
-        "line_spacing": style_checks_warning.line_spacing,
-        "line_spacing_rule": style_checks_warning.line_spacingrule,
-        "first_line_indent": style_checks_warning.first_line_indent,
-        "left_indent": style_checks_warning.left_indent,
-        "right_indent": style_checks_warning.right_indent,
-        "builtin_style_name": style_checks_warning.builtin_style_name,
+        "alignment": warnings.alignment,
+        "space_before": warnings.space_before,
+        "space_after": warnings.space_after,
+        "line_spacing": warnings.line_spacing,
+        "line_spacing_rule": warnings.line_spacingrule,
+        "first_line_indent": warnings.first_line_indent,
+        "left_indent": warnings.left_indent,
+        "right_indent": warnings.right_indent,
+        "builtin_style_name": warnings.builtin_style_name,
     }
     return mapping.get(diff_type, True)
 
@@ -199,10 +218,6 @@ class CharacterStyle:
         self.bold: bool = bold
         self.italic: bool = italic
         self.underline: bool = underline
-        if globals()["style_checks_warning"] is None:
-            globals()["style_checks_warning"] = DotDict(
-                {**_WARNING_DEFAULTS, **get_config().get("style_checks_warning", {})}
-            )
 
     def diff_from_run(self, run: Run) -> list[DIFFResult]:  # noqa c901
         """
@@ -353,7 +368,7 @@ class CharacterStyle:
 
         t = []
         for diff in value:
-            if style_checks_warning is not None:
+            if _get_warnings() is not None:
                 if not _char_warning_enabled(diff.diff_type):
                     continue
             prop = CHAR_DIFF_LABELS.get(diff.diff_type, diff.diff_type)
@@ -406,10 +421,6 @@ class ParagraphStyle:
         self.left_indent: LeftIndent = LeftIndent(left_indent)
         self.right_indent: RightIndent = RightIndent(right_indent)
         self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
-        if globals()["style_checks_warning"] is None:
-            globals()["style_checks_warning"] = DotDict(
-                {**_WARNING_DEFAULTS, **get_config().get("style_checks_warning", {})}
-            )
 
     def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
         """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果"""
@@ -594,7 +605,7 @@ class ParagraphStyle:
 
         t = []
         for diff in value:
-            if style_checks_warning is not None:
+            if _get_warnings() is not None:
                 if not _para_warning_enabled(diff.diff_type):
                     continue
             prop = PARA_DIFF_LABELS.get(diff.diff_type, diff.diff_type)

@@ -82,26 +82,30 @@ class TestLazyConfigLifecycle:
         cfg = get_config()
         assert isinstance(cfg, dict)
 
-    def test_singleton_identity(self):
+    def test_independent_instances(self):
+        """多个 LazyConfig 实例相互独立。"""
         a = LazyConfig()
         b = LazyConfig()
-        assert a is b
+        assert a is not b
 
-    def test_singleton_thread_safety(self):
-        """多线程同时创建实例应得到同一个对象"""
+    def test_thread_safe_independent_instances(self):
+        """多线程各自创建独立实例无竞争。"""
         results = []
         barrier = threading.Barrier(10)
 
         def create():
             barrier.wait()
-            results.append(LazyConfig())
+            lc = LazyConfig()
+            lc._config = {}  # 直接设内部状态，不触发文件加载
+            results.append(lc)
 
         threads = [threading.Thread(target=create) for _ in range(10)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        assert all(r is results[0] for r in results)
+        # 所有实例独立
+        assert len(set(id(r) for r in results)) == 10
 
 
 
