@@ -3,27 +3,10 @@ from copy import deepcopy
 
 from docx.oxml.ns import qn
 
+from wordformat.config.dotdict import BASE_FORMAT
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
-
-# 关键词节点默认值
-_KW = {
-    "alignment": "左对齐",
-    "space_before": "0.5行",
-    "space_after": "0.5行",
-    "line_spacingrule": "单倍行距",
-    "line_spacing": "1.5倍",
-    "left_indent": "0字符",
-    "right_indent": "0字符",
-    "first_line_indent": "0字符",
-    "builtin_style_name": "正文",
-    "english_font_name": "Times New Roman",
-    "font_color": "黑色",
-    "bold": False,
-    "italic": False,
-    "underline": False,
-}
 
 
 # 第一步：提取关键词基类，复用通用逻辑
@@ -103,7 +86,8 @@ class KeywordsEN(BaseKeywordsNode):
     NODE_TYPE = "abstract.keywords.english"
     NODE_LABEL = "英文关键词"
     DEFAULTS = {
-        **_KW,
+        **BASE_FORMAT,
+        "first_line_indent": "0字符",
         "chinese_font_name": "宋体",
         "font_size": "小四",
         "label": {
@@ -228,7 +212,8 @@ class KeywordsCN(BaseKeywordsNode):
     NODE_TYPE = "abstract.keywords.chinese"
     NODE_LABEL = "中文关键词"
     DEFAULTS = {
-        **_KW,
+        **BASE_FORMAT,
+        "first_line_indent": "0字符",
         "chinese_font_name": "宋体",
         "font_size": "小四",
         "label": {

@@ -4,29 +4,10 @@
 # @File    : abstract.py
 import re
 
+from wordformat.config.dotdict import BASE_FORMAT
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
-
-# 全局格式默认值（所有节点以此为底，按需覆盖）
-_BASE = {
-    "alignment": "左对齐",
-    "space_before": "0.5行",
-    "space_after": "0.5行",
-    "line_spacingrule": "单倍行距",
-    "line_spacing": "1.5倍",
-    "left_indent": "0字符",
-    "right_indent": "0字符",
-    "first_line_indent": "2字符",
-    "builtin_style_name": "正文",
-    "chinese_font_name": "宋体",
-    "english_font_name": "Times New Roman",
-    "font_size": "小四",
-    "font_color": "黑色",
-    "bold": False,
-    "italic": False,
-    "underline": False,
-}
 
 
 @register("abstract_chinese_title", level=1)
@@ -36,7 +17,7 @@ class AbstractTitleCN(FormatNode):
     NODE_TYPE = "abstract.chinese.chinese_title"
     NODE_LABEL = "中文摘要标题"
     DEFAULTS = {
-        **_BASE,
+        **BASE_FORMAT,
         "alignment": "居中对齐",
         "first_line_indent": "0字符",
         "chinese_font_name": "黑体",
@@ -53,14 +34,14 @@ class AbstractTitleContentCN(FormatNode):
     NODE_LABEL = "中文摘要"
     DEFAULTS = {
         "chinese_title": {
-            **_BASE,
+            **BASE_FORMAT,
             "alignment": "居中对齐",
             "first_line_indent": "0字符",
             "chinese_font_name": "黑体",
             "font_size": "小二",
             "bold": True,
         },
-        "chinese_content": {**_BASE, "alignment": "两端对齐"},
+        "chinese_content": {**BASE_FORMAT, "alignment": "两端对齐"},
     }
 
     def check_title(self, run) -> bool:
@@ -131,7 +112,7 @@ class AbstractContentCN(FormatNode):
 
     NODE_TYPE = "abstract.chinese.chinese_content"
     NODE_LABEL = "中文摘要正文"
-    DEFAULTS = {**_BASE, "alignment": "两端对齐"}
+    DEFAULTS = {**BASE_FORMAT, "alignment": "两端对齐"}
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -173,7 +154,7 @@ class AbstractTitleEN(FormatNode):
     NODE_TYPE = "abstract.english.english_title"
     NODE_LABEL = "英文摘要标题"
     DEFAULTS = {
-        **_BASE,
+        **BASE_FORMAT,
         "alignment": "居中对齐",
         "first_line_indent": "0字符",
         "font_size": "四号",
@@ -189,13 +170,13 @@ class AbstractTitleContentEN(FormatNode):
     NODE_LABEL = "英文摘要"
     DEFAULTS = {
         "english_title": {
-            **_BASE,
+            **BASE_FORMAT,
             "alignment": "居中对齐",
             "first_line_indent": "0字符",
             "font_size": "四号",
             "bold": True,
         },
-        "english_content": {**_BASE, "alignment": "两端对齐"},
+        "english_content": {**BASE_FORMAT, "alignment": "两端对齐"},
     }
 
     def _check_title_in_full_text(self, runs) -> int:
@@ -294,7 +275,7 @@ class AbstractContentEN(FormatNode):
 
     NODE_TYPE = "abstract.english.english_content"
     NODE_LABEL = "英文摘要正文"
-    DEFAULTS = {**_BASE, "alignment": "两端对齐"}
+    DEFAULTS = {**BASE_FORMAT, "alignment": "两端对齐"}
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config

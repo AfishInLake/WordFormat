@@ -149,7 +149,10 @@ headings:
     alignment: '居中对齐'
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
     font_size: '小二'
+    font_color: '黑色'
+    bold: true
     builtin_style_name: 'Heading 1'
   level_2:
     alignment: '左对齐'
@@ -165,6 +168,9 @@ headings:
     builtin_style_name: 'Heading 3'
 body_text:
   alignment: '两端对齐'
+  chinese_font_name: '宋体'
+  english_font_name: 'Times New Roman'
+  font_size: '小四'
 figures:
   caption_prefix: '图'
 tables:

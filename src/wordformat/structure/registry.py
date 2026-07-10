@@ -1,8 +1,10 @@
 #! /usr/bin/env python
-"""FormatNode 子类的自动注册机制。
+"""FormatNode 子类的自动注册 + 配置导出机制。
 
 每个 FormatNode 子类用 @register(category, level=...) 声明，
-框架自动构建 CATEGORY_TO_CLASS 和 LEVEL_MAP，无需手动维护映射表。
+框架自动构建 CATEGORY_TO_CLASS 和 LEVEL_MAP。
+
+export_defaults() 遍历所有注册类，按 NODE_TYPE 路径重建完整 YAML 配置树。
 """
 
 _registry: dict[str, type] = {}
@@ -14,7 +16,7 @@ def register(category: str, level: int | None = None):
 
     Usage:
         @register("abstract_chinese_title", level=1)
-        class AbstractTitleCN(FormatNode[AbstractTitleConfig]):
+        class AbstractTitleCN(FormatNode):
             ...
     """
 
@@ -25,3 +27,52 @@ def register(category: str, level: int | None = None):
         return cls
 
     return decorator
+
+
+def _deep_set(d: dict, path: str, value: dict) -> None:
+    """将 value 按点分路径写入嵌套 dict。"""
+    parts = path.split(".")
+    current = d
+    for part in parts[:-1]:
+        if part not in current:
+            current[part] = {}
+        current = current[part]
+    # 最后一级：深度合并
+    target = current.setdefault(parts[-1], {})
+    target.update(value)
+
+
+def export_defaults() -> dict:
+    """遍历所有注册的 FormatNode 子类，根据 DEFAULTS + NODE_TYPE 生成完整配置。
+
+    返回可直接写入 .yaml 的嵌套 dict。
+    """
+    result: dict = {}
+    # 全局字段
+    result["template_name"] = "未知模板"
+    result["style_checks_warning"] = {
+        "bold": True,
+        "italic": True,
+        "underline": True,
+        "font_size": True,
+        "font_name": False,
+        "font_color": False,
+        "alignment": True,
+        "space_before": True,
+        "space_after": True,
+        "line_spacing": True,
+        "line_spacingrule": True,
+        "left_indent": True,
+        "right_indent": True,
+        "first_line_indent": True,
+        "builtin_style_name": True,
+    }
+    result["numbering"] = {"enabled": False}
+
+    for cls in _registry.values():
+        defaults = getattr(cls, "DEFAULTS", {})
+        node_type = getattr(cls, "NODE_TYPE", "")
+        if defaults and node_type:
+            _deep_set(result, node_type, dict(defaults))
+
+    return result

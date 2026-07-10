@@ -3,23 +3,9 @@
 # @Author  : afish
 # @File    : acknowledgement.py
 
+from wordformat.config.dotdict import BASE_FORMAT
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
-
-_ACK = {
-    "alignment": "左对齐",
-    "space_before": "0.5行",
-    "space_after": "0.5行",
-    "line_spacingrule": "单倍行距",
-    "line_spacing": "1.5倍",
-    "left_indent": "0字符",
-    "right_indent": "0字符",
-    "builtin_style_name": "正文",
-    "english_font_name": "Times New Roman",
-    "font_color": "黑色",
-    "italic": False,
-    "underline": False,
-}
 
 
 @register("acknowledgements_title", level=1)
@@ -29,7 +15,7 @@ class Acknowledgements(FormatNode):
     NODE_TYPE = "acknowledgements.title"
     NODE_LABEL = "致谢标题"
     DEFAULTS = {
-        **_ACK,
+        **BASE_FORMAT,
         "alignment": "居中对齐",
         "first_line_indent": "0字符",
         "chinese_font_name": "黑体",
@@ -45,9 +31,7 @@ class AcknowledgementsCN(FormatNode):
     NODE_TYPE = "acknowledgements.content"
     NODE_LABEL = "致谢内容"
     DEFAULTS = {
-        **_ACK,
+        **BASE_FORMAT,
         "alignment": "两端对齐",
-        "first_line_indent": "2字符",
         "chinese_font_name": "宋体",
-        "font_size": "小四",
     }

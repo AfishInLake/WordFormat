@@ -271,16 +271,33 @@ wordf startapi -H 127.0.0.1 -p 8000
 
     elif args.mode == "config":
         if args.o:
-            import warnings
-
             import yaml
 
-            from wordformat.config.models import NodeConfigRoot
+            from wordformat.rules import (  # noqa: F401 触发 @register
+                AbstractContentCN,
+                AbstractContentEN,
+                AbstractTitleCN,
+                AbstractTitleContentCN,
+                AbstractTitleContentEN,
+                AbstractTitleEN,
+                Acknowledgements,
+                AcknowledgementsCN,
+                BodyText,
+                CaptionFigure,
+                CaptionTable,
+                FigureImage,
+                HeadingLevel1Node,
+                HeadingLevel2Node,
+                HeadingLevel3Node,
+                KeywordsCN,
+                KeywordsEN,
+                ReferenceEntry,
+                References,
+                TableObject,
+            )
+            from wordformat.structure.registry import export_defaults
 
-            cfg = NodeConfigRoot()
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                data = cfg.model_dump()
+            data = export_defaults()
             yaml_str = yaml.dump(
                 data, default_flow_style=False, allow_unicode=True, sort_keys=False
             )
