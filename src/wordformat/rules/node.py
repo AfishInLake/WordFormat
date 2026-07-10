@@ -166,7 +166,7 @@ class FormatNode(TreeNode):
     # ------------------------------------------------------------------
 
     def _handle_paragraph_style(self, doc, rule_cfg, p: bool):
-        """默认段落样式检查/应用。配置需继承 GlobalFormatConfig。"""
+        """默认段落样式检查/应用。配置需包含 alignment 等格式字段。"""
         if self.paragraph is None or not self.paragraph.runs:
             return
         from wordformat.style.diff import ParagraphStyle
@@ -187,7 +187,7 @@ class FormatNode(TreeNode):
             )
 
     def _handle_character_style(self, doc, rule_cfg, p: bool):
-        """默认字符样式检查/应用。配置需继承 GlobalFormatConfig。"""
+        """默认字符样式检查/应用。配置需包含 chinese_font_name 等格式字段。"""
         if not self.paragraph.runs:
             return
         from wordformat.style.diff import CharacterStyle

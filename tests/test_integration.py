@@ -16,7 +16,6 @@ import numpy as np
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
-from pydantic import ValidationError
 from fastapi.testclient import TestClient
 
 from wordformat.cli import validate_file, main
@@ -27,11 +26,7 @@ from wordformat.config.loader import (
     get_config,
     clear_config,
 )
-from wordformat.config.models import (
-    KeywordCountRule,
-    GlobalFormatConfig,
-    NodeConfigRoot,
-)
+from wordformat.config.models import NodeConfigRoot
 from wordformat.agent.message import MessageManager
 from wordformat.agent.onnx_infer import (
     _get_best_onnx_providers,
@@ -112,46 +107,6 @@ class TestLazyConfigLifecycle:
 
 # ==================== (b) DataModel 验证测试 ====================
 
-
-class TestDataModelValidation:
-    """验证 datamodel 中已知的验证缺陷"""
-
-    def test_keywords_count_positive(self):
-        """count_min/count_max 必须大于 0"""
-        with pytest.raises(ValueError):
-            KeywordCountRule(count_min=0)
-        with pytest.raises(ValueError):
-            KeywordCountRule(count_max=-1)
-
-    def test_keywords_count_min_le_max(self):
-        """count_min 不应大于 count_max"""
-        with pytest.raises(ValidationError):
-            KeywordCountRule(count_min=10, count_max=3)
-
-    def test_font_size_range_validation(self):
-        """字号数值验证：负数应触发 ValidationError"""
-        with pytest.raises(ValidationError):
-            GlobalFormatConfig(font_size=-5.0)
-
-    def test_font_size_accepts_any_number(self):
-        """负数字号应触发 ValidationError"""
-        with pytest.raises(ValidationError):
-            GlobalFormatConfig(font_size=-999.0)
-
-    def test_font_color_validation(self):
-        """font_color 空字符串应验证失败"""
-        with pytest.raises(ValueError):
-            GlobalFormatConfig(font_color="")
-
-    def test_font_color_accepts_any_string(self):
-        """当前行为：任意字符串均可通过"""
-        cfg = GlobalFormatConfig(font_color="随便写")
-        assert cfg.font_color == "随便写"
-
-    def test_font_size_accepts_literal(self):
-        """字号支持中文字号字符串"""
-        cfg = GlobalFormatConfig(font_size="小四")
-        assert cfg.font_size == "小四"
 
 
 

@@ -327,10 +327,8 @@ def process_heading_numbering(root_node, document, config, headings_config=None)
         "level_3": ("2", "level_3"),
     }
 
-    from wordformat.config.models import NumberingLevelConfig
-
     ref_config = getattr(config, "references", None)
-    ref_enabled = isinstance(ref_config, NumberingLevelConfig) and ref_config.enabled
+    ref_enabled = isinstance(ref_config, dict) and ref_config.get("enabled", False)
 
     counters = {"heading": 0, "ref": 0}
     _traverse_numbering(
@@ -478,13 +476,11 @@ def create_numbering_definition(document, config, headings_config=None) -> dict:
     # ========================
     # 2. 参考文献条目编号定义
     # ========================
-    from wordformat.config.models import NumberingLevelConfig
-
     ref_config = getattr(config, "references", None)
     if (
-        isinstance(ref_config, NumberingLevelConfig)
-        and ref_config.enabled
-        and ref_config.template
+        isinstance(ref_config, dict)
+        and ref_config.get("enabled", False)
+        and ref_config.get("template")
     ):
         ref_abstract_num_id = max_abstract_num_id + 1
         ref_num_id = max_num_id + 1
@@ -523,7 +519,7 @@ def _build_numbering_level(
 
     Args:
         level_key: 标题级别键（如 "level_1"），参考文献时为 None
-        level_config: NumberingLevelConfig 配置
+        level_config: 标题编号配置 dict
         ilvl: 编号级别（0-based）
         headings_config: 标题配置（仅标题需要，参考文献传 None）
     """

@@ -215,10 +215,9 @@ class TestHeadingCoverageBoost:
         """_fix_style_run_properties 应设置样式定义中的加粗属性。"""
         
         from wordformat.style.defs import ensure_style_exists
-        from wordformat.config.models import HeadingLevelConfig
-
+        
         doc = Document()
-        cfg = HeadingLevelConfig(bold=True)
+        cfg = NodeConfigRoot(bold=True)
         ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
@@ -232,10 +231,9 @@ class TestHeadingCoverageBoost:
         """_fix_style_run_properties 当 italic=False 时应移除斜体元素。"""
         
         from wordformat.style.defs import ensure_style_exists
-        from wordformat.config.models import HeadingLevelConfig
-
+        
         doc = Document()
-        cfg = HeadingLevelConfig(italic=False)
+        cfg = NodeConfigRoot(italic=False)
         ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
@@ -249,10 +247,9 @@ class TestHeadingCoverageBoost:
         """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""
         
         from wordformat.style.defs import ensure_style_exists
-        from wordformat.config.models import HeadingLevelConfig
-
+        
         doc = Document()
-        cfg = HeadingLevelConfig(alignment="居中对齐")
+        cfg = NodeConfigRoot(alignment="居中对齐")
         ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
@@ -740,24 +737,24 @@ class TestSetStyleCoverageBoost:
         """config_model 无任何有效的 GlobalFormatConfig 时不抛异常。"""
         doc = Document()
         # 使用一个只有 numbering 和 global_format 的空模型
-        from wordformat.config.models import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
+        from wordformat.config.models import NodeConfigRoot
 
         config_bare = NodeConfigRoot(
-            global_format=GlobalFormatConfig(),
-            body_text=BodyTextConfig(),
+            global_format=NodeConfigRoot(),
+            body_text=NodeConfigRoot(),
         )
         _fix_stage._fix_all_style_definitions(doc, config_bare)
         # 不应抛出异常
 
     def test_fix_all_style_definitions_theme_color_fix(self):
         """修正主题色的完整流程：有 themeColor 的样式被修正。"""
-        from wordformat.config.models import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
+        from wordformat.config.models import NodeConfigRoot
 
         doc = Document()
         config_model = NodeConfigRoot(
-            global_format=GlobalFormatConfig(),
-            headings=HeadingsConfig(
-                level_1=HeadingLevelConfig(builtin_style_name="Heading 1", font_color="黑色"),
+            global_format=NodeConfigRoot(),
+            headings=NodeConfigRoot(
+                level_1=NodeConfigRoot(builtin_style_name="Heading 1", font_color="黑色"),
             ),
         )
 
