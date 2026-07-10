@@ -106,7 +106,15 @@ class KeywordsEN(BaseKeywordsNode):
         **_KW,
         "chinese_font_name": "宋体",
         "font_size": "小四",
-        "label": {"chinese_font_name": "黑体", "font_size": "三号", "bold": True},
+        "label": {
+            "chinese_font_name": "黑体",
+            "english_font_name": "Times New Roman",
+            "font_size": "三号",
+            "font_color": "黑色",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+        },
         "rules": {"keyword_count": {"enabled": True, "count_min": 3, "count_max": 5}},
     }
     RULES = {"keyword_count": "_check_keyword_count"}
@@ -223,7 +231,15 @@ class KeywordsCN(BaseKeywordsNode):
         **_KW,
         "chinese_font_name": "宋体",
         "font_size": "小四",
-        "label": {"chinese_font_name": "黑体", "font_size": "三号", "bold": True},
+        "label": {
+            "chinese_font_name": "黑体",
+            "english_font_name": "Times New Roman",
+            "font_size": "三号",
+            "font_color": "黑色",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+        },
         "rules": {
             "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5},
             "trailing_punctuation": {"enabled": True, "forbidden_chars": "；，。、"},

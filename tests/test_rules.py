@@ -972,7 +972,7 @@ class TestAcknowledgementsCNBase:
         node = AcknowledgementsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         # 验证配置中有 first_line_indent 字段
-        assert hasattr(node._pydantic_config, "first_line_indent")
+        assert node.pydantic_config.first_line_indent is not None
         with patch.object(node, "add_comment") as mock_comment:
             node.check_format(doc)
         assert mock_comment.call_count >= 1
@@ -1283,6 +1283,6 @@ class TestReferenceEntryBase:
         """验证 alignment 和 first_line_indent 配置被正确使用。"""
         node = _make_node(ReferenceEntry)
         node.load_config(root_config)
-        assert hasattr(node._pydantic_config, "alignment")
-        assert hasattr(node._pydantic_config, "first_line_indent")
-        assert node._pydantic_config.font_size == "五号"
+        assert node.pydantic_config.alignment is not None
+        assert node.pydantic_config.first_line_indent is not None
+        assert node.pydantic_config.font_size == "五号"

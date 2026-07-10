@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from docx import Document
 
-from wordformat.config.models import CaptionNumberingConfig
+# CaptionNumberingConfig replaced by dict
 from wordformat.utils import _from_chinese_num, _from_roman, parse_caption_text
 
 # ======================== _from_roman ========================
@@ -261,7 +261,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图1.1 系统架构图")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -274,7 +274,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图2.1 测试图")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -288,7 +288,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图1-1 测试图")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -302,7 +302,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("表1.1 测试")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -316,7 +316,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图1.3 第三张图")
         node = self._make_caption_figure(p, chapter=1, seq=2)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -330,7 +330,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("这是正文内容")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -345,7 +345,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图1.1 测试")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=True)
+        cfg = {"enabled": True, "separator": ".", "label_number_space": True}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -360,7 +360,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图 1.1 测试")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=False)
+        cfg = {"enabled": True, "separator": ".", "label_number_space": False}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -375,7 +375,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("图2.1 测试")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=False, separator=".")
+        cfg = {"enabled": False, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -390,7 +390,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "图", cfg)
@@ -404,7 +404,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("续表5.3 测试")
         node = self._make_caption_figure(p, chapter=5, seq=3)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "表", cfg)
@@ -418,7 +418,7 @@ class TestCheckCaptionNumbering:
         doc = Document()
         p = self._make_paragraph("续表5.3 测试")
         node = self._make_caption_figure(p, chapter=5, seq=3)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=True)
+        cfg = {"enabled": True, "separator": ".", "label_number_space": True}
 
         with patch.object(node, "add_comment") as mock_comment:
             _check_caption_numbering(node, doc, "表", cfg)
@@ -459,7 +459,7 @@ class TestApplyCaptionNumbering:
 
         p = self._make_paragraph("图2-1 旧名称")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         _apply_caption_numbering(node, "图", cfg)
 
@@ -470,7 +470,7 @@ class TestApplyCaptionNumbering:
 
         p = self._make_paragraph("图一.9 基于深度学习的图像识别算法")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         _apply_caption_numbering(node, "图", cfg)
 
@@ -482,7 +482,7 @@ class TestApplyCaptionNumbering:
 
         p = self._make_paragraph("图2-1 旧名称")
         node = self._make_caption_figure(p, chapter=1, seq=1)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=True)
+        cfg = {"enabled": True, "separator": ".", "label_number_space": True}
 
         _apply_caption_numbering(node, "图", cfg)
 
@@ -494,7 +494,7 @@ class TestApplyCaptionNumbering:
 
         p = self._make_paragraph("续表5.3 API接口测试结果")
         node = self._make_caption_figure(p, chapter=5, seq=3)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         _apply_caption_numbering(node, "表", cfg)
 
@@ -506,7 +506,7 @@ class TestApplyCaptionNumbering:
 
         p = self._make_paragraph("续表5.3 API接口测试结果")
         node = self._make_caption_figure(p, chapter=5, seq=3)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".", label_number_space=True)
+        cfg = {"enabled": True, "separator": ".", "label_number_space": True}
 
         _apply_caption_numbering(node, "表", cfg)
 
@@ -518,7 +518,7 @@ class TestApplyCaptionNumbering:
 
         p = self._make_paragraph("续表5-3 测试")
         node = self._make_caption_figure(p, chapter=5, seq=3)
-        cfg = CaptionNumberingConfig(enabled=True, separator=".")
+        cfg = {"enabled": True, "separator": "."}
 
         _apply_caption_numbering(node, "表", cfg)
 
@@ -754,7 +754,7 @@ numbering:
         fig = self._make_caption_figure(p)
         heading = self._make_heading_node(children=[fig])
         config = self._init_config(caption_yaml)
-        config.figures.rules.caption_numbering.enabled = False
+        config["figures"]["rules"]["caption_numbering"]["enabled"] = False
 
         with patch.object(fig, "add_comment") as mock_comment:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)

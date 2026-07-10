@@ -80,10 +80,12 @@ def _load_root_config(config_path):
 
 @pytest.fixture
 def root_config(sample_yaml_config):
-    """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
+    """从 sample_yaml_config 加载配置，与示例文件解耦。"""
     from wordformat.config.loader import init_config
+    from wordformat.config.models import NodeConfigRoot
+
     init_config(sample_yaml_config)
-    return _load_root_config(sample_yaml_config)
+    return NodeConfigRoot(**_load_root_config(sample_yaml_config))
 
 
 # ===========================================================================

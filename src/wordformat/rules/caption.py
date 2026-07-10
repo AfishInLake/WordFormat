@@ -10,6 +10,13 @@ from wordformat.structure.registry import register
 from wordformat.utils import parse_caption_text
 
 
+def _get_cfg(cfg, key, default=None):
+    """兼容 dict 和对象访问。"""
+    if isinstance(cfg, dict):
+        return cfg.get(key, default)
+    return getattr(cfg, key, default)
+
+
 def _replace_paragraph_text(paragraph, new_text: str) -> None:
     """替换段落全部文本，保留第一个 run 的格式，清除其余 run。"""
     runs = paragraph.runs
@@ -31,9 +38,10 @@ def _check_caption_numbering(
     if not paragraph:
         return
 
-    chapter = node.value.get("chapter_number", 0)
-    seq = node.value.get("sequence_number", 0)
-    separator = numbering_cfg.separator
+    value = node.value if isinstance(node.value, dict) else {}
+    chapter = value.get("chapter_number", 0)
+    seq = value.get("sequence_number", 0)
+    separator = _get_cfg(numbering_cfg, "separator", ".")
 
     text = paragraph.text.strip()
     if not text:
@@ -67,8 +75,9 @@ def _check_caption_numbering(
     # 检查标签与编号之间的空格（跳过续前缀再检查）
     check_text = text[1:].lstrip() if parsed.get("is_continued") else text
     label_with_space = check_text.startswith(f"{expected_label} ")
-    if label_with_space != numbering_cfg.label_number_space:
-        want = "有空格" if numbering_cfg.label_number_space else "无空格"
+    label_space = _get_cfg(numbering_cfg, "label_number_space", False)
+    if label_with_space != label_space:
+        want = "有空格" if label_space else "无空格"
         issues.append(format_comment(target, "间距错误", "当前不符合", f"应为{want}"))
     ch = parsed.get("chapter_num")
     if ch is not None and ch != chapter:
@@ -114,9 +123,10 @@ def _apply_caption_numbering(
     if not paragraph:
         return
 
-    chapter = node.value.get("chapter_number", 0)
-    seq = node.value.get("sequence_number", 0)
-    separator = numbering_cfg.separator
+    value = node.value if isinstance(node.value, dict) else {}
+    chapter = value.get("chapter_number", 0)
+    seq = value.get("sequence_number", 0)
+    separator = _get_cfg(numbering_cfg, "separator", ".")
 
     text = paragraph.text.strip()
     if not text:
@@ -126,7 +136,8 @@ def _apply_caption_numbering(
     name = parsed["name"] if parsed else text
     is_continued = parsed.get("is_continued", False) if parsed else False
     label_text = f"续{expected_label}" if is_continued else expected_label
-    label_part = f"{label_text} " if numbering_cfg.label_number_space else label_text
+    label_space = _get_cfg(numbering_cfg, "label_number_space", False)
+    label_part = f"{label_text} " if label_space else label_text
     new_text = f"{label_part}{chapter}{separator}{seq} {name}"
     _replace_paragraph_text(paragraph, new_text)
 

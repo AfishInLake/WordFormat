@@ -27,11 +27,14 @@ class LazyConfig:
         self._loaded = False
         logger.info(f"懒加载配置已初始化路径: {config_path}")
 
-    def load(self) -> dict:
+    def load(self):
         if not self._config_path:
             raise ConfigNotLoadedError("请先调用 init(config_path) 初始化配置路径")
         try:
-            self._config = load_yaml_with_merge(self._config_path)
+            from wordformat.config.models import NodeConfigRoot
+
+            raw = load_yaml_with_merge(self._config_path)
+            self._config = NodeConfigRoot(**raw)
             self._loaded = True
             logger.info("配置加载完成")
             return self._config
@@ -67,7 +70,7 @@ def init_config(config_path: str):
     lazy_config.init(config_path)
 
 
-def get_config() -> dict:
+def get_config():
     return lazy_config.get()
 
 

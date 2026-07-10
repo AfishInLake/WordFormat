@@ -452,7 +452,7 @@ def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
 
 
 class NodeConfigRoot(dict):
-    """配置根节点 —— 向后兼容的 dict 包装器。
+    """配置根节点 —— 向后兼容的 dict 包装器，支持点号访问。
 
     之前是 Pydantic 模型，现已改为纯 dict，保留 model_dump() 和
     collect_style_configs() 以兼容尚未迁移的代码。
@@ -460,6 +460,18 @@ class NodeConfigRoot(dict):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+    def __getattr__(self, key: str):
+        try:
+            val = self[key]
+        except KeyError:
+            return None
+        if isinstance(val, dict) and not isinstance(val, NodeConfigRoot):
+            return NodeConfigRoot(**val)
+        return val
+
+    def __setattr__(self, key, value):
+        self[key] = value
 
     def model_dump(self) -> dict:
         return dict(self)

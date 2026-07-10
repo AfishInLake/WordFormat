@@ -192,6 +192,8 @@ acknowledgements:
   content:
     alignment: '两端对齐'
     first_line_indent: '2字符'
+numbering:
+  enabled: false
 """
 
 @pytest.fixture

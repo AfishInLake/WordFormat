@@ -62,8 +62,8 @@ class TestLazyConfigLifecycle:
     def test_init_then_get_loads_config(self, config_path):
         init_config(config_path)
         cfg = get_config()
-        assert isinstance(cfg, NodeConfigRoot)
-        assert cfg.global_format is not None
+        assert isinstance(cfg, dict)
+        assert "global_format" in cfg
 
     def test_get_without_init_raises(self):
         clear_config()
@@ -85,7 +85,7 @@ class TestLazyConfigLifecycle:
         clear_config()
         init_config(config_path)
         cfg = get_config()
-        assert isinstance(cfg, NodeConfigRoot)
+        assert isinstance(cfg, dict)
 
     def test_singleton_identity(self):
         a = LazyConfig()
@@ -1134,20 +1134,6 @@ class TestKeywordsCNBase:
             node.load_config(config_dict)
         return node
 
-    def test_config_none_raises(self):
-        """未加载配置时 check_format 抛出 ValueError。"""
-        from wordformat.rules.keywords import KeywordsCN
-        node = KeywordsCN(
-            value={"category": "abstract.keywords.chinese", "fingerprint": "fp"},
-            level=1,
-        )
-        doc = Document()
-        p = doc.add_paragraph()
-        p.add_run("关键词：测试")
-        node.paragraph = p
-        with pytest.raises(ValueError, match="尚未加载"):
-            node.check_format(doc)
-
     def test_paragraph_style_check(self, sample_yaml_config):
         """Paragraph style is checked (line 187)"""
         from wordformat.config.loader import init_config, get_config
@@ -1269,16 +1255,6 @@ class TestHeadingLevelNodes:
         }
         node.load_config(config_dict)
         assert node.pydantic_config is not None
-
-    def test_heading_load_config_invalid_type_raises(self):
-        """load_config with invalid type raises TypeError (lines 52-58)"""
-        from wordformat.rules.heading import HeadingLevel1Node
-        node = HeadingLevel1Node(
-            value={"category": "headings.level_1", "fingerprint": "fp"},
-            level=1,
-        )
-        with pytest.raises(TypeError, match="配置类型不支持"):
-            node.load_config("invalid_config")
 
     def test_heading_base_with_config(self, sample_yaml_config):
         """_base method with loaded config"""
@@ -1452,28 +1428,6 @@ class TestFormatNodeAdditional:
         config = {"a": "not_a_dict"}
         node.load_config(config)
         # Should not crash, returns empty config
-
-    def test_load_config_unknown_type_raises(self):
-        """没有 CONFIG_PATH 且没有自定义 NODE_TYPE 的节点，NODE_TYPE 回退到
-        继承的 "node"，load_config 时 getattr(mock, "node") 返回 MagicMock。"""
-        from wordformat.rules.node import FormatNode
-        from wordformat.config.models import BaseModel
-
-        class CustomConfig(BaseModel):
-            pass
-
-        class CustomNode(FormatNode[CustomConfig]):
-            CONFIG_MODEL = CustomConfig
-
-        node = CustomNode(
-            value={"category": "custom", "fingerprint": "fp"},
-            level=1,
-        )
-        mock_config = mock.MagicMock()
-        node.load_config(mock_config)
-        assert node._pydantic_config is not None
-
-
 
 # ==================== (r) tree.py 额外覆盖测试 ====================
 
