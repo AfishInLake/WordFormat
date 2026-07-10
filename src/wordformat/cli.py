@@ -39,15 +39,38 @@ def validate_file(
 
 
 def _show_config():
-    """显示配置字段参考（生成自各 FormatNode 子类的 DEFAULTS 和 YAML 样例）。"""
+    """遍历所有注册的 FormatNode，打印完整配置树及默认值。"""
+    import yaml
 
-    console.print("config.yaml 主要节段参考（详请查看 presets/ 目录下的样例配置）\n")
-    console.print(
-        "  global_format, abstract, headings, body_text, figures,\n"
-        "  tables, references, acknowledgements, numbering,\n"
-        "  style_checks_warning\n"
+    from wordformat.rules import (  # noqa: F401 触发 @register
+        AbstractContentCN,
+        AbstractContentEN,
+        AbstractTitleCN,
+        AbstractTitleContentCN,
+        AbstractTitleContentEN,
+        AbstractTitleEN,
+        Acknowledgements,
+        AcknowledgementsCN,
+        BodyText,
+        CaptionFigure,
+        CaptionTable,
+        FigureImage,
+        HeadingLevel1Node,
+        HeadingLevel2Node,
+        HeadingLevel3Node,
+        KeywordsCN,
+        KeywordsEN,
+        ReferenceEntry,
+        References,
+        TableObject,
     )
-    console.print()
+    from wordformat.structure.registry import export_defaults
+
+    data = export_defaults()
+    yaml_str = yaml.dump(
+        data, default_flow_style=False, allow_unicode=True, sort_keys=False
+    )
+    console.print(yaml_str)
 
 
 def main():
