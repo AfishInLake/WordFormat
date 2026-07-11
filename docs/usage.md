@@ -301,7 +301,7 @@ wordf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" 
 
 ### 1. 生成文档结构 JSON
 ```python
-from wordformat.set_tag import set_tag_main
+from wordformat.classify.tag import set_tag_main
 
 # configpath 可选，不传使用默认配置
 set_tag_main(
@@ -312,7 +312,7 @@ set_tag_main(
 
 ### 2. 执行格式检查
 ```python
-from wordformat.set_style import auto_format_thesis_document
+from wordformat.pipeline.orchestrate import auto_format_thesis_document
 
 # configpath 可选，不传使用默认配置
 auto_format_thesis_document(
@@ -326,7 +326,7 @@ auto_format_thesis_document(
 
 ### 3. 执行自动格式化
 ```python
-from wordformat.set_style import auto_format_thesis_document
+from wordformat.pipeline.orchestrate import auto_format_thesis_document
 
 # configpath 可选，不传使用默认配置
 auto_format_thesis_document(
