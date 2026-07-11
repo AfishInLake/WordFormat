@@ -479,8 +479,7 @@ class SummaryGenerationStage:
             "检测结果：",
             f"检测模板：《{template_name}》",
             f"检测错误数：{total}，万字差错率：{error_rate:.1f}",
-            f"严重错误：{stats.get('严重', 0)}，一般错误：{stats.get('一般', 0)}，"
-            f"提醒：{stats.get('提醒', 0)}",
+            f"错误：{stats.get('错误', 0)}，提醒：{stats.get('提醒', 0)}",
         ]
 
         # 字数问题

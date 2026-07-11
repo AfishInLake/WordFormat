@@ -3,6 +3,7 @@ Core 模块综合测试
 
 覆盖 tree.py, utils.py, rules/node.py, numbering.py, settings.py
 """
+
 import os
 import pytest
 from io import StringIO
@@ -242,11 +243,13 @@ class TestPrintTree:
         # rich 渲染单根节点无线条前缀
 
     def test_print_dict_value_node(self):
-        node = TreeNode({
-            "category": "body_text",
-            "paragraph": "这是一段正文内容",
-            "fingerprint": "fp001",
-        })
+        node = TreeNode(
+            {
+                "category": "body_text",
+                "paragraph": "这是一段正文内容",
+                "fingerprint": "fp001",
+            }
+        )
         buf = StringIO()
         with patch("sys.stdout", buf):
             print_tree(node)
@@ -264,9 +267,6 @@ class TestPrintTree:
         assert "root" in output
         assert "child1" in output
         assert "child2" in output
-
-
-
 
 
 # ============================================================
@@ -376,19 +376,20 @@ class TestFormatNode:
         node.apply_format(doc)  # 不应抛异常
 
     def test_add_comment_buffers(self, doc):
-        """add_comment 缓冲文本，_flush_comments 合并写入。"""
+        """add_comment 缓冲文本，_flush_comments 合并写入为一条批注。"""
         node = FormatNode(value="test", level=1)
         p = doc.add_paragraph("hello")
         node.paragraph = p
-        node.add_comment(doc, p.runs[0], "格式错误")
-        node.add_comment(doc, p.runs[0], "字体问题")
-        with patch.object(doc, "add_comment") as mock_add:
-            node._flush_comments(doc)
-        mock_add.assert_called_once()
-        merged = mock_add.call_args[1]["text"]
-        assert "格式错误" in merged
-        assert "字体问题" in merged
-        assert merged.count("\n") == 1
+        node.add_comment(doc, p.runs[0], "标题-字号错误：小四，规范：五号")
+        node.add_comment(doc, p.runs[0], "标题-加粗错误：加粗，规范：不加粗")
+        node._flush_comments(doc)
+        comments = list(doc.comments)
+        assert len(comments) == 1
+        text = comments[0].text
+        assert "字号错误" in text
+        assert "加粗错误" in text
+        # 每条问题各占一段
+        assert len(comments[0].paragraphs) == 2
 
     def test_add_comment_empty_text_skipped(self, doc):
         node = FormatNode(value="test", level=1)
@@ -399,22 +400,22 @@ class TestFormatNode:
 
     def test_load_config_with_node_type(self):
         """load_config 沿 NODE_TYPE 路径提取 dict 并与 DEFAULTS 合并。"""
+
         class TestNode(FormatNode):
             NODE_TYPE = "headings.level_1"
             DEFAULTS = {"font_size": "小二", "alignment": "居中对齐"}
 
         node = TestNode(value="test", level=1)
-        node.load_config({
-            "headings": {
-                "level_1": {"font_size": "三号", "chinese_font_name": "黑体"}
+        node.load_config(
+            {
+                "headings": {
+                    "level_1": {"font_size": "三号", "chinese_font_name": "黑体"}
+                }
             }
-        })
+        )
         assert node.pydantic_config.font_size == "三号"  # YAML 覆盖
         assert node.pydantic_config.alignment == "居中对齐"  # DEFAULTS
         assert node.pydantic_config.chinese_font_name == "黑体"  # YAML
-
-
-
 
 
 class TestDotDict:
@@ -422,12 +423,14 @@ class TestDotDict:
 
     def test_setattr(self):
         from wordformat.config.dotdict import DotDict
+
         d = DotDict()
         d.alignment = "居中"
         assert d["alignment"] == "居中"
 
     def test_delattr_existing_key(self):
         from wordformat.config.dotdict import DotDict
+
         d = DotDict(a=1)
         del d.a
         assert "a" not in d
@@ -435,23 +438,26 @@ class TestDotDict:
     def test_delattr_missing_key_raises(self):
         from wordformat.config.dotdict import DotDict
         import pytest
+
         d = DotDict()
         with pytest.raises(AttributeError):
             del d.nonexistent
 
     def test_getattr_nested_dict_returns_dotdict(self):
         from wordformat.config.dotdict import DotDict
+
         d = DotDict({"outer": {"inner": 1}})
         assert isinstance(d.outer, DotDict)
         assert d.outer.inner == 1
 
     def test_deep_merge_nested(self):
         from wordformat.config.dotdict import deep_merge
+
         base = {"a": {"b": 1, "c": 2}}
         override = {"a": {"b": 99}}
         result = deep_merge(base, override)
         assert result["a"]["b"] == 99  # overridden
-        assert result["a"]["c"] == 2   # kept
+        assert result["a"]["c"] == 2  # kept
 
 
 class TestExportDefaults:
@@ -459,6 +465,7 @@ class TestExportDefaults:
 
     def test_export_returns_dict_with_key_sections(self):
         from wordformat.structure.registry import export_defaults
+
         # 需要先触发 @register（已通过 test 导入完成）
         from wordformat.rules import (  # noqa: F401
             AbstractContentCN,
@@ -466,6 +473,7 @@ class TestExportDefaults:
             BodyText,
             HeadingLevel1Node,
         )
+
         data = export_defaults()
         assert isinstance(data, dict)
         assert "template_name" in data

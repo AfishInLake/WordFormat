@@ -69,7 +69,7 @@ class FormatNode(TreeNode):
     DEFAULTS: dict = {}
 
     # 全局错误统计（类变量，一次 check 周期内累加）
-    _error_stats: dict[str, int] = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
+    _error_stats: dict[str, int] = {"total": 0, "错误": 0, "提醒": 0}
 
     # 中文标签，用作批注的 [位置] 部分
     NODE_LABEL: str = ""
@@ -254,24 +254,25 @@ class FormatNode(TreeNode):
         return groups
 
     def _write_comment_groups(self, doc, groups) -> None:
-        """将分组后的批注写入文档并更新统计。"""
-        from wordformat.style.comments import SEVERITY_ORDER, get_severity
+        """将分组后的批注写入文档并更新统计。
 
-        _SEVERITY_COLOR = {"严重": "FF0000", "一般": None, "提醒": "0000FF"}
+        每条批注按行拆分，`位置-问题类型：` 按严重度上色，正文保持黑色。
+        """
+        from wordformat.style.comments import (
+            SEVERITY_ORDER,
+            add_styled_comment,
+            get_severity,
+            split_comment_line,
+        )
 
         for runs, texts in groups.values():
-            merged = "\n".join(texts)
-            doc.add_comment(
-                runs=runs, text=merged, author="Wordformat", initials="afish"
-            )
+            paragraphs = [split_comment_line(t) for t in texts]
+            add_styled_comment(doc, runs, paragraphs)
             max_sev = "提醒"
             for t in texts:
                 sev = get_severity(t)
                 if SEVERITY_ORDER.get(sev, 3) < SEVERITY_ORDER.get(max_sev, 3):
                     max_sev = sev
-            color = _SEVERITY_COLOR.get(max_sev)
-            if color:
-                _color_last_comment(doc, color)
             FormatNode._error_stats["total"] += 1
             FormatNode._error_stats[max_sev] = (
                 FormatNode._error_stats.get(max_sev, 0) + 1
@@ -280,7 +281,7 @@ class FormatNode(TreeNode):
     @classmethod
     def reset_stats(cls) -> None:
         """重置全局错误统计。"""
-        cls._error_stats = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
+        cls._error_stats = {"total": 0, "错误": 0, "提醒": 0}
 
     def check_format(self, doc: Document):
         """格式检查：先执行样式检查，再自动调度业务规则"""
@@ -368,47 +369,3 @@ class FormatNode(TreeNode):
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         """追加批注到缓冲区，按锚点 run 分组，flush 时同组合并为一条。"""
         self._collect_comment(runs, text)
-
-
-def _color_last_comment(doc, hex_color: str) -> None:
-    """将文档最后一条批注的文字颜色设为指定色（如 FF0000 红色、0000FF 蓝色）。"""
-    try:
-        comments_part = doc._part.comments
-        if comments_part is None:
-            return
-        # python-docx Comments 不支持下标，通过 XML 元素树找最后一条
-        comments_elm = comments_part._comments_elm
-        comment_list = comments_elm.findall(
-            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}comment"
-        )
-        if not comment_list:
-            return
-        last = comment_list[-1]
-        for p in last.findall(
-            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
-        ):
-            for r in p.findall(
-                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
-            ):
-                rPr = r.find(
-                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rPr"
-                )
-                if rPr is None:
-                    from docx.oxml import OxmlElement
-
-                    rPr = OxmlElement("w:rPr")
-                    r.insert(0, rPr)
-                color = rPr.find(
-                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}color"
-                )
-                if color is None:
-                    from docx.oxml import OxmlElement
-
-                    color = OxmlElement("w:color")
-                    rPr.append(color)
-                color.set(
-                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val",
-                    hex_color,
-                )
-    except Exception:
-        pass
