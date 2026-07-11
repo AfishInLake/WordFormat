@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_UNDERLINE
 from docx.oxml.ns import qn
 from loguru import logger
 
@@ -34,13 +34,6 @@ class ThemeRef:
 
 
 # ── 主题字体表 ────────────────────────────────────────────────────
-_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
-
-
-def _a(tag: str) -> str:
-    return f"{{{_A}}}{tag}"
-
-
 class ThemeFontTable:
     """解析 theme part 的 fontScheme，把主题字体 token 映射为具体字体名。"""
 
@@ -53,7 +46,7 @@ class ThemeFontTable:
                 logger.debug(f"主题字体解析失败：{e}")
 
     def _load(self, document) -> None:
-        from lxml import etree
+        from docx.oxml import parse_xml
 
         theme_part = next(
             (
@@ -65,15 +58,15 @@ class ThemeFontTable:
         )
         if theme_part is None:
             return
-        root = etree.fromstring(theme_part.blob)
+        root = parse_xml(theme_part.blob)
         for major_minor in ("major", "minor"):
-            font = root.find(f".//{_a(major_minor + 'Font')}")
+            font = root.find(f".//{qn('a:' + major_minor + 'Font')}")
             if font is None:
                 continue
             cap = major_minor.capitalize()  # Major / Minor
-            latin = font.find(_a("latin"))
-            ea = font.find(_a("ea"))
-            cs = font.find(_a("cs"))
+            latin = font.find(qn("a:latin"))
+            ea = font.find(qn("a:ea"))
+            cs = font.find(qn("a:cs"))
             if latin is not None and latin.get("typeface"):
                 self._map[f"{major_minor}HAnsi"] = latin.get("typeface")
                 self._map[f"{major_minor}Ascii"] = latin.get("typeface")
@@ -92,54 +85,46 @@ class ThemeFontTable:
 
 
 # ── 提取器：单个 rPr/pPr 元素 → 归一化值 | _MISS ──────────────────
-def _bool_toggle(elem, tag: str):
-    node = elem.find(qn(tag))
-    if node is None:
-        return _MISS
-    val = node.get(qn("w:val"))
-    return val is None or val not in ("0", "false", "off", "none")
-
-
+# 字符级 rPr 均为 python-docx 的 CT_RPr，直接用其类型化子元素
+# （.b/.i/.u/.sz/.color），复用官方 on/off、半点、颜色转换。
 def x_bold(rPr):
-    return _bool_toggle(rPr, "w:b")
+    return _MISS if rPr.b is None else bool(rPr.b.val)
 
 
 def x_italic(rPr):
-    return _bool_toggle(rPr, "w:i")
+    return _MISS if rPr.i is None else bool(rPr.i.val)
 
 
 def x_underline(rPr):
-    u = rPr.find(qn("w:u"))
+    u = rPr.u
     if u is None:
         return _MISS
-    val = u.get(qn("w:val"))
-    return val not in (None, "none")
+    return u.val not in (None, WD_UNDERLINE.NONE)
 
 
 def x_size_pt(rPr):
-    sz = rPr.find(qn("w:sz"))
+    sz = rPr.sz
     if sz is None:
         return _MISS
-    val = sz.get(qn("w:val"))
     try:
-        return int(val) / 2.0
-    except (TypeError, ValueError):
+        return sz.val.pt
+    except (ValueError, TypeError):
         return _MISS
 
 
 def x_color_rgb(rPr):
-    c = rPr.find(qn("w:color"))
+    c = rPr.color
     if c is None:
         return _MISS
-    if c.get(qn("w:themeColor")) is not None:
+    if c.themeColor is not None:
         return None  # 主题色：rgb 只是猜测，返回 None 表示不确定
-    val = c.get(qn("w:val"))
+    try:
+        val = c.val
+    except Exception:
+        return (0, 0, 0)
     if val is None or val == "auto":
         return (0, 0, 0)
-    try:
-        return (int(val[0:2], 16), int(val[2:4], 16), int(val[4:6], 16))
-    except (ValueError, IndexError):
-        return _MISS
+    return (val[0], val[1], val[2])  # RGBColor 支持索引
 
 
 def _font_attr(rPr, literal: str, theme: str):
@@ -349,9 +334,8 @@ class StyleResolver:
         rPr = run._element.find(qn("w:rPr"))
         if rPr is not None:
             yield rPr
-            rStyle = rPr.find(qn("w:rStyle"))
-            if rStyle is not None:
-                for st in self._style_chain(rStyle.get(qn("w:val"))):
+            if rPr.style is not None:  # CT_RPr.style → rStyle/@val
+                for st in self._style_chain(rPr.style):
                     yield self._child(st, "w:rPr")
         # 段落样式链
         pPr = getattr(run._parent, "_p", None)

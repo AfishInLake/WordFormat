@@ -155,11 +155,9 @@ class BodyText(FormatNode):
             return replaced
 
         for run in self.paragraph.runs:
-            rPr = run._element.find(qn("w:rPr"))
-            if rPr is not None:
-                vertAlign = rPr.find(qn("w:vertAlign"))
-                if vertAlign is not None:
-                    rPr.remove(vertAlign)
+            # superscript is not None ⇔ 该 run 存在 w:vertAlign（上标或下标）
+            if run.font.superscript is not None:
+                run.font.superscript = None  # 移除 w:vertAlign
 
         return replaced
 
@@ -261,14 +259,8 @@ class BodyText(FormatNode):
 
             for c_start, c_end in citations:
                 if r_start >= c_start and r_end <= c_end:
-                    rPr = r_elem.find(qn("w:rPr"))
-                    if rPr is None:
-                        rPr = OxmlElement("w:rPr")
-                        r_elem.insert(0, rPr)
-                    if rPr.find(qn("w:vertAlign")) is None:
-                        va = OxmlElement("w:vertAlign")
-                        va.set(qn("w:val"), "superscript")
-                        rPr.append(va)
+                    # CT_R.get_or_add_rPr() → CT_RPr.superscript 官方封装
+                    r_elem.get_or_add_rPr().superscript = True
                     break
 
             cum += len(text)

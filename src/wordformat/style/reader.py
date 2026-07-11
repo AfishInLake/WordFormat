@@ -10,10 +10,10 @@
 """
 
 from docx.enum.text import WD_LINE_SPACING
+from docx.oxml.xmlchemy import BaseOxmlElement
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
-from lxml.etree import _Element
 
 from wordformat.style.inheritance import (
     StyleResolver,
@@ -35,8 +35,8 @@ from wordformat.style.inheritance import (
 
 
 def _real_elem(obj) -> bool:
-    """obj 是否为持有真实 lxml 元素的段落/run（排除 Mock 等无效输入）。"""
-    return isinstance(getattr(obj, "_element", None), _Element)
+    """obj 是否为持有真实 python-docx XML 元素的段落/run（排除 Mock 等无效输入）。"""
+    return isinstance(getattr(obj, "_element", None), BaseOxmlElement)
 
 
 def _para(paragraph, extractor, default=None):
