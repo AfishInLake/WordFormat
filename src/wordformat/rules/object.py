@@ -14,7 +14,7 @@ class FigureImage(FormatNode):
 
     NODE_TYPE = "figure_image"
     NODE_LABEL = "图片段落"
-    DEFAULTS = {}
+    DEFAULTS = {"alignment": "居中对齐", "first_line_indent": "0字符"}
     DEFAULT_RULES = {}
 
     def _base(self, doc, p: bool, r: bool):
@@ -23,7 +23,7 @@ class FigureImage(FormatNode):
         from wordformat.style.diff import _format_para_value
 
         cfg = self.pydantic_config
-        expected_align = Alignment(str(cfg.alignment))
+        expected_align = Alignment(str(cfg.alignment or "居中对齐"))
         actual_align = expected_align.get_from_paragraph(self.paragraph)
         if expected_align != actual_align:
             self.add_comment(
@@ -37,7 +37,7 @@ class FigureImage(FormatNode):
                 ),
             )
 
-        expected_indent = FirstLineIndent(str(cfg.first_line_indent))
+        expected_indent = FirstLineIndent(str(cfg.first_line_indent or "0字符"))
         actual_indent = expected_indent.get_from_paragraph(self.paragraph)
         if expected_indent != actual_indent:
             self.add_comment(

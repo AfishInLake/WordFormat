@@ -257,19 +257,21 @@ class FormatNode(TreeNode):
         """将分组后的批注写入文档并更新统计。"""
         from wordformat.style.comments import SEVERITY_ORDER, get_severity
 
+        _SEVERITY_COLOR = {"严重": "FF0000", "一般": None, "提醒": "0000FF"}
+
         for runs, texts in groups.values():
             merged = "\n".join(texts)
             doc.add_comment(
                 runs=runs, text=merged, author="Wordformat", initials="afish"
             )
-            # 提醒级批注用蓝色字体
             max_sev = "提醒"
             for t in texts:
                 sev = get_severity(t)
                 if SEVERITY_ORDER.get(sev, 3) < SEVERITY_ORDER.get(max_sev, 3):
                     max_sev = sev
-            if max_sev == "提醒":
-                _color_last_comment(doc, "0000FF")
+            color = _SEVERITY_COLOR.get(max_sev)
+            if color:
+                _color_last_comment(doc, color)
             FormatNode._error_stats["total"] += 1
             FormatNode._error_stats[max_sev] = (
                 FormatNode._error_stats.get(max_sev, 0) + 1
@@ -369,13 +371,20 @@ class FormatNode(TreeNode):
 
 
 def _color_last_comment(doc, hex_color: str) -> None:
-    """将文档最后一条批注的文字颜色设为指定色（如 0000FF 蓝色）。"""
+    """将文档最后一条批注的文字颜色设为指定色（如 FF0000 红色、0000FF 蓝色）。"""
     try:
-        comments = doc._part.comments
-        if comments is None:
+        comments_part = doc._part.comments
+        if comments_part is None:
             return
-        last = comments[-1]
-        for p in last._element.findall(
+        # python-docx Comments 不支持下标，通过 XML 元素树找最后一条
+        comments_elm = comments_part._comments_elm
+        comment_list = comments_elm.findall(
+            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}comment"
+        )
+        if not comment_list:
+            return
+        last = comment_list[-1]
+        for p in last.findall(
             "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
         ):
             for r in p.findall(
