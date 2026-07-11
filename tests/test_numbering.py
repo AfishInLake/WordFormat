@@ -33,7 +33,6 @@ from wordformat.utils import (
     _get_level_fmt,
     _count_numbering_levels,
 )
-from wordformat.style.reader import _get_style_spacing
 from wordformat.base import DocxBase
 from wordformat import settings
 

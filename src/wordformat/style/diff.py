@@ -11,9 +11,13 @@ from loguru import logger
 
 from wordformat.config.dotdict import DotDict
 from wordformat.style.reader import (
+    run_get_font_bold,
     run_get_font_color,
+    run_get_font_italic,
     run_get_font_name,
+    run_get_font_name_en,
     run_get_font_size_pt,
+    run_get_font_underline,
 )
 from wordformat.utils import has_chinese
 
@@ -226,8 +230,8 @@ class CharacterStyle:
 
         diffs = []
 
-        # 1. 加粗（None = 继承，视为不加粗）
-        bold = bool(run.font.bold)
+        # 1. 加粗（沿继承链：直接→字符样式→段落样式→docDefaults）
+        bold = run_get_font_bold(run)
         if bold != self.bold:
             diffs.append(
                 DIFFResult(
@@ -238,8 +242,8 @@ class CharacterStyle:
                     1,
                 )
             )
-        # 2. 斜体（None = 继承，视为非斜体）
-        italic = bool(run.font.italic)
+        # 2. 斜体（沿继承链解析）
+        italic = run_get_font_italic(run)
         if italic != self.italic:
             diffs.append(
                 DIFFResult(
@@ -251,8 +255,8 @@ class CharacterStyle:
                 )
             )
 
-        # 3. 下划线（None = 继承，视为无下划线）
-        underline = bool(run.font.underline)
+        # 3. 下划线（沿继承链解析）
+        underline = run_get_font_underline(run)
         if underline != self.underline:
             diffs.append(
                 DIFFResult(
@@ -307,8 +311,8 @@ class CharacterStyle:
                     1,
                 )
             )
-        # 7. 非东亚字体（None = 继承，视为空）
-        ascii_font = run.font.name or ""
+        # 7. 非东亚字体（沿继承链，含主题字体；未设置视为空）
+        ascii_font = run_get_font_name_en(run) or ""
         if str(ascii_font).lower() != str(self.font_name_en).lower():
             diffs.append(
                 DIFFResult(

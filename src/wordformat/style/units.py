@@ -138,20 +138,3 @@ def extract_unit_from_string(text: str) -> UnitResult:
         result.is_valid = True
 
     return result
-
-
-def _get_with_style_fallback(paragraph, attr: str, default):
-    """从段落或样式链读取属性值。"""
-    val = getattr(paragraph.paragraph_format, attr, None)
-    if val is not None:
-        return val
-    style = paragraph.style
-    while style is not None:
-        try:
-            val = getattr(style.paragraph_format, attr, None)
-            if val is not None:
-                return val
-        except AttributeError:
-            pass
-        style = style.base_style
-    return default

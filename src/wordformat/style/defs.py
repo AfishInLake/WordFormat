@@ -20,10 +20,11 @@ from wordformat.style.reader import (
     paragraph_get_builtin_style_name,
     paragraph_get_first_line_indent,
     paragraph_get_line_spacing,
+    paragraph_get_line_spacing_rule,
     paragraph_get_space_after,
     paragraph_get_space_before,
 )
-from wordformat.style.units import _get_with_style_fallback, extract_unit_from_string
+from wordformat.style.units import extract_unit_from_string
 from wordformat.style.writer import (
     SetFirstLineIndent,
     SetIndent,
@@ -525,18 +526,7 @@ class LineSpacingRule(UnitLabelEnum):
             raise ValueError(f"无效的行距选项: '{self.value}'")
 
     def get_from_paragraph(self, paragraph: Paragraph):
-        rule = _get_with_style_fallback(
-            paragraph, "line_spacing_rule", WD_LINE_SPACING.MULTIPLE
-        )
-        if rule == WD_LINE_SPACING.MULTIPLE:
-            spacing = _get_with_style_fallback(paragraph, "line_spacing", None)
-            if spacing == 1.0:
-                return WD_LINE_SPACING.SINGLE
-            if spacing == 1.5:
-                return WD_LINE_SPACING.ONE_POINT_FIVE
-            if spacing == 2.0:
-                return WD_LINE_SPACING.DOUBLE
-        return rule
+        return paragraph_get_line_spacing_rule(paragraph)
 
 
 class LineSpacing(UnitLabelEnum):

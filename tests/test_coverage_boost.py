@@ -946,15 +946,15 @@ class TestGetSomeCoverageBoost:
         assert result == ""
 
     def test_run_get_font_color_theme(self):
-        """覆盖行 340: themeColor 类型返回 None。"""
-        # 使用 MagicMock 模拟 run.font.color，使 type 返回 THEME
-        from docx.enum.dml import MSO_COLOR_TYPE
-        mock_run = MagicMock()
-        mock_color = MagicMock()
-        mock_color.type = MSO_COLOR_TYPE.THEME
-        mock_run.font.color = mock_color
-        result = run_get_font_color(mock_run)
-        assert result is None
+        """themeColor（主题色）返回 None：rgb 不确定。"""
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        run = Document().add_paragraph().add_run("x")
+        rPr = run._element.get_or_add_rPr()
+        color = OxmlElement("w:color")
+        color.set(qn("w:themeColor"), "accent1")
+        rPr.append(color)
+        assert run_get_font_color(run) is None
 
     def test_get_indent_invalid_type(self):
         """覆盖行 429-433: GetIndent.line_indent 无效 indent_type。"""

@@ -19,7 +19,7 @@ from wordformat.style.reader import (
     paragraph_get_line_spacing, paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
     run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent, _get_style_spacing,
+    run_get_font_underline, GetIndent,
 )
 from wordformat.style.writer import (
     run_set_font_name, set_paragraph_space_before_by_lines,
@@ -124,8 +124,9 @@ class TestGetSomeRun:
         run_set_font_name(run, "宋体")
         assert run_get_font_name(run) == "宋体"
 
-    def test_font_size_default_12(self, doc):
-        assert run_get_font_size_pt(doc.add_paragraph().add_run("x")) == 12.0
+    def test_font_size_docdefaults_11(self, doc):
+        # 空 run 现沿继承链解析到 docDefaults sz=22 → 11.0（非旧硬编码 12.0）
+        assert run_get_font_size_pt(doc.add_paragraph().add_run("x")) == 11.0
 
     def test_font_size_explicit(self, doc):
         run = doc.add_paragraph().add_run("x")
@@ -193,17 +194,6 @@ class TestGetIndent:
 
 
 
-class TestGetStyleSpacing:
-    def test_none_style(self):
-        assert _get_style_spacing(None, "before") is None
-
-    def test_no_element(self):
-        s = MagicMock()
-        del s.element
-        assert _get_style_spacing(s, "before") is None
-
-
-
 # ===========================================================================
 # Additional coverage tests for get_some.py
 # ===========================================================================
@@ -221,17 +211,14 @@ class TestGetSomeAlignmentFromStyle:
         assert paragraph_get_alignment(p) == WD_ALIGN_PARAGRAPH.CENTER
 
     def test_alignment_from_base_style(self, doc):
-        """Traverse _base_style chain for alignment"""
-        p = doc.add_paragraph()
-        p.paragraph_format.alignment = None
-        # Use patch.object to mock the style property
-        mock_style = MagicMock()
-        mock_style.paragraph_format.alignment = None
-        mock_base = MagicMock()
-        mock_base.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        mock_style._base_style = mock_base
-        with mock_patch.object(type(p), 'style', new_callable=PropertyMock, return_value=mock_style):
-            assert paragraph_get_alignment(p) == WD_ALIGN_PARAGRAPH.RIGHT
+        """沿真实 basedOn 链解析对齐：Child(basedOn=Base) 继承 Base 的对齐。"""
+        from docx.enum.style import WD_STYLE_TYPE
+        base = doc.styles.add_style("BaseAlign", WD_STYLE_TYPE.PARAGRAPH)
+        base.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        child = doc.styles.add_style("ChildAlign", WD_STYLE_TYPE.PARAGRAPH)
+        child.base_style = base
+        p = doc.add_paragraph(style="ChildAlign")
+        assert paragraph_get_alignment(p) == WD_ALIGN_PARAGRAPH.RIGHT
 
     def test_alignment_no_base_style_returns_none(self, doc):
         """No direct alignment, no style alignment, no base_style -> None"""
@@ -240,112 +227,6 @@ class TestGetSomeAlignmentFromStyle:
         p.style.paragraph_format.alignment = None
         p.style._base_style = None
         assert paragraph_get_alignment(p) is None
-
-
-
-class TestGetStyleSpacingExtended:
-    """Cover lines 66-69, 80-124: _get_style_spacing with various paths"""
-
-    def test_style_elem_none_falls_to_base(self):
-        """style.element is None -> recurse to base_style (lines 66-69)"""
-        mock_base = MagicMock()
-        mock_base.element = None
-        mock_base.base_style = None
-        mock_style = MagicMock()
-        mock_style.element = None
-        mock_style.base_style = mock_base
-        assert _get_style_spacing(mock_style, "before") is None
-
-    def test_style_pPr_none_recurse_base(self):
-        """style_pPr is None -> recurse to base_style (lines 76-81)"""
-        from docx.oxml import OxmlElement
-        mock_base = MagicMock()
-        mock_base.element = None
-        mock_base.base_style = None
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-        assert _get_style_spacing(mock_style, "before") is None
-
-    def test_spacing_none_recurse_base(self):
-        """spacing element is None -> recurse to base_style (lines 89-94)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-        mock_base = MagicMock()
-        mock_base.element = None
-        mock_base.base_style = None
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        elem.append(pPr)
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-        assert _get_style_spacing(mock_style, "before") is None
-
-    def test_lines_attr_valid(self):
-        """Valid beforeLines attribute -> returns float (lines 97-112)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "50")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        assert _get_style_spacing(mock_style, "before") == 0.5
-
-    def test_lines_attr_zero_returns_zero(self):
-        """显式 Lines=0 应返回 0.0，不回退到基样式。"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-        mock_base = MagicMock()
-        mock_base.element = None
-        mock_base.base_style = None
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "0")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-        assert _get_style_spacing(mock_style, "before") == 0.0
-
-    def test_mock_detection_in_lines_attr(self):
-        """Lines attr is a Mock object -> detect and handle (lines 100-106)"""
-        # We can't set a Mock as an XML attribute, so we mock the entire
-        # _get_style_spacing function's internal behavior by constructing
-        # a mock style whose spacing.get returns a Mock
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        # Set a real value first, then mock the get to return a Mock
-        spacing.set(qn("w:beforeLines"), "100")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-
-        # Patch spacing.get to return a Mock with "Mock" in class name
-        original_get = spacing.get
-        mock_attr = MagicMock(__class__=MagicMock(__name__="Mock"))
-        mock_attr.return_value = "100"
-
-        def mock_get(qname, default=None):
-            if "beforeLines" in qname:
-                return mock_attr
-            return original_get(qname, default)
-
-        spacing.get = mock_get
-        result = _get_style_spacing(mock_style, "before")
-        assert result == 1.0
 
 
 
@@ -437,13 +318,12 @@ class TestGetSomeRunExtended:
     """Cover lines 317, 338: run_get_font_size_pt with style, run_get_font_color with theme"""
 
     def test_font_size_from_style(self, doc):
-        """run.font.size is None, falls back to style.font.size (line 317)"""
-        run = doc.add_paragraph().add_run("x")
-        run.font.size = None
-        mock_style = MagicMock()
-        mock_style.font.size = Pt(16)
-        with mock_patch.object(type(run._parent), 'style', new_callable=PropertyMock, return_value=mock_style):
-            assert run_get_font_size_pt(run) == 16.0
+        """run 无直接字号时，沿段落样式链解析到样式字号。"""
+        from docx.enum.style import WD_STYLE_TYPE
+        st = doc.styles.add_style("SizeStyle", WD_STYLE_TYPE.PARAGRAPH)
+        st.font.size = Pt(16)
+        run = doc.add_paragraph(style="SizeStyle").add_run("x")
+        assert run_get_font_size_pt(run) == 16.0
 
     def test_font_color_theme_color(self, doc):
         """run.font.color.rgb is None (theme color) -> returns (0,0,0) (line 338)"""
@@ -516,321 +396,6 @@ class TestGetIndentWithRealElement:
         if ind is not None:
             pPr.remove(ind)
         assert GetIndent.line_indent(p, "left") is None
-
-
-
-# ===========================================================================
-# Coverage: get_some.py uncovered lines
-# ===========================================================================
-
-
-class TestGetStyleSpacingAttributeErrorPaths:
-    """Cover lines 68-69, 73-74, 80-81, 86-87, 93-94:
-       _get_style_spacing when various attributes raise AttributeError"""
-
-    def test_style_elem_none_base_style_attr_error(self):
-        """style_elem is None, style.base_style raises AttributeError (lines 68-69)"""
-        mock_style = MagicMock()
-        mock_style.element = None
-        # Make base_style raise AttributeError
-        del mock_style.base_style
-        assert _get_style_spacing(mock_style, "before") is None
-
-    def test_style_pPr_find_attr_error(self):
-        """style_pPr find raises AttributeError (lines 73-74)"""
-        from docx.oxml import OxmlElement
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        mock_style.element = elem
-        # Make elem.find raise AttributeError
-        original_find = elem.find
-        elem.find = MagicMock(side_effect=AttributeError("test"))
-        try:
-            assert _get_style_spacing(mock_style, "before") is None
-        finally:
-            elem.find = original_find
-
-    def test_style_pPr_none_base_style_attr_error(self):
-        """style_pPr is None, style.base_style raises AttributeError (lines 80-81)"""
-        from docx.oxml import OxmlElement
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        mock_style.element = elem
-        del mock_style.base_style
-        # pPr will be None since no w:pPr child
-        assert _get_style_spacing(mock_style, "before") is None
-
-    def test_spacing_find_attr_error(self):
-        """spacing find raises AttributeError (lines 86-87)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        elem.append(pPr)
-        mock_style.element = elem
-        # Make pPr.find raise AttributeError for w:spacing
-        original_find = pPr.find
-        def selective_find(qname):
-            if "spacing" in str(qname):
-                raise AttributeError("test")
-            return original_find(qname)
-        pPr.find = selective_find
-        try:
-            assert _get_style_spacing(mock_style, "before") is None
-        finally:
-            pPr.find = original_find
-
-    def test_spacing_none_base_style_attr_error(self):
-        """spacing is None, style.base_style raises AttributeError (lines 93-94)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        elem.append(pPr)
-        mock_style.element = elem
-        del mock_style.base_style
-        # No w:spacing child -> spacing is None
-        assert _get_style_spacing(mock_style, "before") is None
-
-
-
-class TestGetStyleSpacingMockDetectionAndValueError:
-    """Cover lines 106, 108-109: _get_style_spacing Mock detection and ValueError paths"""
-
-    def test_lines_attr_mock_with_return_value(self):
-        """lines_attr is a Mock with return_value -> use return_value (line 106)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-
-        # Create a Mock that has return_value and "Mock" in class name
-        lines_attr = MagicMock(__class__=MagicMock(__name__="Mock"))
-        lines_attr.return_value = "200"  # 2.0 lines
-
-        original_get = spacing.get
-        def mock_get(qname, default=None):
-            if "beforeLines" in str(qname):
-                return lines_attr
-            return original_get(qname, default)
-        spacing.get = mock_get
-        try:
-            result = _get_style_spacing(mock_style, "before")
-            assert result == 2.0
-        finally:
-            spacing.get = original_get
-
-    def test_lines_attr_mock_no_return_value_value_error(self):
-        """lines_attr is a Mock, return_value exists but int(return_value) raises ValueError (lines 108-109)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        mock_style.base_style = None  # terminate recursion
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-
-        # Create a Mock detected as Mock, with return_value that causes int() to raise
-        return_value_mock = MagicMock()
-        return_value_mock.__int__ = MagicMock(side_effect=ValueError("not a number"))
-        lines_attr = MagicMock(__class__=MagicMock(__name__="Mock"))
-        lines_attr.return_value = return_value_mock
-
-        original_get = spacing.get
-        def mock_get(qname, default=None):
-            if "beforeLines" in str(qname):
-                return lines_attr
-            return original_get(qname, default)
-        spacing.get = mock_get
-        try:
-            result = _get_style_spacing(mock_style, "before")
-            # Mock detected -> lines_attr = return_value_mock
-            # int(return_value_mock) raises ValueError -> lines_val = None
-            # base_style is None -> returns None
-            assert result is None
-        finally:
-            spacing.get = original_get
-
-    def test_lines_attr_not_mock_value_error(self):
-        """lines_attr is not a Mock, int() raises ValueError (lines 108-109)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        mock_style.base_style = None  # terminate recursion
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-
-        original_get = spacing.get
-        def mock_get(qname, default=None):
-            if "beforeLines" in str(qname):
-                return "not_a_number"
-            return original_get(qname, default)
-        spacing.get = mock_get
-        try:
-            result = _get_style_spacing(mock_style, "before")
-            # int("not_a_number") raises ValueError -> lines_val = None
-            # Then falls to base_style which is None
-            assert result is None
-        finally:
-            spacing.get = original_get
-
-
-
-class TestGetStyleSpacingRecursionAndBaseLines:
-    """Cover lines 117-118, 122: _get_style_spacing recursion and base_lines paths"""
-
-    def test_recursion_returns_base_value(self):
-        """当前样式 Lines 有效（非0）时返回自身值，不回退基样式。"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_base = MagicMock()
-        base_elem = OxmlElement("w:style")
-        base_pPr = OxmlElement("w:pPr")
-        base_spacing = OxmlElement("w:spacing")
-        base_spacing.set(qn("w:beforeLines"), "100")
-        base_pPr.append(base_spacing)
-        base_elem.append(base_pPr)
-        mock_base.element = base_elem
-        mock_base.base_style = None
-
-        # 子样式显式设置 beforeLines=200，应使用自身值
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "200")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-
-        result = _get_style_spacing(mock_style, "before")
-        assert result == 2.0  # 自身值，不回退基样式
-
-    def test_explicit_zero_not_falls_to_base(self):
-        """显式 Lines=0 返回 0.0，不回退基样式。"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_base = MagicMock()
-        base_elem = OxmlElement("w:style")
-        base_pPr = OxmlElement("w:pPr")
-        base_spacing = OxmlElement("w:spacing")
-        base_spacing.set(qn("w:beforeLines"), "100")
-        base_pPr.append(base_spacing)
-        base_elem.append(base_pPr)
-        mock_base.element = base_elem
-        mock_base.base_style = None
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "0")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-
-        result = _get_style_spacing(mock_style, "before")
-        assert result == 0.0  # 显式 0，不回退
-
-    def test_recursion_base_style_attr_error(self):
-        """Recursion: base_style raises AttributeError (line 117-118)"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "0")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        del mock_style.base_style
-
-        result = _get_style_spacing(mock_style, "before")
-        # 修复：显式 0 不再回退，返回 0.0
-        assert result == 0.0
-
-    def test_returns_base_lines_when_zero(self):
-        """显式 Lines=0 返回 0.0，不回退基样式。"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_base = MagicMock()
-        base_elem = OxmlElement("w:style")
-        base_pPr = OxmlElement("w:pPr")
-        base_spacing = OxmlElement("w:spacing")
-        base_spacing.set(qn("w:beforeLines"), "50")
-        base_pPr.append(base_spacing)
-        base_elem.append(base_pPr)
-        mock_base.element = base_elem
-        mock_base.base_style = None
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "0")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-
-        result = _get_style_spacing(mock_style, "before")
-        assert result == 0.0  # 显式 0
-
-    def test_returns_base_lines_when_negative(self):
-        """显式负值返回自身，不回退基样式。"""
-        from docx.oxml import OxmlElement
-        from docx.oxml.ns import qn
-
-        mock_base = MagicMock()
-        base_elem = OxmlElement("w:style")
-        base_pPr = OxmlElement("w:pPr")
-        base_spacing = OxmlElement("w:spacing")
-        base_spacing.set(qn("w:beforeLines"), "200")
-        base_pPr.append(base_spacing)
-        base_elem.append(base_pPr)
-        mock_base.element = base_elem
-        mock_base.base_style = None
-
-        mock_style = MagicMock()
-        elem = OxmlElement("w:style")
-        pPr = OxmlElement("w:pPr")
-        spacing = OxmlElement("w:spacing")
-        spacing.set(qn("w:beforeLines"), "-50")
-        pPr.append(spacing)
-        elem.append(pPr)
-        mock_style.element = elem
-        mock_style.base_style = mock_base
-
-        result = _get_style_spacing(mock_style, "before")
-        assert result == -0.5  # 显式负值
 
 
 
