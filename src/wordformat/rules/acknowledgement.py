@@ -28,7 +28,7 @@ class Acknowledgements(FormatNode):
 class AcknowledgementsCN(FormatNode):
     """致谢内容"""
 
-    NODE_TYPE = "acknowledgements.content"
+    NODE_TYPE = "acknowledgements.body"
     NODE_LABEL = "致谢内容"
     DEFAULTS = {
         **BASE_FORMAT,

@@ -90,7 +90,7 @@ def _split_run_at(paragraph, start: int, end: int):
 class BodyText(FormatNode):
     """正文节点"""
 
-    NODE_TYPE = "body_text"
+    NODE_TYPE = "body.text"
     NODE_LABEL = "正文段落"
     DEFAULTS = {
         "alignment": "两端对齐",

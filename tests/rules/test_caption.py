@@ -282,26 +282,24 @@ global_format:
   font_color: '黑色'
   builtin_style_name: '正文'
 figures:
-  caption_position: 'below'
-  caption_prefix: '图'
-  rules:
-    caption_numbering:
-      enabled: true
-      separator: '.'
+  caption:
+    caption_prefix: '图'
+    rules:
+      caption_numbering:
+        enabled: true
+        separator: '.'
 tables:
-  caption_position: 'above'
-  caption_prefix: '表'
-  content:
-    font_size: '五号'
-  rules:
-    caption_numbering:
-      enabled: true
-      separator: '.'
+  caption:
+    caption_prefix: '表'
+    rules:
+      caption_numbering:
+        enabled: true
+        separator: '.'
+  object:
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
 numbering:
   enabled: false
-  captions:
-    enabled: true
-    separator: '.'
 """
         path = tmp_path / "caption_test.yaml"
         path.write_text(yaml_content, encoding="utf-8")
@@ -524,7 +522,7 @@ numbering:
         fig = self._make_caption_figure(p)
         heading = self._make_heading_node(children=[fig])
         config = self._init_config(caption_yaml)
-        config["figures"]["rules"]["caption_numbering"]["enabled"] = False
+        config["figures"]["caption"]["rules"]["caption_numbering"]["enabled"] = False
 
         with patch.object(fig, "add_comment") as mock_comment:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)

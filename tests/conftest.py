@@ -99,24 +99,15 @@ global_format:
   underline: false
 abstract:
   chinese:
-    chinese_title:
+    title:
       alignment: '居中对齐'
       first_line_indent: '0字符'
       chinese_font_name: '黑体'
       font_size: '小二'
       bold: true
-    chinese_content:
+    body:
       alignment: '两端对齐'
-  english:
-    english_title:
-      alignment: '居中对齐'
-      first_line_indent: '0字符'
-      font_size: '四号'
-      bold: true
-    english_content:
-      alignment: '两端对齐'
-  keywords:
-    chinese:
+    keywords:
       label:
         chinese_font_name: '黑体'
         font_size: '三号'
@@ -133,7 +124,15 @@ abstract:
           count_max: 5
         trailing_punctuation:
           enabled: true
-    english:
+  english:
+    title:
+      alignment: '居中对齐'
+      first_line_indent: '0字符'
+      font_size: '四号'
+      bold: true
+    body:
+      alignment: '两端对齐'
+    keywords:
       label:
         font_size: '三号'
         bold: true
@@ -168,17 +167,24 @@ headings:
     chinese_font_name: '黑体'
     font_size: '小四'
     builtin_style_name: 'Heading 3'
-body_text:
-  alignment: '两端对齐'
-  chinese_font_name: '宋体'
-  english_font_name: 'Times New Roman'
-  font_size: '小四'
+body:
+  text:
+    alignment: '两端对齐'
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '小四'
 figures:
-  caption_prefix: '图'
+  caption:
+    caption_prefix: '图'
+  image:
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
 tables:
-  caption_prefix: '表'
-  content:
-    font_size: '五号'
+  caption:
+    caption_prefix: '表'
+  object:
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
 references:
   title:
     alignment: '居中对齐'
@@ -186,7 +192,7 @@ references:
     chinese_font_name: '黑体'
     font_size: '三号'
     bold: true
-  content:
+  entry:
     alignment: '左对齐'
     first_line_indent: '0字符'
     font_size: '五号'
@@ -197,7 +203,7 @@ acknowledgements:
     chinese_font_name: '黑体'
     font_size: '小二'
     bold: true
-  content:
+  body:
     alignment: '两端对齐'
     first_line_indent: '2字符'
 numbering:

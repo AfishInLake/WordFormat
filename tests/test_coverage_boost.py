@@ -202,7 +202,7 @@ class TestHeadingCoverageBoost:
         from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
-        cfg = root_config.body_text
+        cfg = root_config.body.text
         ensure_style_exists(doc, "Normal")
         style = doc.styles["Normal"]
 

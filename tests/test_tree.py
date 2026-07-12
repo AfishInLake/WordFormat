@@ -479,4 +479,4 @@ class TestExportDefaults:
         assert "style_checks_warning" in data
         assert "abstract" in data
         assert "headings" in data
-        assert "body_text" in data
+        assert "body" in data

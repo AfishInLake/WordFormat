@@ -28,7 +28,7 @@ class References(FormatNode):
 class ReferenceEntry(FormatNode):
     """参考文献条目节点"""
 
-    NODE_TYPE = "references.content"
+    NODE_TYPE = "references.entry"
     NODE_LABEL = "参考文献条目"
     DEFAULTS = {
         **BASE_FORMAT,

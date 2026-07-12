@@ -146,7 +146,7 @@ def _apply_caption_numbering(
 class CaptionFigure(FormatNode):
     """题注-图片"""
 
-    NODE_TYPE = "figures"
+    NODE_TYPE = "figures.caption"
     NODE_LABEL = "图注"
     DEFAULTS = {
         **BASE_FORMAT,
@@ -174,7 +174,7 @@ class CaptionFigure(FormatNode):
 class CaptionTable(FormatNode):
     """题注-表格"""
 
-    NODE_TYPE = "tables"
+    NODE_TYPE = "tables.caption"
     NODE_LABEL = "表注"
     DEFAULTS = {
         **BASE_FORMAT,

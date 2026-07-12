@@ -83,7 +83,7 @@ class BaseKeywordsNode(FormatNode):
 class KeywordsEN(BaseKeywordsNode):
     """关键词节点-英文"""
 
-    NODE_TYPE = "abstract.keywords.english"
+    NODE_TYPE = "abstract.english.keywords"
     NODE_LABEL = "英文关键词"
     DEFAULTS = {
         **BASE_FORMAT,
@@ -209,7 +209,7 @@ class KeywordsEN(BaseKeywordsNode):
 class KeywordsCN(BaseKeywordsNode):
     """关键词节点-中文"""
 
-    NODE_TYPE = "abstract.keywords.chinese"
+    NODE_TYPE = "abstract.chinese.keywords"
     NODE_LABEL = "中文关键词"
     DEFAULTS = {
         **BASE_FORMAT,
