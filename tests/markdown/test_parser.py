@@ -130,3 +130,76 @@ class TestSpecialBlocks:
     def test_thematic_break_skipped(self):
         result = parse_markdown("---")
         assert len(result) == 0
+
+    def test_table_with_header_and_body(self):
+        text = "| A | B |\n|----|----|\n| 1 | 2 |\n| 3 | 4 |"
+        result = parse_markdown(text)
+        assert len(result) == 1
+        assert result[0]["category"] == "table_object"
+        rows = result[0]["table_rows"]
+        assert len(rows) == 3  # header + 2 data rows
+        assert rows[0] == ["A", "B"]
+
+    def test_block_quote_flattens(self):
+        result = parse_markdown("> 引用文字")
+        assert len(result) == 1
+        assert result[0]["category"] == "body_text"
+        assert "引用文字" in result[0]["paragraph"]
+
+    def test_code_block_empty_lines_skipped(self):
+        result = parse_markdown('```\n\na = 1\n\nb = 2\n\n```')
+        assert len(result) == 2
+        assert result[0]["paragraph"] == "a = 1"
+        assert result[1]["paragraph"] == "b = 2"
+
+    def test_paragraph_with_inline_image_kept_as_body(self):
+        """段落中文字+图片混合时保持为 body_text"""
+        result = parse_markdown("文字 ![](img.png) 更多文字")
+        assert len(result) == 1
+        assert result[0]["category"] == "body_text"
+
+    def test_image_with_alt_creates_caption_and_figure(self):
+        result = parse_markdown("![图1.1 系统架构](arch.png)")
+        assert len(result) == 2
+        assert result[0]["category"] == "figure_image"
+        assert result[0]["paragraph"] == "arch.png"
+        assert result[1]["category"] == "caption_figure"
+        assert result[1]["paragraph"] == "图1.1 系统架构"
+
+    def test_image_no_alt_creates_figure_only(self):
+        result = parse_markdown("![](noalt.png)")
+        assert len(result) == 1
+        assert result[0]["category"] == "figure_image"
+        assert result[0]["paragraph"] == "noalt.png"
+
+    def test_strikethrough_text(self):
+        result = parse_markdown("这是~~删除~~文字")
+        assert len(result) == 1
+        marks = result[0]["inline_marks"]
+        strike_segs = [m for m in marks if m.get("strikethrough")]
+        assert len(strike_segs) == 1
+        assert strike_segs[0]["text"] == "删除"
+
+    def test_link_text(self):
+        result = parse_markdown("访问[链接](https://example.com)")
+        marks = result[0]["inline_marks"]
+        link_segs = [m for m in marks if m.get("link_url")]
+        assert len(link_segs) == 1
+        assert link_segs[0]["link_url"] == "https://example.com"
+
+    def test_crlf_normalized(self):
+        result = parse_markdown("第一行\r\n第二行\r第三行")
+        assert len(result) >= 1
+        text = result[0]["paragraph"]
+        assert "\r" not in text
+
+    def test_codespan_in_text(self):
+        result = parse_markdown("使用 `wordf md` 命令")
+        text = result[0]["paragraph"]
+        assert "wordf md" in text
+        assert "`" not in text
+
+    def test_linebreak_in_paragraph(self):
+        result = parse_markdown("第一行  \n第二行")
+        text = result[0]["paragraph"]
+        assert "\n" in text  # linebreak preserved
