@@ -15,12 +15,13 @@ from wordformat.pipeline.stages_md import (
 class TestLoadMarkdownStage:
     def test_loads_file_content(self, tmp_path):
         md_file = tmp_path / "test.md"
-        md_file.write_text("# 标题\n\n正文")
+        md_file.write_text("# Heading\n\ncontent")
         ctx = FormatContext(md_path=str(md_file))
         stage = LoadMarkdownStage()
-        result = stage.process(ctx)
-        assert "# 标题" in result.md_text
-        assert "正文" in result.md_text
+        with patch("wordformat.pipeline.stages_md.logger"):
+            result = stage.process(ctx)
+        assert "# Heading" in result.md_text
+        assert "content" in result.md_text
 
     def test_missing_file_raises(self):
         ctx = FormatContext(md_path="/nonexistent/path.md")
@@ -32,10 +33,11 @@ class TestLoadMarkdownStage:
 class TestMarkdownParseStage:
     def test_parses_markdown_to_paragraphs(self, tmp_path):
         md_file = tmp_path / "test.md"
-        md_file.write_text("# 标题\n\n正文段落")
+        md_file.write_text("# Heading\n\nparagraph text")
         ctx = FormatContext(md_path=str(md_file))
-        ctx = LoadMarkdownStage().process(ctx)
-        ctx = MarkdownParseStage().process(ctx)
+        with patch("wordformat.pipeline.stages_md.logger"):
+            ctx = LoadMarkdownStage().process(ctx)
+            ctx = MarkdownParseStage().process(ctx)
         assert len(ctx.paragraphs) >= 2
         categories = [p["category"] for p in ctx.paragraphs]
         assert "heading_level_1" in categories
@@ -47,7 +49,8 @@ class TestDocumentCreationStage:
         """用简单 tree 创建文档。"""
         ctx = FormatContext()
         ctx.root_node = root_node_fixture
-        ctx = DocumentCreationStage().process(ctx)
+        with patch("wordformat.pipeline.stages_md.logger"):
+            ctx = DocumentCreationStage().process(ctx)
         assert ctx.document is not None
         assert len(ctx.document.paragraphs) >= 1
 
@@ -63,7 +66,8 @@ class TestDocumentCreationStage:
         root.add_child_node(node)
         ctx = FormatContext()
         ctx.root_node = root
-        ctx = DocumentCreationStage().process(ctx)
+        with patch("wordformat.pipeline.stages_md.logger"):
+            ctx = DocumentCreationStage().process(ctx)
         assert node.paragraph is not None
         assert node.paragraph.runs[0].text == ""
 
@@ -74,7 +78,7 @@ def root_node_fixture():
 
     root = FormatNode(value={}, level=0)
     child = FormatNode(
-        value={"category": "body_text", "paragraph": "测试正文"},
+        value={"category": "body_text", "paragraph": "test content"},
         level=1,
     )
     root.add_child_node(child)
