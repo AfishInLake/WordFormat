@@ -4,7 +4,7 @@
 # @File    : abstract.py
 import re
 
-from wordformat.config.dotdict import BASE_FORMAT
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
@@ -16,14 +16,13 @@ class AbstractTitleCN(FormatNode):
 
     NODE_TYPE = "abstract.chinese.title"
     NODE_LABEL = "中文摘要标题"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "居中对齐",
-        "first_line_indent": "0字符",
-        "chinese_font_name": "黑体",
-        "font_size": "小二",
-        "bold": True,
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"alignment": "居中对齐", "first_line_indent": "0字符"},
+            "font": {"chinese_font_name": "黑体", "font_size": "小二", "bold": True},
+        },
+    )
 
 
 @register("abstract_chinese_title_content", level=1)
@@ -112,7 +111,7 @@ class AbstractContentCN(FormatNode):
 
     NODE_TYPE = "abstract.chinese.body"
     NODE_LABEL = "中文摘要正文"
-    DEFAULTS = {**BASE_FORMAT, "alignment": "两端对齐"}
+    DEFAULTS = deep_merge(BASE_FORMAT, {"paragraph": {"alignment": "两端对齐"}})
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -153,13 +152,13 @@ class AbstractTitleEN(FormatNode):
 
     NODE_TYPE = "abstract.english.title"
     NODE_LABEL = "英文摘要标题"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "居中对齐",
-        "first_line_indent": "0字符",
-        "font_size": "四号",
-        "bold": True,
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"alignment": "居中对齐", "first_line_indent": "0字符"},
+            "font": {"font_size": "四号", "bold": True},
+        },
+    )
 
 
 @register("abstract_english_title_content", level=1)
@@ -275,7 +274,7 @@ class AbstractContentEN(FormatNode):
 
     NODE_TYPE = "abstract.english.body"
     NODE_LABEL = "英文摘要正文"
-    DEFAULTS = {**BASE_FORMAT, "alignment": "两端对齐"}
+    DEFAULTS = deep_merge(BASE_FORMAT, {"paragraph": {"alignment": "两端对齐"}})
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config

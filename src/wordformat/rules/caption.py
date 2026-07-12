@@ -4,7 +4,7 @@
 # @File    : caption.py
 
 
-from wordformat.config.dotdict import BASE_FORMAT
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.utils import parse_caption_text
@@ -148,17 +148,19 @@ class CaptionFigure(FormatNode):
 
     NODE_TYPE = "figures.caption"
     NODE_LABEL = "图注"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "caption_prefix": "图",
-        "rules": {
-            "caption_numbering": {
-                "enabled": True,
-                "separator": ".",
-                "label_number_space": False,
-            }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "caption_prefix": "图",
+            "rules": {
+                "caption_numbering": {
+                    "enabled": True,
+                    "separator": ".",
+                    "label_number_space": False,
+                }
+            },
         },
-    }
+    )
     RULES = {"caption_numbering": "_handle_caption_numbering"}
 
     def _handle_caption_numbering(self, doc, rule_cfg, p: bool):
@@ -176,17 +178,19 @@ class CaptionTable(FormatNode):
 
     NODE_TYPE = "tables.caption"
     NODE_LABEL = "表注"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "caption_prefix": "表",
-        "rules": {
-            "caption_numbering": {
-                "enabled": True,
-                "separator": ".",
-                "label_number_space": False,
-            }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "caption_prefix": "表",
+            "rules": {
+                "caption_numbering": {
+                    "enabled": True,
+                    "separator": ".",
+                    "label_number_space": False,
+                }
+            },
         },
-    }
+    )
     RULES = {"caption_numbering": "_handle_caption_numbering"}
 
     def _handle_caption_numbering(self, doc, rule_cfg, p: bool):

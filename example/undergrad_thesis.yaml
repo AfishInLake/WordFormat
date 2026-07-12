@@ -59,22 +59,24 @@ style_checks_warning:
 # 全局基础格式（其他节通过 <<: *global_format 继承后再覆写）
 # ---------------------------------------------------------------------------
 global_format: &global_format
-  alignment: '两端对齐'
-  space_before: "0行"
-  space_after: "0行"
-  line_spacingrule: "1.5倍行距"
-  line_spacing: '1.5倍'
-  left_indent: "0字符"
-  right_indent: "0字符"
-  first_line_indent: '2字符'
-  builtin_style_name: '正文'
-  chinese_font_name: '宋体'
-  english_font_name: 'Times New Roman'
-  font_size: '小四'
-  font_color: '黑色'
-  bold: false
-  italic: false
-  underline: false
+  paragraph:
+    alignment: '两端对齐'
+    space_before: "0行"
+    space_after: "0行"
+    line_spacingrule: "1.5倍行距"
+    line_spacing: '1.5倍'
+    left_indent: "0字符"
+    right_indent: "0字符"
+    first_line_indent: '2字符'
+    builtin_style_name: '正文'
+  font:
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '小四'
+    font_color: '黑色'
+    bold: false
+    italic: false
+    underline: false
 
 # ===========================================================================
 # 摘要（中英文）
