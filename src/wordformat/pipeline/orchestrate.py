@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from wordformat.pipeline import PipelineStage
 
+from wordformat.log_config import logger
 from wordformat.pipeline.context import FormatContext
 from wordformat.pipeline.stages import (
     DocumentSavingStage,
@@ -21,6 +22,11 @@ from wordformat.pipeline.stages import (
     SummaryGenerationStage,
     TreeBuildingStage,
     TreeNormalizationStage,
+)
+from wordformat.pipeline.stages_md import (
+    DocumentCreationStage,
+    LoadMarkdownStage,
+    MarkdownParseStage,
 )
 
 
@@ -90,3 +96,62 @@ def auto_format_thesis_document(
     for stage in pipeline:
         ctx = stage.process(ctx)
     return ctx.output_path
+
+
+def md_to_docx(
+    md_path: str,
+    config_path: str | None = None,
+    save_dir: str = "output/",
+):
+    """将 Markdown 文件转换为格式化后的 .docx 文档。
+
+    流程：
+        1. 加载 YAML 格式配置（可选）；
+        2. 读取并解析 Markdown 文件为扁平段落列表；
+        3. 构建 FormatNode 文档树；
+        4. 创建新的 Word 文档，逐节点生成段落并填入文本；
+        5. 修正样式定义；
+        6. 应用格式规则；
+        7. 后处理（标题编号、引用超链接）；
+        8. 保存输出 .docx 文件。
+
+    Args:
+        md_path: Markdown 源文件路径。
+        config_path: YAML 格式规范配置文件路径，为 None 时使用内置默认配置。
+        save_dir: 输出目录。
+
+    Returns:
+        生成的 .docx 文件路径。
+    """
+    from pathlib import Path
+
+    from wordformat.utils import ensure_directory_exists, get_file_name
+
+    ctx = FormatContext(
+        md_path=md_path,
+        config_path=config_path or "",
+        save_dir=save_dir,
+        check=False,
+    )
+
+    pipeline: list[PipelineStage] = [
+        LoadConfigStage(),
+        LoadMarkdownStage(),
+        MarkdownParseStage(),
+        TreeBuildingStage(),
+        DocumentCreationStage(),
+        StyleDefinitionFixStage(),
+        FormattingExecutionStage(),
+        PostProcessingStage(),
+    ]
+
+    for stage in pipeline:
+        ctx = stage.process(ctx)
+
+    # 重命名输出文件
+    ensure_directory_exists(save_dir)
+    filename = get_file_name(md_path)
+    out_path = Path(save_dir) / f"{filename}--生成版.docx"
+    ctx.document.save(str(out_path))
+    logger.info(f"保存文件到 {out_path}")
+    return str(out_path)

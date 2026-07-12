@@ -3,6 +3,7 @@
 
 将所有测试文件中重复定义的 fixture 集中管理。
 """
+
 import os
 import json
 import pytest
@@ -17,6 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 
 # ==================== Document Fixtures ====================
+
 
 @pytest.fixture
 def doc():
@@ -202,6 +204,7 @@ numbering:
   enabled: false
 """
 
+
 @pytest.fixture
 def config_path(tmp_path):
     """用内联 YAML 生成临时配置文件，不依赖外部文件。"""
@@ -215,17 +218,24 @@ def mock_config():
     """创建一个 mock 配置对象，模拟 NodeConfigRoot"""
     config = MagicMock()
     config.style_checks_warning = MagicMock(
-        bold=True, italic=True, underline=True,
-        font_size=True, font_name=True, font_color=True,
-        alignment=True, space_before=True, space_after=True,
-        line_spacing=True, line_spacingrule=True,
-        left_indent=True, right_indent=True,
-        first_line_indent=True, builtin_style_name=True,
+        bold=True,
+        italic=True,
+        underline=True,
+        font_size=True,
+        font_name=True,
+        font_color=True,
+        alignment=True,
+        space_before=True,
+        space_after=True,
+        line_spacing=True,
+        line_spacingrule=True,
+        left_indent=True,
+        right_indent=True,
+        first_line_indent=True,
+        builtin_style_name=True,
     )
     config.numbering = MagicMock(enabled=False)
     return config
-
-
 
 
 @pytest.fixture
@@ -238,16 +248,18 @@ def sample_yaml_config(tmp_path):
 
 # ==================== Mock Fixtures ====================
 
+
 @pytest.fixture
 def mock_onnx_infer():
     """Mock ONNX 推理函数，返回可控结果"""
+
     def _infer(texts):
         if isinstance(texts, str):
             texts = [texts]
         return [
-            {"text": t, "label": "body_text", "pred_id": 0, "score": 0.9}
-            for t in texts
+            {"text": t, "label": "body_text", "pred_id": 0, "score": 0.9} for t in texts
         ]
+
     return _infer
 
 
@@ -261,6 +273,7 @@ def mock_onnx_single():
 def reset_config():
     """每个测试前后自动清理配置状态"""
     from wordformat.config.loader import clear_config
+
     clear_config()
     yield
     clear_config()
@@ -270,6 +283,7 @@ def reset_config():
 def reset_style_warning():
     """每个测试前后重置警告缓存。"""
     from wordformat.style import diff
+
     diff._warnings = None
     yield
     diff._warnings = None

@@ -177,14 +177,22 @@ class FormatNode(TreeNode):
         ps = ParagraphStyle.from_config(cfg)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
+            if issues:
+                self.add_comment(
+                    doc=doc,
+                    runs=self.paragraph.runs,
+                    text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
+                )
         else:
-            issues = ps.apply_to_paragraph(self.paragraph)
-        if issues:
-            self.add_comment(
-                doc=doc,
-                runs=self.paragraph.runs,
-                text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
-            )
+            ps.apply_to_paragraph(self.paragraph)
+            # apply 后再次 diff，只报告修正失败的残留差异
+            remaining = ps.diff_from_paragraph(self.paragraph)
+            if remaining:
+                self.add_comment(
+                    doc=doc,
+                    runs=self.paragraph.runs,
+                    text=ParagraphStyle.to_string(remaining, target=self.NODE_LABEL),
+                )
 
     def _handle_character_style(self, doc, rule_cfg, p: bool):
         """默认字符样式检查/应用。配置需包含 chinese_font_name 等格式字段。"""
@@ -209,14 +217,24 @@ class FormatNode(TreeNode):
                 continue
             if p:
                 diff = cstyle.diff_from_run(run)
+                if diff:
+                    self.add_comment(
+                        doc=doc,
+                        runs=run,
+                        text=CharacterStyle.to_string(diff, target=self.NODE_LABEL),
+                    )
             else:
-                diff = cstyle.apply_to_run(run)
-            if diff:
-                self.add_comment(
-                    doc=doc,
-                    runs=run,
-                    text=CharacterStyle.to_string(diff, target=self.NODE_LABEL),
-                )
+                cstyle.apply_to_run(run)
+                # apply 后再次 diff，只报告修正失败的残留差异
+                remaining = cstyle.diff_from_run(run)
+                if remaining:
+                    self.add_comment(
+                        doc=doc,
+                        runs=run,
+                        text=CharacterStyle.to_string(
+                            remaining, target=self.NODE_LABEL
+                        ),
+                    )
 
     def _collect_comment(self, runs, text: str) -> None:
         """将批注文本加入缓冲区，(runs, text) 成对存储。"""
@@ -290,11 +308,18 @@ class FormatNode(TreeNode):
         self._flush_comments(doc)
 
     def apply_format(self, doc: Document):
-        """格式应用：先清理、应用样式，再自动调度业务规则"""
+        """格式应用：先清理、应用样式，再写入批注记录变更。"""
         self._clean_paragraph_edge_spaces()
         self._base(doc, p=False, r=False)
         self._run_rules(doc, p=False)
         self._flush_comments(doc)
+
+    def apply_style(self, doc: Document):
+        """格式应用（无批注）：仅应用样式，不生成批注。
+        用于 md→docx 等从零生成文档的场景。"""
+        self._clean_paragraph_edge_spaces()
+        self._base(doc, p=False, r=False)
+        self._run_rules(doc, p=False)
 
     def apply_replace(self, doc: Document = None) -> bool:
         """替换段落文本内容（由 JSON 的 replace 字段驱动）。

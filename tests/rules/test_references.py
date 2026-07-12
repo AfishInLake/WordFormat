@@ -1,6 +1,7 @@
 """
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -51,6 +52,7 @@ def _load_root_config(config_path):
 
 def _load_yaml(path):
     import yaml
+
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -59,6 +61,7 @@ def _load_yaml(path):
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
     from wordformat.config.loader import init_config
+
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -84,7 +87,6 @@ def run_with_text(para):
 # ---------------------------------------------------------------------------
 # 1. FormatNode 基类行为
 # ---------------------------------------------------------------------------
-
 
 
 class TestReferencesBase:
@@ -123,13 +125,12 @@ class TestReferencesBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
 
 # ---------------------------------------------------------------------------
 # 22. ReferenceEntry._base 覆盖
 # ---------------------------------------------------------------------------
-
 
 
 class TestReferenceEntryBase:
@@ -167,7 +168,7 @@ class TestReferenceEntryBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
     def test_check_alignment_and_indent(self, root_config):
         """验证 alignment 和 first_line_indent 配置被正确使用。"""

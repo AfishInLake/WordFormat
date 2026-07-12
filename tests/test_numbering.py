@@ -3,6 +3,7 @@ Core 模块综合测试
 
 覆盖 tree.py, utils.py, rules/node.py, numbering.py, settings.py
 """
+
 import os
 import pytest
 from io import StringIO
@@ -97,6 +98,7 @@ class TestApplyAutoNumbering:
         p = doc.add_paragraph("test")
         apply_auto_numbering(p, num_id="100", ilvl="0")
         from docx.oxml.ns import qn
+
         pPr = p._element.find(qn("w:pPr"))
         assert pPr is not None
         numPr = pPr.find(qn("w:numPr"))
@@ -111,6 +113,7 @@ class TestApplyAutoNumbering:
         apply_auto_numbering(p, num_id="50", ilvl="1")
         apply_auto_numbering(p, num_id="99", ilvl="2")
         from docx.oxml.ns import qn
+
         pPr = p._element.find(qn("w:pPr"))
         numPr = pPr.find(qn("w:numPr"))
         assert numPr.find(qn("w:numId")).get(qn("w:val")) == "99"
@@ -211,6 +214,7 @@ class TestGetParagraphNumberingText:
         """段落有 pPr 但没有 numPr 时返回空字符串"""
         p = doc.add_paragraph("hello")
         from docx.oxml import OxmlElement
+
         pPr = OxmlElement("w:pPr")
         p._element.insert(0, pPr)
         assert get_paragraph_numbering_text(p) == ""
@@ -219,6 +223,7 @@ class TestGetParagraphNumberingText:
         """numPr 中没有 numId 时返回空字符串"""
         p = doc.add_paragraph("hello")
         from docx.oxml import OxmlElement
+
         pPr = OxmlElement("w:pPr")
         numPr = OxmlElement("w:numPr")
         pPr.append(numPr)
@@ -229,6 +234,7 @@ class TestGetParagraphNumberingText:
         """numId 为 0 时返回空字符串"""
         p = doc.add_paragraph("hello")
         from docx.oxml import OxmlElement
+
         pPr = OxmlElement("w:pPr")
         numPr = OxmlElement("w:numPr")
         numId_elem = OxmlElement("w:numId")
@@ -242,6 +248,7 @@ class TestGetParagraphNumberingText:
         """文档没有 numbering part 时返回空字符串（已修复：捕获 NotImplementedError）"""
         p = doc.add_paragraph("hello")
         from docx.oxml import OxmlElement
+
         pPr = OxmlElement("w:pPr")
         numPr = OxmlElement("w:numPr")
         numId_elem = OxmlElement("w:numId")
@@ -254,6 +261,7 @@ class TestGetParagraphNumberingText:
         p._element.insert(0, pPr)
         # 移除 numbering 关系使 numbering_part 访问抛出异常
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
         rels = doc.part.rels
         to_remove = [k for k, v in rels.items() if v.reltype == RT.NUMBERING]
         for k in to_remove:
@@ -261,7 +269,9 @@ class TestGetParagraphNumberingText:
         # 修复后捕获 NotImplementedError 并返回空字符串
         assert get_paragraph_numbering_text(p) == ""
 
-    def _setup_numbering(self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"):
+    def _setup_numbering(
+        self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"
+    ):
         """辅助方法：为文档创建 numbering part 和编号定义"""
         from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
@@ -316,6 +326,7 @@ class TestGetParagraphNumberingText:
     def _add_numPr_to_paragraph(self, p, num_id="1", ilvl="0"):
         """辅助方法：为段落添加 numPr"""
         from docx.oxml import OxmlElement
+
         pPr = OxmlElement("w:pPr")
         numPr = OxmlElement("w:numPr")
         numId_elem = OxmlElement("w:numId")
@@ -515,31 +526,34 @@ class TestGetLevelFmt:
 
     def test_existing_level_returns_fmt(self):
         from lxml import etree
+
         abstract_num = etree.fromstring(
             '<w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
             '  <w:lvl w:ilvl="0">'
             '    <w:numFmt w:val="upperRoman"/>'
-            '  </w:lvl>'
-            '</w:abstractNum>'
+            "  </w:lvl>"
+            "</w:abstractNum>"
         )
         assert _get_level_fmt(abstract_num, 0) == "upperRoman"
 
     def test_missing_level_returns_decimal(self):
         from lxml import etree
+
         abstract_num = etree.fromstring(
             '<w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-            '</w:abstractNum>'
+            "</w:abstractNum>"
         )
         assert _get_level_fmt(abstract_num, 0) == "decimal"
 
     def test_no_numFmt_returns_decimal(self):
         from lxml import etree
+
         abstract_num = etree.fromstring(
             '<w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
             '  <w:lvl w:ilvl="0">'
             '    <w:start w:val="1"/>'
-            '  </w:lvl>'
-            '</w:abstractNum>'
+            "  </w:lvl>"
+            "</w:abstractNum>"
         )
         assert _get_level_fmt(abstract_num, 0) == "decimal"
 
@@ -619,7 +633,6 @@ class TestRemoveAllNumbering:
         """如果样式不存在（不太可能），不报错"""
         # Document() 默认包含 Heading 1/2/3，所以这个测试主要验证不会抛异常
         remove_all_numbering(doc)
-
 
 
 # ============================================================
@@ -768,6 +781,7 @@ class TestCreateNumberingDefinitionXML:
     def test_creates_numbering_part_when_missing(self, tmp_path):
         """文档没有 numbering part 时自动创建"""
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
         # 创建一个没有 numbering 关系的文档
         doc = Document()
         # 移除已有的 numbering 关系（如果有）
@@ -1160,26 +1174,32 @@ class TestProcessReferenceNumbering:
 class TestParseRefNumbers:
     def test_single_number(self):
         from wordformat.hyperlinks import _parse_ref_numbers
+
         assert _parse_ref_numbers("[1]") == [1]
 
     def test_multiple_numbers(self):
         from wordformat.hyperlinks import _parse_ref_numbers
+
         assert _parse_ref_numbers("[1,2,3]") == [1, 2, 3]
 
     def test_range(self):
         from wordformat.hyperlinks import _parse_ref_numbers
+
         assert _parse_ref_numbers("[1-3]") == [1, 2, 3]
 
     def test_mixed(self):
         from wordformat.hyperlinks import _parse_ref_numbers
+
         assert _parse_ref_numbers("[1,3-5]") == [1, 3, 4, 5]
 
     def test_chinese_comma(self):
         from wordformat.hyperlinks import _parse_ref_numbers
+
         assert _parse_ref_numbers("[1，2，3]") == [1, 2, 3]
 
     def test_spaces(self):
         from wordformat.hyperlinks import _parse_ref_numbers
+
         assert _parse_ref_numbers("[1, 2, 3]") == [1, 2, 3]
 
 
@@ -1191,6 +1211,7 @@ class TestParseRefNumbers:
 class TestInsertBookmark:
     def test_adds_bookmark_to_paragraph(self, doc):
         from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+
         p = doc.add_paragraph("A reference entry.")
         bid = _next_bookmark_id()
         _insert_bookmark(p, "_Ref1", bid)
@@ -1204,6 +1225,7 @@ class TestInsertBookmark:
 
     def test_bookmark_before_first_run(self, doc):
         from wordformat.hyperlinks import _insert_bookmark, _next_bookmark_id
+
         p = doc.add_paragraph("Text")
         bid = _next_bookmark_id()
         _insert_bookmark(p, "_RefTest", bid)
@@ -1231,6 +1253,7 @@ class TestInsertBookmark:
 class TestWrapCitationsInHyperlinks:
     def test_wraps_citation_in_hyperlink(self, doc):
         from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+
         p = doc.add_paragraph("参见")
         p.add_run("[1]").font.superscript = True
         p.add_run("的研究。")
@@ -1244,6 +1267,7 @@ class TestWrapCitationsInHyperlinks:
 
     def test_regular_brackets_not_wrapped(self, doc):
         from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+
         p = doc.add_paragraph("这是一个[注]释说明。")
 
         _wrap_citations_in_hyperlinks(p, ["_Ref1"])
@@ -1254,6 +1278,7 @@ class TestWrapCitationsInHyperlinks:
 
     def test_run_retains_superscript_in_hyperlink(self, doc):
         from wordformat.hyperlinks import _wrap_citations_in_hyperlinks
+
         p = doc.add_paragraph("见")
         r = p.add_run("[1]")
         r.font.superscript = True
@@ -1270,7 +1295,6 @@ class TestWrapCitationsInHyperlinks:
         # 同时应有 Hyperlink 样式
         rStyle = rPr.find(qn("w:rStyle"))
         assert rStyle.get(qn("w:val")) == "Hyperlink"
-
 
 
 # ============================================================
@@ -1361,36 +1385,39 @@ class TestGetLevelFmtAdditional:
     def test_level_missing_numFmt_returns_decimal(self):
         """lvl 存在但缺少 numFmt 元素时返回 decimal"""
         from lxml import etree
+
         abstract_num = etree.fromstring(
             '<w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
             '  <w:lvl w:ilvl="0">'
             '    <w:start w:val="1"/>'
-            '  </w:lvl>'
-            '</w:abstractNum>'
+            "  </w:lvl>"
+            "</w:abstractNum>"
         )
         assert _get_level_fmt(abstract_num, 0) == "decimal"
 
     def test_level_missing_numFmt_val_returns_decimal(self):
         """numFmt 元素存在但缺少 w:val 属性时返回 decimal"""
         from lxml import etree
+
         abstract_num = etree.fromstring(
             '<w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
             '  <w:lvl w:ilvl="0">'
-            '    <w:numFmt/>'
-            '  </w:lvl>'
-            '</w:abstractNum>'
+            "    <w:numFmt/>"
+            "  </w:lvl>"
+            "</w:abstractNum>"
         )
         assert _get_level_fmt(abstract_num, 0) == "decimal"
 
     def test_nonexistent_level_returns_decimal(self):
         """请求不存在的级别返回 decimal"""
         from lxml import etree
+
         abstract_num = etree.fromstring(
             '<w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
             '  <w:lvl w:ilvl="0">'
             '    <w:numFmt w:val="decimal"/>'
-            '  </w:lvl>'
-            '</w:abstractNum>'
+            "  </w:lvl>"
+            "</w:abstractNum>"
         )
         assert _get_level_fmt(abstract_num, 5) == "decimal"
 
@@ -1403,7 +1430,9 @@ class TestGetLevelFmtAdditional:
 class TestCountNumberingLevels:
     """测试 _count_numbering_levels 编号级别计数逻辑"""
 
-    def _setup_numbering_doc(self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"):
+    def _setup_numbering_doc(
+        self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"
+    ):
         """辅助方法：为文档创建 numbering part"""
         from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
@@ -1460,6 +1489,7 @@ class TestCountNumberingLevels:
     def _add_numPr_to_paragraph(self, p, num_id="1", ilvl="0"):
         """辅助方法：为段落添加 numPr"""
         from docx.oxml import OxmlElement
+
         pPr = OxmlElement("w:pPr")
         numPr = OxmlElement("w:numPr")
         numId_elem = OxmlElement("w:numId")
@@ -1552,4 +1582,3 @@ class TestCountNumberingLevels:
         numbering_elm = numbering_part._element
         result = _count_numbering_levels(numbering_elm, "0", p)
         assert result == {0: 1}
-

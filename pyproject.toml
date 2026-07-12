@@ -26,6 +26,7 @@ classifiers = [
 dependencies = [
     "fastapi>=0.128.1",
     "loguru>=0.7.3",
+    "mistune>=3.0.0",
     "numpy>=1.24.0",
     "onnxruntime>=1.17.0",
     "pydantic>=2.12.5",

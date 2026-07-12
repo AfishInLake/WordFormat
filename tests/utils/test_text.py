@@ -1,6 +1,8 @@
 """utils/_text.py 测试 — 罗马数字、中文数字、题注解析。"""
+
 import pytest
 from wordformat.utils import _from_chinese_num, _from_roman, parse_caption_text
+
 
 class TestFromChineseNum:
     def test_single_digit(self):
@@ -39,6 +41,7 @@ class TestFromChineseNum:
 
 # ======================== parse_caption_text ========================
 
+
 class TestFromRoman:
     def test_basic_singles(self):
         assert _from_roman("I") == 1
@@ -68,6 +71,7 @@ class TestFromRoman:
 
 
 # ======================== _from_chinese_num ========================
+
 
 class TestParseCaptionText:
     def test_basic_figure_arabic(self):

@@ -138,7 +138,7 @@ class BodyText(FormatNode):
                     else self.paragraph.runs
                 )
             msg = (
-                f"{self.NODE_LABEL}-提醒-标点符号问题："
+                f"{self.NODE_LABEL}-提醒-标点问题："
                 f'使用了半角英文标点符号"{half}(英文)"，'
                 f'规范：应使用全角中文标点符号"{full}(中文)"'
             )

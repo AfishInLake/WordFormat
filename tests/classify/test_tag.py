@@ -3,6 +3,7 @@ Core 模块综合测试
 
 覆盖 tree.py, utils.py, rules/node.py, numbering.py, settings.py
 """
+
 import os
 import pytest
 from io import StringIO
@@ -101,13 +102,16 @@ class TestDocxBase:
         assert result[1]["category"] == "body_text"
         assert "强制设为" in result[1]["comment"]
 
-
     def test_parse_batch_failure_fallback_to_single(self, temp_docx):
         """测试批量推理失败时降级到单条推理"""
         mock_single_result = {"label": "body_text", "score": 0.9}
 
-        with patch("wordformat.base.onnx_batch_infer", side_effect=RuntimeError("ONNX error")):
-            with patch("wordformat.base.onnx_single_infer", return_value=mock_single_result):
+        with patch(
+            "wordformat.base.onnx_batch_infer", side_effect=RuntimeError("ONNX error")
+        ):
+            with patch(
+                "wordformat.base.onnx_single_infer", return_value=mock_single_result
+            ):
                 base = DocxBase(temp_docx, "/fake/config.yaml")
                 result = base.parse()
 
@@ -212,7 +216,12 @@ class TestDocxBase:
         path = str(tmp_path / "numbered.docx")
         doc.save(path)
 
-        with patch("wordformat.base.onnx_batch_infer", return_value=[{"text": "1. 绪论", "label": "body_text", "pred_id": 0, "score": 0.9}]):
+        with patch(
+            "wordformat.base.onnx_batch_infer",
+            return_value=[
+                {"text": "1. 绪论", "label": "body_text", "pred_id": 0, "score": 0.9}
+            ],
+        ):
             base = DocxBase(path, "/fake/config.yaml")
             result = base.parse()
 
@@ -224,6 +233,3 @@ class TestDocxBase:
 # ============================================================
 # utils.py — _format_number 额外覆盖测试
 # ============================================================
-
-
-

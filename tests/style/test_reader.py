@@ -15,21 +15,45 @@ from docx.oxml.ns import qn
 
 from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
 from wordformat.style.reader import (
-    paragraph_get_alignment, paragraph_get_space_before, paragraph_get_space_after,
-    paragraph_get_line_spacing, paragraph_get_first_line_indent,
-    paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
-    run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent,
+    paragraph_get_alignment,
+    paragraph_get_space_before,
+    paragraph_get_space_after,
+    paragraph_get_line_spacing,
+    paragraph_get_first_line_indent,
+    paragraph_get_builtin_style_name,
+    run_get_font_name,
+    run_get_font_size_pt,
+    run_get_font_color,
+    run_get_font_bold,
+    run_get_font_italic,
+    run_get_font_underline,
+    GetIndent,
 )
 from wordformat.style.writer import (
-    run_set_font_name, set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines, _paragraph_space_by_lines,
-    SetSpacing, SetLineSpacing, SetIndent, SetFirstLineIndent,
+    run_set_font_name,
+    set_paragraph_space_before_by_lines,
+    set_paragraph_space_after_by_lines,
+    _paragraph_space_by_lines,
+    SetSpacing,
+    SetLineSpacing,
+    SetIndent,
+    SetFirstLineIndent,
 )
 from wordformat.style.defs import (
-    FontName, FontSize, FontColor, Alignment, LineSpacingRule, LineSpacing,
-    FirstLineIndent, LeftIndent, RightIndent, BuiltInStyle, SpaceBefore, SpaceAfter,
-    Spacing, UnitLabelEnum,
+    FontName,
+    FontSize,
+    FontColor,
+    Alignment,
+    LineSpacingRule,
+    LineSpacing,
+    FirstLineIndent,
+    LeftIndent,
+    RightIndent,
+    BuiltInStyle,
+    SpaceBefore,
+    SpaceAfter,
+    Spacing,
+    UnitLabelEnum,
 )
 from wordformat.style.units import extract_unit_from_string, UnitResult
 
@@ -37,6 +61,7 @@ from wordformat.style.units import extract_unit_from_string, UnitResult
 # ---------------------------------------------------------------------------
 # fixtures & helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def doc():
@@ -46,10 +71,23 @@ def doc():
 @pytest.fixture
 def mock_warning():
     w = MagicMock()
-    for attr in ("bold", "italic", "underline", "font_size", "font_color",
-                 "font_name", "alignment", "space_before", "space_after",
-                 "line_spacing", "line_spacingrule", "first_line_indent",
-                 "left_indent", "right_indent", "builtin_style_name"):
+    for attr in (
+        "bold",
+        "italic",
+        "underline",
+        "font_size",
+        "font_color",
+        "font_name",
+        "alignment",
+        "space_before",
+        "space_after",
+        "line_spacing",
+        "line_spacingrule",
+        "first_line_indent",
+        "left_indent",
+        "right_indent",
+        "builtin_style_name",
+    ):
         setattr(w, attr, True)
     return w
 
@@ -57,21 +95,36 @@ def mock_warning():
 @pytest.fixture
 def mock_warning_off():
     w = MagicMock()
-    for attr in ("bold", "italic", "underline", "font_size", "font_color",
-                 "font_name", "alignment", "space_before", "space_after",
-                 "line_spacing", "line_spacingrule", "first_line_indent",
-                 "left_indent", "right_indent", "builtin_style_name"):
+    for attr in (
+        "bold",
+        "italic",
+        "underline",
+        "font_size",
+        "font_color",
+        "font_name",
+        "alignment",
+        "space_before",
+        "space_after",
+        "line_spacing",
+        "line_spacingrule",
+        "first_line_indent",
+        "left_indent",
+        "right_indent",
+        "builtin_style_name",
+    ):
         setattr(w, attr, False)
     return w
 
 
 def _set_warning(w):
     import wordformat.style.diff as m
+
     m.style_checks_warning = w
 
 
 def _clear_warning():
     import wordformat.style.diff as m
+
     m.__dict__.pop("style_checks_warning", None)
 
 
@@ -79,8 +132,12 @@ def _clear_warning():
 # get_some
 # ===========================================================================
 
+
 class TestGetSomeAlignment:
-    @pytest.mark.parametrize("align", [WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.RIGHT])
+    @pytest.mark.parametrize(
+        "align",
+        [WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.RIGHT],
+    )
     def test_direct(self, doc, align):
         p = doc.add_paragraph()
         p.paragraph_format.alignment = align
@@ -90,12 +147,15 @@ class TestGetSomeAlignment:
         assert paragraph_get_alignment(doc.add_paragraph()) is None
 
 
-
 class TestGetSomeLineSpacing:
-    @pytest.mark.parametrize("rule,expected", [
-        (WD_LINE_SPACING.SINGLE, 1.0), (WD_LINE_SPACING.ONE_POINT_FIVE, 1.5),
-        (WD_LINE_SPACING.DOUBLE, 2.0),
-    ])
+    @pytest.mark.parametrize(
+        "rule,expected",
+        [
+            (WD_LINE_SPACING.SINGLE, 1.0),
+            (WD_LINE_SPACING.ONE_POINT_FIVE, 1.5),
+            (WD_LINE_SPACING.DOUBLE, 2.0),
+        ],
+    )
     def test_preset(self, doc, rule, expected):
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing_rule = rule
@@ -107,12 +167,13 @@ class TestGetSomeLineSpacing:
         p.paragraph_format.line_spacing = 2.3
         assert paragraph_get_line_spacing(p) == 2.3
 
-    @pytest.mark.parametrize("rule", [WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST])
+    @pytest.mark.parametrize(
+        "rule", [WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST]
+    )
     def test_fixed_returns_none(self, doc, rule):
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing_rule = rule
         assert paragraph_get_line_spacing(p) is None
-
 
 
 class TestGetSomeRun:
@@ -141,16 +202,19 @@ class TestGetSomeRun:
         run.font.color.rgb = RGBColor(0xFF, 0, 0)
         assert run_get_font_color(run) == (255, 0, 0)
 
-    @pytest.mark.parametrize("getter,attr", [
-        (run_get_font_bold, "bold"), (run_get_font_italic, "italic"),
-        (run_get_font_underline, "underline"),
-    ])
+    @pytest.mark.parametrize(
+        "getter,attr",
+        [
+            (run_get_font_bold, "bold"),
+            (run_get_font_italic, "italic"),
+            (run_get_font_underline, "underline"),
+        ],
+    )
     def test_boolean_props(self, doc, getter, attr):
         run = doc.add_paragraph().add_run("x")
         assert getter(run) is False
         setattr(run.font, attr, True)
         assert getter(run) is True
-
 
 
 class TestGetSomeFirstLineIndent:
@@ -169,12 +233,10 @@ class TestGetSomeFirstLineIndent:
         assert paragraph_get_first_line_indent(p) is None
 
 
-
 class TestGetSomeBuiltinStyle:
     def test_default_normal_lowercase(self, doc):
         name = paragraph_get_builtin_style_name(doc.add_paragraph())
         assert name == "normal"
-
 
 
 class TestGetIndent:
@@ -191,7 +253,6 @@ class TestGetIndent:
         p = doc.add_paragraph()
         SetIndent.set_char(p, "R", 3)
         assert GetIndent.left_indent(p) == 3.0
-
 
 
 # ===========================================================================
@@ -213,6 +274,7 @@ class TestGetSomeAlignmentFromStyle:
     def test_alignment_from_base_style(self, doc):
         """沿真实 basedOn 链解析对齐：Child(basedOn=Base) 继承 Base 的对齐。"""
         from docx.enum.style import WD_STYLE_TYPE
+
         base = doc.styles.add_style("BaseAlign", WD_STYLE_TYPE.PARAGRAPH)
         base.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         child = doc.styles.add_style("ChildAlign", WD_STYLE_TYPE.PARAGRAPH)
@@ -229,7 +291,6 @@ class TestGetSomeAlignmentFromStyle:
         assert paragraph_get_alignment(p) is None
 
 
-
 class TestGetSomeSpaceBeforeAfterInheritance:
     """Cover lines 147-148, 157-158: space_before/after with style inheritance"""
 
@@ -238,6 +299,7 @@ class TestGetSomeSpaceBeforeAfterInheritance:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:beforeLines"), "abc")
@@ -250,6 +312,7 @@ class TestGetSomeSpaceBeforeAfterInheritance:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:afterLines"), "xyz")
@@ -262,7 +325,9 @@ class TestGetSomeSpaceBeforeAfterInheritance:
         mock_style = MagicMock()
         mock_style.element = None
         mock_style.base_style = None
-        with mock_patch.object(type(p), 'style', new_callable=PropertyMock, return_value=mock_style):
+        with mock_patch.object(
+            type(p), "style", new_callable=PropertyMock, return_value=mock_style
+        ):
             # _get_style_spacing returns None for None element
             assert paragraph_get_space_before(p) is None
 
@@ -272,9 +337,10 @@ class TestGetSomeSpaceBeforeAfterInheritance:
         mock_style = MagicMock()
         mock_style.element = None
         mock_style.base_style = None
-        with mock_patch.object(type(p), 'style', new_callable=PropertyMock, return_value=mock_style):
+        with mock_patch.object(
+            type(p), "style", new_callable=PropertyMock, return_value=mock_style
+        ):
             assert paragraph_get_space_after(p) is None
-
 
 
 class TestGetSomeLineSpacingInheritance:
@@ -297,7 +363,6 @@ class TestGetSomeLineSpacingInheritance:
         assert result is None
 
 
-
 class TestGetSomeFirstLineIndentPhysicalUnit:
     """Cover lines 264-266: paragraph_get_first_line_indent with firstLine (physical unit)"""
 
@@ -306,12 +371,13 @@ class TestGetSomeFirstLineIndentPhysicalUnit:
         p = doc.add_paragraph()
         # Force an exception by making pPr raise
         original = p._element.find
+
         def bad_find(qname):
             raise RuntimeError("test error")
+
         p._element.find = bad_find
         assert paragraph_get_first_line_indent(p) is None
         p._element.find = original
-
 
 
 class TestGetSomeRunExtended:
@@ -320,6 +386,7 @@ class TestGetSomeRunExtended:
     def test_font_size_from_style(self, doc):
         """run 无直接字号时，沿段落样式链解析到样式字号。"""
         from docx.enum.style import WD_STYLE_TYPE
+
         st = doc.styles.add_style("SizeStyle", WD_STYLE_TYPE.PARAGRAPH)
         st.font.size = Pt(16)
         run = doc.add_paragraph(style="SizeStyle").add_run("x")
@@ -341,7 +408,6 @@ class TestGetSomeRunExtended:
         assert run_get_font_color(mock_run) == (0, 0, 0)
 
 
-
 class TestGetIndentWithRealElement:
     """Cover lines 408-423: GetIndent.line_indent with real indent element"""
 
@@ -350,6 +416,7 @@ class TestGetIndentWithRealElement:
         p = doc.add_paragraph()
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
+
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
         ind.set(qn("w:leftChars"), "300")
@@ -361,6 +428,7 @@ class TestGetIndentWithRealElement:
         p = doc.add_paragraph()
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
+
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
         ind.set(qn("w:rightChars"), "200")
@@ -372,6 +440,7 @@ class TestGetIndentWithRealElement:
         p = doc.add_paragraph()
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
+
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
         ind.set(qn("w:leftChars"), "abc")
@@ -391,12 +460,12 @@ class TestGetIndentWithRealElement:
         """pPr exists but no ind element -> returns None (line 404-405)"""
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
+
         pPr = p._element.get_or_add_pPr()
         ind = pPr.find(qn("w:ind"))
         if ind is not None:
             pPr.remove(ind)
         assert GetIndent.line_indent(p, "left") is None
-
 
 
 class TestParagraphGetSpaceBeforeWithValidLines:
@@ -407,6 +476,7 @@ class TestParagraphGetSpaceBeforeWithValidLines:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:beforeLines"), "100")
@@ -418,12 +488,12 @@ class TestParagraphGetSpaceBeforeWithValidLines:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:beforeLines"), "33")
         pPr.append(spacing)
         assert paragraph_get_space_before(p) == 0.3  # round(0.33, 1)
-
 
 
 class TestParagraphGetSpaceAfterWithValidLines:
@@ -434,6 +504,7 @@ class TestParagraphGetSpaceAfterWithValidLines:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:afterLines"), "150")
@@ -445,12 +516,12 @@ class TestParagraphGetSpaceAfterWithValidLines:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:afterLines"), "67")
         pPr.append(spacing)
         assert paragraph_get_space_after(p) == 0.7  # round(0.67, 1)
-
 
 
 class TestRunGetFontColorValidRGB:
@@ -463,7 +534,6 @@ class TestRunGetFontColorValidRGB:
         # RGBColor supports indexing: rgb[0] = 0x12, etc.
         result = run_get_font_color(run)
         assert result == (0x12, 0x34, 0x56)
-
 
 
 class TestRunGetFontColorFalsyRGB:
@@ -489,7 +559,6 @@ class TestRunGetFontColorFalsyRGB:
         assert result == (0, 0, 0)
 
 
-
 class TestGetIndentLineIndentWithCharsValues:
     """Cover lines 419-423: GetIndent.line_indent with valid leftChars/rightChars values"""
 
@@ -498,6 +567,7 @@ class TestGetIndentLineIndentWithCharsValues:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
         ind.set(qn("w:leftChars"), "150")
@@ -509,6 +579,7 @@ class TestGetIndentLineIndentWithCharsValues:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
         ind.set(qn("w:rightChars"), "250")
@@ -520,6 +591,7 @@ class TestGetIndentLineIndentWithCharsValues:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
         ind.set(qn("w:leftChars"), "0")
@@ -531,4 +603,3 @@ class TestGetIndentLineIndentWithCharsValues:
         mock_para = MagicMock()
         mock_para._element.pPr = None
         assert GetIndent.line_indent(mock_para, "left") is None
-

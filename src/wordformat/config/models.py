@@ -87,7 +87,7 @@ def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
     if not isinstance(obj, dict):
         return
     eng_name = _resolve_builtin_style_name(obj)
-    if eng_name:
+    if eng_name and isinstance(eng_name, str):
         style_map[eng_name] = obj
     for _key, val in obj.items():
         if isinstance(val, dict):
