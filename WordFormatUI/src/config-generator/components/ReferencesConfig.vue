@@ -3,7 +3,7 @@
     <h3>参考文献标题</h3>
     <FormatConfig :config="config.title" />
     <h3 class="mt-4">参考文献内容</h3>
-    <FormatConfig :config="config.content" />
+    <FormatConfig :config="config.entry" />
   </div>
 </template>
 

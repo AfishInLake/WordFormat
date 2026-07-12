@@ -47,14 +47,6 @@
           <div class="field" :class="{ disabled: !config.references.enabled }"><label>文本缩进</label><input type="text" v-model="config.references.text_indent" :disabled="!config.references.enabled" placeholder="可选" /><span class="hint">悬挂缩进量</span></div>
         </div>
       </div>
-      <div class="level-item">
-        <h4>题注编号</h4>
-        <div class="level-controls">
-          <label class="inline-check"><input type="checkbox" v-model="config.captions.enabled" /><span>启用</span></label>
-          <div class="field" :class="{ disabled: !config.captions.enabled }"><label>分隔符</label><input type="text" v-model="config.captions.separator" :disabled="!config.captions.enabled" /><span class="hint">如 . - :</span></div>
-          <label class="inline-check" :class="{ disabled: !config.captions.enabled }"><input type="checkbox" v-model="config.captions.label_number_space" :disabled="!config.captions.enabled" /><span>标签与编号间加空格</span></label>
-        </div>
-      </div>
     </div>
   </div>
 </template>

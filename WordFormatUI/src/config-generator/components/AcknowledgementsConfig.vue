@@ -3,7 +3,7 @@
     <h3>致谢标题</h3>
     <FormatConfig :config="config.title" />
     <h3 class="mt-4">致谢内容</h3>
-    <FormatConfig :config="config.content" />
+    <FormatConfig :config="config.body" />
   </div>
 </template>
 

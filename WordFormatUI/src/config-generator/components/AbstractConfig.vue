@@ -2,42 +2,42 @@
   <div class="abstract-config">
     <h3>中文摘要</h3>
     <h4>中文标题</h4>
-    <FormatConfig :config="config.chinese.chinese_title" />
+    <FormatConfig :config="config.chinese.title" />
     <h4 class="mt-4">中文内容</h4>
-    <FormatConfig :config="config.chinese.chinese_content" />
+    <FormatConfig :config="config.chinese.body" />
 
     <h3 class="mt-4">英文摘要</h3>
     <h4>英文标题</h4>
-    <FormatConfig :config="config.english.english_title" />
+    <FormatConfig :config="config.english.title" />
     <h4 class="mt-4">英文内容</h4>
-    <FormatConfig :config="config.english.english_content" />
+    <FormatConfig :config="config.english.body" />
 
     <h3 class="mt-4">关键词配置</h3>
     <h4>中文关键词</h4>
     <div class="rules-grid">
-      <label class="rule-check"><input type="checkbox" v-model="config.keywords.chinese.rules.keyword_count.enabled"> 启用数量检查</label>
-      <div class="rule-field"><label>最少</label><input type="number" v-model.number="config.keywords.chinese.rules.keyword_count.count_min"></div>
-      <div class="rule-field"><label>最多</label><input type="number" v-model.number="config.keywords.chinese.rules.keyword_count.count_max"></div>
-      <label class="rule-check"><input type="checkbox" v-model="config.keywords.chinese.rules.trailing_punctuation.enabled"> 禁止末尾标点</label>
-      <div class="rule-field"><label>禁止字符</label><input type="text" v-model="config.keywords.chinese.rules.trailing_punctuation.forbidden_chars" :disabled="!config.keywords.chinese.rules.trailing_punctuation.enabled"></div>
+      <label class="rule-check"><input type="checkbox" v-model="config.chinese.keywords.rules.keyword_count.enabled"> 启用数量检查</label>
+      <div class="rule-field"><label>最少</label><input type="number" v-model.number="config.chinese.keywords.rules.keyword_count.count_min"></div>
+      <div class="rule-field"><label>最多</label><input type="number" v-model.number="config.chinese.keywords.rules.keyword_count.count_max"></div>
+      <label class="rule-check"><input type="checkbox" v-model="config.chinese.keywords.rules.trailing_punctuation.enabled"> 禁止末尾标点</label>
+      <div class="rule-field"><label>禁止字符</label><input type="text" v-model="config.chinese.keywords.rules.trailing_punctuation.forbidden_chars" :disabled="!config.chinese.keywords.rules.trailing_punctuation.enabled"></div>
     </div>
     <h5>中文关键词内容格式</h5>
-    <FormatConfig :config="config.keywords.chinese" />
+    <FormatConfig :config="config.chinese.keywords" />
     <h5 class="mt-3">中文关键词标签（"关键词："）</h5>
-    <FormatConfig :config="config.keywords.chinese.label" />
+    <FormatConfig :config="config.chinese.keywords.label" />
 
     <h4 class="mt-4">英文关键词</h4>
     <div class="rules-grid">
-      <label class="rule-check"><input type="checkbox" v-model="config.keywords.english.rules.keyword_count.enabled"> 启用数量检查</label>
-      <div class="rule-field"><label>最少</label><input type="number" v-model.number="config.keywords.english.rules.keyword_count.count_min"></div>
-      <div class="rule-field"><label>最多</label><input type="number" v-model.number="config.keywords.english.rules.keyword_count.count_max"></div>
-      <label class="rule-check"><input type="checkbox" v-model="config.keywords.english.rules.trailing_punctuation.enabled"> 禁止末尾标点</label>
-      <div class="rule-field"><label>禁止字符</label><input type="text" v-model="config.keywords.english.rules.trailing_punctuation.forbidden_chars" :disabled="!config.keywords.english.rules.trailing_punctuation.enabled"></div>
+      <label class="rule-check"><input type="checkbox" v-model="config.english.keywords.rules.keyword_count.enabled"> 启用数量检查</label>
+      <div class="rule-field"><label>最少</label><input type="number" v-model.number="config.english.keywords.rules.keyword_count.count_min"></div>
+      <div class="rule-field"><label>最多</label><input type="number" v-model.number="config.english.keywords.rules.keyword_count.count_max"></div>
+      <label class="rule-check"><input type="checkbox" v-model="config.english.keywords.rules.trailing_punctuation.enabled"> 禁止末尾标点</label>
+      <div class="rule-field"><label>禁止字符</label><input type="text" v-model="config.english.keywords.rules.trailing_punctuation.forbidden_chars" :disabled="!config.english.keywords.rules.trailing_punctuation.enabled"></div>
     </div>
     <h5>英文关键词内容格式</h5>
-    <FormatConfig :config="config.keywords.english" />
+    <FormatConfig :config="config.english.keywords" />
     <h5 class="mt-3">英文关键词标签（"Keywords:"）</h5>
-    <FormatConfig :config="config.keywords.english.label" />
+    <FormatConfig :config="config.english.keywords.label" />
   </div>
 </template>
 
