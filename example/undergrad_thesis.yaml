@@ -227,17 +227,6 @@ tables:
     <<: *global_format
     alignment: '居中对齐'
     first_line_indent: '0字符'
-  # -- 表格内容格式（单元格内文字）--
-  content:
-    <<: *global_format
-    chinese_font_name: '宋体'
-    english_font_name: 'Times New Roman'
-    font_size: '五号'
-    line_spacingrule: '单倍行距'
-    alignment: '居中对齐'
-    first_line_indent: '0字符'
-    space_before: "0行"
-    space_after: "0行"
   rules:
     caption_numbering:
       enabled: true
@@ -291,12 +280,6 @@ acknowledgements:
 # ===========================================================================
 numbering:
   enabled: true                     # 总开关：是否启用自动编号
-
-  # -- 题注编号校验/修正 --
-  captions:
-    enabled: true                    # 是否启用题注编号校验/修正
-    separator: '.'                   # 章节号与题注编号间的分隔符
-    label_number_space: false        # 标签与编号间加空格（图 1.1 vs 图1.1）
 
   # -- 一级标题编号（如"第1章"）--
   level_1:

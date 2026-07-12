@@ -12,7 +12,7 @@ class FigureImage(FormatNode):
     只检查对齐和首行缩进，不检查行距、字体等。
     """
 
-    NODE_TYPE = "figure_image"
+    NODE_TYPE = "figures.image"
     NODE_LABEL = "图片段落"
     DEFAULTS = {"alignment": "居中对齐", "first_line_indent": "0字符"}
     DEFAULT_RULES = {}
@@ -56,7 +56,7 @@ class FigureImage(FormatNode):
 class TableObject(FormatNode):
     """表格对象节点（表格整体格式，非题注）。"""
 
-    NODE_TYPE = "table_object"
+    NODE_TYPE = "tables.object"
     NODE_LABEL = "表格对象"
     DEFAULTS = {}
     DEFAULT_RULES = {}  # 表格对象格式由 Word 表格属性控制
