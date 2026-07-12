@@ -1,454 +1,192 @@
 #! /usr/bin/env python
 # @Time    : 2026/1/12 15:18
 # @Author  : afish
-# @File    : utils.py
-"""
-获取 段落/字体 属性
+# @File    : reader.py
+"""获取段落 / 字体的**有效**格式属性。
+
+所有读取统一走 `style.inheritance.StyleResolver`，沿 OOXML 继承链
+（直接格式 → 字符/段落样式 basedOn 链 → docDefaults → 主题字体）解析，
+不再各自手写样式回退，避免漏掉继承链。新增属性只需在 inheritance.py 加一个提取器。
 """
 
 from docx.enum.text import WD_LINE_SPACING
-from docx.oxml.shared import qn
+from docx.oxml.xmlchemy import BaseOxmlElement
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.style.units import _get_with_style_fallback
+from wordformat.style.inheritance import (
+    StyleResolver,
+    x_alignment,
+    x_bold,
+    x_color_rgb,
+    x_first_line_indent,
+    x_font_ascii,
+    x_font_ea,
+    x_italic,
+    x_left_indent,
+    x_line_spacing,
+    x_right_indent,
+    x_size_pt,
+    x_space_after,
+    x_space_before,
+    x_underline,
+)
 
 
-def paragraph_get_alignment(paragraph: Paragraph) -> object:
-    """
-    获取段落的有效对齐方式（考虑直接格式 + 样式继承）
-
-    Args:
-        paragraph: python-docx 的 Paragraph 对象
-
-    Returns:
-        str: 对齐方式描述，如 '左对齐', '居中', '右对齐', '两端对齐'，若均未设置则返回 '未设置'
-    """
-    # 1. 先看段落是否显式设置了对齐
-    direct_alignment = paragraph.paragraph_format.alignment
-    if direct_alignment is not None:
-        return direct_alignment
-
-    # 2. 否则，从段落样式中获取
-    style = paragraph.style
-    while style is not None:
-        if (
-            hasattr(style, "paragraph_format")
-            and style.paragraph_format.alignment is not None
-        ):
-            return style.paragraph_format.alignment
-        # 尝试向上查找基础样式（部分版本支持 _base_style）
-        base_style = getattr(style, "_base_style", None)
-        if base_style is None:
-            break
-        style = base_style
-
-    # 3. 所有地方都没设置 → Word 默认是左对齐，但为严谨返回“未设置”
-    return None
+def _real_elem(obj) -> bool:
+    """obj 是否为持有真实 python-docx XML 元素的段落/run（排除 Mock 等无效输入）。"""
+    return isinstance(getattr(obj, "_element", None), BaseOxmlElement)
 
 
-def _get_style_spacing(style, spacing_type="before"):  # noqa C901
-    """
-    递归查找样式中的段前/段后间距（支持Lines格式）
-    :param style: docx.styles.style._ParagraphStyle 对象
-    :param spacing_type: 'before' 段前 / 'after' 段后
-    :return: lines值，无则返回 None
-    """
-    if not style:
+def _para(paragraph, extractor, default=None):
+    """沿继承链解析段落属性，无效段落/Mock 返回 default，异常降级同 default。"""
+    if not _real_elem(paragraph):
+        return default
+    try:
+        return StyleResolver.for_paragraph(paragraph).resolve_para(
+            paragraph, extractor, default
+        )
+    except Exception as e:
+        logger.debug(f"段落属性解析失败：{e}")
+        return default
+
+
+def _run(run, extractor, default=None):
+    """沿继承链解析 run 字符属性，无效 run/Mock 返回 default，异常降级同 default。"""
+    if not _real_elem(run):
+        return default
+    try:
+        return StyleResolver.for_run(run).resolve_run(run, extractor, default)
+    except Exception as e:
+        logger.debug(f"run 属性解析失败：{e}")
+        return default
+
+
+def _run_font(run, extractor):
+    """沿继承链解析 run 字体名（含主题字体兑现），无效/异常返回 None。"""
+    if not _real_elem(run):
+        return None
+    try:
+        return StyleResolver.for_run(run).resolve_font(run, extractor)
+    except Exception as e:
+        logger.debug(f"字体解析失败：{e}")
         return None
 
-    # 1. 获取样式的XML元素
-    try:
-        style_elem = style.element
-    except AttributeError:
-        return None
 
-    if style_elem is None:  # 添加空值检查
-        try:
-            return _get_style_spacing(style.base_style, spacing_type)
-        except AttributeError:
-            return None
-
-    try:
-        style_pPr = style_elem.find(qn("w:pPr"))
-    except AttributeError:
-        return None
-
-    if style_pPr is None:
-        # 递归查基样式
-        try:
-            return _get_style_spacing(style.base_style, spacing_type)
-        except AttributeError:
-            return None
-
-    # 2. 查找样式中的spacing元素
-    try:
-        spacing = style_pPr.find(qn("w:spacing"))
-    except AttributeError:
-        return None
-
-    if spacing is None:
-        # 递归查基样式
-        try:
-            return _get_style_spacing(style.base_style, spacing_type)
-        except AttributeError:
-            return None
-
-    # 3. 优先读取Lines属性（beforeLines/afterLines）
-    try:
-        # 先检查是否设置了自动间距（Autospacing=1 时 Word 忽略 Lines 和 twips 值）
-        autospacing_attr = spacing.get(qn(f"w:{spacing_type}Autospacing"))
-        if autospacing_attr is not None and autospacing_attr in ("1", "true"):
-            return None
-        lines_attr = spacing.get(qn(f"w:{spacing_type}Lines"))
-        # 检查lines_attr是否为Mock对象
-        if hasattr(lines_attr, "__class__") and "Mock" in lines_attr.__class__.__name__:
-            # 对于Mock对象，尝试获取其值
-            if hasattr(lines_attr, "return_value"):
-                lines_attr = lines_attr.return_value
-            else:
-                # 尝试直接使用lines_attr，因为测试中可能设置了side_effect
-                pass
-        lines_val = int(lines_attr) / 100.0 if lines_attr is not None else None
-    except (AttributeError, ValueError):
-        lines_val = None
-
-    if lines_val is not None:
-        return lines_val
-
-    # 无Lines值时，继续递归查基样式
-    try:
-        base_lines = _get_style_spacing(style.base_style, spacing_type)
-    except AttributeError:
-        base_lines = None
-
-    return base_lines
+# ── 段落级 ────────────────────────────────────────────────────────
+def paragraph_get_alignment(paragraph: Paragraph):
+    """段落有效对齐方式（沿继承链）；均未设置返回 None。"""
+    return _para(paragraph, x_alignment, None)
 
 
 def paragraph_get_space_before(paragraph) -> float | None:
-    """获取段前间距（单位：行）。
-
-    无显式值时返回 None（表示 Word 自动间距），不再与 0 混淆。
-    """
-    try:
-        p = paragraph._element
-        pPr = p.find(qn("w:pPr"))
-
-        # 第一步：查段落自身的设置
-        self_lines = None
-        self_autospacing = False
-        if pPr is not None:
-            spacing = pPr.find(qn("w:spacing"))
-            if spacing is not None:
-                # 优先检查自动间距（Autospacing=1 时忽略 Lines/twips）
-                autospacing_attr = spacing.get(qn("w:beforeAutospacing"))
-                if autospacing_attr is not None and autospacing_attr in ("1", "true"):
-                    self_autospacing = True
-                before_lines_attr = spacing.get(qn("w:beforeLines"))
-                if before_lines_attr is not None:
-                    try:
-                        self_lines = int(before_lines_attr) / 100.0
-                    except (ValueError, TypeError):
-                        self_lines = None
-
-        # 如果段落自身设置了自动间距，直接返回 None（不查样式继承）
-        if self_autospacing:
-            return None
-
-        # 第二步：自身无值，查样式继承
-        style_lines = _get_style_spacing(paragraph.style, "before")
-        final_lines = self_lines if self_lines is not None else style_lines
-
-        # 第三步：有值直接返回（包括显式 0）
-        if final_lines is not None:
-            return round(final_lines, 1)
-    except (AttributeError, TypeError):
-        pass
-    return None
+    """段前间距（单位：行）；无显式值返回 None。"""
+    return _para(paragraph, x_space_before, None)
 
 
 def paragraph_get_space_after(paragraph) -> float | None:
-    """获取段后间距（单位：行）。
+    """段后间距（单位：行）；无显式值返回 None。"""
+    return _para(paragraph, x_space_after, None)
 
-    无显式值时返回 None（表示 Word 自动间距），不再与 0 混淆。
-    """
+
+def paragraph_get_line_spacing(paragraph) -> float | None:
+    """行距倍数；固定值/最小值返回 None。"""
+    res = _para(paragraph, x_line_spacing, None)
+    if not res:
+        return None
     try:
-        p = paragraph._element
-        pPr = p.find(qn("w:pPr"))
-
-        # 第一步：查段落自身的设置
-        self_lines = None
-        self_autospacing = False
-        if pPr is not None:
-            spacing = pPr.find(qn("w:spacing"))
-            if spacing is not None:
-                # 优先检查自动间距（Autospacing=1 时忽略 Lines/twips）
-                autospacing_attr = spacing.get(qn("w:afterAutospacing"))
-                if autospacing_attr is not None and autospacing_attr in ("1", "true"):
-                    self_autospacing = True
-                after_lines_attr = spacing.get(qn("w:afterLines"))
-                if after_lines_attr is not None:
-                    try:
-                        self_lines = int(after_lines_attr) / 100.0
-                    except (ValueError, TypeError):
-                        self_lines = None
-
-        # 如果段落自身设置了自动间距，直接返回 None（不查样式继承）
-        if self_autospacing:
-            return None
-
-        # 第二步：自身无值，查样式继承
-        style_lines = _get_style_spacing(paragraph.style, "after")
-        final_lines = self_lines if self_lines is not None else style_lines
-
-        # 第三步：有值直接返回（包括显式 0）
-        if final_lines is not None:
-            return round(final_lines, 1)
-    except (AttributeError, TypeError):
-        pass
-    return None
+        rule, factor = res
+    except (TypeError, ValueError):
+        return None
+    return factor if rule == WD_LINE_SPACING.MULTIPLE else None
 
 
-def paragraph_get_line_spacing(paragraph):  # noqa c901
-    """Return line spacing as float; fallback to style chain."""
+def paragraph_get_line_spacing_rule(paragraph):
+    """行距类型（WD_LINE_SPACING）。倍数 1.0/1.5/2.0 归一为单倍/1.5/2 倍。"""
+    res = _para(paragraph, x_line_spacing, None)
+    if not res:
+        return WD_LINE_SPACING.MULTIPLE
     try:
-        rule = _get_with_style_fallback(paragraph, "line_spacing_rule", None)
-        if rule is None:
-            return None
-        if rule == WD_LINE_SPACING.SINGLE:
-            return 1.0
-        elif rule == WD_LINE_SPACING.ONE_POINT_FIVE:
-            return 1.5
-        elif rule == WD_LINE_SPACING.DOUBLE:
-            return 2.0
-        elif rule == WD_LINE_SPACING.MULTIPLE:
-            spacing = _get_with_style_fallback(paragraph, "line_spacing", None)
-            if isinstance(spacing, (int, float)) and spacing > 0:
-                return float(spacing)
-        return None
-    except (AttributeError, TypeError):
-        return None
+        rule, factor = res
+    except (TypeError, ValueError):
+        return WD_LINE_SPACING.MULTIPLE
+    if rule == WD_LINE_SPACING.MULTIPLE:
+        return {
+            1.0: WD_LINE_SPACING.SINGLE,
+            1.5: WD_LINE_SPACING.ONE_POINT_FIVE,
+            2.0: WD_LINE_SPACING.DOUBLE,
+        }.get(factor, WD_LINE_SPACING.MULTIPLE)
+    return rule
 
 
-def paragraph_get_first_line_indent(paragraph: Paragraph) -> float | None:  # noqa c901
-    """获取首行缩进(字符单位)。优先段落自身，无则查样式链。"""
-
-    def _read(pPr_elem):
-        ind = pPr_elem.find(qn("w:ind"))
-        if ind is None:
-            return None
-        v = ind.get(qn("w:firstLineChars"))
-        if v and v.lstrip("-").isdigit():
-            return int(v) / 100
-        v = ind.get(qn("w:hangingChars"))
-        if v and v.isdigit():
-            return -int(v) / 100
-        return None
-
-    try:
-        pPr = paragraph._element.find(qn("w:pPr"))
-        if pPr is not None:
-            val = _read(pPr)
-            if val is not None:
-                return val
-        style = paragraph.style
-        while style is not None:
-            sPr = style.element.find(qn("w:pPr"))
-            if sPr is not None:
-                val = _read(sPr)
-                if val is not None:
-                    return val
-            style = style.base_style
-        return None
-    except Exception as e:
-        logger.error(f"获取首行缩进失败：{e}")
-        return None
+def paragraph_get_first_line_indent(paragraph: Paragraph) -> float | None:
+    """首行缩进（字符）；首行=正值，悬挂=负值，无则 None。"""
+    return _para(paragraph, x_first_line_indent, None)
 
 
-def paragraph_get_builtin_style_name(paragraph: Paragraph):
-    """
-    获取段落样式名称(全字母小写)
-    Params:
-       paragraph: 段落对象，通常是 python-docx 的 Paragraph 对象
-
-    Return:
-        str: 样式名称
-    """
+def paragraph_get_builtin_style_name(paragraph: Paragraph) -> str:
+    """段落样式名（全小写）。"""
     style = paragraph.style
     if style is None:
         return ""
     return style.name.lower()
 
 
+# ── 字符级 ────────────────────────────────────────────────────────
 def run_get_font_name(run: Run) -> str | None:
-    """
-    获取 Run 对象的东亚字体（eastAsia font）名称。
-    Params:
-        run: python-docx 的 Run 对象
-
-    Return:
-       str: 东亚字体名称（如 "Microsoft YaHei"），如果未设置则返回 None。
-    """
-    rPr = run._element.rPr
-    if rPr is not None:
-        rFonts = rPr.rFonts
-        if rFonts is not None:
-            # 获取 w:eastAsia 属性
-            east_asia = rFonts.get(qn("w:eastAsia"))
-            return east_asia if east_asia else None
-    return None
+    """东亚字体（eastAsia），沿继承链并解析主题字体；未设置 None。"""
+    return _run_font(run, x_font_ea)
 
 
-def run_get_font_size_pt(run: Run):
-    """
-    获取run的字体大小
-    Params:
-        run: python-docx 的 Run 对象
+def run_get_font_name_en(run: Run) -> str | None:
+    """西文字体（ascii），沿继承链并解析主题字体；未设置 None。"""
+    return _run_font(run, x_font_ascii)
 
-    Return:
-        float: 字体大小，单位为pt
-    """
-    font_size = run.font.size
-    if font_size is not None:
-        return font_size.pt
-    style = run._parent.style
-    if style and hasattr(style, "font") and style.font and style.font.size is not None:
-        return style.font.size.pt
-    return 12.0
+
+def run_get_font_size_pt(run: Run) -> float:
+    """字号（pt），沿继承链；均未设置回退 12.0。"""
+    return _run(run, x_size_pt, 12.0)
 
 
 def run_get_font_color(run: Run) -> tuple[int, int, int] | None:
-    """
-    获取run的字体颜色
-    Params:
-        run: python-docx 的 Run 对象
-
-    Return:
-        tuple or None: (r, g, b) 元组，每个分量为 0-255 的整数。
-                       若未设置颜色，返回 (0, 0, 0)。
-                       若使用主题色（themeColor），返回 None，表示颜色不确定
-                       （主题色在渲染时由 Word 根据主题动态解析，rgb 只是猜测值）。
-    """
-    color = run.font.color
-    if color is None:
-        return 0, 0, 0
-
-    # 检测主题色类型：themeColor 优先级高于 rgb，rgb 只是猜测值
-    from docx.enum.dml import MSO_COLOR_TYPE
-
-    if color.type == MSO_COLOR_TYPE.THEME:
-        return None
-
-    if color.rgb is None:
-        return 0, 0, 0
-
-    rgb_hex = color.rgb  # 如 'FF0000'
-    if rgb_hex:
-        return rgb_hex[0], rgb_hex[1], rgb_hex[2]
-    return 0, 0, 0
+    """字体颜色 (r,g,b)；主题色返回 None（不确定），未设置返回 (0,0,0)。"""
+    return _run(run, x_color_rgb, (0, 0, 0))
 
 
 def run_get_font_bold(run: Run) -> bool:
-    """
-    获取run的字体是否加粗
-    Params:
-        run: python-docx 的 Run 对象
-
-    Return:
-        bool: 是否加粗。若未显式设置，返回 False。
-    """
-    return bool(run.font.bold)
+    """有效加粗（沿继承链：直接→字符样式→段落样式→docDefaults）。"""
+    return bool(_run(run, x_bold, False))
 
 
 def run_get_font_italic(run: Run) -> bool:
-    """
-    获取run的字体是否斜体
-    Params:
-        run: python-docx 的 Run 对象
-
-    Return:
-        bool: 是否斜体。若未显式设置，返回 False。
-    """
-    return bool(run.font.italic)
+    """有效斜体（沿继承链解析）。"""
+    return bool(_run(run, x_italic, False))
 
 
 def run_get_font_underline(run: Run) -> bool:
-    """
-    获取run的字体是否下划线
-    Params:
-        run: python-docx 的 Run 对象
-
-    Return:
-        bool: 是否下划线。若未显式设置，返回 False。
-    """
-    return bool(run.font.underline)
+    """有效下划线（沿继承链解析）。"""
+    return bool(_run(run, x_underline, False))
 
 
 class GetIndent:
-    """
-    获取段落缩进 单位(字符)
-    """
+    """段落左/右缩进（单位：字符），沿继承链解析。"""
 
     @staticmethod
     def line_indent(paragraph: Paragraph, indent_type: str = "left") -> float | None:
-        """
-        获取段落的左/右缩进（单位：字符）
-
-        Args:
-            paragraph: 段落对象
-            indent_type: 'left' 或 'right'（对应 Word 中的“文本之前(R)”和“文本之后(X)”）
-
-        Returns:
-            float | None: 缩进字符数（如 2.0），若未设置返回 0.0；出错返回 None
-        """
         if indent_type not in ("left", "right"):
             logger.error("indent_type 必须是 'left' 或 'right'")
             raise ValueError("indent_type 必须是 'left' 或 'right'")
-
-        try:
-            pPr = paragraph._element.pPr
-            if pPr is None:
-                return None
-
-            ind = pPr.find(qn("w:ind"))
-            if ind is None:
-                return None
-
-            # 确定要读取的字符单位属性
-            char_attr = "w:leftChars" if indent_type == "left" else "w:rightChars"
-
-            char_val = ind.get(qn(char_attr))
-            if char_val is not None:
-                try:
-                    # Word 内部：1 字符 = 100 单位
-                    chars = int(char_val) / 100.0
-                    return max(0.0, chars)
-                except (ValueError, TypeError):
-                    logger.warning(f"无效的 {char_attr} 值: {char_val}")
-                    return None
+        extractor = x_left_indent if indent_type == "left" else x_right_indent
+        val = _para(paragraph, extractor, None)
+        if val is None:
             return None
-
-        except Exception as e:
-            logger.error(f"读取 {indent_type} 缩进失败: {e}")
-            return None
+        return max(0.0, val)
 
     @staticmethod
     def left_indent(paragraph: Paragraph) -> float | None:
-        """
-        获取 左缩进
-        Args:
-            paragraph:
-        Returns:
-        """
         return GetIndent.line_indent(paragraph, "left")
 
     @staticmethod
     def right_indent(paragraph: Paragraph) -> float | None:
-        """
-        获取右缩进
-        Args:
-            paragraph:
-        Returns:
-        """
         return GetIndent.line_indent(paragraph, "right")

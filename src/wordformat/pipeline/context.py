@@ -9,7 +9,6 @@ from typing import Protocol
 
 from docx.document import Document as DocumentObject
 
-from wordformat.config.models import NodeConfigRoot
 from wordformat.rules.node import FormatNode
 
 
@@ -23,7 +22,7 @@ class FormatContext:
     # 运行时对象（由各阶段填充）
     document: DocumentObject | None = None
     root_node: FormatNode = None
-    config_model: NodeConfigRoot = field(default_factory=NodeConfigRoot)
+    config_model: dict = field(default_factory=dict)
     output_path: Path | str = ""
 
 

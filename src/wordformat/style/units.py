@@ -27,24 +27,20 @@ class UnitResult:
         }
 
     def convert_to_emu(self) -> Optional[int]:
-        """扩展方法：将数值转换为EMU（Office内部单位）
-        注意：「行、字符」为非国际标准单位，不参与转换，返回None
+        """将数值转换为 EMU（Office 内部单位），使用 python-docx 标准转换。
+
+        注意：「行、字符」为非国际标准单位，不参与转换，返回 None。
         """
-        # 非合法格式 或 非国际标准单位 → 返回None
         if not self.is_valid or self.value is None or self.standard_unit is None:
             return None
         if self.standard_unit in ["行", "字符", "hang"]:
             return None
 
-        # EMU换算规则（1英寸=914400 EMU）
-        emu_mapping = {
-            "pt": self.value * 12700,  # 1pt=12700 EMU
-            "cm": self.value * 360000,  # 1cm=360000 EMU
-            "inch": self.value * 914400,  # 1英寸=914400 EMU
-            "mm": self.value * 36000,  # 1mm=36000 EMU
-            "emu": self.value,  # 本身就是EMU
-        }
-        return round(emu_mapping.get(self.standard_unit, 0))
+        from docx.shared import Cm, Emu, Inches, Mm, Pt
+
+        _CONVERTERS = {"pt": Pt, "cm": Cm, "inch": Inches, "mm": Mm, "emu": Emu}
+        conv = _CONVERTERS.get(self.standard_unit)
+        return int(conv(self.value)) if conv else None
 
     @property
     def unit_ch(self):
@@ -138,20 +134,3 @@ def extract_unit_from_string(text: str) -> UnitResult:
         result.is_valid = True
 
     return result
-
-
-def _get_with_style_fallback(paragraph, attr: str, default):
-    """从段落或样式链读取属性值。"""
-    val = getattr(paragraph.paragraph_format, attr, None)
-    if val is not None:
-        return val
-    style = paragraph.style
-    while style is not None:
-        try:
-            val = getattr(style.paragraph_format, attr, None)
-            if val is not None:
-                return val
-        except AttributeError:
-            pass
-        style = style.base_style
-    return default

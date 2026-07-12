@@ -149,7 +149,10 @@ headings:
     alignment: '居中对齐'
     first_line_indent: '0字符'
     chinese_font_name: '黑体'
+    english_font_name: 'Times New Roman'
     font_size: '小二'
+    font_color: '黑色'
+    bold: true
     builtin_style_name: 'Heading 1'
   level_2:
     alignment: '左对齐'
@@ -165,6 +168,9 @@ headings:
     builtin_style_name: 'Heading 3'
 body_text:
   alignment: '两端对齐'
+  chinese_font_name: '宋体'
+  english_font_name: 'Times New Roman'
+  font_size: '小四'
 figures:
   caption_prefix: '图'
 tables:
@@ -192,6 +198,8 @@ acknowledgements:
   content:
     alignment: '两端对齐'
     first_line_indent: '2字符'
+numbering:
+  enabled: false
 """
 
 @pytest.fixture
@@ -260,9 +268,8 @@ def reset_config():
 
 @pytest.fixture(autouse=True)
 def reset_style_warning():
-    """每个测试前后重置 style_checks_warning 全局变量"""
+    """每个测试前后重置警告缓存。"""
     from wordformat.style import diff
-    original = diff.style_checks_warning
-    diff.style_checks_warning = None
+    diff._warnings = None
     yield
-    diff.style_checks_warning = original
+    diff._warnings = None

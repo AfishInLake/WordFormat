@@ -7,8 +7,9 @@ from pathlib import Path
 
 from docx import Document
 from docx.document import Document as DocumentObject
+from docx.shared import Pt, RGBColor
 
-from wordformat.config.loader import get_config, init_config
+from wordformat.config.loader import load_config
 from wordformat.hyperlinks import create_citation_hyperlinks
 from wordformat.log_config import logger
 from wordformat.rules.abstract import (
@@ -40,21 +41,10 @@ from wordformat.style.defs import (
 from wordformat.style.writer import (
     SetFirstLineIndent,
     SetIndent,
-    SetLineSpacing,
     SetSpacing,
 )
 from wordformat.style.xml_ops import (
     ensure_pPr,
-    ensure_rPr,
-    line_rule_to_xml,
-    line_spacing_val_to_xml,
-    pPr_set_alignment,
-    rPr_set_bold,
-    rPr_set_font,
-    rPr_set_font_color,
-    rPr_set_font_size,
-    rPr_set_italic,
-    rPr_set_underline,
 )
 from wordformat.utils import (
     count_chinese_chars,
@@ -71,11 +61,9 @@ class LoadConfigStage:
     """加载配置pipline"""
 
     def process(self, ctx: FormatContext) -> FormatContext:
-        configpath = ctx.config_path
-        if configpath:
-            init_config(configpath)
+        if ctx.config_path:
             try:
-                ctx.config_model = get_config()
+                ctx.config_model = load_config(ctx.config_path)
                 logger.info("配置文件验证通过")
             except Exception as e:
                 logger.error(f"配置加载失败: {str(e)}")
@@ -146,57 +134,84 @@ class StyleDefinitionFixStage:
     """修正样式定义（仅 apply 模式）"""
 
     def _fix_style_run_properties(self, style, cfg, style_name: str):
-        """修正样式定义中的字符格式属性（w:rPr）。"""
-        rPr = ensure_rPr(style.element)
+        """修正样式定义中的字符格式属性。
 
+        python-docx 的 Style.font API 覆盖 size/color/bold/italic/underline，
+        但 eastAsia 字体名需通过 XML 设置（Font 类不支持该属性）。
+        """
+        # 字体名：西文用 style.font.name，东亚用 XML（python-docx 不支持 eastAsia）
         cn_name = getattr(cfg, "chinese_font_name", None)
         en_name = getattr(cfg, "english_font_name", None)
         if cn_name or en_name:
+            from wordformat.style.xml_ops import ensure_rPr, rPr_set_font
+
+            rPr = ensure_rPr(style.element)
             rPr_set_font(rPr, cn_name=cn_name, en_name=en_name)
 
         font_size = getattr(cfg, "font_size", None)
         if font_size is not None:
             try:
-                rPr_set_font_size(rPr, FontSize(font_size).rel_value)
+                style.font.size = Pt(FontSize(font_size).rel_value)
             except Exception as e:
                 logger.warning(f"设置样式 '{style_name}' 字号失败: {e}")
 
         font_color = getattr(cfg, "font_color", None)
         if font_color is not None:
             try:
-                rPr_set_font_color(rPr, FontColor(font_color).rel_value)
+                rgb = FontColor(font_color).rel_value
+                style.font.color.rgb = RGBColor(*rgb)
             except Exception as e:
                 logger.warning(f"设置样式 '{style_name}' 颜色失败: {e}")
 
         bold = getattr(cfg, "bold", None)
         if bold is not None:
-            rPr_set_bold(rPr, bold)
+            style.font.bold = bold
 
         italic = getattr(cfg, "italic", None)
         if italic is not None:
-            rPr_set_italic(rPr, italic)
+            style.font.italic = italic
 
         underline = getattr(cfg, "underline", None)
         if underline is not None:
-            rPr_set_underline(rPr, underline)
+            style.font.underline = underline
 
     def _fix_style_paragraph_properties(self, style, cfg, style_name: str):
-        """修正样式定义中的段落格式属性（w:pPr）。
+        """修正样式定义中的段落格式属性。
 
-        设置：对齐方式、段前/段后间距、行距、首行缩进、左右缩进。
-        直接在 w:pPr 元素上操作 XML，确保样式定义级别生效。
+        优先使用 python-docx 的 style.paragraph_format API（对齐、行距）。
+        行单位（段前/段后间距）和字符单位（缩进）因 python-docx 不支持，
+        回退到 XML 操作。
         """
-        pPr = ensure_pPr(style.element)
-
-        # --- 对齐方式 ---
+        # --- 对齐方式（python-docx API） ---
         alignment = getattr(cfg, "alignment", None)
         if alignment is not None:
             try:
-                pPr_set_alignment(pPr, Alignment(alignment).rel_value)
+                style.paragraph_format.alignment = Alignment(alignment).rel_value
             except Exception as e:
                 logger.warning(f"设置样式 '{style_name}' 对齐方式失败: {e}")
 
-        # --- 段前/段后间距 ---
+        # --- 行距（python-docx API） ---
+        line_spacingrule = getattr(cfg, "line_spacingrule", None)
+        if line_spacingrule is not None:
+            try:
+                lsr = LineSpacingRule(line_spacingrule)
+                style.paragraph_format.line_spacing_rule = lsr.rel_value
+                line_spacing = getattr(cfg, "line_spacing", None)
+                if line_spacing is not None:
+                    ls = LineSpacing(line_spacing)
+                    if ls.rel_unit == "pt":
+                        style.paragraph_format.line_spacing = Pt(ls.rel_value)
+                    else:
+                        style.paragraph_format.line_spacing = ls.rel_value
+                else:
+                    logger.warning(
+                        f"样式 '{style_name}' 设置了 line_spacingrule 但未设置 line_spacing，已跳过行距"
+                    )
+            except Exception as e:
+                logger.warning(f"设置样式 '{style_name}' 行距失败: {e}")
+
+        # --- 段前/段后间距（仅支持行单位，需 XML） ---
+        pPr = ensure_pPr(style.element)
         for attr_name, cls, spacing_type in [
             ("space_before", SpaceBefore, "before"),
             ("space_after", SpaceAfter, "after"),
@@ -216,26 +231,7 @@ class StyleDefinitionFixStage:
             except Exception as e:
                 logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
 
-        # --- 行距 ---
-        line_spacingrule = getattr(cfg, "line_spacingrule", None)
-        if line_spacingrule is not None:
-            try:
-                lsr = LineSpacingRule(line_spacingrule)
-                line_rule = line_rule_to_xml(lsr.rel_value)
-
-                line_spacing = getattr(cfg, "line_spacing", None)
-                if line_spacing is not None:
-                    ls = LineSpacing(line_spacing)
-                    line_val = line_spacing_val_to_xml(ls.rel_value, ls.rel_unit)
-                    SetLineSpacing._set_on_pPr(pPr, line_rule, line_val)
-                else:
-                    logger.warning(
-                        f"样式 '{style_name}' 设置了 line_spacingrule 但未设置 line_spacing，已跳过行距"
-                    )
-            except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' 行距失败: {e}")
-
-        # --- 缩进：先设置首行缩进，再设置左右缩进，避免 _clear_ind_on_pPr 清除 *Chars 属性 ---
+        # --- 缩进（仅支持字符单位，需 XML） ---
         first_line_indent = getattr(cfg, "first_line_indent", None)
         if first_line_indent is not None:
             try:
@@ -479,8 +475,7 @@ class SummaryGenerationStage:
             "检测结果：",
             f"检测模板：《{template_name}》",
             f"检测错误数：{total}，万字差错率：{error_rate:.1f}",
-            f"严重错误：{stats.get('严重', 0)}，一般错误：{stats.get('一般', 0)}，"
-            f"提醒：{stats.get('提醒', 0)}",
+            f"错误：{stats.get('错误', 0)}，提醒：{stats.get('提醒', 0)}",
         ]
 
         # 字数问题

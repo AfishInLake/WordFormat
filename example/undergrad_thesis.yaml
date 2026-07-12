@@ -24,13 +24,14 @@ style_checks_warning:
   italic: false
   underline: false
   font_size: true
-  font_name: true
+  font_name_cn: true
+  font_name_en: true
   font_color: false
   alignment: true
   space_before: true
   space_after: true
   line_spacing: true
-  line_spacingrule: true
+  line_spacing_rule: true
   left_indent: true
   right_indent: true
   first_line_indent: true

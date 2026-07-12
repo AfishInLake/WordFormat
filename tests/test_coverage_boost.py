@@ -75,15 +75,17 @@ def _load_yaml(path):
 
 
 def _load_root_config(config_path):
-    return NodeConfigRoot(**_load_yaml(config_path))
+    return _load_yaml(config_path)
 
 
 @pytest.fixture
 def root_config(sample_yaml_config):
-    """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
+    """从 sample_yaml_config 加载配置，与示例文件解耦。"""
     from wordformat.config.loader import init_config
+    from wordformat.config.models import NodeConfigRoot
+
     init_config(sample_yaml_config)
-    return _load_root_config(sample_yaml_config)
+    return NodeConfigRoot(**_load_root_config(sample_yaml_config))
 
 
 # ===========================================================================
@@ -213,10 +215,9 @@ class TestHeadingCoverageBoost:
         """_fix_style_run_properties 应设置样式定义中的加粗属性。"""
         
         from wordformat.style.defs import ensure_style_exists
-        from wordformat.config.models import HeadingLevelConfig
-
+        
         doc = Document()
-        cfg = HeadingLevelConfig(bold=True)
+        cfg = NodeConfigRoot(bold=True)
         ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
@@ -226,14 +227,13 @@ class TestHeadingCoverageBoost:
         b = rPr.find(qn("w:b"))
         assert b is not None
 
-    def test_fix_style_run_properties_removes_italic(self, root_config):
-        """_fix_style_run_properties 当 italic=False 时应移除斜体元素。"""
-        
+    def test_fix_style_run_properties_disables_italic(self, root_config):
+        """_fix_style_run_properties 当 italic=False 时应显式关闭斜体（val='0'）。"""
+
         from wordformat.style.defs import ensure_style_exists
-        from wordformat.config.models import HeadingLevelConfig
 
         doc = Document()
-        cfg = HeadingLevelConfig(italic=False)
+        cfg = NodeConfigRoot(italic=False)
         ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
@@ -241,16 +241,17 @@ class TestHeadingCoverageBoost:
 
         rPr = style.element.find(qn("w:rPr"))
         i = rPr.find(qn("w:i"))
-        assert i is None
+        # python-docx style.font.italic = False 写入 w:val="0" 而非移除元素
+        assert i is not None
+        assert i.get(qn("w:val")) == "0"
 
     def test_fix_style_paragraph_properties_sets_alignment(self, root_config):
         """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""
         
         from wordformat.style.defs import ensure_style_exists
-        from wordformat.config.models import HeadingLevelConfig
-
+        
         doc = Document()
-        cfg = HeadingLevelConfig(alignment="居中对齐")
+        cfg = NodeConfigRoot(alignment="居中对齐")
         ensure_style_exists(doc, "Heading 1")
         style = doc.styles["Heading 1"]
 
@@ -738,24 +739,24 @@ class TestSetStyleCoverageBoost:
         """config_model 无任何有效的 GlobalFormatConfig 时不抛异常。"""
         doc = Document()
         # 使用一个只有 numbering 和 global_format 的空模型
-        from wordformat.config.models import NodeConfigRoot, GlobalFormatConfig, BodyTextConfig
+        from wordformat.config.models import NodeConfigRoot
 
         config_bare = NodeConfigRoot(
-            global_format=GlobalFormatConfig(),
-            body_text=BodyTextConfig(),
+            global_format=NodeConfigRoot(),
+            body_text=NodeConfigRoot(),
         )
         _fix_stage._fix_all_style_definitions(doc, config_bare)
         # 不应抛出异常
 
     def test_fix_all_style_definitions_theme_color_fix(self):
         """修正主题色的完整流程：有 themeColor 的样式被修正。"""
-        from wordformat.config.models import NodeConfigRoot, HeadingsConfig, HeadingLevelConfig, GlobalFormatConfig
+        from wordformat.config.models import NodeConfigRoot
 
         doc = Document()
         config_model = NodeConfigRoot(
-            global_format=GlobalFormatConfig(),
-            headings=HeadingsConfig(
-                level_1=HeadingLevelConfig(builtin_style_name="Heading 1", font_color="黑色"),
+            global_format=NodeConfigRoot(),
+            headings=NodeConfigRoot(
+                level_1=NodeConfigRoot(builtin_style_name="Heading 1", font_color="黑色"),
             ),
         )
 
@@ -947,15 +948,15 @@ class TestGetSomeCoverageBoost:
         assert result == ""
 
     def test_run_get_font_color_theme(self):
-        """覆盖行 340: themeColor 类型返回 None。"""
-        # 使用 MagicMock 模拟 run.font.color，使 type 返回 THEME
-        from docx.enum.dml import MSO_COLOR_TYPE
-        mock_run = MagicMock()
-        mock_color = MagicMock()
-        mock_color.type = MSO_COLOR_TYPE.THEME
-        mock_run.font.color = mock_color
-        result = run_get_font_color(mock_run)
-        assert result is None
+        """themeColor（主题色）返回 None：rgb 不确定。"""
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+        run = Document().add_paragraph().add_run("x")
+        rPr = run._element.get_or_add_rPr()
+        color = OxmlElement("w:color")
+        color.set(qn("w:themeColor"), "accent1")
+        rPr.append(color)
+        assert run_get_font_color(run) is None
 
     def test_get_indent_invalid_type(self):
         """覆盖行 429-433: GetIndent.line_indent 无效 indent_type。"""

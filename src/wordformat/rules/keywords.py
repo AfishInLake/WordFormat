@@ -1,56 +1,21 @@
 import re
 from copy import deepcopy
-from typing import Literal
 
 from docx.oxml.ns import qn
 
-from wordformat.config.models import (
-    KeywordCountRule,
-    KeywordsConfig,
-    NodeConfigRoot,
-    TrailingPunctRule,
-)
+from wordformat.config.dotdict import BASE_FORMAT
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
 
 # 第一步：提取关键词基类，复用通用逻辑
-class BaseKeywordsNode(FormatNode[KeywordsConfig]):
+class BaseKeywordsNode(FormatNode):
     """关键词节点基类（复用中英文通用逻辑）"""
 
-    # 子类必须定义的属性
-    LANG: Literal["cn", "en"] = ""  # 语言类型：cn/en
     NODE_TYPE: str = ""
-    CONFIG_MODEL = KeywordsConfig
 
-    def _get_lang_config(self, root_config: NodeConfigRoot) -> KeywordsConfig:
-        """根据语言类型获取对应配置"""
-        lang_config_map = {
-            "cn": root_config.abstract.keywords["chinese"],
-            "en": root_config.abstract.keywords["english"],
-        }
-        return lang_config_map.get(self.LANG, root_config.abstract.keywords["chinese"])
-
-    def load_config(self, root_config: dict | NodeConfigRoot):
-        """重载加载配置，自动匹配对应语言的关键词配置"""
-        if isinstance(root_config, dict):
-            # 从字典中提取对应语言的配置，通过父类方法设置 __config
-            lang_config = (
-                root_config.get("abstract", {}).get("keywords", {}).get(self.LANG, {})
-            )
-            # 直接设置父类的 __config（避免名称修饰问题）
-            self._TreeNode__config = lang_config
-            self._pydantic_config = self.CONFIG_MODEL(**self.config)
-        elif isinstance(root_config, NodeConfigRoot):
-            # 从Pydantic模型提取对应语言的配置
-            self._pydantic_config = self._get_lang_config(root_config)
-            self._TreeNode__config = self._pydantic_config.model_dump()
-        else:
-            raise TypeError(
-                f"配置类型不支持：{type(root_config)}，仅支持dict或NodeConfigRoot"
-            )
-
-    def _check_paragraph_style(self, cfg: KeywordsConfig, p: bool) -> str:
+    def _check_paragraph_style(self, cfg, p: bool) -> str:
         """通用段落样式检查（复用）"""
         ps = ParagraphStyle.from_config(cfg)
         if p:
@@ -114,12 +79,28 @@ class BaseKeywordsNode(FormatNode[KeywordsConfig]):
     # 第二步：英文关键词节点（专属逻辑）
 
 
+@register("keywords_english", level=3)
 class KeywordsEN(BaseKeywordsNode):
     """关键词节点-英文"""
 
-    LANG = "en"
     NODE_TYPE = "abstract.keywords.english"
     NODE_LABEL = "英文关键词"
+    DEFAULTS = {
+        **BASE_FORMAT,
+        "first_line_indent": "0字符",
+        "chinese_font_name": "宋体",
+        "font_size": "小四",
+        "label": {
+            "chinese_font_name": "黑体",
+            "english_font_name": "Times New Roman",
+            "font_size": "三号",
+            "font_color": "黑色",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+        },
+        "rules": {"keyword_count": {"enabled": True, "count_min": 3, "count_max": 5}},
+    }
     RULES = {"keyword_count": "_check_keyword_count"}
 
     _LABEL_RE = re.compile(r"Keywords?:?\s*", re.IGNORECASE)
@@ -155,7 +136,7 @@ class KeywordsEN(BaseKeywordsNode):
         """英文标签拆分模式：匹配 'Keywords:' 或 'Keywords ' 及其变体"""
         return re.compile(r"Keywords?\s*[:：]?\s*", re.IGNORECASE)
 
-    def _check_keyword_count(self, doc, rule_cfg: KeywordCountRule, p: bool = False):
+    def _check_keyword_count(self, doc, rule_cfg, p: bool = False):
         """校验英文关键词数量"""
         keyword_text = "".join([run.text for run in self.paragraph.runs])
         keyword_list = KeywordsEN.extract_keywords(keyword_text)
@@ -224,12 +205,31 @@ class KeywordsEN(BaseKeywordsNode):
 
 
 # 第三步：中文关键词节点（专属逻辑）
+@register("keywords_chinese", level=3)
 class KeywordsCN(BaseKeywordsNode):
     """关键词节点-中文"""
 
-    LANG = "cn"
     NODE_TYPE = "abstract.keywords.chinese"
     NODE_LABEL = "中文关键词"
+    DEFAULTS = {
+        **BASE_FORMAT,
+        "first_line_indent": "0字符",
+        "chinese_font_name": "宋体",
+        "font_size": "小四",
+        "label": {
+            "chinese_font_name": "黑体",
+            "english_font_name": "Times New Roman",
+            "font_size": "三号",
+            "font_color": "黑色",
+            "bold": True,
+            "italic": False,
+            "underline": False,
+        },
+        "rules": {
+            "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5},
+            "trailing_punctuation": {"enabled": True, "forbidden_chars": "；，。、"},
+        },
+    }
     RULES = {
         "keyword_count": "_check_keyword_count",
         "trailing_punctuation": "_check_trailing_punctuation",
@@ -273,7 +273,7 @@ class KeywordsCN(BaseKeywordsNode):
             r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*"
         )
 
-    def _check_keyword_count(self, doc, rule_cfg: KeywordCountRule, p: bool = False):
+    def _check_keyword_count(self, doc, rule_cfg, p: bool = False):
         """校验中文关键词数量"""
         keyword_text = "".join([run.text for run in self.paragraph.runs])
         keyword_list = KeywordsCN.extract_keywords(keyword_text)
@@ -297,9 +297,7 @@ class KeywordsCN(BaseKeywordsNode):
             )
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
 
-    def _check_trailing_punctuation(
-        self, doc, rule_cfg: TrailingPunctRule, p: bool = False
-    ):
+    def _check_trailing_punctuation(self, doc, rule_cfg, p: bool = False):
         """校验中文关键词末尾标点"""
         from wordformat.style.comments import format_comment
 

@@ -18,14 +18,14 @@ WordFormat is a Python CLI tool that checks and auto-corrects formatting in acad
 # Install dev environment (creates venv, installs deps, downloads ONNX model)
 make install
 
-# Run all tests (with coverage, must reach 85%)
+# Run all tests (with coverage, must reach 87%)
 make tests
 
 # Run a single test file
-pytest tests/test_rules.py -v
+pytest tests/rules/test_abstract.py -v
 
 # Run a specific test
-pytest tests/test_rules.py::TestAbstractTitleContentENBase -v
+pytest tests/rules/test_abstract.py::TestAbstractTitleContentENBase -v
 
 # Run tests matching a keyword
 pytest tests/ -k "Abstract" -v
@@ -77,7 +77,7 @@ Pre-commit runs on `pre-commit` and `pre-push` stages, configured in `.pre-commi
 - **Line length**: 108 (pycodestyle), 200 (docstrings)
 - **Complexity**: max 10 (mccabe)
 - **Quote style**: double, space indent
-- **Per-file ignores**: `__init__.py` (F401/F403/E501), `tree.py`/`cli.py` (T201 print), `body.py`/`heading.py`/`numbering.py`/`set_style.py`/`utils.py` (C901 complexity)
+- **Per-file ignores**: `__init__.py` (F401/F403/E501), `tree.py`/`cli.py` (T201 print), `body.py`/`heading.py`/`numbering.py`/`_text.py` (C901 complexity)
 
 ## Environment variables
 
@@ -102,14 +102,14 @@ wordf gj (generate JSON)          wordf cf / wordf af (check/apply format)
                                           per-node style check/apply
 ```
 
-**Phase 1 — Classification** (`set_tag.py` → `base.py`):
+**Phase 1 — Classification** (`classify/tag.py` → `base.py`):
 - `DocxBase.parse()` loads a .docx, iterates paragraphs, batches them through ONNX BERT inference (`agent/onnx_infer.py`), and returns a flat list of `{category, text, score, comment}` dicts saved as JSON.
 
-**Phase 2 — Tree building** (`word_structure/`):
-- `DocumentBuilder.build_from_json()` feeds the flat JSON list into `DocumentTreeBuilder.build_tree()`, which creates a hierarchical `FormatNode` tree. `LEVEL_MAP` in `word_structure/settings.py` maps category strings to numeric levels; `CATEGORY_TO_CLASS` maps categories to `FormatNode` subclasses.
-- `node_factory.create_node()` instantiates the right `FormatNode` subclass and calls `load_config()`, which resolves the node's `CONFIG_PATH` (e.g. `"abstract.english"`) against the Pydantic root config model (`NodeConfigRoot`).
+**Phase 2 — Tree building** (`structure/`):
+- `DocumentBuilder.build_from_json()` feeds the flat JSON list into `DocumentTreeBuilder.build_tree()`, which creates a hierarchical `FormatNode` tree. `LEVEL_MAP` in `structure/settings.py` maps category strings to numeric levels; `CATEGORY_TO_CLASS` is auto-built from `@register` decorators on `FormatNode` subclasses.
+- `node_factory.create_node()` instantiates the right `FormatNode` subclass and calls `load_config()`, which walks the YAML dict along `NODE_TYPE` path, merges with class `DEFAULTS`, and stores a `DotDict`.
 
-**Phase 3 — Matching & formatting** (`set_style.py`):
+**Phase 3 — Matching & formatting** (`pipeline/stages.py`):
 - Each paragraph in the document is matched to a tree node by position order: `_flatten_tree_nodes()` converts the tree to a flat DFS list, then `zip()` pairs nodes with `document.paragraphs` by index.
 - Before formatting, `node.apply_replace(doc)` checks for a `replace` field in the JSON value dict; if present, it substitutes the paragraph's run text with the replacement string.
 - The tree is also mutated: `promote_bodytext_in_subtrees_of_type()` replaces generic `body_text` nodes under specific parents (e.g. `AbstractTitleCN`) with typed content nodes (e.g. `AbstractContentCN`).
@@ -122,55 +122,54 @@ wordf gj (generate JSON)          wordf cf / wordf af (check/apply format)
 
 | Path | Purpose |
 |------|---------|
-| `src/wordformat/cli.py` | CLI entry point (`gj`/`cf`/`af`/`tree`/`startapi` subcommands) |
-| `src/wordformat/set_style.py` | Orchestrator: tree flattening (`_flatten_tree_nodes`), position-based paragraph matching, subtree promotion, text replace, calls check/apply on each node |
-| `src/wordformat/set_tag.py` | Classification entry point: loads doc, calls `DocxBase`, returns JSON |
+| `src/wordformat/cli.py` | CLI entry point (`gj`/`cf`/`af`/`tree`/`config`/`startapi` subcommands) |
+| `src/wordformat/classify/tag.py` | Classification entry point: loads doc, calls `DocxBase`, returns JSON |
 | `src/wordformat/base.py` | `DocxBase`: docx loading + ONNX batch inference |
-| `src/wordformat/rules/node.py` | `FormatNode` base class with `load_config`, `check_format`, `apply_format`, `add_comment` |
+| `src/wordformat/pipeline/stages.py` | Orchestrator: tree flattening, position-based paragraph matching, subtree promotion, text replace, calls check/apply on each node |
+| `src/wordformat/pipeline/orchestrate.py` | Top-level orchestration: `auto_format_thesis_document()` |
+| `src/wordformat/rules/node.py` | `FormatNode` base class and `TreeNode` |
 | `src/wordformat/rules/abstract.py` | Abstract title/content/title-content nodes (CN + EN) |
-| `src/wordformat/rules/heading.py` | Heading level 1/2/3 nodes with custom config loading |
+| `src/wordformat/rules/heading.py` | Heading level 1/2/3 nodes (no longer overrides `load_config`) |
 | `src/wordformat/rules/keywords.py` | Keywords nodes with tag detection and count validation |
-| `src/wordformat/style/check_format.py` | `CharacterStyle` (run-level) and `ParagraphStyle` (para-level) with diff/apply logic |
-| `src/wordformat/style/style_enum.py` | Enums: `FontSize`, `FontColor`, `FontName`, `Alignment`, `LineSpacingRule`, etc. |
-| `src/wordformat/config/datamodel.py` | Pydantic v2 models for all config sections (`GlobalFormatConfig`, `AbstractConfig`, `HeadingsConfig`, `NumberingConfig`, etc.) |
-| `src/wordformat/config/config.py` | `LazyConfig` singleton for YAML loading and caching |
+| `src/wordformat/rules/body.py` | Body text node with punctuation checking |
+| `src/wordformat/rules/caption.py` | Caption formatting and numbering check/apply |
+| `src/wordformat/rules/references.py` | References title and entry nodes |
+| `src/wordformat/rules/acknowledgement.py` | Acknowledgements title and content nodes |
+| `src/wordformat/rules/object.py` | FigureImage and TableObject nodes |
+| `src/wordformat/style/diff.py` | `CharacterStyle` and `ParagraphStyle` with diff/apply logic |
+| `src/wordformat/style/defs.py` | Enums: `FontSize`, `FontColor`, `FontName`, `Alignment`, `LineSpacingRule`, etc. |
+| `src/wordformat/config/models.py` | `NodeConfigRoot` (dict subclass with dot access + `collect_style_configs()`) |
+| `src/wordformat/config/loader.py` | `LazyConfig` (normal class, not singleton) for YAML loading |
+| `src/wordformat/config/dotdict.py` | `DotDict` (dict with dot access), `BASE_FORMAT` defaults, `deep_merge` |
+| `src/wordformat/structure/registry.py` | `@register` decorator, `export_defaults()` — auto-registration of FormatNode subclasses |
+| `src/wordformat/structure/settings.py` | `CATEGORY_TO_CLASS` and `LEVEL_MAP` (auto-built from registry) |
 | `src/wordformat/numbering.py` | Heading auto-numbering (clear manual + apply Word numbering) |
 | `src/wordformat/tree.py` | `Tree`, `TreeNode`, `Stack` data structures |
-| `src/wordformat/word_structure/` | Tree building from flat JSON (`DocumentBuilder`, `DocumentTreeBuilder`, `node_factory`, `settings`) |
-| `src/wordformat/api/__init__.py` | FastAPI app (unusual: defined in `__init__.py`, not a separate module). 3 main endpoints + download. Serves Vue SPA from `api/static/`. |
+| `src/wordformat/api/__init__.py` | FastAPI app. Serves Vue SPA from `api/static/`. |
 | `src/wordformat/agent/` | `onnx_infer.py` (ONNX model inference), `message.py` (messaging) |
 | `src/wordformat/settings.py` | Global config: `BASE_DIR`, `SERVER_HOST`, model/env settings |
-| `tests/` | 5 test files with ~850 tests, ~93% coverage |
+| `tests/` | 21 test files mirroring src/ structure, 955 tests, 87% coverage |
 | `presets/` | Per-university preset YAML configs |
 | `wordformat-skill/` | AI assistant skill definition for Claude Code integration |
 
 ## FormatNode subclass pattern
 
-Each `FormatNode` subclass declares three class-level attributes and implements `_base(doc, p, r)`:
+Each `FormatNode` subclass declares class-level attributes and optionally implements `_base(doc, p, r)`:
 
-- `NODE_TYPE` — dot-separated path used by `TreeNode.load_config()` to extract dict config from the full YAML tree
-- `CONFIG_MODEL` — Pydantic model class for type-safe config access via `self.pydantic_config`
-- `CONFIG_PATH` — dot-separated path used by `FormatNode.load_config()` to resolve the Pydantic config object via `getattr`
+- `NODE_TYPE` — dot-separated YAML path (e.g. `"abstract.chinese.chinese_title"`)
+- `NODE_LABEL` — Chinese label for comment annotations
+- `DEFAULTS` — dict of default formatting values, merged with YAML overrides at load time
+- `RULES` — optional dict of `rule_name → handler_method` for config-gated business rules
+- `DEFAULT_RULES` — always-on rules (paragraph_style + character_style)
 
-When adding a new node type, register it in `word_structure/settings.py` (`CATEGORY_TO_CLASS` and `LEVEL_MAP`) and in `rules/__init__.py`.
+Use `@register("category_name", level=N)` decorator to auto-register in `CATEGORY_TO_CLASS` and `LEVEL_MAP`. Import the class in `rules/__init__.py`.
 
 ## Test conventions
 
-- Tests are organized by module: `test_core.py` (tree, stack, numbering, utils, DocxBase), `test_style.py` (style enums, CharacterStyle, ParagraphStyle), `test_rules.py` (all FormatNode subclasses), `test_integration.py` (config, cross-module, CLI, API), `test_coverage_boost.py` (edge case coverage).
-- Known bugs are documented in tests with `"""BUG: ..."""` docstrings — the test asserts the current (buggy) behavior. When fixing, update the test to assert the correct behavior.
-- Tests use `python-docx` `Document()` to create in-memory test docs rather than real .docx files. Patches are applied via `unittest.mock.patch` at the module level (e.g. `patch("wordformat.base.onnx_batch_infer", ...)`).
-- `conftest.py` provides shared fixtures: `doc` (in-memory Document), a mock ONNX session, and config reset between tests.
+- Tests are organized in `tests/` directory mirroring `src/wordformat/` structure (e.g. `tests/rules/` ↔ `src/wordformat/rules/`).
+- Tests use `python-docx` `Document()` to create in-memory test docs. Patches via `unittest.mock.patch`.
+- `conftest.py` provides shared fixtures: `doc`, `config_path`, `root_config`, `temp_docx`, `temp_json`, and `reset_config`/`reset_style_warning` autouse fixtures.
 
 ## Config model structure
 
-The YAML config is validated by `NodeConfigRoot` (in `datamodel.py`), which wraps:
-- `abstract: AbstractConfig` → `chinese: AbstractChineseConfig`, `english: AbstractEnglishConfig`
-- `headings: HeadingsConfig` → `level_1/level_2/level_3: HeadingLevelConfig`
-- `body_text: GlobalFormatConfig`
-- `references: GlobalFormatConfig`
-- `captions: dict[str, GlobalFormatConfig]`
-- `numbering: NumberingConfig`
-- `style_checks_warning: WarningFieldConfig`
-- `replace: dict[str, str]`
-
-`GlobalFormatConfig` carries all glyph + paragraph format fields (font, size, color, bold, italic, alignment, spacing, indent, etc.). `AbstractChineseConfig` and `AbstractEnglishConfig` each hold a `title` and `content` sub-config (both `GlobalFormatConfig` subclasses), enabling `AbstractTitleContentCN`/`AbstractTitleContentEN` to apply different styles to title-runs vs content-runs within the same paragraph.
+Config is defined by `DEFAULTS` dict on each `FormatNode` subclass. YAML overrides are merged at load time. `NodeConfigRoot` (dict subclass in `config/models.py`) provides dot-notation access and `collect_style_configs()`. Use `wordf config -o config.yaml` to export a complete config template with all defaults. `BASE_FORMAT` in `config/dotdict.py` provides shared global format defaults.

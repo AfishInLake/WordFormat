@@ -19,7 +19,7 @@ from wordformat.style.reader import (
     paragraph_get_line_spacing, paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
     run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent, _get_style_spacing,
+    run_get_font_underline, GetIndent,
 )
 from wordformat.style.writer import (
     run_set_font_name, set_paragraph_space_before_by_lines,
@@ -86,9 +86,9 @@ class TestFontSize:
     def test_label_map(self, label, expected):
         assert FontSize(label).rel_value == expected
 
-    def test_bare_number_rel_value_is_string(self):
-        """No unit -> extract_unit fails -> rel_value stays as raw string."""
-        assert FontSize("15").rel_value == "15"
+    def test_bare_number_rel_value_is_float(self):
+        """裸数字（无单位）→ float 转换。"""
+        assert FontSize("15").rel_value == 15.0
 
     def test_base_set(self, doc):
         run = doc.add_paragraph().add_run("x")

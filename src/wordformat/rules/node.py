@@ -3,17 +3,14 @@
 # @Author  : afish
 # @File    : node.py
 from collections.abc import Sequence
-from pathlib import Path
-from typing import Any, Dict, Generic, Optional, Type, TypeVar
+from typing import Any
 
-import yaml
 from docx.document import Document
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
-from pydantic import ValidationError
 
-from wordformat.config.models import BaseModel, NodeConfigRoot
+from wordformat.config.dotdict import DotDict, deep_merge
 
 
 class TreeNode:
@@ -23,42 +20,33 @@ class TreeNode:
 
     def __init__(self, value: Any):
         self.value = value
-        self.__config = {}
+        self._config = DotDict()
         self.children: list[TreeNode] = []
         self.fingerprint = None
 
     @property
     def config(self):
-        return self.__config
+        return self._config
 
-    def load_config(self, full_config: dict | Any) -> None:
-        """
-        根据 cls.NODE_TYPE（点分路径）从 full_config 中提取子配置。
-
-        例如：
-          NODE_TYPE = 'abstract.keywords.chinese'
-          则从 full_config['abstract']['keywords']['chinese'] 提取
-        """
-        if not isinstance(full_config, dict):
-            self.__config = {}
-            return
-
-        # 解析路径：支持 'a.b.c' 或直接 'top_level_key'
+    def load_config(self, full_config: dict) -> None:
+        """根据 NODE_TYPE 从 full_config 中提取子配置，与 DEFAULTS 合并。"""
+        # 沿 NODE_TYPE 路径逐级查找 YAML 配置
         path_parts = self.NODE_TYPE.split(".")
-
+        yaml_node: dict = {}
         current = full_config
         try:
             for part in path_parts:
                 if not isinstance(current, dict):
-                    raise KeyError(
-                        f"Expected dict at path {'.'.join(path_parts[: path_parts.index(part) + 1])}"
-                    )
+                    raise KeyError
                 current = current[part]
-            # 如果最终值不是 dict，也允许（但通常应是 dict）
-            self.__config = current if isinstance(current, dict) else {}
+            yaml_node = current if isinstance(current, dict) else {}
         except (KeyError, TypeError):
-            # 路径不存在或结构不匹配，返回空配置
-            self.__config = {}
+            yaml_node = {}
+
+        # 合并：DEFAULTS 为底，YAML 覆盖
+        defaults = getattr(type(self), "DEFAULTS", {})
+        merged = deep_merge(defaults, yaml_node) if defaults else yaml_node
+        self._config = DotDict(merged)
 
     def add_child(self, child_value: Any) -> "TreeNode":
         """添加一个子节点，并返回该子节点（便于链式调用）"""
@@ -74,22 +62,19 @@ class TreeNode:
         return f"TreeNode({self.value})"
 
 
-T = TypeVar("T", bound=BaseModel)
-
-
-class FormatNode(TreeNode, Generic[T]):
+class FormatNode(TreeNode):
     """所有格式检查节点的基类"""
 
-    CONFIG_MODEL: Type[T]
+    # 子类定义的默认值，load_config 时与 YAML 合并
+    DEFAULTS: dict = {}
 
     # 全局错误统计（类变量，一次 check 周期内累加）
-    _error_stats: dict[str, int] = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
+    _error_stats: dict[str, int] = {"total": 0, "错误": 0, "提醒": 0}
 
     # 中文标签，用作批注的 [位置] 部分
     NODE_LABEL: str = ""
 
     # 子类声明：规则名 → handler 方法名，框架自动按 config 启用/禁用调度
-    # 只放需要 YAML 配置控制的业务规则。段落/字符格式由 DEFAULT_RULES 自动处理
     RULES: dict[str, str] = {}
 
     # 框架自动注入的默认规则，不依赖配置，所有节点默认启用
@@ -105,61 +90,16 @@ class FormatNode(TreeNode, Generic[T]):
         paragraph: Paragraph = None,
         expected_rule: dict[str, Any] = None,
     ):
-        super().__init__(value=value)  # value 就是 paragraph
+        super().__init__(value=value)
         self.level: int | float = level
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
-        self._pydantic_config: Optional[T] = None  # Pydantic配置对象
-        self._comment_texts: list[
-            tuple
-        ] = []  # (runs, text) 缓冲，flush 时按 runs 分组合并
+        self._comment_texts: list[tuple] = []
 
     @property
-    def pydantic_config(self) -> T:
-        """只读属性：获取类型安全的Pydantic配置对象"""
-        if self._pydantic_config is None:
-            raise ValueError(f"节点 {self.NODE_TYPE} 尚未加载Pydantic配置")
-        return self._pydantic_config
-
-    @classmethod
-    def load_yaml_config(cls, config_path: str | Path) -> Dict[str, Any]:
-        """加载并解析YAML配置文件"""
-        try:
-            with open(config_path, encoding="utf-8") as f:
-                raw_config = yaml.safe_load(f)
-            # 使用根模型验证整个配置结构
-            from wordformat.config.models import NodeConfigRoot
-
-            root_config = NodeConfigRoot(**raw_config)
-            return root_config.model_dump()
-        except FileNotFoundError as e:
-            raise FileNotFoundError(f"配置文件 {config_path} 不存在") from e
-        except ValidationError as e:
-            raise ValueError(f"配置文件格式错误: {e}") from e
-        except Exception as e:
-            raise RuntimeError(f"加载配置失败: {e}") from e
-
-    def load_config(self, full_config: NodeConfigRoot):
-        """重写父类方法：同时加载字典配置和Pydantic配置。
-
-        通过 CONFIG_PATH 属性声明配置路径，沿路径逐级 getattr 解析。
-        子类只需设置 CONFIG_PATH = "abstract.chinese.chinese_title" 即可，
-        无需在此方法中维护硬编码映射表。
-        """
-        # 1. 先执行父类的字典配置加载（兼容旧逻辑）
-        super().load_config(full_config)
-
-        # 2. 有自定义 load_config 的子类（BaseHeadingNode、BaseKeywordsNode）
-        #    会重写此方法，不会执行到这里
-        config_path = getattr(self, "CONFIG_PATH", None)
-        if config_path is None:
-            return
-
-        # 3. 沿 CONFIG_PATH 逐级 getattr
-        obj = full_config
-        for part in config_path.split("."):
-            obj = getattr(obj, part)
-        self._pydantic_config = obj
+    def pydantic_config(self) -> "DotDict":
+        """返回当前节点的合并配置（DotDict）。"""
+        return self._config
 
     def update_paragraph(self, paragraph: Paragraph | dict):
         self.paragraph = paragraph
@@ -181,7 +121,7 @@ class FormatNode(TreeNode, Generic[T]):
         if not all_rules:
             return
 
-        rules_config = getattr(self._pydantic_config, "rules", None)
+        rules_config = getattr(self.pydantic_config, "rules", None)
 
         # 双向验证（仅检查自定义 RULES）
         if self.RULES:
@@ -189,7 +129,11 @@ class FormatNode(TreeNode, Generic[T]):
                 logger.debug(f"[{self.NODE_TYPE}] RULES 已声明但配置无 rules 节点")
             else:
                 declared_rules = set(self.RULES.keys())
-                config_rules = set(type(rules_config).model_fields.keys())
+                config_rules = (
+                    set(rules_config.keys())
+                    if isinstance(rules_config, dict)
+                    else set()
+                )
                 orphan_handlers = declared_rules - config_rules
                 orphan_configs = config_rules - declared_rules
                 if orphan_handlers:
@@ -222,13 +166,13 @@ class FormatNode(TreeNode, Generic[T]):
     # ------------------------------------------------------------------
 
     def _handle_paragraph_style(self, doc, rule_cfg, p: bool):
-        """默认段落样式检查/应用。配置需继承 GlobalFormatConfig。"""
+        """默认段落样式检查/应用。配置需包含 alignment 等格式字段。"""
         if self.paragraph is None or not self.paragraph.runs:
             return
         from wordformat.style.diff import ParagraphStyle
 
         cfg = self.pydantic_config
-        if not hasattr(cfg, "alignment"):
+        if cfg.alignment is None:
             return
         ps = ParagraphStyle.from_config(cfg)
         if p:
@@ -243,13 +187,13 @@ class FormatNode(TreeNode, Generic[T]):
             )
 
     def _handle_character_style(self, doc, rule_cfg, p: bool):
-        """默认字符样式检查/应用。配置需继承 GlobalFormatConfig。"""
+        """默认字符样式检查/应用。配置需包含 chinese_font_name 等格式字段。"""
         if not self.paragraph.runs:
             return
         from wordformat.style.diff import CharacterStyle
 
         cfg = self.pydantic_config
-        if not hasattr(cfg, "chinese_font_name"):
+        if cfg.chinese_font_name is None:
             return
         cstyle = CharacterStyle(
             font_name_cn=cfg.chinese_font_name,
@@ -310,30 +254,26 @@ class FormatNode(TreeNode, Generic[T]):
         return groups
 
     def _write_comment_groups(self, doc, groups) -> None:
-        """将分组后的批注写入文档并更新统计。"""
-        from wordformat.style.comments import SEVERITY_ORDER, get_severity
+        """将分组后的批注写入文档并更新统计。
+
+        每条批注按行拆分，`位置-问题类型：` 按严重度上色，正文保持黑色。
+        """
+        from wordformat.style.comments import (
+            SEVERITY_ORDER,
+            add_styled_comment,
+            get_severity,
+            split_comment_line,
+        )
 
         for runs, texts in groups.values():
-            merged = "\n".join(texts)
-            doc.add_comment(
-                runs=runs, text=merged, author="Wordformat", initials="afish"
-            )
-            # 提醒级批注用蓝色字体
+            paragraphs = [split_comment_line(t) for t in texts]
+            add_styled_comment(doc, runs, paragraphs)
             max_sev = "提醒"
             for t in texts:
                 sev = get_severity(t)
                 if SEVERITY_ORDER.get(sev, 3) < SEVERITY_ORDER.get(max_sev, 3):
                     max_sev = sev
-            if max_sev == "提醒":
-                _color_last_comment(doc, "0000FF")
             FormatNode._error_stats["total"] += 1
-            FormatNode._error_stats[max_sev] = (
-                FormatNode._error_stats.get(max_sev, 0) + 1
-            )
-            for t in texts:
-                sev = get_severity(t)
-                if SEVERITY_ORDER.get(sev, 3) < SEVERITY_ORDER.get(max_sev, 3):
-                    max_sev = sev
             FormatNode._error_stats[max_sev] = (
                 FormatNode._error_stats.get(max_sev, 0) + 1
             )
@@ -341,7 +281,7 @@ class FormatNode(TreeNode, Generic[T]):
     @classmethod
     def reset_stats(cls) -> None:
         """重置全局错误统计。"""
-        cls._error_stats = {"total": 0, "严重": 0, "一般": 0, "提醒": 0}
+        cls._error_stats = {"total": 0, "错误": 0, "提醒": 0}
 
     def check_format(self, doc: Document):
         """格式检查：先执行样式检查，再自动调度业务规则"""
@@ -429,40 +369,3 @@ class FormatNode(TreeNode, Generic[T]):
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         """追加批注到缓冲区，按锚点 run 分组，flush 时同组合并为一条。"""
         self._collect_comment(runs, text)
-
-
-def _color_last_comment(doc, hex_color: str) -> None:
-    """将文档最后一条批注的文字颜色设为指定色（如 0000FF 蓝色）。"""
-    try:
-        comments = doc._part.comments
-        if comments is None:
-            return
-        last = comments[-1]
-        for p in last._element.findall(
-            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
-        ):
-            for r in p.findall(
-                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
-            ):
-                rPr = r.find(
-                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rPr"
-                )
-                if rPr is None:
-                    from docx.oxml import OxmlElement
-
-                    rPr = OxmlElement("w:rPr")
-                    r.insert(0, rPr)
-                color = rPr.find(
-                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}color"
-                )
-                if color is None:
-                    from docx.oxml import OxmlElement
-
-                    color = OxmlElement("w:color")
-                    rPr.append(color)
-                color.set(
-                    "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val",
-                    hex_color,
-                )
-    except Exception:
-        pass

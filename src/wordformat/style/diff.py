@@ -2,6 +2,7 @@
 # @Time    : 2026/1/12 10:46
 # @Author  : afish
 # @File    : style.py
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,14 +11,18 @@ from docx.text.run import Run
 from loguru import logger
 
 from wordformat.config.loader import get_config
-from wordformat.config.models import WarningFieldConfig
 from wordformat.style.reader import (
+    run_get_font_bold,
     run_get_font_color,
+    run_get_font_italic,
     run_get_font_name,
+    run_get_font_name_en,
     run_get_font_size_pt,
+    run_get_font_underline,
 )
 from wordformat.utils import has_chinese
 
+from .comments import CHAR_DIFF_LABELS, PARA_DIFF_LABELS
 from .defs import (
     Alignment,
     BuiltInStyle,
@@ -33,23 +38,54 @@ from .defs import (
     SpaceBefore,
 )
 
-style_checks_warning: WarningFieldConfig | None = None
+
+@dataclass
+class WarningConfig:
+    """Warning toggle; field name = diff_type.  Overridable via YAML style_checks_warning."""
+
+    bold: bool = True
+    italic: bool = True
+    underline: bool = True
+    font_size: bool = True
+    font_name_cn: bool = False
+    font_name_en: bool = False
+    font_color: bool = False
+
+    alignment: bool = True
+    space_before: bool = True
+    space_after: bool = True
+    line_spacing: bool = True
+    line_spacing_rule: bool = True
+    left_indent: bool = True
+    right_indent: bool = True
+    first_line_indent: bool = True
+    builtin_style_name: bool = True
 
 
-def _char_warning_enabled(diff_type: str) -> bool:
-    """判断某个字符 diff_type 是否在 WarningFieldConfig 中开启。"""
-    if style_checks_warning is None:
-        return True
-    mapping = {
-        "bold": style_checks_warning.bold,
-        "italic": style_checks_warning.italic,
-        "underline": style_checks_warning.underline,
-        "font_size": style_checks_warning.font_size,
-        "font_color": style_checks_warning.font_color,
-        "font_name_cn": style_checks_warning.font_name,
-        "font_name_en": style_checks_warning.font_name,
-    }
-    return mapping.get(diff_type, True)
+_warnings: WarningConfig | None = None
+
+
+# 旧 key → 新 key 映射，兼容历史 YAML 配置
+_WARNING_KEY_MAP = {
+    "font_name": "font_name_cn",
+    "line_spacingrule": "line_spacing_rule",
+}
+
+
+def _load_warnings() -> WarningConfig:
+    global _warnings
+    if _warnings is not None:
+        return _warnings
+    try:
+        cfg = get_config().get("style_checks_warning", {})
+    except RuntimeError:
+        cfg = {}
+    # 兼容旧 key 名
+    for old, new in _WARNING_KEY_MAP.items():
+        if old in cfg and new not in cfg:
+            cfg[new] = cfg.pop(old)
+    _warnings = WarningConfig(**{**dataclasses.asdict(WarningConfig()), **cfg})
+    return _warnings
 
 
 def _pt_to_label(pt: float) -> str:
@@ -70,22 +106,12 @@ def _format_char_value(diff_type: str, value) -> str:
     return str(value)
 
 
-_LINE_SPACING_LABELS = {
-    0: "单倍行距",
-    1: "1.5倍行距",
-    2: "2倍行距",
-    3: "最小值",
-    4: "固定值",
-    5: "多倍行距",
-}
+def _line_spacing_label(val) -> str:
+    return LineSpacingRule._LABEL_MAP_REVERSE.get(val, str(val))
 
-_ALIGNMENT_LABELS = {
-    0: "左对齐",
-    1: "居中对齐",
-    2: "右对齐",
-    3: "两端对齐",
-    4: "分散对齐",
-}
+
+def _alignment_label(val) -> str:
+    return Alignment._LABEL_MAP_REVERSE.get(val, str(val))
 
 
 def _format_para_value(diff_type: str, value) -> str:
@@ -94,12 +120,12 @@ def _format_para_value(diff_type: str, value) -> str:
         return "未设置"
     if diff_type == "line_spacing_rule":
         try:
-            return _LINE_SPACING_LABELS.get(int(value), str(value))
+            return _line_spacing_label(int(value))
         except (ValueError, TypeError):
             return str(value)
     if diff_type == "alignment":
         try:
-            return _ALIGNMENT_LABELS.get(int(value), str(value))
+            return _alignment_label(int(value))
         except (ValueError, TypeError):
             return str(value)
     if diff_type == "line_spacing":
@@ -107,24 +133,6 @@ def _format_para_value(diff_type: str, value) -> str:
             return f"{value}倍"
         return str(value)
     return str(value)
-
-
-def _para_warning_enabled(diff_type: str) -> bool:
-    """判断某个段落 diff_type 是否在 WarningFieldConfig 中开启。"""
-    if style_checks_warning is None:
-        return True
-    mapping = {
-        "alignment": style_checks_warning.alignment,
-        "space_before": style_checks_warning.space_before,
-        "space_after": style_checks_warning.space_after,
-        "line_spacing": style_checks_warning.line_spacing,
-        "line_spacing_rule": style_checks_warning.line_spacingrule,
-        "first_line_indent": style_checks_warning.first_line_indent,
-        "left_indent": style_checks_warning.left_indent,
-        "right_indent": style_checks_warning.right_indent,
-        "builtin_style_name": style_checks_warning.builtin_style_name,
-    }
-    return mapping.get(diff_type, True)
 
 
 @dataclass
@@ -182,8 +190,6 @@ class CharacterStyle:
         self.bold: bool = bold
         self.italic: bool = italic
         self.underline: bool = underline
-        if globals()["style_checks_warning"] is None:
-            globals()["style_checks_warning"] = get_config().style_checks_warning
 
     def diff_from_run(self, run: Run) -> list[DIFFResult]:  # noqa c901
         """
@@ -192,8 +198,8 @@ class CharacterStyle:
 
         diffs = []
 
-        # 1. 加粗（None = 继承，视为不加粗）
-        bold = bool(run.font.bold)
+        # 1. 加粗（沿继承链：直接→字符样式→段落样式→docDefaults）
+        bold = run_get_font_bold(run)
         if bold != self.bold:
             diffs.append(
                 DIFFResult(
@@ -204,8 +210,8 @@ class CharacterStyle:
                     1,
                 )
             )
-        # 2. 斜体（None = 继承，视为非斜体）
-        italic = bool(run.font.italic)
+        # 2. 斜体（沿继承链解析）
+        italic = run_get_font_italic(run)
         if italic != self.italic:
             diffs.append(
                 DIFFResult(
@@ -217,8 +223,8 @@ class CharacterStyle:
                 )
             )
 
-        # 3. 下划线（None = 继承，视为无下划线）
-        underline = bool(run.font.underline)
+        # 3. 下划线（沿继承链解析）
+        underline = run_get_font_underline(run)
         if underline != self.underline:
             diffs.append(
                 DIFFResult(
@@ -273,8 +279,8 @@ class CharacterStyle:
                     1,
                 )
             )
-        # 7. 非东亚字体（None = 继承，视为空）
-        ascii_font = run.font.name or ""
+        # 7. 非东亚字体（沿继承链，含主题字体；未设置视为空）
+        ascii_font = run_get_font_name_en(run) or ""
         if str(ascii_font).lower() != str(self.font_name_en).lower():
             diffs.append(
                 DIFFResult(
@@ -328,15 +334,18 @@ class CharacterStyle:
         return result
 
     @staticmethod
-    def to_string(value: list[DIFFResult], target: str = "") -> str:
+    def to_string(
+        value: list[DIFFResult], target: str = "", warnings: WarningConfig | None = None
+    ) -> str:
+        if warnings is None:
+            warnings = _load_warnings()
         """将 DIFFResult 列表转为标准格式批注文本。"""
-        from .comments import CHAR_DIFF_LABELS, format_comment
+        from .comments import format_comment
 
         t = []
         for diff in value:
-            if style_checks_warning is not None:
-                if not _char_warning_enabled(diff.diff_type):
-                    continue
+            if not getattr(warnings, diff.diff_type, True):
+                continue
             prop = CHAR_DIFF_LABELS.get(diff.diff_type, diff.diff_type)
             actual = _format_char_value(diff.diff_type, diff.current_value)
             standard = _format_char_value(diff.diff_type, diff.expected_value)
@@ -387,8 +396,6 @@ class ParagraphStyle:
         self.left_indent: LeftIndent = LeftIndent(left_indent)
         self.right_indent: RightIndent = RightIndent(right_indent)
         self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
-        if globals()["style_checks_warning"] is None:
-            globals()["style_checks_warning"] = get_config().style_checks_warning
 
     def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
         """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果"""
@@ -567,15 +574,18 @@ class ParagraphStyle:
         return sorted(diffs, key=lambda x: x.level)
 
     @staticmethod
-    def to_string(value: list[DIFFResult], target: str = "") -> str:
+    def to_string(
+        value: list[DIFFResult], target: str = "", warnings: WarningConfig | None = None
+    ) -> str:
+        if warnings is None:
+            warnings = _load_warnings()
         """将 DIFFResult 列表转为标准格式批注文本。"""
-        from .comments import PARA_DIFF_LABELS, format_comment
+        from .comments import format_comment
 
         t = []
         for diff in value:
-            if style_checks_warning is not None:
-                if not _para_warning_enabled(diff.diff_type):
-                    continue
+            if not getattr(warnings, diff.diff_type, True):
+                continue
             prop = PARA_DIFF_LABELS.get(diff.diff_type, diff.diff_type)
             actual = _format_para_value(diff.diff_type, diff.current_value)
             standard = _format_para_value(diff.diff_type, diff.expected_value)

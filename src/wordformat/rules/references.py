@@ -3,22 +3,36 @@
 # @Author  : afish
 # @File    : references.py
 
-from wordformat.config.models import ReferencesContentConfig, ReferencesTitleConfig
+from wordformat.config.dotdict import BASE_FORMAT
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 
 
-class References(FormatNode[ReferencesTitleConfig]):
+@register("references_title", level=1)
+class References(FormatNode):
     """参考文献节点"""
 
-    NODE_TYPE = "references"
+    NODE_TYPE = "references.title"
     NODE_LABEL = "参考文献标题"
-    CONFIG_MODEL = ReferencesTitleConfig
-    CONFIG_PATH = "references.title"
+    DEFAULTS = {
+        **BASE_FORMAT,
+        "alignment": "居中对齐",
+        "first_line_indent": "0字符",
+        "chinese_font_name": "黑体",
+        "font_size": "三号",
+        "bold": True,
+    }
 
 
-class ReferenceEntry(FormatNode[ReferencesContentConfig]):
+@register("references_content")
+class ReferenceEntry(FormatNode):
     """参考文献条目节点"""
 
+    NODE_TYPE = "references.content"
     NODE_LABEL = "参考文献条目"
-    CONFIG_MODEL = ReferencesContentConfig
-    CONFIG_PATH = "references.content"
+    DEFAULTS = {
+        **BASE_FORMAT,
+        "first_line_indent": "0字符",
+        "chinese_font_name": "宋体",
+        "font_size": "五号",
+    }

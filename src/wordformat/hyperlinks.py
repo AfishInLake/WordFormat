@@ -232,10 +232,10 @@ def _wrap_citations_in_hyperlinks(paragraph, bookmark_names: list):  # noqa: C90
             rStyle.set(qn("w:val"), "Hyperlink")
             rPr.insert(0, rStyle)
 
-        # 创建 <w:hyperlink> 包裹 run
+        # 创建 <w:hyperlink> 包裹 run（w:hyperlink → CT_Hyperlink，用其类型化属性）
         hyperlink = OxmlElement("w:hyperlink")
-        hyperlink.set(qn("w:anchor"), anchor)
-        hyperlink.set(qn("w:history"), "1")
+        hyperlink.anchor = anchor
+        hyperlink.history = True
         r_elem.addprevious(hyperlink)
         hyperlink.append(r_elem)
 

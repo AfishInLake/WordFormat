@@ -19,7 +19,7 @@ from wordformat.style.reader import (
     paragraph_get_line_spacing, paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
     run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent, _get_style_spacing,
+    run_get_font_underline, GetIndent,
 )
 from wordformat.style.writer import (
     run_set_font_name, set_paragraph_space_before_by_lines,
@@ -67,12 +67,12 @@ def mock_warning_off():
 
 def _set_warning(w):
     import wordformat.style.diff as m
-    m.style_checks_warning = w
+    m._warnings = w
 
 
 def _clear_warning():
     import wordformat.style.diff as m
-    m.__dict__.pop("style_checks_warning", None)
+    m._warnings = m._load_warnings()
 
 
 # ===========================================================================
@@ -337,20 +337,17 @@ class TestCharacterStyleInitFromConfig:
     """Cover line 94: CharacterStyle.__init__ with style_checks_warning from get_config()"""
 
     def test_init_loads_warning_from_config(self, config_path):
-        """When style_checks_warning is None, __init__ calls get_config() (line 94)"""
+        """从配置加载警告设置。"""
         from wordformat.config.loader import init_config, clear_config
         import wordformat.style.diff as m
 
-        # Ensure style_checks_warning is None so __init__ triggers get_config()
-        m.style_checks_warning = None
         init_config(config_path)
         try:
-            cs = CharacterStyle()
-            # After init, style_checks_warning should have been loaded
-            assert m.style_checks_warning is not None
+            w = m._load_warnings()
+            assert w.bold is True
         finally:
             clear_config()
-            m.style_checks_warning = None
+            m._warnings = m._load_warnings()
 
 
 
@@ -443,10 +440,12 @@ class TestCharacterStyleApplyToRunFontNameCn:
 class TestCharacterStyleToStringNone:
     """Cover line 244: CharacterStyle.to_string with style_checks_warning is None"""
 
-    def test_to_string_warning_none(self):
-        """style_checks_warning=None 时返回所有 diff 的标准格式文本。"""
+    def test_to_string_all_warnings_enabled(self):
+        """warnings 全开时返回所有 diff 的标准格式文本。"""
+        import dataclasses
         import wordformat.style.diff as m
-        m.style_checks_warning = None
+
+        m._warnings = m.WarningConfig(**{f.name: True for f in dataclasses.fields(m.WarningConfig)})
         diffs = [
             DIFFResult(diff_type="bold", current_value=True, expected_value=False),
             DIFFResult(diff_type="italic", current_value=True, expected_value=False),
@@ -508,13 +507,15 @@ class TestCharacterStyleToStringVariousFilters:
 
 
 
-class TestParagraphStyleToStringNone:
-    """Cover line 478: ParagraphStyle.to_string with style_checks_warning is None"""
+class TestParagraphStyleToStringAllEnabled:
+    """ParagraphStyle.to_string — warnings 全开时不过滤任何 diff。"""
 
-    def test_to_string_warning_none(self):
-        """style_checks_warning=None 时返回所有 diff 的标准格式文本。"""
+    def test_to_string_all_warnings_enabled(self):
+        """warnings 全开时返回所有 diff 的标准格式文本。"""
+        import dataclasses
         import wordformat.style.diff as m
-        m.style_checks_warning = None
+
+        m._warnings = m.WarningConfig(**{f.name: True for f in dataclasses.fields(m.WarningConfig)})
         diffs = [
             DIFFResult(diff_type="alignment", current_value="左对齐", expected_value="居中对齐"),
             DIFFResult(diff_type="space_before", current_value="0行", expected_value="0.5行"),

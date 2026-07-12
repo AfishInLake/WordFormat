@@ -16,7 +16,6 @@ import numpy as np
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
-from pydantic import ValidationError
 from fastapi.testclient import TestClient
 
 from wordformat.cli import validate_file, main
@@ -26,12 +25,9 @@ from wordformat.config.loader import (
     init_config,
     get_config,
     clear_config,
+    load_config,
 )
-from wordformat.config.models import (
-    KeywordCountRule,
-    GlobalFormatConfig,
-    NodeConfigRoot,
-)
+from wordformat.config.models import NodeConfigRoot
 from wordformat.agent.message import MessageManager
 from wordformat.agent.onnx_infer import (
     _get_best_onnx_providers,
@@ -56,28 +52,26 @@ apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_
 # ==================== (a) Config 模块集成测试 ====================
 
 
-class TestLazyConfigLifecycle:
-    """LazyConfig 完整生命周期：init -> get -> clear -> 重复"""
+class TestConfigLifecycle:
+    """load_config -> get_config 基本流程。"""
 
-    def test_init_then_get_loads_config(self, config_path):
-        init_config(config_path)
+    def test_load_then_get(self, config_path):
+        load_config(config_path)
         cfg = get_config()
-        assert isinstance(cfg, NodeConfigRoot)
-        assert cfg.global_format is not None
+        assert isinstance(cfg, dict)
+        assert "global_format" in cfg
 
-    def test_get_without_init_raises(self):
+    def test_get_without_load_raises(self):
         clear_config()
-        with pytest.raises(ConfigNotLoadedError):
+        with pytest.raises(RuntimeError):
             get_config()
 
-    def test_clear_resets_all_state(self, config_path):
-        init_config(config_path)
-        get_config()
+    def test_clear_resets_state(self, config_path):
+        load_config(config_path)
+        assert get_config() is not None
         clear_config()
-        lc = LazyConfig()
-        assert lc._loaded is False
-        assert lc._config is None
-        assert lc._config_path is None
+        with pytest.raises(RuntimeError):
+            get_config()
 
     def test_reinit_after_clear(self, config_path):
         init_config(config_path)
@@ -85,73 +79,37 @@ class TestLazyConfigLifecycle:
         clear_config()
         init_config(config_path)
         cfg = get_config()
-        assert isinstance(cfg, NodeConfigRoot)
+        assert isinstance(cfg, dict)
 
-    def test_singleton_identity(self):
+    def test_independent_instances(self):
+        """多个 LazyConfig 实例相互独立。"""
         a = LazyConfig()
         b = LazyConfig()
-        assert a is b
+        assert a is not b
 
-    def test_singleton_thread_safety(self):
-        """多线程同时创建实例应得到同一个对象"""
+    def test_thread_safe_independent_instances(self):
+        """多线程各自创建独立实例无竞争。"""
         results = []
         barrier = threading.Barrier(10)
 
         def create():
             barrier.wait()
-            results.append(LazyConfig())
+            lc = LazyConfig()
+            lc._config = {}  # 直接设内部状态，不触发文件加载
+            results.append(lc)
 
         threads = [threading.Thread(target=create) for _ in range(10)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        assert all(r is results[0] for r in results)
+        # 所有实例独立
+        assert len(set(id(r) for r in results)) == 10
 
 
 
 # ==================== (b) DataModel 验证测试 ====================
 
-
-class TestDataModelValidation:
-    """验证 datamodel 中已知的验证缺陷"""
-
-    def test_keywords_count_positive(self):
-        """count_min/count_max 必须大于 0"""
-        with pytest.raises(ValueError):
-            KeywordCountRule(count_min=0)
-        with pytest.raises(ValueError):
-            KeywordCountRule(count_max=-1)
-
-    def test_keywords_count_min_le_max(self):
-        """count_min 不应大于 count_max"""
-        with pytest.raises(ValidationError):
-            KeywordCountRule(count_min=10, count_max=3)
-
-    def test_font_size_range_validation(self):
-        """字号数值验证：负数应触发 ValidationError"""
-        with pytest.raises(ValidationError):
-            GlobalFormatConfig(font_size=-5.0)
-
-    def test_font_size_accepts_any_number(self):
-        """负数字号应触发 ValidationError"""
-        with pytest.raises(ValidationError):
-            GlobalFormatConfig(font_size=-999.0)
-
-    def test_font_color_validation(self):
-        """font_color 空字符串应验证失败"""
-        with pytest.raises(ValueError):
-            GlobalFormatConfig(font_color="")
-
-    def test_font_color_accepts_any_string(self):
-        """当前行为：任意字符串均可通过"""
-        cfg = GlobalFormatConfig(font_color="随便写")
-        assert cfg.font_color == "随便写"
-
-    def test_font_size_accepts_literal(self):
-        """字号支持中文字号字符串"""
-        cfg = GlobalFormatConfig(font_size="小四")
-        assert cfg.font_size == "小四"
 
 
 
@@ -1134,20 +1092,6 @@ class TestKeywordsCNBase:
             node.load_config(config_dict)
         return node
 
-    def test_config_none_raises(self):
-        """未加载配置时 check_format 抛出 ValueError。"""
-        from wordformat.rules.keywords import KeywordsCN
-        node = KeywordsCN(
-            value={"category": "abstract.keywords.chinese", "fingerprint": "fp"},
-            level=1,
-        )
-        doc = Document()
-        p = doc.add_paragraph()
-        p.add_run("关键词：测试")
-        node.paragraph = p
-        with pytest.raises(ValueError, match="尚未加载"):
-            node.check_format(doc)
-
     def test_paragraph_style_check(self, sample_yaml_config):
         """Paragraph style is checked (line 187)"""
         from wordformat.config.loader import init_config, get_config
@@ -1270,16 +1214,6 @@ class TestHeadingLevelNodes:
         node.load_config(config_dict)
         assert node.pydantic_config is not None
 
-    def test_heading_load_config_invalid_type_raises(self):
-        """load_config with invalid type raises TypeError (lines 52-58)"""
-        from wordformat.rules.heading import HeadingLevel1Node
-        node = HeadingLevel1Node(
-            value={"category": "headings.level_1", "fingerprint": "fp"},
-            level=1,
-        )
-        with pytest.raises(TypeError, match="配置类型不支持"):
-            node.load_config("invalid_config")
-
     def test_heading_base_with_config(self, sample_yaml_config):
         """_base method with loaded config"""
         from wordformat.config.loader import init_config, get_config
@@ -1380,7 +1314,7 @@ class TestSetStyleAdditionalCoverage:
 
         from wordformat.pipeline.orchestrate import auto_format_thesis_document
         # Mock config with numbering.enabled = True
-        with mock.patch("wordformat.pipeline.stages.get_config") as mock_get_cfg:
+        with mock.patch("wordformat.pipeline.stages.load_config") as mock_get_cfg:
             mock_cfg = mock.MagicMock()
             mock_cfg.numbering.enabled = True
             mock_get_cfg.return_value = mock_cfg
@@ -1453,36 +1387,6 @@ class TestFormatNodeAdditional:
         node.load_config(config)
         # Should not crash, returns empty config
 
-    def test_load_yaml_config_validation_error(self, tmp_path):
-        """load_yaml_config with invalid config raises ValueError (line 127)"""
-        from wordformat.rules.node import FormatNode
-        bad_yaml = tmp_path / "bad.yaml"
-        # Valid YAML but invalid structure (list where dict expected)
-        bad_yaml.write_text("global_format:\n  - not_a_dict\n", encoding="utf-8")
-        with pytest.raises((ValueError, ValidationError)):
-            FormatNode.load_yaml_config(str(bad_yaml))
-
-    def test_load_config_unknown_type_raises(self):
-        """没有 CONFIG_PATH 的节点，load_config 后 _pydantic_config 应为 None。"""
-        from wordformat.rules.node import FormatNode
-        from wordformat.config.models import BaseModel
-
-        class CustomConfig(BaseModel):
-            pass
-
-        class CustomNode(FormatNode[CustomConfig]):
-            CONFIG_MODEL = CustomConfig
-
-        node = CustomNode(
-            value={"category": "custom", "fingerprint": "fp"},
-            level=1,
-        )
-        mock_config = mock.MagicMock()
-        node.load_config(mock_config)
-        assert node._pydantic_config is None
-
-
-
 # ==================== (r) tree.py 额外覆盖测试 ====================
 
 
@@ -1543,30 +1447,22 @@ class TestSettingsFrozenPath:
 
 
 class TestConfigAdditional:
-    """覆盖 config/config.py lines 59-60, 74, 80"""
+    """config/loader.py 额外覆盖测试。"""
 
-    def test_lazy_config_load_validation_error(self, tmp_path):
-        """load() with invalid YAML triggers ValidationError (lines 59-60)"""
+    def test_load_invalid_yaml_raises(self, tmp_path):
         bad_yaml = tmp_path / "bad.yaml"
         bad_yaml.write_text("global_format: {alignment: [invalid}", encoding="utf-8")
-        lc = LazyConfig()
-        lc._config_path = str(bad_yaml)
         with pytest.raises(Exception):
-            lc.load()
+            load_config(str(bad_yaml))
 
-    def test_lazy_config_get_none_config_raises(self):
-        """get() when _config is None raises ConfigNotLoadedError (line 74)"""
-        lc = LazyConfig()
-        lc._loaded = True
-        lc._config = None
-        with pytest.raises(ConfigNotLoadedError):
-            lc.get()
+    def test_get_without_load_raises(self):
+        clear_config()
+        with pytest.raises(RuntimeError):
+            get_config()
 
-    def test_lazy_config_config_path_property(self):
-        """config_path property returns _config_path (line 80)"""
-        lc = LazyConfig()
-        lc._config_path = "/some/path.yaml"
-        assert lc.config_path == "/some/path.yaml"
+    def test_load_then_get_returns_config(self, config_path):
+        cfg = load_config(config_path)
+        assert cfg is get_config()
 
 
 

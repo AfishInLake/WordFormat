@@ -19,7 +19,7 @@ from wordformat.style.reader import (
     paragraph_get_line_spacing, paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
     run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent, _get_style_spacing,
+    run_get_font_underline, GetIndent,
 )
 from wordformat.style.writer import (
     run_set_font_name, set_paragraph_space_before_by_lines,

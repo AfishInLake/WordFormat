@@ -30,21 +30,21 @@ PARA_DIFF_LABELS: dict[str, str] = {
 
 # 问题类型 → 严重等级
 SEVERITY_MAP: dict[str, str] = {
-    "行距问题": "严重",
-    "对齐错误": "严重",
-    "首行缩进错误": "一般",
-    "段前间距错误": "一般",
-    "段后间距错误": "一般",
-    "行距类型问题": "一般",
-    "左缩进错误": "一般",
-    "右缩进错误": "一般",
-    "内置样式错误": "一般",
-    "字号错误": "一般",
-    "加粗错误": "一般",
-    "数量过少": "一般",
-    "数量过多": "一般",
-    "编号错误": "一般",
-    "章节号错误": "一般",
+    "行距问题": "错误",
+    "对齐错误": "错误",
+    "首行缩进错误": "错误",
+    "段前间距错误": "错误",
+    "段后间距错误": "错误",
+    "行距类型问题": "错误",
+    "左缩进错误": "错误",
+    "右缩进错误": "错误",
+    "内置样式错误": "错误",
+    "字号错误": "错误",
+    "加粗错误": "错误",
+    "数量过少": "错误",
+    "数量过多": "错误",
+    "编号错误": "错误",
+    "章节号错误": "错误",
     "分隔符错误": "提醒",
     "标签错误": "提醒",
     "间距错误": "提醒",
@@ -57,10 +57,13 @@ SEVERITY_MAP: dict[str, str] = {
     "标点错误": "提醒",
 }
 
-_DEFAULT_SEVERITY = "一般"
+_DEFAULT_SEVERITY = "错误"
 
 # 严重等级排序权重（数值越小越严重）
-SEVERITY_ORDER: dict[str, int] = {"严重": 0, "一般": 1, "提醒": 2}
+SEVERITY_ORDER: dict[str, int] = {"错误": 0, "提醒": 1}
+
+# 严重等级 → 文字颜色（十六进制，无 #）
+SEVERITY_COLOR: dict[str, str] = {"错误": "FF0000", "提醒": "0000FF"}
 
 
 def get_severity(comment_text: str) -> str:
@@ -72,6 +75,71 @@ def get_severity(comment_text: str) -> str:
     return SEVERITY_MAP.get(prop, _DEFAULT_SEVERITY)
 
 
+def severity_color(property_name: str) -> str | None:
+    """按问题类型返回对应严重等级的颜色，未知类型按默认等级。"""
+    return SEVERITY_COLOR.get(SEVERITY_MAP.get(property_name, _DEFAULT_SEVERITY))
+
+
 def format_comment(target: str, property_name: str, actual: str, standard: str) -> str:
     """生成标准批注文本：位置-问题类型：现状，规范：标准。"""
     return f"{target}-{property_name}：{actual}，规范：{standard}"
+
+
+# ── 批注富文本接口 ────────────────────────────────────────────────
+# 段落 = 若干「片段」，片段 = (文字, 样式)。样式为 None（黑色正文）或
+# dict：{"color": "FF0000", "bold": True, "italic": True, "underline": True}。
+Style = dict | None
+Segment = tuple[str, Style]
+
+
+def apply_run_style(run, style: Style) -> None:
+    """将样式字典应用到批注 run，仅设置字典中出现的属性。"""
+    if not style:
+        return
+    from docx.shared import RGBColor
+
+    color = style.get("color")
+    if color:
+        run.font.color.rgb = RGBColor.from_string(color)
+    for attr in ("bold", "italic", "underline"):
+        if attr in style:
+            setattr(run, attr, style[attr])
+
+
+def add_styled_comment(
+    doc,
+    runs,
+    paragraphs: list[list[Segment]],
+    *,
+    author: str = "Wordformat",
+    initials: str = "afish",
+):
+    """添加批注，并对其中指定文字片段单独设置样式。
+
+    这是给批注「某些字」上色/加粗的统一入口：`paragraphs` 是若干段落，每段是
+    一串 `(文字, 样式)` 片段；样式为 None 表示默认黑色正文。返回 Comment 对象。
+    """
+    comment = doc.add_comment(runs=runs, text="", author=author, initials=initials)
+    for i, segments in enumerate(paragraphs):
+        para = comment.paragraphs[0] if i == 0 else comment.add_paragraph()
+        para.clear()  # 清掉 add_comment 建的占位空 run
+        for text, style in segments:
+            apply_run_style(para.add_run(text), style)
+    return comment
+
+
+def split_comment_line(line: str) -> list[Segment]:
+    """把一行批注拆成带样式片段：`位置-问题类型：` 按严重度上色，其余黑色。
+
+    输入格式 `位置-问题类型：现状，规范：标准`；无法解析时整行黑色。
+    颜色由「问题类型」（首个 `-` 与首个 `：` 之间）决定。
+    """
+    prefix, sep, tail = line.partition("：")
+    if not sep:
+        return [(line, None)]
+    prop = prefix.split("-", 1)[1] if "-" in prefix else prefix
+    color = severity_color(prop)
+    segments: list[Segment] = [(prefix + sep, {"color": color} if color else None)]
+    if tail:
+        segments.append((tail, None))
+    return segments

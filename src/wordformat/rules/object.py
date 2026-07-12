@@ -1,20 +1,20 @@
 """图片段落和表格对象节点。"""
 
-from wordformat.config.models import ImageFormatConfig, TableObjectConfig
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import register
 from wordformat.style.comments import format_comment
 
 
-class FigureImage(FormatNode[ImageFormatConfig]):
+@register("figure_image")
+class FigureImage(FormatNode):
     """图片段落节点（包含内联图片的段落，非题注）。
 
     只检查对齐和首行缩进，不检查行距、字体等。
     """
 
     NODE_TYPE = "figure_image"
-    CONFIG_MODEL = ImageFormatConfig
-    CONFIG_PATH = "figures.image"
     NODE_LABEL = "图片段落"
+    DEFAULTS = {"alignment": "居中对齐", "first_line_indent": "0字符"}
     DEFAULT_RULES = {}
 
     def _base(self, doc, p: bool, r: bool):
@@ -23,7 +23,7 @@ class FigureImage(FormatNode[ImageFormatConfig]):
         from wordformat.style.diff import _format_para_value
 
         cfg = self.pydantic_config
-        expected_align = Alignment(str(cfg.alignment))
+        expected_align = Alignment(str(cfg.alignment or "居中对齐"))
         actual_align = expected_align.get_from_paragraph(self.paragraph)
         if expected_align != actual_align:
             self.add_comment(
@@ -37,7 +37,7 @@ class FigureImage(FormatNode[ImageFormatConfig]):
                 ),
             )
 
-        expected_indent = FirstLineIndent(str(cfg.first_line_indent))
+        expected_indent = FirstLineIndent(str(cfg.first_line_indent or "0字符"))
         actual_indent = expected_indent.get_from_paragraph(self.paragraph)
         if expected_indent != actual_indent:
             self.add_comment(
@@ -52,11 +52,11 @@ class FigureImage(FormatNode[ImageFormatConfig]):
             )
 
 
-class TableObject(FormatNode[TableObjectConfig]):
+@register("table_object")
+class TableObject(FormatNode):
     """表格对象节点（表格整体格式，非题注）。"""
 
     NODE_TYPE = "table_object"
-    CONFIG_MODEL = TableObjectConfig
-    CONFIG_PATH = "tables.object"
     NODE_LABEL = "表格对象"
+    DEFAULTS = {}
     DEFAULT_RULES = {}  # 表格对象格式由 Word 表格属性控制
