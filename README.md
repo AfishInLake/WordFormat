@@ -147,39 +147,9 @@ python -m wordformat startapi
 
 更多详细用法请查看 [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md)
 
-## AI Skill 集成
+## 预设配置
 
-WordFormat 提供了 **SOLO Skill**，可在 SOLO 等 AI 助手平台中直接调用，实现对话式论文格式化。
-
-### Skill 工作流程
-
-Skill 包含两个独立任务，可分步执行：
-
-| 任务 | 说明 | 产物 |
-|------|------|------|
-| **任务一：准备配置文件** | 根据格式要求生成/编辑 config.yaml | `config.yaml` |
-| **任务二：执行格式化** | 使用配置文件对论文进行格式检查或修正 | `--标注版.docx` 或 `--修改版.docx` |
-
-### Skill 目录结构
-
-```
-wordformat-skill/
-├── SKILL.md                    # Skill 定义文件
-├── scripts/
-│   ├── setup_config.py         # 配置文件生成/验证脚本
-│   ├── validate_json.py        # JSON 标签校验脚本
-│   └── validate_config.py      # 配置文件验证脚本
-└── data/
-    ├── config.yaml             # 默认配置模板
-    ├── config_spec.md          # 配置文件完整字段规范
-    ├── config_editing_guide.md # 配置编辑指南
-    ├── category_reference.md   # 段落分类参考
-    └── font_size_table.md      # 字号对照表
-```
-
-### 预设配置库
-
-项目内置了多所高校的论文格式预设，保存在 `presets/` 目录下，命名格式为 `{学校}_{学院/专业}_{论文类型}.yaml`，可直接使用或在此基础上修改。
+项目内置了多所高校的论文格式预设，保存在 `presets/` 目录下，可直接使用或在此基础上修改。
 
 ## 详细文档
 
