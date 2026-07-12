@@ -122,8 +122,7 @@ def add_styled_comment(
     comment = doc.add_comment(runs=runs, text="", author=author, initials=initials)
     for i, segments in enumerate(paragraphs):
         para = comment.paragraphs[0] if i == 0 else comment.add_paragraph()
-        for r in list(para.runs):  # 清掉 add_comment 建的占位空 run
-            r._element.getparent().remove(r._element)
+        para.clear()  # 清掉 add_comment 建的占位空 run
         for text, style in segments:
             apply_run_style(para.add_run(text), style)
     return comment

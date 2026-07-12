@@ -7,6 +7,8 @@
 export_defaults() 遍历所有注册类，按 NODE_TYPE 路径重建完整 YAML 配置树。
 """
 
+import dataclasses
+
 _registry: dict[str, type] = {}
 _level_registry: dict[str, int] = {}
 
@@ -47,26 +49,11 @@ def export_defaults() -> dict:
 
     返回可直接写入 .yaml 的嵌套 dict。
     """
+    from wordformat.style.diff import WarningConfig
+
     result: dict = {}
-    # 全局字段
     result["template_name"] = "未知模板"
-    result["style_checks_warning"] = {
-        "bold": True,
-        "italic": True,
-        "underline": True,
-        "font_size": True,
-        "font_name": False,
-        "font_color": False,
-        "alignment": True,
-        "space_before": True,
-        "space_after": True,
-        "line_spacing": True,
-        "line_spacingrule": True,
-        "left_indent": True,
-        "right_indent": True,
-        "first_line_indent": True,
-        "builtin_style_name": True,
-    }
+    result["style_checks_warning"] = dataclasses.asdict(WarningConfig())
     result["numbering"] = {"enabled": False}
 
     for cls in _registry.values():

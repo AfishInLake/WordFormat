@@ -30,6 +30,7 @@ class ThemeRef:
     __slots__ = ("token",)
 
     def __init__(self, token: str):
+        """token 如 'minorHAnsi'、'majorEastAsia'。"""
         self.token = token
 
 
@@ -38,6 +39,7 @@ class ThemeFontTable:
     """解析 theme part 的 fontScheme，把主题字体 token 映射为具体字体名。"""
 
     def __init__(self, document=None):
+        """从 document 解析主题字体表；document 为 None 或解析失败时退化为空表。"""
         self._map: dict[str, str] = {}
         if document is not None:
             try:
@@ -88,14 +90,17 @@ class ThemeFontTable:
 # 字符级 rPr 均为 python-docx 的 CT_RPr，直接用其类型化子元素
 # （.b/.i/.u/.sz/.color），复用官方 on/off、半点、颜色转换。
 def x_bold(rPr):
+    """从 rPr 提取加粗状态，未设置返回 _MISS。"""
     return _MISS if rPr.b is None else bool(rPr.b.val)
 
 
 def x_italic(rPr):
+    """从 rPr 提取斜体状态，未设置返回 _MISS。"""
     return _MISS if rPr.i is None else bool(rPr.i.val)
 
 
 def x_underline(rPr):
+    """从 rPr 提取下划线状态，未设置返回 _MISS。"""
     u = rPr.u
     if u is None:
         return _MISS
@@ -103,6 +108,7 @@ def x_underline(rPr):
 
 
 def x_size_pt(rPr):
+    """从 rPr 提取字号（pt），未设置返回 _MISS。"""
     sz = rPr.sz
     if sz is None:
         return _MISS
@@ -113,6 +119,7 @@ def x_size_pt(rPr):
 
 
 def x_color_rgb(rPr):
+    """从 rPr 提取字体颜色 (r,g,b)；主题色返回 None，未设置返回 _MISS。"""
     c = rPr.color
     if c is None:
         return _MISS
@@ -128,6 +135,7 @@ def x_color_rgb(rPr):
 
 
 def _font_attr(rPr, literal: str, theme: str):
+    """从 rFonts 提取字体名；直接字体名返回 str，主题 token 返回 ThemeRef，否则 _MISS。"""
     rFonts = rPr.find(qn("w:rFonts"))
     if rFonts is None:
         return _MISS
@@ -141,10 +149,12 @@ def _font_attr(rPr, literal: str, theme: str):
 
 
 def x_font_ea(rPr):
+    """提取东亚字体（eastAsia）或主题引用。"""
     return _font_attr(rPr, "w:eastAsia", "w:eastAsiaTheme")
 
 
 def x_font_ascii(rPr):
+    """提取西文字体（ascii）或主题引用。"""
     return _font_attr(rPr, "w:ascii", "w:asciiTheme")
 
 
@@ -160,6 +170,7 @@ _JC_MAP = {
 
 
 def x_alignment(pPr):
+    """从 pPr 提取对齐方式（WD_ALIGN_PARAGRAPH），未设置返回 _MISS。"""
     jc = pPr.find(qn("w:jc"))
     if jc is None:
         return _MISS
@@ -167,6 +178,7 @@ def x_alignment(pPr):
 
 
 def _spacing_lines(pPr, which: str):
+    """从 pPr/spacing 提取段前/段后间距（行数）；autospacing 返回 None，未设置返回 _MISS。"""
     spacing = pPr.find(qn("w:spacing"))
     if spacing is None:
         return _MISS
@@ -182,10 +194,12 @@ def _spacing_lines(pPr, which: str):
 
 
 def x_space_before(pPr):
+    """提取段前间距（行数）。"""
     return _spacing_lines(pPr, "before")
 
 
 def x_space_after(pPr):
+    """提取段后间距（行数）。"""
     return _spacing_lines(pPr, "after")
 
 
@@ -210,6 +224,7 @@ def x_line_spacing(pPr):
 
 
 def _ind_chars(pPr, attr: str, negate: bool = False):
+    """从 pPr/ind 提取缩进（字符数）；negate=True 时取反（悬挂缩进用）。"""
     ind = pPr.find(qn("w:ind"))
     if ind is None:
         return _MISS
@@ -243,10 +258,12 @@ def x_first_line_indent(pPr):
 
 
 def x_left_indent(pPr):
+    """提取左缩进（字符数）。"""
     return _ind_chars(pPr, "w:leftChars")
 
 
 def x_right_indent(pPr):
+    """提取右缩进（字符数）。"""
     return _ind_chars(pPr, "w:rightChars")
 
 
@@ -268,6 +285,7 @@ class StyleResolver:
 
     # -- 构建 --
     def _index(self, document) -> None:
+        """遍历 styles.xml，构建 styleId -> CT_Style 映射和 docDefaults 引用。"""
         styles_el = document.styles.element
         for s in styles_el.findall(qn("w:style")):
             sid = s.get(qn("w:styleId"))
@@ -313,6 +331,7 @@ class StyleResolver:
 
     # -- 样式链 --
     def _style_chain(self, style_id: str | None):
+        """沿 w:basedOn 链向上遍历，yield 每个 CT_Style 元素。"""
         seen: set[str] = set()
         while style_id and style_id not in seen and style_id in self._by_id:
             seen.add(style_id)
@@ -331,6 +350,7 @@ class StyleResolver:
 
     # -- 源链 --
     def run_rpr_sources(self, run):
+        """生成 run 字符属性继承链源：直接 rPr -> rStyle 链 -> 段落样式链 -> docDefaults。"""
         rPr = run._element.find(qn("w:rPr"))
         if rPr is not None:
             yield rPr
@@ -348,6 +368,7 @@ class StyleResolver:
         yield self._rpr_default
 
     def para_ppr_sources(self, paragraph):
+        """生成段落属性继承链源：直接 pPr -> 段落样式链 -> docDefaults。"""
         pPr = paragraph._element.find(qn("w:pPr"))
         yield pPr
         pid = self._para_style_id(pPr) if pPr is not None else None
@@ -359,6 +380,7 @@ class StyleResolver:
 
     # -- 解析 --
     def _resolve(self, sources, extractor):
+        """遍历源链，用 extractor 提取第一个非 _MISS 的值。"""
         for src in sources:
             if src is None:
                 continue
@@ -368,10 +390,12 @@ class StyleResolver:
         return _MISS
 
     def resolve_run(self, run, extractor, default=None):
+        """解析 run 有效字符属性，全链未设置返回 default。"""
         val = self._resolve(self.run_rpr_sources(run), extractor)
         return default if val is _MISS else val
 
     def resolve_para(self, paragraph, extractor, default=None):
+        """解析段落有效段落属性，全链未设置返回 default。"""
         val = self._resolve(self.para_ppr_sources(paragraph), extractor)
         return default if val is _MISS else val
 

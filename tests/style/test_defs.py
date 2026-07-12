@@ -86,9 +86,9 @@ class TestFontSize:
     def test_label_map(self, label, expected):
         assert FontSize(label).rel_value == expected
 
-    def test_bare_number_rel_value_is_string(self):
-        """No unit -> extract_unit fails -> rel_value stays as raw string."""
-        assert FontSize("15").rel_value == "15"
+    def test_bare_number_rel_value_is_float(self):
+        """裸数字（无单位）→ float 转换。"""
+        assert FontSize("15").rel_value == 15.0
 
     def test_base_set(self, doc):
         run = doc.add_paragraph().add_run("x")

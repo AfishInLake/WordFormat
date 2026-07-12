@@ -270,7 +270,6 @@ def reset_config():
 def reset_style_warning():
     """每个测试前后重置警告缓存。"""
     from wordformat.style import diff
-    original = diff._warnings_cache
-    diff._warnings_cache = None
+    diff._warnings = None
     yield
-    diff._warnings_cache = original
+    diff._warnings = None

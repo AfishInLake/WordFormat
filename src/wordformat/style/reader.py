@@ -40,6 +40,7 @@ def _real_elem(obj) -> bool:
 
 
 def _para(paragraph, extractor, default=None):
+    """沿继承链解析段落属性，无效段落/Mock 返回 default，异常降级同 default。"""
     if not _real_elem(paragraph):
         return default
     try:
@@ -52,6 +53,7 @@ def _para(paragraph, extractor, default=None):
 
 
 def _run(run, extractor, default=None):
+    """沿继承链解析 run 字符属性，无效 run/Mock 返回 default，异常降级同 default。"""
     if not _real_elem(run):
         return default
     try:
@@ -62,6 +64,7 @@ def _run(run, extractor, default=None):
 
 
 def _run_font(run, extractor):
+    """沿继承链解析 run 字体名（含主题字体兑现），无效/异常返回 None。"""
     if not _real_elem(run):
         return None
     try:

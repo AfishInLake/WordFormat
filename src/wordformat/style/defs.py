@@ -82,16 +82,13 @@ class UnitLabelEnum(metaclass=UnitEnumMeta):
         return member
 
     def __init__(self, value):
-        self.value = value  # 获取的原始值
-        self.original_unit = None  # 解析的单位
-        self.unit_ch = None  # 中文单位
-        self._rel_value = None  # 解析的真实值
-        self._rel_unit = None  # 解析的标准单位
-        self.extract_unit_result = None  # 解析的结果
-        # 对于固定单位的枚举类，如行间距、对齐方式，不需要处理单位
-        # 但需要确保rel_value正确设置
-        class_name = self.__class__.__name__
-        if class_name not in ["LineSpacingRule", "Alignment"]:
+        self.value = value
+        self.original_unit = None
+        self.unit_ch = None
+        self._rel_value = None
+        self._rel_unit = None
+        self.extract_unit_result = None
+        if self.__class__._meta_funcs:
             self.split_unit()
 
     def split_unit(self):
@@ -218,26 +215,6 @@ class FontName(UnitLabelEnum):
             docx_obj.font.name = self.value
 
 
-class FontSizeLabel(str, Enum):
-    """中文字号枚举，可在 Pydantic 模型和运行时代码中统一使用。"""
-
-    YI_HAO = "一号"
-    XIAO_YI = "小一"
-    ER_HAO = "二号"
-    XIAO_ER = "小二"
-    SAN_HAO = "三号"
-    XIAO_SAN = "小三"
-    SI_HAO = "四号"
-    XIAO_SI = "小四"
-    WU_HAO = "五号"
-    XIAO_WU = "小五"
-    LIU_HAO = "六号"
-    QI_HAO = "七号"
-
-    def __str__(self) -> str:
-        return self.value
-
-
 class FontSize(UnitLabelEnum):
     """
     常用中文字档字号（单位：磅 / pt）。
@@ -276,18 +253,27 @@ class FontSize(UnitLabelEnum):
     }
     _LABEL_MAP_REVERSE = {v: k for k, v in _LABEL_MAP.items()}
 
+    @property
+    def rel_value(self):
+        """字号值：标签（"小四"）→ _LABEL_MAP，"12pt" → 解析，裸数字 → float。"""
+        if self._rel_value is not None:
+            return self._rel_value
+        if self.value in self._LABEL_MAP:
+            return self._LABEL_MAP[self.value]
+        result = extract_unit_from_string(str(self.value))
+        if result.is_valid and result.value is not None:
+            return result.value
+        try:
+            return float(self.value)
+        except (ValueError, TypeError):
+            raise ValueError(f"无效的字号: '{self.value}'") from None
+
+    @rel_value.setter
+    def rel_value(self, value):
+        self._rel_value = value
+
     def base_set(self, docx_obj: Run, **kwargs):
-        """仅作为将字符串转化为数值操作"""
-        size = self._LABEL_MAP.get(self.value, None)
-        if size:
-            docx_obj.font.size = Pt(size)
-        else:
-            try:
-                docx_obj.font.size = Pt(float(self.value))
-            except ValueError as e:
-                raise ValueError(
-                    f"无效的字号: '{self.value}' font_size 必须为数字"
-                ) from e
+        docx_obj.font.size = Pt(self.rel_value)
 
 
 class FontColor(UnitLabelEnum):
@@ -420,6 +406,7 @@ class Alignment(UnitLabelEnum):
         "两端对齐": WD_ALIGN_PARAGRAPH.JUSTIFY,
         "分散对齐": WD_ALIGN_PARAGRAPH.DISTRIBUTE,
     }
+    _LABEL_MAP_REVERSE = {int(v): k for k, v in _LABEL_MAP.items()}
 
     # WD_ALIGN_PARAGRAPH → OOXML w:jc/@val
     XML_VAL_MAP = {
@@ -506,6 +493,7 @@ class LineSpacingRule(UnitLabelEnum):
         "固定值": WD_LINE_SPACING.EXACTLY,
         "多倍行距": WD_LINE_SPACING.MULTIPLE,
     }
+    _LABEL_MAP_REVERSE = {int(v): k for k, v in _LABEL_MAP.items()}
 
     # WD_LINE_SPACING → OOXML w:spacing/@w:lineRule
     XML_RULE_MAP = {
@@ -630,7 +618,7 @@ class BuiltInStyle(UnitLabelEnum):
     Word 内置段落样式名称（使用英文标准名称，跨语言兼容）。
 
     注意：这些名称是 python-docx 和 Word API 的标准名称，
-    即使文档界面显示为“标题 1”，实际样式名仍是 "Heading 1"。
+    即使文档界面显示为”标题 1”，实际样式名仍是 “Heading 1”。
     """
 
     HEADING_1 = "Heading 1"

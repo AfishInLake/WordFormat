@@ -2,6 +2,7 @@
 # @Time    : 2026/1/12 10:46
 # @Author  : afish
 # @File    : style.py
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,7 +10,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.config.dotdict import DotDict
+from wordformat.config.loader import get_config
 from wordformat.style.reader import (
     run_get_font_bold,
     run_get_font_color,
@@ -21,6 +22,7 @@ from wordformat.style.reader import (
 )
 from wordformat.utils import has_chinese
 
+from .comments import CHAR_DIFF_LABELS, PARA_DIFF_LABELS
 from .defs import (
     Alignment,
     BuiltInStyle,
@@ -36,60 +38,54 @@ from .defs import (
     SpaceBefore,
 )
 
-_WARNING_DEFAULTS = {
-    "bold": True,
-    "italic": True,
-    "underline": True,
-    "font_size": True,
-    "font_name": False,
-    "font_color": False,
-    "alignment": True,
-    "space_before": True,
-    "space_after": True,
-    "line_spacing": True,
-    "line_spacingrule": True,
-    "left_indent": True,
-    "right_indent": True,
-    "first_line_indent": True,
-    "builtin_style_name": True,
+
+@dataclass
+class WarningConfig:
+    """Warning toggle; field name = diff_type.  Overridable via YAML style_checks_warning."""
+
+    bold: bool = True
+    italic: bool = True
+    underline: bool = True
+    font_size: bool = True
+    font_name_cn: bool = False
+    font_name_en: bool = False
+    font_color: bool = False
+
+    alignment: bool = True
+    space_before: bool = True
+    space_after: bool = True
+    line_spacing: bool = True
+    line_spacing_rule: bool = True
+    left_indent: bool = True
+    right_indent: bool = True
+    first_line_indent: bool = True
+    builtin_style_name: bool = True
+
+
+_warnings: WarningConfig | None = None
+
+
+# 旧 key → 新 key 映射，兼容历史 YAML 配置
+_WARNING_KEY_MAP = {
+    "font_name": "font_name_cn",
+    "line_spacingrule": "line_spacing_rule",
 }
 
 
-def _load_warnings() -> DotDict:
+def _load_warnings() -> WarningConfig:
+    global _warnings
+    if _warnings is not None:
+        return _warnings
     try:
-        from wordformat.config.loader import get_config
-
-        return DotDict(
-            {**_WARNING_DEFAULTS, **get_config().get("style_checks_warning", {})}
-        )
-    except Exception:
-        return DotDict(_WARNING_DEFAULTS)
-
-
-_warnings_cache: DotDict | None = None
-
-
-def _get_warnings() -> DotDict:
-    global _warnings_cache
-    if _warnings_cache is None:
-        _warnings_cache = _load_warnings()
-    return _warnings_cache
-
-
-def _char_warning_enabled(diff_type: str) -> bool:
-    warnings = _get_warnings()
-    if warnings is None:
-        return True
-    mapping = {
-        "bold": warnings.bold,
-        "italic": warnings.italic,
-        "underline": warnings.underline,
-        "font_size": warnings.font_size,
-        "font_color": warnings.font_color,
-        "font_name_cn": warnings.font_name,
-        "font_name_en": warnings.font_name,
-    }
-    return mapping.get(diff_type, True)
+        cfg = get_config().get("style_checks_warning", {})
+    except RuntimeError:
+        cfg = {}
+    # 兼容旧 key 名
+    for old, new in _WARNING_KEY_MAP.items():
+        if old in cfg and new not in cfg:
+            cfg[new] = cfg.pop(old)
+    _warnings = WarningConfig(**{**dataclasses.asdict(WarningConfig()), **cfg})
+    return _warnings
 
 
 def _pt_to_label(pt: float) -> str:
@@ -110,22 +106,12 @@ def _format_char_value(diff_type: str, value) -> str:
     return str(value)
 
 
-_LINE_SPACING_LABELS = {
-    0: "单倍行距",
-    1: "1.5倍行距",
-    2: "2倍行距",
-    3: "最小值",
-    4: "固定值",
-    5: "多倍行距",
-}
+def _line_spacing_label(val) -> str:
+    return LineSpacingRule._LABEL_MAP_REVERSE.get(val, str(val))
 
-_ALIGNMENT_LABELS = {
-    0: "左对齐",
-    1: "居中对齐",
-    2: "右对齐",
-    3: "两端对齐",
-    4: "分散对齐",
-}
+
+def _alignment_label(val) -> str:
+    return Alignment._LABEL_MAP_REVERSE.get(val, str(val))
 
 
 def _format_para_value(diff_type: str, value) -> str:
@@ -134,12 +120,12 @@ def _format_para_value(diff_type: str, value) -> str:
         return "未设置"
     if diff_type == "line_spacing_rule":
         try:
-            return _LINE_SPACING_LABELS.get(int(value), str(value))
+            return _line_spacing_label(int(value))
         except (ValueError, TypeError):
             return str(value)
     if diff_type == "alignment":
         try:
-            return _ALIGNMENT_LABELS.get(int(value), str(value))
+            return _alignment_label(int(value))
         except (ValueError, TypeError):
             return str(value)
     if diff_type == "line_spacing":
@@ -147,24 +133,6 @@ def _format_para_value(diff_type: str, value) -> str:
             return f"{value}倍"
         return str(value)
     return str(value)
-
-
-def _para_warning_enabled(diff_type: str) -> bool:
-    warnings = _get_warnings()
-    if warnings is None:
-        return True
-    mapping = {
-        "alignment": warnings.alignment,
-        "space_before": warnings.space_before,
-        "space_after": warnings.space_after,
-        "line_spacing": warnings.line_spacing,
-        "line_spacing_rule": warnings.line_spacingrule,
-        "first_line_indent": warnings.first_line_indent,
-        "left_indent": warnings.left_indent,
-        "right_indent": warnings.right_indent,
-        "builtin_style_name": warnings.builtin_style_name,
-    }
-    return mapping.get(diff_type, True)
 
 
 @dataclass
@@ -366,15 +334,18 @@ class CharacterStyle:
         return result
 
     @staticmethod
-    def to_string(value: list[DIFFResult], target: str = "") -> str:
+    def to_string(
+        value: list[DIFFResult], target: str = "", warnings: WarningConfig | None = None
+    ) -> str:
+        if warnings is None:
+            warnings = _load_warnings()
         """将 DIFFResult 列表转为标准格式批注文本。"""
-        from .comments import CHAR_DIFF_LABELS, format_comment
+        from .comments import format_comment
 
         t = []
         for diff in value:
-            if _get_warnings() is not None:
-                if not _char_warning_enabled(diff.diff_type):
-                    continue
+            if not getattr(warnings, diff.diff_type, True):
+                continue
             prop = CHAR_DIFF_LABELS.get(diff.diff_type, diff.diff_type)
             actual = _format_char_value(diff.diff_type, diff.current_value)
             standard = _format_char_value(diff.diff_type, diff.expected_value)
@@ -603,15 +574,18 @@ class ParagraphStyle:
         return sorted(diffs, key=lambda x: x.level)
 
     @staticmethod
-    def to_string(value: list[DIFFResult], target: str = "") -> str:
+    def to_string(
+        value: list[DIFFResult], target: str = "", warnings: WarningConfig | None = None
+    ) -> str:
+        if warnings is None:
+            warnings = _load_warnings()
         """将 DIFFResult 列表转为标准格式批注文本。"""
-        from .comments import PARA_DIFF_LABELS, format_comment
+        from .comments import format_comment
 
         t = []
         for diff in value:
-            if _get_warnings() is not None:
-                if not _para_warning_enabled(diff.diff_type):
-                    continue
+            if not getattr(warnings, diff.diff_type, True):
+                continue
             prop = PARA_DIFF_LABELS.get(diff.diff_type, diff.diff_type)
             actual = _format_para_value(diff.diff_type, diff.current_value)
             standard = _format_para_value(diff.diff_type, diff.expected_value)

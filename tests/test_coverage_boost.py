@@ -227,11 +227,11 @@ class TestHeadingCoverageBoost:
         b = rPr.find(qn("w:b"))
         assert b is not None
 
-    def test_fix_style_run_properties_removes_italic(self, root_config):
-        """_fix_style_run_properties 当 italic=False 时应移除斜体元素。"""
-        
+    def test_fix_style_run_properties_disables_italic(self, root_config):
+        """_fix_style_run_properties 当 italic=False 时应显式关闭斜体（val='0'）。"""
+
         from wordformat.style.defs import ensure_style_exists
-        
+
         doc = Document()
         cfg = NodeConfigRoot(italic=False)
         ensure_style_exists(doc, "Heading 1")
@@ -241,7 +241,9 @@ class TestHeadingCoverageBoost:
 
         rPr = style.element.find(qn("w:rPr"))
         i = rPr.find(qn("w:i"))
-        assert i is None
+        # python-docx style.font.italic = False 写入 w:val="0" 而非移除元素
+        assert i is not None
+        assert i.get(qn("w:val")) == "0"
 
     def test_fix_style_paragraph_properties_sets_alignment(self, root_config):
         """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""

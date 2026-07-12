@@ -11,22 +11,13 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Mm, Pt
 from docx.text.paragraph import Paragraph
-from docx.text.run import Run
 from loguru import logger
 
 
-def run_set_font_name(run: Run, font_name: str):
-    """
-    设置 Run 对象的中文字体名称（修复空值问题，兼容无样式配置的 Run）
-
-    参数:
-        run (docx.text.run.Run): 要设置字体的 Run 对象。
-        font_name (str): 字体名称，如 "Microsoft YaHei"、"SimSun"、"Arial" 等。
-    """
-    r = run._element
-    rPr = r.get_or_add_rPr()
-    rFonts = rPr.get_or_add_rFonts()
-    rFonts.set(qn("w:eastAsia"), font_name)
+def run_set_font_name(run, font_name: str):
+    """设置 Run 对象的东亚字体名称（python-docx Font 不支持 eastAsia）。"""
+    rPr = run._element.get_or_add_rPr()
+    rPr.get_or_add_rFonts().set(qn("w:eastAsia"), font_name)
 
 
 def _paragraph_space_by_lines(
@@ -143,13 +134,7 @@ class SetSpacing:
         4. 支持浮点数行值（如0.5行→50，1.2行→120）
         """
         try:
-            p = paragraph._element
-            pPr = p.find(qn("w:pPr"))
-            if pPr is None:
-                pPr = parse_xml(
-                    r'<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
-                )
-                p.append(pPr)
+            pPr = paragraph._element.get_or_add_pPr()
             SetSpacing._set_hang_on_pPr(pPr, spacing_type, value)
         except Exception as e:
             logger.error(f"设置段落{spacing_type}间距{value}行失败: {e}")

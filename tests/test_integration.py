@@ -25,6 +25,7 @@ from wordformat.config.loader import (
     init_config,
     get_config,
     clear_config,
+    load_config,
 )
 from wordformat.config.models import NodeConfigRoot
 from wordformat.agent.message import MessageManager
@@ -51,28 +52,26 @@ apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_
 # ==================== (a) Config 模块集成测试 ====================
 
 
-class TestLazyConfigLifecycle:
-    """LazyConfig 完整生命周期：init -> get -> clear -> 重复"""
+class TestConfigLifecycle:
+    """load_config -> get_config 基本流程。"""
 
-    def test_init_then_get_loads_config(self, config_path):
-        init_config(config_path)
+    def test_load_then_get(self, config_path):
+        load_config(config_path)
         cfg = get_config()
         assert isinstance(cfg, dict)
         assert "global_format" in cfg
 
-    def test_get_without_init_raises(self):
+    def test_get_without_load_raises(self):
         clear_config()
-        with pytest.raises(ConfigNotLoadedError):
+        with pytest.raises(RuntimeError):
             get_config()
 
-    def test_clear_resets_all_state(self, config_path):
-        init_config(config_path)
-        get_config()
+    def test_clear_resets_state(self, config_path):
+        load_config(config_path)
+        assert get_config() is not None
         clear_config()
-        lc = LazyConfig()
-        assert lc._loaded is False
-        assert lc._config is None
-        assert lc._config_path is None
+        with pytest.raises(RuntimeError):
+            get_config()
 
     def test_reinit_after_clear(self, config_path):
         init_config(config_path)
@@ -1315,7 +1314,7 @@ class TestSetStyleAdditionalCoverage:
 
         from wordformat.pipeline.orchestrate import auto_format_thesis_document
         # Mock config with numbering.enabled = True
-        with mock.patch("wordformat.pipeline.stages.get_config") as mock_get_cfg:
+        with mock.patch("wordformat.pipeline.stages.load_config") as mock_get_cfg:
             mock_cfg = mock.MagicMock()
             mock_cfg.numbering.enabled = True
             mock_get_cfg.return_value = mock_cfg
@@ -1448,30 +1447,22 @@ class TestSettingsFrozenPath:
 
 
 class TestConfigAdditional:
-    """覆盖 config/config.py lines 59-60, 74, 80"""
+    """config/loader.py 额外覆盖测试。"""
 
-    def test_lazy_config_load_validation_error(self, tmp_path):
-        """load() with invalid YAML triggers ValidationError (lines 59-60)"""
+    def test_load_invalid_yaml_raises(self, tmp_path):
         bad_yaml = tmp_path / "bad.yaml"
         bad_yaml.write_text("global_format: {alignment: [invalid}", encoding="utf-8")
-        lc = LazyConfig()
-        lc._config_path = str(bad_yaml)
         with pytest.raises(Exception):
-            lc.load()
+            load_config(str(bad_yaml))
 
-    def test_lazy_config_get_none_config_raises(self):
-        """get() when _config is None raises ConfigNotLoadedError (line 74)"""
-        lc = LazyConfig()
-        lc._loaded = True
-        lc._config = None
-        with pytest.raises(ConfigNotLoadedError):
-            lc.get()
+    def test_get_without_load_raises(self):
+        clear_config()
+        with pytest.raises(RuntimeError):
+            get_config()
 
-    def test_lazy_config_config_path_property(self):
-        """config_path property returns _config_path (line 80)"""
-        lc = LazyConfig()
-        lc._config_path = "/some/path.yaml"
-        assert lc.config_path == "/some/path.yaml"
+    def test_load_then_get_returns_config(self, config_path):
+        cfg = load_config(config_path)
+        assert cfg is get_config()
 
 
 
