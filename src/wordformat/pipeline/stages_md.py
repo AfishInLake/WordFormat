@@ -6,6 +6,7 @@
 
 Markdown 仅提供文本内容和文档结构（标题层级、段落划分），
 所有格式（字体、字号、段落样式）由 YAML 配置 + FormatNode 统一处理。
+图片插入、表格创建等由对应 FormatNode 子类负责。
 """
 
 from pathlib import Path
@@ -44,7 +45,7 @@ class DocumentCreationStage:
     """从 FormatNode 树创建新的 .docx Document。
 
     每个节点创建一个段落，单 run 填充纯文本。
-    格式由后续的 FormattingExecutionStage 统一应用。
+    格式、图片、表格等由后续 FormattingExecutionStage 中各 FormatNode 子类处理。
     """
 
     def process(self, ctx: FormatContext) -> FormatContext:
@@ -55,8 +56,13 @@ class DocumentCreationStage:
         for node in nodes:
             value = node.value
             text = value.get("paragraph", "") if isinstance(value, dict) else str(value)
+            category = value.get("category", "") if isinstance(value, dict) else ""
             para = ctx.document.add_paragraph()
-            para.add_run(text.strip())
+            # figure_image: 路径留给 FigureImage._try_insert_image 处理，这里只建空段落
+            if category == "figure_image":
+                para.add_run("")
+            else:
+                para.add_run(text.strip())
             node.paragraph = para
 
         return ctx

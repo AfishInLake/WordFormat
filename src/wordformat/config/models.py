@@ -23,7 +23,14 @@ class NodeConfigRoot(dict):
         try:
             val = self[key]
         except KeyError:
-            return None
+            # fallback：到 paragraph / font 子字典中查找
+            for sub in ("paragraph", "font"):
+                sub_dict = self.get(sub)
+                if isinstance(sub_dict, dict) and key in sub_dict:
+                    val = sub_dict[key]
+                    break
+            else:
+                return None
         if isinstance(val, dict) and not isinstance(val, NodeConfigRoot):
             return NodeConfigRoot(**val)
         return val

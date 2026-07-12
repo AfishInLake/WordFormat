@@ -47,12 +47,14 @@ def _walk_blocks(blocks: list[dict], result: list[dict]) -> None:
             result.append(_make_heading(block))
         elif btype in ("paragraph", "block_text"):
             item = _make_paragraph(block)
-            if item:
+            if isinstance(item, list):
+                result.extend(item)
+            elif item:
                 result.append(item)
         elif btype == "table":
             result.append(_make_table(block))
         elif btype == "block_code":
-            result.append(_make_code_block(block))
+            result.extend(_make_code_block(block))
         elif btype == "list":
             _walk_list(block, result)
         elif btype == "block_quote":
@@ -72,18 +74,34 @@ def _make_heading(block: dict) -> dict:
     }
 
 
-def _make_paragraph(block: dict) -> dict | None:
+def _make_paragraph(block: dict) -> dict | list[dict] | None:
     children = block.get("children", [])
 
-    # 仅含图片的段落 → figure_image
+    # 仅含图片的段落
     non_empty = [c for c in children if c["type"] != "softbreak"]
     if len(non_empty) == 1 and non_empty[0]["type"] == "image":
-        return {
-            "category": "figure_image",
-            "paragraph": non_empty[0]["attrs"].get("url", ""),
-            "score": 1.0,
-            "inline_marks": [],
-        }
+        img_node = non_empty[0]
+        url = img_node["attrs"].get("url", "")
+        alt_text = _extract_text(img_node.get("children", [])).strip()
+        # 图片在前，题注在后（图题在下）
+        result: list[dict] = [
+            {
+                "category": "figure_image",
+                "paragraph": url,
+                "score": 1.0,
+                "inline_marks": [],
+            }
+        ]
+        if alt_text:
+            result.append(
+                {
+                    "category": "caption_figure",
+                    "paragraph": alt_text,
+                    "score": 1.0,
+                    "inline_marks": [],
+                }
+            )
+        return result
 
     text = _extract_text(children)
     if not text.strip():
@@ -98,32 +116,50 @@ def _make_paragraph(block: dict) -> dict | None:
 
 
 def _make_table(block: dict) -> dict:
-    rows: list[str] = []
+    rows: list[list[str]] = []
     for child in block.get("children", []):
-        if child["type"] in ("table_head", "table_body"):
+        if child["type"] == "table_head":
+            # table_head: cells are direct children (no row wrapper)
+            cells = [
+                _extract_text(cell.get("children", []))
+                for cell in child.get("children", [])
+            ]
+            rows.append(cells)
+        elif child["type"] == "table_body":
+            # table_body: children are table_row elements
             for row in child.get("children", []):
                 cells = [
                     _extract_text(cell.get("children", []))
                     for cell in row.get("children", [])
                 ]
-                rows.append(" | ".join(cells))
-    text = "\n".join(rows)
+                rows.append(cells)
     return {
-        "category": "body_text",
-        "paragraph": text,
+        "category": "table_object",
+        "paragraph": "",
         "score": 1.0,
         "inline_marks": [],
+        "table_rows": rows,
     }
 
 
-def _make_code_block(block: dict) -> dict:
+def _make_code_block(block: dict) -> list[dict]:
+    """代码块按行拆成多个段落，每行独立为一个 body_text 节点。"""
     text = block.get("raw", "")
-    return {
-        "category": "body_text",
-        "paragraph": text,
-        "score": 1.0,
-        "inline_marks": [{"text": text, "code": True}],
-    }
+    lines = text.split("\n")
+    result: list[dict] = []
+    for line in lines:
+        line = line.strip("\r")
+        if not line.strip():
+            continue
+        result.append(
+            {
+                "category": "body_text",
+                "paragraph": line,
+                "score": 1.0,
+                "inline_marks": [{"text": line, "code": True}],
+            }
+        )
+    return result
 
 
 def _walk_list(block: dict, result: list[dict]) -> None:
@@ -140,7 +176,9 @@ def _extract_text(children: list[dict]) -> str:
     def walk(nodes):
         for node in nodes:
             if node["type"] == "text":
-                parts.append(node["raw"])
+                parts.append(node["raw"].replace("\r\n", "\n").replace("\r", "\n"))
+            elif node["type"] == "codespan":
+                parts.append(node.get("raw", ""))
             elif node["type"] == "softbreak":
                 parts.append(" ")
             elif node["type"] == "linebreak":
@@ -161,7 +199,8 @@ def _extract_segments(children: list[dict]) -> list[dict]:  # noqa: C901
             ntype = node["type"]
             if ntype == "text":
                 if node["raw"]:
-                    segments.append({"text": node["raw"], **attrs})
+                    text = node["raw"].replace("\r\n", "\n").replace("\r", "\n")
+                    segments.append({"text": text, **attrs})
             elif ntype in ("strong", "emphasis", "strikethrough"):
                 extra = {
                     "strong": "bold",

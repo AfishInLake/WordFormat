@@ -101,6 +101,7 @@ max-complexity = 10
 "cli.py" = ["C901"]
 "**/body.py" = ["C901"]
 "**/pipeline/stages.py" = ["C901"]
+"**/markdown/parser.py" = ["C901"]
 "**/utils/_text.py" = ["C901"]
 
 [tool.ruff.format]

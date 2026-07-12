@@ -362,6 +362,14 @@ class FormatNode(TreeNode):
         logger.debug(f"已替换段落文本 → {replace_text[:50]}...")
         return True
 
+    def _remove_manual_line_breaks(self) -> None:
+        """移除段落内所有手动换行符 <w:br/>（Shift+Enter）。"""
+        from docx.oxml.ns import qn
+
+        for r_elem in self.paragraph._element.findall(qn("w:r")):
+            for br in r_elem.findall(qn("w:br")):
+                r_elem.remove(br)
+
     def _clean_paragraph_edge_spaces(self) -> None:
         """清理段落首尾 run 中的多余空格。
 
@@ -374,6 +382,9 @@ class FormatNode(TreeNode):
         runs = self.paragraph.runs
         if not runs:
             return
+
+        # 移除段落内的手动换行符（Shift+Enter → <w:br/>）
+        self._remove_manual_line_breaks()
 
         # 清理第一个非空 run 的开头空格
         for run in runs:
