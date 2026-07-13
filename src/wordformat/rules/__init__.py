@@ -16,6 +16,7 @@ from .body import BodyText
 from .caption import CaptionFigure, CaptionTable
 from .heading import HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node
 from .keywords import KeywordsCN, KeywordsEN
+from .math import MathBlock
 from .node import FormatNode
 from .object import FigureImage, TableObject
 from .references import ReferenceEntry, References
@@ -29,6 +30,7 @@ __all__ = [
     "AbstractContentEN",
     "KeywordsEN",
     "KeywordsCN",
+    "MathBlock",
     "Acknowledgements",
     "AcknowledgementsCN",
     "BodyText",

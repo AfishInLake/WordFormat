@@ -8,13 +8,17 @@ from wordformat.rules.node import FormatNode
 from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 from wordformat.tree import Stack
 
+_NON_HEADING = {"body_text", "math_block", "figure_image", "table_object"}
+
+_HEADING_CATEGORIES = {
+    k: v for k, v in CATEGORY_TO_CLASS.items() if k not in _NON_HEADING
+}
+
 
 class DocumentTreeBuilder:
     """负责将扁平列表构建成层级树结构"""
 
-    HEADING_CATEGORIES = {
-        k: v for k, v in CATEGORY_TO_CLASS.items() if k != "body_text"
-    }
+    HEADING_CATEGORIES = _HEADING_CATEGORIES
     CONFIG = {}
 
     def __init__(self):

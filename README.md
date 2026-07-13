@@ -54,8 +54,7 @@ pip install pipx         # 其他平台
 # 安装 WordFormat
 pipx install wordformat
 
-# 需要 Web 界面时安装 api 版本
-pipx install "wordformat[api]"
+pipx install wordformat
 ```
 
 安装完成后直接使用 `wordf` 或 `wordformat` 命令。
@@ -64,8 +63,6 @@ pipx install "wordformat[api]"
 
 ```bash
 pip install wordformat
-# 或
-pip install "wordformat[api]"
 ```
 
 > 安装后如果提示"找不到 wordf 命令"，说明 Python 脚本目录不在系统 PATH 中。
@@ -123,8 +120,8 @@ wordf md -d 论文.md -c 配置.yaml
 ### startapi命令行预览（推荐使用）
 
 ```bash
-# 下载api版
-pip install "wordformat[api]"
+# 安装
+pip install wordformat
 # 启动 Web 可视化界面
 wordf startapi
 # 访问 http://127.0.0.1:8000

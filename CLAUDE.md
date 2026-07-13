@@ -57,10 +57,9 @@ pre-commit run --all-files
 ## Install variants
 
 ```bash
-pip install -e "."              # core only
-pip install -e ".[api]"         # core + FastAPI server
+pip install -e "."              # core (includes FastAPI server)
 pip install -e ".[test]"        # core + pytest plugins
-pip install -e ".[dev]"         # everything (api, test, pre-commit, ruff, pyinstaller)
+pip install -e ".[dev]"         # everything (test, pre-commit, ruff, pyinstaller)
 ```
 
 ## Pre-commit hooks

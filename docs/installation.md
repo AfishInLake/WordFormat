@@ -19,13 +19,7 @@ pip install wordformat
 uv pip install wordformat
 ```
 
-安装完成后即可使用 `wordf` 和 `wordformat` 命令。
-
-如需 API 服务功能，安装 api 可选依赖：
-
-```bash
-pip install wordformat[api]
-```
+安装完成后即可使用 `wordf` 和 `wordformat` 命令（含 API 服务）。
 
 ### 方式二：从源码安装（推荐开发者）
 
@@ -72,9 +66,8 @@ wordf --help
 
 | 依赖组 | 安装命令 | 包含内容 |
 |--------|----------|----------|
-| `api` | `pip install wordformat[api]` | FastAPI、uvicorn（API 服务） |
 | `test` | `pip install wordformat[test]` | pytest（测试框架） |
-| `dev` | `pip install wordformat[dev]` | 以上全部 + ruff、pre-commit、pyinstaller |
+| `dev` | `pip install wordformat[dev]` | test + ruff、pre-commit、pyinstaller |
 
 ## 故障排查
 
@@ -92,5 +85,5 @@ wordf --help
 
 ### API 服务启动失败
 
-- 确保已安装 api 可选依赖：`pip install wordformat[api]`
+- 确保已安装 wordformat：`pip install wordformat`
 - 检查端口未被其他服务占用
