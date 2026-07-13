@@ -1,26 +1,13 @@
 #! /usr/bin/env python
-# @Time    : 2025/12/22 21:47
-# @Author  : afish
-# @File    : __init__.py.py
+"""WordFormat — 论文格式自动化处理工具。"""
+
 from wordformat._version import __version__
+from wordformat.classify.tag import set_tag_main
+from wordformat.pipeline.orchestrate import auto_format_thesis_document, md_to_docx
 
 __all__ = [
     "__version__",
     "auto_format_thesis_document",
+    "md_to_docx",
     "set_tag_main",
 ]
-
-
-def __getattr__(name: str):
-    """懒加载重导出，避免 import wordformat 时触发整个 ONNX / pipeline 依赖链。"""
-    if name == "auto_format_thesis_document":
-        from wordformat.pipeline.orchestrate import (
-            auto_format_thesis_document as _fn,
-        )
-
-        return _fn
-    if name == "set_tag_main":
-        from wordformat.classify.tag import set_tag_main as _fn
-
-        return _fn
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
