@@ -186,8 +186,7 @@ wordf af -d your_document.docx -c example/undergrad_thesis.yaml -f output/论文
 ### 启动方式
 
 ```bash
-# 使用 pip 安装时带上 api 依赖
-pip install "wordformat[api]"
+pip install wordformat
 
 # 默认启动（127.0.0.1:8000，仅本机可访问）
 wordf startapi
@@ -351,7 +350,7 @@ auto_format_thesis_document(
 make server
 
 # 或直接使用 uvicorn
-pip install -e ".[api]"
+pip install -e "."
 python start_api.py
 ```
 

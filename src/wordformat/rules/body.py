@@ -9,6 +9,7 @@ from copy import deepcopy
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 
@@ -90,27 +91,19 @@ def _split_run_at(paragraph, start: int, end: int):
 class BodyText(FormatNode):
     """正文节点"""
 
-    NODE_TYPE = "body_text"
+    NODE_TYPE = "body.text"
     NODE_LABEL = "正文段落"
-    DEFAULTS = {
-        "alignment": "两端对齐",
-        "space_before": "0.5行",
-        "space_after": "0.5行",
-        "line_spacingrule": "单倍行距",
-        "line_spacing": "1.5倍",
-        "left_indent": "0字符",
-        "right_indent": "0字符",
-        "first_line_indent": "2字符",
-        "builtin_style_name": "正文",
-        "chinese_font_name": "宋体",
-        "english_font_name": "Times New Roman",
-        "font_size": "小四",
-        "font_color": "黑色",
-        "bold": False,
-        "italic": False,
-        "underline": False,
-        "rules": {"punctuation": {"enabled": True}},
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"alignment": "两端对齐"},
+            "font": {
+                "chinese_font_name": "宋体",
+                "english_font_name": "Times New Roman",
+            },
+            "rules": {"punctuation": {"enabled": True}},
+        },
+    )
     RULES = {"punctuation": "_check_punctuation"}
 
     def _check_punctuation(self, doc, rule_cfg, p: bool = False):
@@ -138,7 +131,7 @@ class BodyText(FormatNode):
                     else self.paragraph.runs
                 )
             msg = (
-                f"{self.NODE_LABEL}-提醒-标点符号问题："
+                f"{self.NODE_LABEL}-提醒-标点问题："
                 f'使用了半角英文标点符号"{half}(英文)"，'
                 f'规范：应使用全角中文标点符号"{full}(中文)"'
             )

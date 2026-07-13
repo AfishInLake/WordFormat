@@ -54,6 +54,7 @@ SEVERITY_MAP: dict[str, str] = {
     "字体颜色错误": "提醒",
     "中文字体错误": "提醒",
     "英文字体错误": "提醒",
+    "标点问题": "提醒",
     "标点错误": "提醒",
 }
 
@@ -67,11 +68,18 @@ SEVERITY_COLOR: dict[str, str] = {"错误": "FF0000", "提醒": "0000FF"}
 
 
 def get_severity(comment_text: str) -> str:
-    """从批注文本中提取严重等级。格式：位置-问题类型：..."""
+    """从批注文本中提取严重等级。
+
+    支持两种格式：
+      - 位置-问题类型：...        → 问题类型 = 首个 - 与 ： 之间
+      - 位置-严重等级-问题类型：... → 问题类型 = 最后一段
+    """
     try:
         prop = comment_text.split("-", 1)[1].split("：")[0]
     except (IndexError, AttributeError):
         return _DEFAULT_SEVERITY
+    if "-" in prop:
+        prop = prop.rsplit("-", 1)[-1]
     return SEVERITY_MAP.get(prop, _DEFAULT_SEVERITY)
 
 
@@ -138,6 +146,8 @@ def split_comment_line(line: str) -> list[Segment]:
     if not sep:
         return [(line, None)]
     prop = prefix.split("-", 1)[1] if "-" in prefix else prefix
+    if "-" in prop:
+        prop = prop.rsplit("-", 1)[-1]
     color = severity_color(prop)
     segments: list[Segment] = [(prefix + sep, {"color": color} if color else None)]
     if tail:

@@ -13,7 +13,7 @@ from loguru import logger
 from rich.console import Console
 
 from wordformat.classify.tag import set_tag_main
-from wordformat.pipeline.orchestrate import auto_format_thesis_document
+from wordformat.pipeline.orchestrate import auto_format_thesis_document, md_to_docx
 from wordformat.settings import VERSION
 from wordformat.tree import print_tree
 
@@ -90,6 +90,7 @@ wordf cf    检查格式错误
 wordf af    自动格式化论文
 wordf tree  查看文档结构树
 wordf config  查看所有可配置字段
+wordf md    Markdown 转 Docx
 wordf startapi    启动API服务
 
 【一键示例】
@@ -97,6 +98,7 @@ wordf gj -d 论文.docx -c config.yaml -o output/
 wordf cf -d 论文.docx -c config.yaml -f output/xxx.json -o output/
 wordf af -d 论文.docx -c config.yaml -f output/xxx.json -o output/
 wordf tree -f output/xxx.json
+wordf md -d thesis.md -c config.yaml -o output/
 wordf config
 wordf startapi -H 127.0.0.1 -p 8000
 ==================================================
@@ -206,7 +208,25 @@ wordf startapi -H 127.0.0.1 -p 8000
     )
 
     # ------------------------------
-    # 6. startapi = 启动API服务
+    # 6. md = Markdown 转 Docx
+    # ------------------------------
+    p_md = subparsers.add_parser("md", help="Markdown 转 Docx")
+    p_md.add_argument(
+        "-d",
+        required=True,
+        type=lambda x: validate_file(x, "Markdown文件", [".md"]),
+        help="Markdown 文件路径",
+    )
+    p_md.add_argument(
+        "-c",
+        default=None,
+        type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]),
+        help="YAML 配置路径（可选）",
+    )
+    p_md.add_argument("-o", default="output/", help="输出目录（默认output/）")
+
+    # ------------------------------
+    # 7. startapi = 启动API服务
     # ------------------------------
     p_startapi = subparsers.add_parser("startapi", help="启动API服务")
     p_startapi.add_argument(
@@ -231,7 +251,7 @@ wordf startapi -H 127.0.0.1 -p 8000
     args = parser.parse_args()
 
     # 只在需要输出目录的命令中创建目录
-    if args.mode in ["gj", "cf", "af"]:
+    if args.mode in ["gj", "cf", "af", "md"]:
         output_dir = Path(args.o)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -329,6 +349,15 @@ wordf startapi -H 127.0.0.1 -p 8000
             logger.success(f"配置模板已输出 → {args.o}")
         else:
             _show_config()
+
+    elif args.mode == "md":
+        logger.info("📝 开始 Markdown → Docx 转换...")
+        md_to_docx(
+            md_path=args.d,
+            config_path=args.c,
+            save_dir=args.o,
+        )
+        logger.success(f"✅ 转换完成！文件保存在：{args.o}")
 
     elif args.mode == "startapi":
         logger.info("🚀 启动API服务...")

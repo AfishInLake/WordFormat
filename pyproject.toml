@@ -1,6 +1,6 @@
 [project]
 name = "wordformat"
-version = "1.4.0"
+version = "1.5.0"
 description = "论文格式自动化处理工具"
 readme = "README.md"
 license = "Apache-2.0"
@@ -24,8 +24,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "latex2mathml>=3.81.0",
+    "lxml>=5.0.0",
+    "mathml2omml>=0.0.2",
     "fastapi>=0.128.1",
     "loguru>=0.7.3",
+    "mistune>=3.0.0",
     "numpy>=1.24.0",
     "onnxruntime>=1.17.0",
     "pydantic>=2.12.5",
@@ -100,6 +104,7 @@ max-complexity = 10
 "cli.py" = ["C901"]
 "**/body.py" = ["C901"]
 "**/pipeline/stages.py" = ["C901"]
+"**/markdown/parser.py" = ["C901"]
 "**/utils/_text.py" = ["C901"]
 
 [tool.ruff.format]

@@ -15,21 +15,45 @@ from docx.oxml.ns import qn
 
 from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
 from wordformat.style.reader import (
-    paragraph_get_alignment, paragraph_get_space_before, paragraph_get_space_after,
-    paragraph_get_line_spacing, paragraph_get_first_line_indent,
-    paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
-    run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent,
+    paragraph_get_alignment,
+    paragraph_get_space_before,
+    paragraph_get_space_after,
+    paragraph_get_line_spacing,
+    paragraph_get_first_line_indent,
+    paragraph_get_builtin_style_name,
+    run_get_font_name,
+    run_get_font_size_pt,
+    run_get_font_color,
+    run_get_font_bold,
+    run_get_font_italic,
+    run_get_font_underline,
+    GetIndent,
 )
 from wordformat.style.writer import (
-    run_set_font_name, set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines, _paragraph_space_by_lines,
-    SetSpacing, SetLineSpacing, SetIndent, SetFirstLineIndent,
+    run_set_font_name,
+    set_paragraph_space_before_by_lines,
+    set_paragraph_space_after_by_lines,
+    _paragraph_space_by_lines,
+    SetSpacing,
+    SetLineSpacing,
+    SetIndent,
+    SetFirstLineIndent,
 )
 from wordformat.style.defs import (
-    FontName, FontSize, FontColor, Alignment, LineSpacingRule, LineSpacing,
-    FirstLineIndent, LeftIndent, RightIndent, BuiltInStyle, SpaceBefore, SpaceAfter,
-    Spacing, UnitLabelEnum,
+    FontName,
+    FontSize,
+    FontColor,
+    Alignment,
+    LineSpacingRule,
+    LineSpacing,
+    FirstLineIndent,
+    LeftIndent,
+    RightIndent,
+    BuiltInStyle,
+    SpaceBefore,
+    SpaceAfter,
+    Spacing,
+    UnitLabelEnum,
 )
 from wordformat.style.units import extract_unit_from_string, UnitResult
 
@@ -37,6 +61,7 @@ from wordformat.style.units import extract_unit_from_string, UnitResult
 # ---------------------------------------------------------------------------
 # fixtures & helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def doc():
@@ -46,10 +71,23 @@ def doc():
 @pytest.fixture
 def mock_warning():
     w = MagicMock()
-    for attr in ("bold", "italic", "underline", "font_size", "font_color",
-                 "font_name", "alignment", "space_before", "space_after",
-                 "line_spacing", "line_spacingrule", "first_line_indent",
-                 "left_indent", "right_indent", "builtin_style_name"):
+    for attr in (
+        "bold",
+        "italic",
+        "underline",
+        "font_size",
+        "font_color",
+        "font_name",
+        "alignment",
+        "space_before",
+        "space_after",
+        "line_spacing",
+        "line_spacingrule",
+        "first_line_indent",
+        "left_indent",
+        "right_indent",
+        "builtin_style_name",
+    ):
         setattr(w, attr, True)
     return w
 
@@ -57,21 +95,36 @@ def mock_warning():
 @pytest.fixture
 def mock_warning_off():
     w = MagicMock()
-    for attr in ("bold", "italic", "underline", "font_size", "font_color",
-                 "font_name", "alignment", "space_before", "space_after",
-                 "line_spacing", "line_spacingrule", "first_line_indent",
-                 "left_indent", "right_indent", "builtin_style_name"):
+    for attr in (
+        "bold",
+        "italic",
+        "underline",
+        "font_size",
+        "font_color",
+        "font_name",
+        "alignment",
+        "space_before",
+        "space_after",
+        "line_spacing",
+        "line_spacingrule",
+        "first_line_indent",
+        "left_indent",
+        "right_indent",
+        "builtin_style_name",
+    ):
         setattr(w, attr, False)
     return w
 
 
 def _set_warning(w):
     import wordformat.style.diff as m
+
     m.style_checks_warning = w
 
 
 def _clear_warning():
     import wordformat.style.diff as m
+
     m.__dict__.pop("style_checks_warning", None)
 
 
@@ -79,12 +132,12 @@ def _clear_warning():
 # set_some
 # ===========================================================================
 
+
 class TestSetSomeFontName:
     def test_set_and_verify_xml(self, doc):
         run = doc.add_paragraph().add_run("x")
         run_set_font_name(run, "黑体")
         assert run._element.rPr.rFonts.get(qn("w:eastAsia")) == "黑体"
-
 
 
 class TestSetSomeSpaceByLines:
@@ -108,7 +161,6 @@ class TestSetSomeSpaceByLines:
         assert paragraph_get_space_after(p) == 1.0
 
 
-
 class TestSetSpacingHang:
     def test_set_and_clamp(self, doc):
         p = doc.add_paragraph()
@@ -118,14 +170,12 @@ class TestSetSpacingHang:
         assert paragraph_get_space_before(p) == 10.0
 
 
-
 class TestSetLineSpacing:
     @pytest.mark.parametrize("method,val", [("set_pt", 20), ("set_cm", 1.0)])
     def test_sets_exactly_rule(self, doc, method, val):
         p = doc.add_paragraph()
         getattr(SetLineSpacing, method)(p, val)
         assert p.paragraph_format.line_spacing_rule == WD_LINE_SPACING.EXACTLY
-
 
 
 class TestSetIndent:
@@ -140,9 +190,15 @@ class TestSetIndent:
     def test_set_char_invalid_returns_false(self, doc):
         assert SetIndent.set_char(doc.add_paragraph(), "Z", 1) is False
 
-    @pytest.mark.parametrize("method,indent_type", [
-        ("set_pt", "R"), ("set_cm", "X"), ("set_inch", "R"), ("set_mm", "R"),
-    ])
+    @pytest.mark.parametrize(
+        "method,indent_type",
+        [
+            ("set_pt", "R"),
+            ("set_cm", "X"),
+            ("set_inch", "R"),
+            ("set_mm", "R"),
+        ],
+    )
     def test_physical_units_set_indent(self, doc, method, indent_type):
         p = doc.add_paragraph()
         getattr(SetIndent, method)(p, indent_type, 1.0)
@@ -152,7 +208,6 @@ class TestSetIndent:
     def test_apply_indent_invalid_raises(self, doc):
         with pytest.raises(ValueError, match="无效的缩进类型"):
             SetIndent._apply_indent(doc.add_paragraph(), "Z", 10)
-
 
 
 class TestSetFirstLineIndent:
@@ -188,7 +243,6 @@ class TestSetFirstLineIndent:
         p = doc.add_paragraph()
         getattr(SetFirstLineIndent, method)(p, 1.0)
         assert paragraph_get_first_line_indent(p) is None
-
 
 
 # ===========================================================================
@@ -252,6 +306,7 @@ class TestSetSpacingUnits:
         p = doc.add_paragraph()
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
         spacing.set(qn("w:before"), "200")
@@ -259,7 +314,6 @@ class TestSetSpacingUnits:
         SetSpacing.set_hang(p, "before", 0.5)
         spacing_after = pPr.find(qn("w:spacing"))
         assert spacing_after.get(qn("w:before")) == "0"
-
 
 
 class TestSetLineSpacingUnits:
@@ -276,7 +330,6 @@ class TestSetLineSpacingUnits:
         p = doc.add_paragraph()
         SetLineSpacing.set_mm(p, 10.0)
         assert p.paragraph_format.line_spacing_rule == WD_LINE_SPACING.EXACTLY
-
 
 
 class TestSetIndentUnits:
@@ -328,7 +381,6 @@ class TestSetIndentUnits:
         assert p.paragraph_format.right_indent is not None
 
 
-
 class TestSetFirstLineIndentUnits:
     """Cover lines 478, 494, 510, 526: _SetFirstLineIndent physical unit methods"""
 
@@ -376,13 +428,14 @@ class TestSetFirstLineIndentUnits:
         # clear() calls get_or_add_pPr first, then we make it fail.
         call_count = [0]
         original_get_or_add = p._element.get_or_add_pPr
+
         def bad_get_or_add():
             call_count[0] += 1
             if call_count[0] > 1:
                 # First call is from clear(), second is from the try block
                 raise RuntimeError("test error")
             return original_get_or_add()
+
         p._element.get_or_add_pPr = bad_get_or_add
         assert SetFirstLineIndent.set_char(p, 2) is False
         p._element.get_or_add_pPr = original_get_or_add
-

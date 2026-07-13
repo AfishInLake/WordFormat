@@ -1,6 +1,7 @@
 """
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -51,6 +52,7 @@ def _load_root_config(config_path):
 
 def _load_yaml(path):
     import yaml
+
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -59,6 +61,7 @@ def _load_yaml(path):
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
     from wordformat.config.loader import init_config
+
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -86,7 +89,6 @@ def run_with_text(para):
 # ---------------------------------------------------------------------------
 
 
-
 class TestCaptionFigureBase:
     """覆盖 caption.py CaptionFigure._base 的 diff/apply 逻辑。"""
 
@@ -112,13 +114,12 @@ class TestCaptionFigureBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
 
 # ---------------------------------------------------------------------------
 # 17. CaptionTable._base 覆盖
 # ---------------------------------------------------------------------------
-
 
 
 class TestCaptionTableBase:
@@ -146,7 +147,7 @@ class TestCaptionTableBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +166,6 @@ from docx import Document
 # CaptionNumberingConfig replaced by dict
 
 # ======================== _from_roman ========================
-
 
 
 class TestApplyCaptionNumbering:
@@ -265,6 +265,7 @@ class TestApplyCaptionNumbering:
 
 # ======================== apply_format_check_to_all_nodes 集成 ========================
 
+
 class TestCaptionNumberingIntegration:
     """测试 caption numbering 在 apply_format_check_to_all_nodes 中的集成。"""
 
@@ -281,26 +282,24 @@ global_format:
   font_color: '黑色'
   builtin_style_name: '正文'
 figures:
-  caption_position: 'below'
-  caption_prefix: '图'
-  rules:
-    caption_numbering:
-      enabled: true
-      separator: '.'
+  caption:
+    caption_prefix: '图'
+    rules:
+      caption_numbering:
+        enabled: true
+        separator: '.'
 tables:
-  caption_position: 'above'
-  caption_prefix: '表'
-  content:
-    font_size: '五号'
-  rules:
-    caption_numbering:
-      enabled: true
-      separator: '.'
+  caption:
+    caption_prefix: '表'
+    rules:
+      caption_numbering:
+        enabled: true
+        separator: '.'
+  object:
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
 numbering:
   enabled: false
-  captions:
-    enabled: true
-    separator: '.'
 """
         path = tmp_path / "caption_test.yaml"
         path.write_text(yaml_content, encoding="utf-8")
@@ -347,7 +346,11 @@ numbering:
 
     def test_check_mode_injects_chapter_and_seq(self, caption_yaml):
         """验证遍历时章节号和顺序号被注入到 node.value 中。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p = self._make_paragraph("图1.1 系统架构图")
@@ -371,19 +374,26 @@ numbering:
         mock_cs = MagicMock()
         mock_cs.diff_from_run.return_value = {}
         mock_cs.apply_to_run.return_value = {}
-        with patch(
-            "wordformat.style.diff.ParagraphStyle.from_config",
-            return_value=mock_ps,
-        ), patch(
-            "wordformat.style.diff.CharacterStyle",
-            return_value=mock_cs,
+        with (
+            patch(
+                "wordformat.style.diff.ParagraphStyle.from_config",
+                return_value=mock_ps,
+            ),
+            patch(
+                "wordformat.style.diff.CharacterStyle",
+                return_value=mock_cs,
+            ),
         ):
             yield
 
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_check_mode_correct_no_comment(self, caption_yaml):
         """check 模式：格式正确，不添加批注。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p = self._make_paragraph("图1.1 系统架构图")
@@ -399,7 +409,11 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_check_mode_wrong_chapter_adds_comment(self, caption_yaml):
         """check 模式：章节号错误应添加批注。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p = self._make_paragraph("图2.1 测试图")
@@ -416,7 +430,11 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_apply_mode_rewrites_caption(self, caption_yaml):
         """apply 模式：重写题注文本。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p = self._make_paragraph("图2-1 旧名称")
@@ -431,7 +449,11 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_per_type_counters(self, caption_yaml):
         """图和表使用独立计数器。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p_fig = self._make_paragraph("图1.1 图")
@@ -442,8 +464,10 @@ numbering:
         heading = self._make_heading_node(children=[fig, tab])
         config = self._init_config(caption_yaml)
 
-        with patch.object(fig, "add_comment") as mc1, \
-             patch.object(tab, "add_comment") as mc2:
+        with (
+            patch.object(fig, "add_comment") as mc1,
+            patch.object(tab, "add_comment") as mc2,
+        ):
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
 
         mc1.assert_not_called()
@@ -454,7 +478,11 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_multi_chapter_counters_reset(self, caption_yaml):
         """不同章节的题注计数器独立重置。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p1 = self._make_paragraph("图1.1 第一章图")
@@ -472,8 +500,7 @@ numbering:
 
         config = self._init_config(caption_yaml)
 
-        with patch.object(fig1, "add_comment"), \
-             patch.object(fig2, "add_comment"):
+        with patch.object(fig1, "add_comment"), patch.object(fig2, "add_comment"):
             apply_format_check_to_all_nodes(root, doc, config, check=True)
 
         assert fig1.value["chapter_number"] == 1
@@ -484,14 +511,18 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_disabled_skips_numbering_check(self, caption_yaml):
         """rules.caption_numbering.enabled=False 时不检查编号（但仍注入 chapter/seq）。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p = self._make_paragraph("图2.1 测试")
         fig = self._make_caption_figure(p)
         heading = self._make_heading_node(children=[fig])
         config = self._init_config(caption_yaml)
-        config["figures"]["rules"]["caption_numbering"]["enabled"] = False
+        config["figures"]["caption"]["rules"]["caption_numbering"]["enabled"] = False
 
         with patch.object(fig, "add_comment") as mock_comment:
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
@@ -503,7 +534,11 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_continued_table_does_not_increment_counter(self, caption_yaml):
         """续表不消耗题注编号，后续普通题注编号正确递增。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p1 = self._make_paragraph("表5.1 岗位信息表")
@@ -516,9 +551,11 @@ numbering:
         heading = self._make_heading_node(children=[tab1, tab_continued, tab2])
         config = self._init_config(caption_yaml)
 
-        with patch.object(tab1, "add_comment"), \
-             patch.object(tab_continued, "add_comment"), \
-             patch.object(tab2, "add_comment"):
+        with (
+            patch.object(tab1, "add_comment"),
+            patch.object(tab_continued, "add_comment"),
+            patch.object(tab2, "add_comment"),
+        ):
             apply_format_check_to_all_nodes(heading, doc, config, check=True)
 
         # 表5.1: 章节号5，序号1
@@ -534,7 +571,11 @@ numbering:
     @pytest.mark.usefixtures("_suppress_format_comments")
     def test_continued_table_apply_mode_preserves_prefix(self, caption_yaml):
         """apply 模式：续表文本保留续前缀。"""
-        from wordformat.pipeline.stages import FormattingExecutionStage; apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+        from wordformat.pipeline.stages import FormattingExecutionStage
+
+        apply_format_check_to_all_nodes = (
+            FormattingExecutionStage().apply_format_check_to_all_nodes
+        )
 
         doc = Document()
         p = self._make_paragraph("续表5.3 API接口测试结果")
@@ -545,6 +586,7 @@ numbering:
         apply_format_check_to_all_nodes(heading, doc, config, check=False)
 
         assert p.text == "续表5.3 API接口测试结果"
+
 
 class TestCheckCaptionNumbering:
     """直接测试 _check_caption_numbering 函数。"""
@@ -744,6 +786,7 @@ class TestCheckCaptionNumbering:
 
 # ======================== _apply_caption_numbering ========================
 
+
 class TestReplaceParagraphText:
     def test_single_run(self):
         from wordformat.rules.caption import _replace_paragraph_text
@@ -785,6 +828,7 @@ class TestCaptionEdgeCases:
         """空 runs 列表不抛异常。"""
         from docx import Document
         from wordformat.rules.caption import _replace_paragraph_text
+
         doc = Document()
         p = doc.add_paragraph()
         # 没有 runs — 不应抛异常
@@ -793,17 +837,26 @@ class TestCaptionEdgeCases:
     def test_check_caption_numbering_no_paragraph(self):
         """paragraph 为 None 时直接返回。"""
         from wordformat.rules.caption import _check_caption_numbering, CaptionFigure
+
         node = CaptionFigure(value={"category": "test"}, level=0)
         node.paragraph = None
         # 不应抛异常
-        _check_caption_numbering(node, None, "图", {"enabled": True, "separator": ".", "label_number_space": False})
+        _check_caption_numbering(
+            node,
+            None,
+            "图",
+            {"enabled": True, "separator": ".", "label_number_space": False},
+        )
 
     def test_apply_caption_numbering_no_paragraph(self):
         """paragraph 为 None 时直接返回。"""
         from wordformat.rules.caption import _apply_caption_numbering, CaptionFigure
+
         node = CaptionFigure(value={"category": "test"}, level=0)
         node.paragraph = None
-        _apply_caption_numbering(node, "图", {"enabled": True, "separator": ".", "label_number_space": False})
+        _apply_caption_numbering(
+            node, "图", {"enabled": True, "separator": ".", "label_number_space": False}
+        )
 
 
 class TestNodeConfigRoot:
@@ -811,16 +864,19 @@ class TestNodeConfigRoot:
 
     def test_setattr(self):
         from wordformat.config.models import NodeConfigRoot
+
         cfg = NodeConfigRoot()
         cfg.template_name = "测试"
         assert cfg["template_name"] == "测试"
 
     def test_getattr_missing_returns_none(self):
         from wordformat.config.models import NodeConfigRoot
+
         cfg = NodeConfigRoot()
         assert cfg.nonexistent is None
 
     def test_model_dump(self):
         from wordformat.config.models import NodeConfigRoot
+
         cfg = NodeConfigRoot(a=1, b=2)
         assert cfg.model_dump() == {"a": 1, "b": 2}

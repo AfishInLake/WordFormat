@@ -83,12 +83,14 @@ class LoadDocxStage:
 
 
 class TreeBuildingStage:
-    """构建tree pipline"""
+    """构建tree pipline。
+    优先使用 ctx.paragraphs（内存中的段落列表，如 MD 解析结果），
+    否则从 ctx.json_path 加载 JSON 文件。
+    """
 
     def process(self, ctx: FormatContext) -> FormatContext:
-        ctx.root_node = DocumentBuilder.build_from_json(
-            ctx.json_path, config=ctx.config_model
-        )
+        source = ctx.paragraphs if ctx.paragraphs else ctx.json_path
+        ctx.root_node = DocumentBuilder.build_from_json(source, config=ctx.config_model)
         return ctx
 
 
@@ -304,6 +306,9 @@ class StyleDefinitionFixStage:
 class FormattingExecutionStage:
     """执行格式化/检查（核心遍历）"""
 
+    def __init__(self, skip_comments: bool = False):
+        self.skip_comments = skip_comments
+
     def apply_format_check_to_all_nodes(
         self, root_node: FormatNode, document, config, check=True
     ):
@@ -376,6 +381,8 @@ class FormattingExecutionStage:
                             node.apply_replace(document)
                             if check:
                                 node.check_format(document)
+                            elif self.skip_comments:
+                                node.apply_style(document)
                             else:
                                 node.apply_format(document)
                 except Exception as e:
@@ -542,13 +549,14 @@ class PostProcessingStage:
             return ctx
         config_model = ctx.config_model
         # 标题编号
-        if hasattr(config_model, "numbering") and config_model.numbering.enabled:
+        numbering = config_model.numbering
+        if numbering and getattr(numbering, "enabled", False):
             from wordformat.numbering import process_heading_numbering
 
             process_heading_numbering(
                 ctx.root_node,
                 ctx.document,
-                config_model.numbering,
+                numbering,
                 config_model.headings,
             )
 

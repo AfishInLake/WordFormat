@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : references.py
 
-from wordformat.config.dotdict import BASE_FORMAT
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 
@@ -14,25 +14,28 @@ class References(FormatNode):
 
     NODE_TYPE = "references.title"
     NODE_LABEL = "参考文献标题"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "居中对齐",
-        "first_line_indent": "0字符",
-        "chinese_font_name": "黑体",
-        "font_size": "三号",
-        "bold": True,
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {
+                "alignment": "居中对齐",
+                "first_line_indent": "0字符",
+            },
+            "font": {"chinese_font_name": "黑体", "font_size": "三号", "bold": True},
+        },
+    )
 
 
 @register("references_content")
 class ReferenceEntry(FormatNode):
     """参考文献条目节点"""
 
-    NODE_TYPE = "references.content"
+    NODE_TYPE = "references.entry"
     NODE_LABEL = "参考文献条目"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "first_line_indent": "0字符",
-        "chinese_font_name": "宋体",
-        "font_size": "五号",
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"first_line_indent": "0字符"},
+            "font": {"chinese_font_name": "宋体", "font_size": "五号"},
+        },
+    )

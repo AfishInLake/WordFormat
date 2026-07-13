@@ -22,6 +22,7 @@
 - **灵活的交互方式**：支持「生成结构文件→手动调整→执行校验」的分步流程，兼顾自动化与灵活性
 
 ### 实用功能
+- **Markdown 转 Word**：支持将 Markdown 文件直接转换为格式化后的 .docx 文档，保留标题层级结构并自动应用配置中的格式规范
 - **自动批注生成**：在格式违规位置自动添加 Word 批注，标注问题类型和修正建议
 - **文档结构可视化**：通过 `wordf tree` 命令以树形结构展示文档段落分类和层级关系，支持按类别过滤、显示置信度
 - **格式一键修正**：支持根据规范自动修正部分常见格式问题（如标题字号、正文行距）
@@ -53,8 +54,7 @@ pip install pipx         # 其他平台
 # 安装 WordFormat
 pipx install wordformat
 
-# 需要 Web 界面时安装 api 版本
-pipx install "wordformat[api]"
+pipx install wordformat
 ```
 
 安装完成后直接使用 `wordf` 或 `wordformat` 命令。
@@ -63,8 +63,6 @@ pipx install "wordformat[api]"
 
 ```bash
 pip install wordformat
-# 或
-pip install "wordformat[api]"
 ```
 
 > 安装后如果提示"找不到 wordf 命令"，说明 Python 脚本目录不在系统 PATH 中。
@@ -115,12 +113,15 @@ wordf af -d 论文.docx -c 配置.yaml -f 结构文件.json
 # 5. 启动 Web 可视化界面
 wordf startapi
 # 然后在浏览器打开 http://127.0.0.1:8000
+
+# 6. Markdown 转 Word（从 Markdown 直接生成格式化后的 .docx）
+wordf md -d 论文.md -c 配置.yaml
 ```
 ### startapi命令行预览（推荐使用）
 
 ```bash
-# 下载api版
-pip install "wordformat[api]"
+# 安装
+pip install wordformat
 # 启动 Web 可视化界面
 wordf startapi
 # 访问 http://127.0.0.1:8000
@@ -143,39 +144,9 @@ python -m wordformat startapi
 
 更多详细用法请查看 [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md)
 
-## AI Skill 集成
+## 预设配置
 
-WordFormat 提供了 **SOLO Skill**，可在 SOLO 等 AI 助手平台中直接调用，实现对话式论文格式化。
-
-### Skill 工作流程
-
-Skill 包含两个独立任务，可分步执行：
-
-| 任务 | 说明 | 产物 |
-|------|------|------|
-| **任务一：准备配置文件** | 根据格式要求生成/编辑 config.yaml | `config.yaml` |
-| **任务二：执行格式化** | 使用配置文件对论文进行格式检查或修正 | `--标注版.docx` 或 `--修改版.docx` |
-
-### Skill 目录结构
-
-```
-wordformat-skill/
-├── SKILL.md                    # Skill 定义文件
-├── scripts/
-│   ├── setup_config.py         # 配置文件生成/验证脚本
-│   ├── validate_json.py        # JSON 标签校验脚本
-│   └── validate_config.py      # 配置文件验证脚本
-└── data/
-    ├── config.yaml             # 默认配置模板
-    ├── config_spec.md          # 配置文件完整字段规范
-    ├── config_editing_guide.md # 配置编辑指南
-    ├── category_reference.md   # 段落分类参考
-    └── font_size_table.md      # 字号对照表
-```
-
-### 预设配置库
-
-项目内置了多所高校的论文格式预设，保存在 `presets/` 目录下，命名格式为 `{学校}_{学院/专业}_{论文类型}.yaml`，可直接使用或在此基础上修改。
+项目内置了多所高校的论文格式预设，保存在 `presets/` 目录下，可直接使用或在此基础上修改。
 
 ## 详细文档
 
@@ -184,6 +155,7 @@ wordformat-skill/
 - [安装指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/installation.md) - 环境要求和安装步骤
 - [使用指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/usage.md) - 命令行、Python编程和API调用的详细使用方法
 - [配置文件说明](https://github.com/AfishInLake/WordFormat/blob/master/docs/configuration.md) - 格式规范配置项和自定义配置方法
+- [Markdown 转 Word](https://github.com/AfishInLake/WordFormat/blob/master/docs/md-to-docx.md) - Markdown → Docx 转换功能介绍与使用说明
 - [常见问题](https://github.com/AfishInLake/WordFormat/blob/master/docs/faq.md) - 常见问题及解决方案
 - [贡献指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/contributing.md) - 如何为项目贡献代码和文档
 - [技术架构](https://github.com/AfishInLake/WordFormat/blob/master/docs/architecture.md) - 项目的技术架构和实现原理

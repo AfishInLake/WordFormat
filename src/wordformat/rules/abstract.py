@@ -4,7 +4,7 @@
 # @File    : abstract.py
 import re
 
-from wordformat.config.dotdict import BASE_FORMAT
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
@@ -14,16 +14,15 @@ from wordformat.style.diff import CharacterStyle, ParagraphStyle
 class AbstractTitleCN(FormatNode):
     """摘要标题中文节点"""
 
-    NODE_TYPE = "abstract.chinese.chinese_title"
+    NODE_TYPE = "abstract.chinese.title"
     NODE_LABEL = "中文摘要标题"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "居中对齐",
-        "first_line_indent": "0字符",
-        "chinese_font_name": "黑体",
-        "font_size": "小二",
-        "bold": True,
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"alignment": "居中对齐", "first_line_indent": "0字符"},
+            "font": {"chinese_font_name": "黑体", "font_size": "小二", "bold": True},
+        },
+    )
 
 
 @register("abstract_chinese_title_content", level=1)
@@ -33,7 +32,7 @@ class AbstractTitleContentCN(FormatNode):
     NODE_TYPE = "abstract.chinese"
     NODE_LABEL = "中文摘要"
     DEFAULTS = {
-        "chinese_title": {
+        "title": {
             **BASE_FORMAT,
             "alignment": "居中对齐",
             "first_line_indent": "0字符",
@@ -41,7 +40,7 @@ class AbstractTitleContentCN(FormatNode):
             "font_size": "小二",
             "bold": True,
         },
-        "chinese_content": {**BASE_FORMAT, "alignment": "两端对齐"},
+        "body": {**BASE_FORMAT, "alignment": "两端对齐"},
     }
 
     def check_title(self, run) -> bool:
@@ -56,7 +55,7 @@ class AbstractTitleContentCN(FormatNode):
         # 混合节点的cfg有两个值，遂需要重新组装
         # 段落样式选择content样式
         # 字体样式"摘要"选择title，"正文"选择content
-        ps = ParagraphStyle.from_config(cfg.chinese_content)
+        ps = ParagraphStyle.from_config(cfg.body)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -67,13 +66,13 @@ class AbstractTitleContentCN(FormatNode):
             if self.check_title(run):
                 # 对run对象设置样式
                 C = CharacterStyle(
-                    font_name_cn=cfg.chinese_title.chinese_font_name,
-                    font_name_en=cfg.chinese_title.english_font_name,
-                    font_size=cfg.chinese_title.font_size,
-                    font_color=cfg.chinese_title.font_color,
-                    bold=cfg.chinese_title.bold,
-                    italic=cfg.chinese_title.italic,
-                    underline=cfg.chinese_title.underline,
+                    font_name_cn=cfg.title.chinese_font_name,
+                    font_name_en=cfg.title.english_font_name,
+                    font_size=cfg.title.font_size,
+                    font_color=cfg.title.font_color,
+                    bold=cfg.title.bold,
+                    italic=cfg.title.italic,
+                    underline=cfg.title.underline,
                 )
                 if r:
                     diff_result = C.diff_from_run(run)
@@ -82,13 +81,13 @@ class AbstractTitleContentCN(FormatNode):
             else:
                 # 对剩余部分的run设置样式
                 C = CharacterStyle(
-                    font_name_cn=cfg.chinese_content.chinese_font_name,
-                    font_name_en=cfg.chinese_content.english_font_name,
-                    font_size=cfg.chinese_content.font_size,
-                    font_color=cfg.chinese_content.font_color,
-                    bold=cfg.chinese_content.bold,
-                    italic=cfg.chinese_content.italic,
-                    underline=cfg.chinese_content.underline,
+                    font_name_cn=cfg.body.chinese_font_name,
+                    font_name_en=cfg.body.english_font_name,
+                    font_size=cfg.body.font_size,
+                    font_color=cfg.body.font_color,
+                    bold=cfg.body.bold,
+                    italic=cfg.body.italic,
+                    underline=cfg.body.underline,
                 )
                 if r:
                     diff_result = C.diff_from_run(run)
@@ -110,9 +109,9 @@ class AbstractTitleContentCN(FormatNode):
 class AbstractContentCN(FormatNode):
     """摘要内容中文节点"""
 
-    NODE_TYPE = "abstract.chinese.chinese_content"
+    NODE_TYPE = "abstract.chinese.body"
     NODE_LABEL = "中文摘要正文"
-    DEFAULTS = {**BASE_FORMAT, "alignment": "两端对齐"}
+    DEFAULTS = deep_merge(BASE_FORMAT, {"paragraph": {"alignment": "两端对齐"}})
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -151,15 +150,15 @@ class AbstractContentCN(FormatNode):
 class AbstractTitleEN(FormatNode):
     """摘要标题英文节点"""
 
-    NODE_TYPE = "abstract.english.english_title"
+    NODE_TYPE = "abstract.english.title"
     NODE_LABEL = "英文摘要标题"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "居中对齐",
-        "first_line_indent": "0字符",
-        "font_size": "四号",
-        "bold": True,
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"alignment": "居中对齐", "first_line_indent": "0字符"},
+            "font": {"font_size": "四号", "bold": True},
+        },
+    )
 
 
 @register("abstract_english_title_content", level=1)
@@ -169,14 +168,14 @@ class AbstractTitleContentEN(FormatNode):
     NODE_TYPE = "abstract.english"
     NODE_LABEL = "英文摘要"
     DEFAULTS = {
-        "english_title": {
+        "title": {
             **BASE_FORMAT,
             "alignment": "居中对齐",
             "first_line_indent": "0字符",
             "font_size": "四号",
             "bold": True,
         },
-        "english_content": {**BASE_FORMAT, "alignment": "两端对齐"},
+        "body": {**BASE_FORMAT, "alignment": "两端对齐"},
     }
 
     def _check_title_in_full_text(self, runs) -> int:
@@ -197,7 +196,7 @@ class AbstractTitleContentEN(FormatNode):
         # 段落样式选择content样式
         # 字体样式"摘要"选择title，"正文"选择content
         cfg = self.pydantic_config
-        ps = ParagraphStyle.from_config(cfg.english_content)
+        ps = ParagraphStyle.from_config(cfg.body)
         if p:
             issues = ps.diff_from_paragraph(self.paragraph)
         else:
@@ -234,23 +233,23 @@ class AbstractTitleContentEN(FormatNode):
                     run.text = text_clean[title_end - run_start :]
 
                 c = CharacterStyle(
-                    font_name_cn=cfg.english_title.chinese_font_name,
-                    font_name_en=cfg.english_title.english_font_name,
-                    font_size=cfg.english_title.font_size,
-                    font_color=cfg.english_title.font_color,
-                    bold=cfg.english_title.bold,
-                    italic=cfg.english_title.italic,
-                    underline=cfg.english_title.underline,
+                    font_name_cn=cfg.title.chinese_font_name,
+                    font_name_en=cfg.title.english_font_name,
+                    font_size=cfg.title.font_size,
+                    font_color=cfg.title.font_color,
+                    bold=cfg.title.bold,
+                    italic=cfg.title.italic,
+                    underline=cfg.title.underline,
                 )
             else:
                 c = CharacterStyle(
-                    font_name_cn=cfg.english_content.chinese_font_name,
-                    font_name_en=cfg.english_content.english_font_name,
-                    font_size=cfg.english_content.font_size,
-                    font_color=cfg.english_content.font_color,
-                    bold=cfg.english_content.bold,
-                    italic=cfg.english_content.italic,
-                    underline=cfg.english_content.underline,
+                    font_name_cn=cfg.body.chinese_font_name,
+                    font_name_en=cfg.body.english_font_name,
+                    font_size=cfg.body.font_size,
+                    font_color=cfg.body.font_color,
+                    bold=cfg.body.bold,
+                    italic=cfg.body.italic,
+                    underline=cfg.body.underline,
                 )
             if r:
                 diff_result = c.diff_from_run(run)
@@ -273,9 +272,9 @@ class AbstractTitleContentEN(FormatNode):
 class AbstractContentEN(FormatNode):
     """摘要内容英文节点"""
 
-    NODE_TYPE = "abstract.english.english_content"
+    NODE_TYPE = "abstract.english.body"
     NODE_LABEL = "英文摘要正文"
-    DEFAULTS = {**BASE_FORMAT, "alignment": "两端对齐"}
+    DEFAULTS = deep_merge(BASE_FORMAT, {"paragraph": {"alignment": "两端对齐"}})
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config

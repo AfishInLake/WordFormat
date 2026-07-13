@@ -23,7 +23,14 @@ class NodeConfigRoot(dict):
         try:
             val = self[key]
         except KeyError:
-            return None
+            # fallback：到 paragraph / font 子字典中查找
+            for sub in ("paragraph", "font"):
+                sub_dict = self.get(sub)
+                if isinstance(sub_dict, dict) and key in sub_dict:
+                    val = sub_dict[key]
+                    break
+            else:
+                return None
         if isinstance(val, dict) and not isinstance(val, NodeConfigRoot):
             return NodeConfigRoot(**val)
         return val
@@ -87,7 +94,7 @@ def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
     if not isinstance(obj, dict):
         return
     eng_name = _resolve_builtin_style_name(obj)
-    if eng_name:
+    if eng_name and isinstance(eng_name, str):
         style_map[eng_name] = obj
     for _key, val in obj.items():
         if isinstance(val, dict):

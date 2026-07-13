@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from docx.oxml.ns import qn
 
-from wordformat.config.dotdict import BASE_FORMAT
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
@@ -83,24 +83,27 @@ class BaseKeywordsNode(FormatNode):
 class KeywordsEN(BaseKeywordsNode):
     """关键词节点-英文"""
 
-    NODE_TYPE = "abstract.keywords.english"
+    NODE_TYPE = "abstract.english.keywords"
     NODE_LABEL = "英文关键词"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "first_line_indent": "0字符",
-        "chinese_font_name": "宋体",
-        "font_size": "小四",
-        "label": {
-            "chinese_font_name": "黑体",
-            "english_font_name": "Times New Roman",
-            "font_size": "三号",
-            "font_color": "黑色",
-            "bold": True,
-            "italic": False,
-            "underline": False,
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"first_line_indent": "0字符"},
+            "font": {"chinese_font_name": "宋体", "font_size": "小四"},
+            "label": {
+                "chinese_font_name": "黑体",
+                "english_font_name": "Times New Roman",
+                "font_size": "三号",
+                "font_color": "黑色",
+                "bold": True,
+                "italic": False,
+                "underline": False,
+            },
+            "rules": {
+                "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5}
+            },
         },
-        "rules": {"keyword_count": {"enabled": True, "count_min": 3, "count_max": 5}},
-    }
+    )
     RULES = {"keyword_count": "_check_keyword_count"}
 
     _LABEL_RE = re.compile(r"Keywords?:?\s*", re.IGNORECASE)
@@ -209,27 +212,31 @@ class KeywordsEN(BaseKeywordsNode):
 class KeywordsCN(BaseKeywordsNode):
     """关键词节点-中文"""
 
-    NODE_TYPE = "abstract.keywords.chinese"
+    NODE_TYPE = "abstract.chinese.keywords"
     NODE_LABEL = "中文关键词"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "first_line_indent": "0字符",
-        "chinese_font_name": "宋体",
-        "font_size": "小四",
-        "label": {
-            "chinese_font_name": "黑体",
-            "english_font_name": "Times New Roman",
-            "font_size": "三号",
-            "font_color": "黑色",
-            "bold": True,
-            "italic": False,
-            "underline": False,
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"first_line_indent": "0字符"},
+            "font": {"chinese_font_name": "宋体", "font_size": "小四"},
+            "label": {
+                "chinese_font_name": "黑体",
+                "english_font_name": "Times New Roman",
+                "font_size": "三号",
+                "font_color": "黑色",
+                "bold": True,
+                "italic": False,
+                "underline": False,
+            },
+            "rules": {
+                "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5},
+                "trailing_punctuation": {
+                    "enabled": True,
+                    "forbidden_chars": "；，。、",
+                },
+            },
         },
-        "rules": {
-            "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5},
-            "trailing_punctuation": {"enabled": True, "forbidden_chars": "；，。、"},
-        },
-    }
+    )
     RULES = {
         "keyword_count": "_check_keyword_count",
         "trailing_punctuation": "_check_trailing_punctuation",

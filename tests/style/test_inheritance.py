@@ -211,7 +211,9 @@ class TestLineSpacing:
         assert paragraph_get_line_spacing(p) == 2.3
         assert paragraph_get_line_spacing_rule(p) == WD_LINE_SPACING.MULTIPLE
 
-    @pytest.mark.parametrize("rule", [WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST])
+    @pytest.mark.parametrize(
+        "rule", [WD_LINE_SPACING.EXACTLY, WD_LINE_SPACING.AT_LEAST]
+    )
     def test_fixed_returns_none(self, doc, rule):
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing_rule = rule
@@ -274,6 +276,7 @@ class TestExtractors:
         sz.set(qn("w:val"), "abc")
         rPr.append(sz)
         from wordformat.style.inheritance import _MISS
+
         assert x_size_pt(rPr) is _MISS
 
     def test_theme_ref_font(self, doc):
@@ -284,6 +287,7 @@ class TestExtractors:
         rFonts.set(qn("w:asciiTheme"), "majorHAnsi")
         rPr.append(rFonts)
         from wordformat.style.inheritance import x_font_ascii
+
         assert isinstance(x_font_ascii(rPr), ThemeRef)
         assert run_get_font_name_en(r) == "Calibri"
 

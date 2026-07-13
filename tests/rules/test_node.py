@@ -1,6 +1,7 @@
 """
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -51,6 +52,7 @@ def _load_root_config(config_path):
 
 def _load_yaml(path):
     import yaml
+
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -59,6 +61,7 @@ def _load_yaml(path):
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
     from wordformat.config.loader import init_config
+
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -86,8 +89,6 @@ def run_with_text(para):
 # ---------------------------------------------------------------------------
 
 
-
-
 class TestFormatNodeBase:
     """FormatNode 基类的核心契约。"""
 
@@ -100,18 +101,17 @@ class TestFormatNodeBase:
     def test_check_format_calls_base_with_true(self, doc, para):
         """check_format 应以 p=True, r=True 调用 _base。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
-        with patch.object(node, "_base") as mock_base, \
-                patch.object(node, "_run_rules"):
+        with patch.object(node, "_base") as mock_base, patch.object(node, "_run_rules"):
             node.check_format(doc)
         mock_base.assert_called_once_with(doc, p=True, r=True)
 
     def test_apply_format_calls_base_with_false(self, doc, para):
         """apply_format 应以 p=False, r=False 调用 _base。"""
         node = FormatNodeBase(value=para, level=0, paragraph=para)
-        with patch.object(node, "_base") as mock_base, \
-                patch.object(node, "_run_rules"):
+        with patch.object(node, "_base") as mock_base, patch.object(node, "_run_rules"):
             node.apply_format(doc)
         mock_base.assert_called_once_with(doc, p=False, r=False)
+
 
 # ---------------------------------------------------------------------------
 # 2. 所有节点类型可实例化
@@ -119,20 +119,28 @@ class TestFormatNodeBase:
 
 
 NODE_CLASSES = [
-    AbstractTitleCN, AbstractTitleContentCN, AbstractContentCN,
-    AbstractTitleEN, AbstractTitleContentEN, AbstractContentEN,
-    KeywordsCN, KeywordsEN,
-    HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node,
+    AbstractTitleCN,
+    AbstractTitleContentCN,
+    AbstractContentCN,
+    AbstractTitleEN,
+    AbstractTitleContentEN,
+    AbstractContentEN,
+    KeywordsCN,
+    KeywordsEN,
+    HeadingLevel1Node,
+    HeadingLevel2Node,
+    HeadingLevel3Node,
     BodyText,
-    CaptionFigure, CaptionTable,
-    References, ReferenceEntry,
-    Acknowledgements, AcknowledgementsCN,
+    CaptionFigure,
+    CaptionTable,
+    References,
+    ReferenceEntry,
+    Acknowledgements,
+    AcknowledgementsCN,
 ]
 
 
 @pytest.mark.parametrize("cls", NODE_CLASSES, ids=lambda c: c.__name__)
-
-
 class TestNodeInstantiation:
     """每个节点类型都能正确实例化。"""
 
@@ -154,8 +162,6 @@ class TestNodeInstantiation:
 # ---------------------------------------------------------------------------
 # 3. load_config 为每个节点正确设置 _pydantic_config
 # ---------------------------------------------------------------------------
-
-
 
 
 class TestLoadConfig:
@@ -202,7 +208,9 @@ class TestLoadConfig:
         node = _make_node(CaptionTable)
         node.load_config(root_config)
         # YAML: tables.content.font_size = '五号'
-        assert node.pydantic_config.font_size == "小四"  # DEFAULTS 值（非 content 子对象）
+        assert (
+            node.pydantic_config.font_size == "小四"
+        )  # DEFAULTS 值（非 content 子对象）
 
     def test_references(self, root_config):
         node = _make_node(References)
@@ -245,8 +253,6 @@ class TestLoadConfig:
 # ---------------------------------------------------------------------------
 # 4. HeadingLevelConfig bug
 # ---------------------------------------------------------------------------
-
-
 
 
 class TestBaseImplementation:
@@ -300,4 +306,3 @@ class TestBaseImplementation:
 # ---------------------------------------------------------------------------
 # 7. BodyText._apply_citation_superscript
 # ---------------------------------------------------------------------------
-

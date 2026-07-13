@@ -35,10 +35,10 @@
         <ConfigSection title="正文配置">
           <div class="grid grid-cols-2 gap-4 mb-4">
             <div class="form-item">
-              <label><input type="checkbox" v-model="userConfig.body_text.rules.punctuation.enabled"> 启用标点符号校验</label>
+              <label><input type="checkbox" v-model="userConfig.body.text.rules.punctuation.enabled"> 启用标点符号校验</label>
             </div>
           </div>
-          <FormatConfig :config="userConfig.body_text" />
+          <FormatConfig :config="userConfig.body.text" />
         </ConfigSection>
 
         <!-- 插图配置 -->

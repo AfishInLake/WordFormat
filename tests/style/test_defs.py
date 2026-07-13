@@ -15,21 +15,45 @@ from docx.oxml.ns import qn
 
 from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
 from wordformat.style.reader import (
-    paragraph_get_alignment, paragraph_get_space_before, paragraph_get_space_after,
-    paragraph_get_line_spacing, paragraph_get_first_line_indent,
-    paragraph_get_builtin_style_name, run_get_font_name, run_get_font_size_pt,
-    run_get_font_color, run_get_font_bold, run_get_font_italic,
-    run_get_font_underline, GetIndent,
+    paragraph_get_alignment,
+    paragraph_get_space_before,
+    paragraph_get_space_after,
+    paragraph_get_line_spacing,
+    paragraph_get_first_line_indent,
+    paragraph_get_builtin_style_name,
+    run_get_font_name,
+    run_get_font_size_pt,
+    run_get_font_color,
+    run_get_font_bold,
+    run_get_font_italic,
+    run_get_font_underline,
+    GetIndent,
 )
 from wordformat.style.writer import (
-    run_set_font_name, set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines, _paragraph_space_by_lines,
-    SetSpacing, SetLineSpacing, SetIndent, SetFirstLineIndent,
+    run_set_font_name,
+    set_paragraph_space_before_by_lines,
+    set_paragraph_space_after_by_lines,
+    _paragraph_space_by_lines,
+    SetSpacing,
+    SetLineSpacing,
+    SetIndent,
+    SetFirstLineIndent,
 )
 from wordformat.style.defs import (
-    FontName, FontSize, FontColor, Alignment, LineSpacingRule, LineSpacing,
-    FirstLineIndent, LeftIndent, RightIndent, BuiltInStyle, SpaceBefore, SpaceAfter,
-    Spacing, UnitLabelEnum,
+    FontName,
+    FontSize,
+    FontColor,
+    Alignment,
+    LineSpacingRule,
+    LineSpacing,
+    FirstLineIndent,
+    LeftIndent,
+    RightIndent,
+    BuiltInStyle,
+    SpaceBefore,
+    SpaceAfter,
+    Spacing,
+    UnitLabelEnum,
 )
 from wordformat.style.units import extract_unit_from_string, UnitResult
 
@@ -37,6 +61,7 @@ from wordformat.style.units import extract_unit_from_string, UnitResult
 # ---------------------------------------------------------------------------
 # fixtures & helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def doc():
@@ -46,10 +71,23 @@ def doc():
 @pytest.fixture
 def mock_warning():
     w = MagicMock()
-    for attr in ("bold", "italic", "underline", "font_size", "font_color",
-                 "font_name", "alignment", "space_before", "space_after",
-                 "line_spacing", "line_spacingrule", "first_line_indent",
-                 "left_indent", "right_indent", "builtin_style_name"):
+    for attr in (
+        "bold",
+        "italic",
+        "underline",
+        "font_size",
+        "font_color",
+        "font_name",
+        "alignment",
+        "space_before",
+        "space_after",
+        "line_spacing",
+        "line_spacingrule",
+        "first_line_indent",
+        "left_indent",
+        "right_indent",
+        "builtin_style_name",
+    ):
         setattr(w, attr, True)
     return w
 
@@ -57,21 +95,36 @@ def mock_warning():
 @pytest.fixture
 def mock_warning_off():
     w = MagicMock()
-    for attr in ("bold", "italic", "underline", "font_size", "font_color",
-                 "font_name", "alignment", "space_before", "space_after",
-                 "line_spacing", "line_spacingrule", "first_line_indent",
-                 "left_indent", "right_indent", "builtin_style_name"):
+    for attr in (
+        "bold",
+        "italic",
+        "underline",
+        "font_size",
+        "font_color",
+        "font_name",
+        "alignment",
+        "space_before",
+        "space_after",
+        "line_spacing",
+        "line_spacingrule",
+        "first_line_indent",
+        "left_indent",
+        "right_indent",
+        "builtin_style_name",
+    ):
         setattr(w, attr, False)
     return w
 
 
 def _set_warning(w):
     import wordformat.style.diff as m
+
     m.style_checks_warning = w
 
 
 def _clear_warning():
     import wordformat.style.diff as m
+
     m.__dict__.pop("style_checks_warning", None)
 
 
@@ -79,10 +132,19 @@ def _clear_warning():
 # style_enum - FontSize
 # ===========================================================================
 
+
 class TestFontSize:
-    @pytest.mark.parametrize("label,expected", [
-        ("小四", 12), ("四号", 14), ("三号", 16), ("五号", 10.5), ("一号", 26), ("七号", 5.5),
-    ])
+    @pytest.mark.parametrize(
+        "label,expected",
+        [
+            ("小四", 12),
+            ("四号", 14),
+            ("三号", 16),
+            ("五号", 10.5),
+            ("一号", 26),
+            ("七号", 5.5),
+        ],
+    )
     def test_label_map(self, label, expected):
         assert FontSize(label).rel_value == expected
 
@@ -100,18 +162,27 @@ class TestFontSize:
             FontSize("abc").base_set(doc.add_paragraph().add_run("x"))
 
 
-
 # ===========================================================================
 # style_enum - FontColor
 # ===========================================================================
 
+
 class TestFontColor:
-    @pytest.mark.parametrize("spec,expected", [
-        ("BLACK", (0, 0, 0)), ("black", (0, 0, 0)), ("黑色", (0, 0, 0)),
-        ("red", (255, 0, 0)), ("红色", (255, 0, 0)),
-        ("#FF0000", (255, 0, 0)), ("#f00", (255, 0, 0)), ("FF0000", (255, 0, 0)),
-        ("white", (255, 255, 255)), ("白色", (255, 255, 255)),
-    ])
+    @pytest.mark.parametrize(
+        "spec,expected",
+        [
+            ("BLACK", (0, 0, 0)),
+            ("black", (0, 0, 0)),
+            ("黑色", (0, 0, 0)),
+            ("red", (255, 0, 0)),
+            ("红色", (255, 0, 0)),
+            ("#FF0000", (255, 0, 0)),
+            ("#f00", (255, 0, 0)),
+            ("FF0000", (255, 0, 0)),
+            ("white", (255, 255, 255)),
+            ("白色", (255, 255, 255)),
+        ],
+    )
     def test_parse_color(self, spec, expected):
         assert FontColor(spec).rel_value == expected
 
@@ -137,7 +208,9 @@ class TestFontColor:
         with pytest.raises(TypeError):
             FontColor(123).rel_value
 
-    @pytest.mark.parametrize("h,ok", [("#f00", True), ("#FF0000", True), ("FF0000", True), ("#GGG", False)])
+    @pytest.mark.parametrize(
+        "h,ok", [("#f00", True), ("#FF0000", True), ("FF0000", True), ("#GGG", False)]
+    )
     def test_is_hex(self, h, ok):
         assert FontColor._is_hex(h) == ok
 
@@ -146,16 +219,21 @@ class TestFontColor:
         assert FontColor._normalize_hex("AABBCC") == "#aabbcc"
 
 
-
 # ===========================================================================
 # style_enum - Alignment / LineSpacingRule / LineSpacing / BuiltInStyle / FontName
 # ===========================================================================
 
+
 class TestAlignmentEnum:
-    @pytest.mark.parametrize("label,val", [
-        ("左对齐", WD_ALIGN_PARAGRAPH.LEFT), ("居中对齐", WD_ALIGN_PARAGRAPH.CENTER),
-        ("右对齐", WD_ALIGN_PARAGRAPH.RIGHT), ("两端对齐", WD_ALIGN_PARAGRAPH.JUSTIFY),
-    ])
+    @pytest.mark.parametrize(
+        "label,val",
+        [
+            ("左对齐", WD_ALIGN_PARAGRAPH.LEFT),
+            ("居中对齐", WD_ALIGN_PARAGRAPH.CENTER),
+            ("右对齐", WD_ALIGN_PARAGRAPH.RIGHT),
+            ("两端对齐", WD_ALIGN_PARAGRAPH.JUSTIFY),
+        ],
+    )
     def test_label_map(self, label, val):
         assert Alignment(label).rel_value == val
 
@@ -166,23 +244,30 @@ class TestAlignmentEnum:
         assert Alignment("左对齐").get_from_paragraph(p) == WD_ALIGN_PARAGRAPH.CENTER
 
     def test_get_fallback_left(self, doc):
-        assert Alignment("左对齐").get_from_paragraph(doc.add_paragraph()) == WD_ALIGN_PARAGRAPH.LEFT
+        assert (
+            Alignment("左对齐").get_from_paragraph(doc.add_paragraph())
+            == WD_ALIGN_PARAGRAPH.LEFT
+        )
 
     def test_invalid_raises(self, doc):
         with pytest.raises(ValueError, match="无效的对齐方式"):
             Alignment("无效").base_set(doc.add_paragraph())
 
 
-
 class TestLineSpacingRuleEnum:
-    @pytest.mark.parametrize("label,val", [
-        ("单倍行距", WD_LINE_SPACING.SINGLE), ("1.5倍行距", WD_LINE_SPACING.ONE_POINT_FIVE),
-        ("2倍行距", WD_LINE_SPACING.DOUBLE), ("固定值", WD_LINE_SPACING.EXACTLY),
-        ("最小值", WD_LINE_SPACING.AT_LEAST), ("多倍行距", WD_LINE_SPACING.MULTIPLE),
-    ])
+    @pytest.mark.parametrize(
+        "label,val",
+        [
+            ("单倍行距", WD_LINE_SPACING.SINGLE),
+            ("1.5倍行距", WD_LINE_SPACING.ONE_POINT_FIVE),
+            ("2倍行距", WD_LINE_SPACING.DOUBLE),
+            ("固定值", WD_LINE_SPACING.EXACTLY),
+            ("最小值", WD_LINE_SPACING.AT_LEAST),
+            ("多倍行距", WD_LINE_SPACING.MULTIPLE),
+        ],
+    )
     def test_label_map(self, label, val):
         assert LineSpacingRule(label).rel_value == val
-
 
 
 class TestLineSpacingEnum:
@@ -205,9 +290,11 @@ class TestLineSpacingEnum:
             LineSpacing("0倍").base_set(doc.add_paragraph())
 
 
-
 class TestBuiltInStyleEnum:
-    @pytest.mark.parametrize("label,expected", [("正文", "Normal"), ("标题", "Title"), ("Heading 1", "Heading 1")])
+    @pytest.mark.parametrize(
+        "label,expected",
+        [("正文", "Normal"), ("标题", "Title"), ("Heading 1", "Heading 1")],
+    )
     def test_label_map(self, label, expected):
         assert BuiltInStyle(label).rel_value == expected
 
@@ -226,11 +313,16 @@ class TestBuiltInStyleEnum:
         assert p.style.name == "NonExistent"
 
 
-
 class TestFontNameEnum:
-    @pytest.mark.parametrize("name,is_cn", [
-        ("宋体", True), ("黑体", True), ("Times New Roman", False), ("Arial", False),
-    ])
+    @pytest.mark.parametrize(
+        "name,is_cn",
+        [
+            ("宋体", True),
+            ("黑体", True),
+            ("Times New Roman", False),
+            ("Arial", False),
+        ],
+    )
     def test_is_chinese(self, name, is_cn):
         assert FontName(name).is_chinese(name) == is_cn
 
@@ -243,7 +335,6 @@ class TestFontNameEnum:
         run = doc.add_paragraph().add_run("x")
         FontName("Arial").base_set(run)
         assert run.font.name == "Arial"
-
 
 
 class TestUnitLabelEnumEq:
@@ -263,19 +354,29 @@ class TestUnitLabelEnumEq:
         assert FontSize("小四") != Alignment("左对齐")
 
 
-
 # ===========================================================================
 # utils
 # ===========================================================================
 
+
 class TestExtractUnitFromString:
-    @pytest.mark.parametrize("text,val,unit", [
-        ("12pt", 12.0, "pt"), ("1.5磅", 1.5, "pt"), ("2cm", 2.0, "cm"),
-        ("3.5厘米", 3.5, "cm"), ("1inch", 1.0, "inch"), ("0.5英寸", 0.5, "inch"),
-        ("10mm", 10.0, "mm"), ("2毫米", 2.0, "mm"),
-        ("1.5行", 1.5, "hang"), ("2字符", 2.0, "char"), ("1.5倍", 1.5, "bei"),
-        ("100emu", 100.0, "emu"),
-    ])
+    @pytest.mark.parametrize(
+        "text,val,unit",
+        [
+            ("12pt", 12.0, "pt"),
+            ("1.5磅", 1.5, "pt"),
+            ("2cm", 2.0, "cm"),
+            ("3.5厘米", 3.5, "cm"),
+            ("1inch", 1.0, "inch"),
+            ("0.5英寸", 0.5, "inch"),
+            ("10mm", 10.0, "mm"),
+            ("2毫米", 2.0, "mm"),
+            ("1.5行", 1.5, "hang"),
+            ("2字符", 2.0, "char"),
+            ("1.5倍", 1.5, "bei"),
+            ("100emu", 100.0, "emu"),
+        ],
+    )
     def test_valid(self, text, val, unit):
         r = extract_unit_from_string(text)
         assert r.is_valid and r.value == val and r.standard_unit == unit
@@ -288,32 +389,58 @@ class TestExtractUnitFromString:
         assert extract_unit_from_string("12PT").standard_unit == "pt"
 
 
-
 class TestUnitResult:
     def test_to_dict(self):
-        r = UnitResult(original_unit="pt", standard_unit="pt", value=12.0, is_valid=True)
+        r = UnitResult(
+            original_unit="pt", standard_unit="pt", value=12.0, is_valid=True
+        )
         assert r.to_dict()["value"] == 12.0
 
-    @pytest.mark.parametrize("unit,val,emu", [
-        ("pt", 1, 12700), ("cm", 1, 360000), ("inch", 1, 914400), ("mm", 1, 36000), ("emu", 1, 1),
-    ])
+    @pytest.mark.parametrize(
+        "unit,val,emu",
+        [
+            ("pt", 1, 12700),
+            ("cm", 1, 360000),
+            ("inch", 1, 914400),
+            ("mm", 1, 36000),
+            ("emu", 1, 1),
+        ],
+    )
     def test_convert_to_emu(self, unit, val, emu):
-        assert UnitResult(standard_unit=unit, value=val, is_valid=True).convert_to_emu() == emu
+        assert (
+            UnitResult(standard_unit=unit, value=val, is_valid=True).convert_to_emu()
+            == emu
+        )
 
     def test_convert_to_emu_hang_bug(self):
         """hang 单位现在返回 None 而非 0。"""
-        assert UnitResult(standard_unit="hang", value=1.5, is_valid=True).convert_to_emu() is None
+        assert (
+            UnitResult(standard_unit="hang", value=1.5, is_valid=True).convert_to_emu()
+            is None
+        )
 
     def test_convert_to_emu_hang_should_be_none(self):
-        assert UnitResult(standard_unit="hang", value=1.5, is_valid=True).convert_to_emu() is None
+        assert (
+            UnitResult(standard_unit="hang", value=1.5, is_valid=True).convert_to_emu()
+            is None
+        )
 
     def test_convert_to_emu_invalid(self):
         assert UnitResult(is_valid=False).convert_to_emu() is None
 
-    @pytest.mark.parametrize("unit,ch", [
-        ("pt", "磅"), ("cm", "厘米"), ("inch", "英寸"), ("mm", "毫米"),
-        ("emu", "emu"), ("hang", "行"), ("char", "字符"), ("bei", "倍"),
-    ])
+    @pytest.mark.parametrize(
+        "unit,ch",
+        [
+            ("pt", "磅"),
+            ("cm", "厘米"),
+            ("inch", "英寸"),
+            ("mm", "毫米"),
+            ("emu", "emu"),
+            ("hang", "行"),
+            ("char", "字符"),
+            ("bei", "倍"),
+        ],
+    )
     def test_unit_ch(self, unit, ch):
         assert UnitResult(standard_unit=unit).unit_ch == ch
 
@@ -323,7 +450,6 @@ class TestUnitResult:
     def test_unit_ch_invalid_raises(self):
         with pytest.raises(ValueError, match="Invalid unit"):
             UnitResult(standard_unit="xyz").unit_ch
-
 
 
 # ===========================================================================
@@ -342,12 +468,12 @@ class TestUnitLabelEnumRelValueSetter:
         assert e.rel_value == 99
 
 
-
 class TestUnitLabelEnumBaseSetDefault:
     """Cover line 135: base_set default implementation (just logs debug)"""
 
     def test_base_set_default_no_crash(self, doc):
         """UnitLabelEnum.base_set default just logs, no crash"""
+
         # Use a bare UnitLabelEnum instance - but it's abstract due to get_from_paragraph
         # So we create a concrete subclass that doesn't override base_set
         class MinimalEnum(UnitLabelEnum):
@@ -357,7 +483,6 @@ class TestUnitLabelEnumBaseSetDefault:
         e = MinimalEnum("test")
         # Calling base_set should just log and not crash
         e.base_set(doc.add_paragraph())
-
 
 
 class TestUnitLabelEnumFormatWithRun:
@@ -382,12 +507,12 @@ class TestUnitLabelEnumFormatWithRun:
         assert run_get_font_name(run) == "宋体"
 
 
-
 class TestUnitLabelEnumGetFromParagraphAbstract:
     """Cover line 163: get_from_paragraph abstract method raises NotImplementedError"""
 
     def test_abstract_raises_not_implemented(self, doc):
         """Calling get_from_paragraph on base UnitLabelEnum raises NotImplementedError"""
+
         # Can't instantiate UnitLabelEnum directly due to ABC, use a minimal subclass
         class MinimalEnum(UnitLabelEnum):
             pass
@@ -395,7 +520,6 @@ class TestUnitLabelEnumGetFromParagraphAbstract:
         e = MinimalEnum("test")
         with pytest.raises(NotImplementedError):
             e.get_from_paragraph(doc.add_paragraph())
-
 
 
 class TestFontColorParseColorValueError:
@@ -409,6 +533,7 @@ class TestFontColorParseColorValueError:
         # Actually, all valid 6-digit hex are valid RGB colors, so this path is hard to trigger
         # We'll test with a mock to force the ValueError
         import webcolors
+
         original = webcolors.hex_to_rgb
         webcolors.hex_to_rgb = MagicMock(side_effect=ValueError("mock error"))
         try:
@@ -416,7 +541,6 @@ class TestFontColorParseColorValueError:
                 FontColor("#FF0000").rel_value
         finally:
             webcolors.hex_to_rgb = original
-
 
 
 class TestFontColorBaseSetNonString:
@@ -436,16 +560,15 @@ class TestFontColorBaseSetNonString:
             fc.base_set(run)
 
 
-
 class TestFontColorEqEdgeCases:
     """Cover lines 344-345: FontColor.__eq__ with non-tuple or wrong length tuple"""
 
     def test_eq_non_tuple_returns_false(self):
         """__eq__ with non-color values returns False"""
         fc = FontColor("red")
-        assert fc == "red"          # 字符串颜色名现在被正确比较
-        assert fc != 42             # 非颜色应返回 False
-        assert fc != None           # None 应返回 False
+        assert fc == "red"  # 字符串颜色名现在被正确比较
+        assert fc != 42  # 非颜色应返回 False
+        assert fc != None  # None 应返回 False
 
     def test_eq_wrong_length_tuple_returns_false(self):
         """__eq__ with tuple of wrong length returns False (line 339-340)"""
@@ -466,24 +589,30 @@ class TestFontColorEqEdgeCases:
         assert fc != (255, 0, 0)
 
 
-
 class TestSpacingBaseSetHangNotImplemented:
     """Cover lines 400-404: Spacing.base_set raises NotImplementedError for 'hang' unit"""
 
     def test_spacing_get_from_paragraph_hang_raises(self, doc):
         """Spacing.get_from_paragraph with 'hang' unit raises NotImplementedError"""
         s = Spacing("1行")
-        with pytest.raises(NotImplementedError, match="Spacing 需要知道是 before 还是 after"):
+        with pytest.raises(
+            NotImplementedError, match="Spacing 需要知道是 before 还是 after"
+        ):
             s.get_from_paragraph(doc.add_paragraph())
-
 
 
 class TestSpaceBeforeGetFromParagraphUnits:
     """Cover lines 412-416: SpaceBefore.get_from_paragraph with pt/mm/cm/inch units"""
 
-    @pytest.mark.parametrize("unit,val,attr", [
-        ("pt", 12, "pt"), ("mm", 5, "mm"), ("cm", 1, "cm"), ("inch", 0.5, "inches"),
-    ])
+    @pytest.mark.parametrize(
+        "unit,val,attr",
+        [
+            ("pt", 12, "pt"),
+            ("mm", 5, "mm"),
+            ("cm", 1, "cm"),
+            ("inch", 0.5, "inches"),
+        ],
+    )
     def test_get_from_paragraph_physical_units(self, doc, unit, val, attr):
         """SpaceBefore.get_from_paragraph returns value in specified physical unit"""
         p = doc.add_paragraph()
@@ -491,6 +620,7 @@ class TestSpaceBeforeGetFromParagraphUnits:
         if unit != "pt":
             # Set via EMU conversion
             from docx.shared import Emu
+
             if unit == "mm":
                 p.paragraph_format.space_before = Emu(36000 * val)
             elif unit == "cm":
@@ -519,17 +649,23 @@ class TestSpaceBeforeGetFromParagraphUnits:
         assert result is None
 
 
-
 class TestSpaceAfterGetFromParagraphUnits:
     """Cover lines 424-428: SpaceAfter.get_from_paragraph with pt/mm/cm/inch units"""
 
-    @pytest.mark.parametrize("unit,val", [
-        ("pt", 12), ("mm", 5), ("cm", 1), ("inch", 0.5),
-    ])
+    @pytest.mark.parametrize(
+        "unit,val",
+        [
+            ("pt", 12),
+            ("mm", 5),
+            ("cm", 1),
+            ("inch", 0.5),
+        ],
+    )
     def test_get_from_paragraph_physical_units(self, doc, unit, val):
         """SpaceAfter.get_from_paragraph returns value in specified physical unit"""
         p = doc.add_paragraph()
         from docx.shared import Emu
+
         if unit == "pt":
             p.paragraph_format.space_after = Pt(val)
         elif unit == "mm":
@@ -559,7 +695,6 @@ class TestSpaceAfterGetFromParagraphUnits:
         assert result is None
 
 
-
 class TestLineSpacingRuleBaseSetInvalid:
     """Cover lines 447-451: LineSpacingRule.base_set with invalid value raises ValueError"""
 
@@ -575,7 +710,6 @@ class TestLineSpacingRuleBaseSetInvalid:
         lsr.extract_unit_result = None
         with pytest.raises(ValueError, match="无效的行距选项"):
             lsr.base_set(p)
-
 
 
 class TestLineSpacingBaseSetInvalidValue:
@@ -608,17 +742,23 @@ class TestLineSpacingBaseSetInvalidValue:
             ls.base_set(p)
 
 
-
 class TestLeftIndentGetFromParagraphUnits:
     """Cover lines 513-517: LeftIndent.get_from_paragraph with pt/mm/cm/inch units"""
 
-    @pytest.mark.parametrize("unit,val", [
-        ("pt", 12), ("mm", 5), ("cm", 1), ("inch", 0.5),
-    ])
+    @pytest.mark.parametrize(
+        "unit,val",
+        [
+            ("pt", 12),
+            ("mm", 5),
+            ("cm", 1),
+            ("inch", 0.5),
+        ],
+    )
     def test_get_from_paragraph_physical_units(self, doc, unit, val):
         """LeftIndent.get_from_paragraph returns value in specified physical unit"""
         p = doc.add_paragraph()
         from docx.shared import Emu
+
         if unit == "pt":
             p.paragraph_format.left_indent = Pt(val)
         elif unit == "mm":
@@ -640,17 +780,23 @@ class TestLeftIndentGetFromParagraphUnits:
         assert result is None
 
 
-
 class TestRightIndentGetFromParagraphUnits:
     """Cover lines 525-529: RightIndent.get_from_paragraph with pt/mm/cm/inch units"""
 
-    @pytest.mark.parametrize("unit,val", [
-        ("pt", 12), ("mm", 5), ("cm", 1), ("inch", 0.5),
-    ])
+    @pytest.mark.parametrize(
+        "unit,val",
+        [
+            ("pt", 12),
+            ("mm", 5),
+            ("cm", 1),
+            ("inch", 0.5),
+        ],
+    )
     def test_get_from_paragraph_physical_units(self, doc, unit, val):
         """RightIndent.get_from_paragraph returns value in specified physical unit"""
         p = doc.add_paragraph()
         from docx.shared import Emu
+
         if unit == "pt":
             p.paragraph_format.right_indent = Pt(val)
         elif unit == "mm":
@@ -672,17 +818,23 @@ class TestRightIndentGetFromParagraphUnits:
         assert result is None
 
 
-
 class TestFirstLineIndentGetFromParagraphUnits:
     """Cover lines 548-552: FirstLineIndent.get_from_paragraph with pt/mm/cm/inch units"""
 
-    @pytest.mark.parametrize("unit,val", [
-        ("pt", 24), ("mm", 5), ("cm", 1), ("inch", 0.5),
-    ])
+    @pytest.mark.parametrize(
+        "unit,val",
+        [
+            ("pt", 24),
+            ("mm", 5),
+            ("cm", 1),
+            ("inch", 0.5),
+        ],
+    )
     def test_get_from_paragraph_physical_units(self, doc, unit, val):
         """FirstLineIndent.get_from_paragraph returns value in specified physical unit"""
         p = doc.add_paragraph()
         from docx.shared import Emu
+
         if unit == "pt":
             p.paragraph_format.first_line_indent = Pt(val)
         elif unit == "mm":
@@ -704,10 +856,9 @@ class TestFirstLineIndentGetFromParagraphUnits:
         assert result is None
 
 
-
 class TestBuiltInStyleBaseSetElseBranch:
     """Cover lines 594-595: BuiltInStyle.base_set with value NOT in _LABEL_MAP (else branch)
-       Cover line 600: BuiltInStyle.base_set with invalid style raises ValueError"""
+    Cover line 600: BuiltInStyle.base_set with invalid style raises ValueError"""
 
     def test_base_set_else_branch_valid_style(self, doc):
         """base_set with value not in _LABEL_MAP but valid docx style (else branch, line 596-600)"""
@@ -770,4 +921,3 @@ class TestBuiltInStyleBaseSetElseBranch:
         # This should succeed since Normal is a valid style
         bis.base_set(p)
         assert p.style.name == "Normal"
-

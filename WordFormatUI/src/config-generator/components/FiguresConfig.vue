@@ -1,13 +1,13 @@
 <template>
   <div class="figures-config">
     <div class="rules-grid">
-      <div class="rule-field"><label>编号前缀</label><input type="text" v-model="config.caption_prefix"></div>
-      <label class="rule-check"><input type="checkbox" v-model="config.rules.caption_numbering.enabled"> 启用编号检查</label>
-      <div class="rule-field"><label>分隔符</label><input type="text" v-model="config.rules.caption_numbering.separator" :disabled="!config.rules.caption_numbering.enabled"></div>
-      <label class="rule-check"><input type="checkbox" v-model="config.rules.caption_numbering.label_number_space" :disabled="!config.rules.caption_numbering.enabled"> 标签-编号间空格</label>
+      <div class="rule-field"><label>编号前缀</label><input type="text" v-model="config.caption.caption_prefix"></div>
+      <label class="rule-check"><input type="checkbox" v-model="config.caption.rules.caption_numbering.enabled"> 启用编号检查</label>
+      <div class="rule-field"><label>分隔符</label><input type="text" v-model="config.caption.rules.caption_numbering.separator" :disabled="!config.caption.rules.caption_numbering.enabled"></div>
+      <label class="rule-check"><input type="checkbox" v-model="config.caption.rules.caption_numbering.label_number_space" :disabled="!config.caption.rules.caption_numbering.enabled"> 标签-编号间空格</label>
     </div>
     <h5>题注格式</h5>
-    <FormatConfig :config="config" />
+    <FormatConfig :config="config.caption" />
     <h5 class="mt-3">图片段落格式</h5>
     <FormatConfig :config="config.image" />
   </div>

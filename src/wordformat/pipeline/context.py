@@ -14,11 +14,15 @@ from wordformat.rules.node import FormatNode
 
 @dataclass
 class FormatContext:
-    json_path: str
-    docx_path: str
-    check: bool
-    config_path: str
+    json_path: str = ""
+    docx_path: str = ""
+    check: bool = False
+    config_path: str = ""
     save_dir: str = "/output"
+    # MD → Docx 专用
+    md_path: str = ""
+    md_text: str = ""
+    paragraphs: list = field(default_factory=list)
     # 运行时对象（由各阶段填充）
     document: DocumentObject | None = None
     root_node: FormatNode = None

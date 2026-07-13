@@ -70,6 +70,7 @@ from wordformat.utils import (
 
 def _load_yaml(path):
     import yaml
+
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -170,7 +171,7 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_clears_theme_color(self, root_config):
         """_fix_style_run_properties 应清除样式定义中的主题色。"""
-        
+
         from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
@@ -197,11 +198,11 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_sets_font_name(self, root_config):
         """_fix_style_run_properties 应设置样式定义中的英文字体名。"""
-        
+
         from wordformat.style.defs import ensure_style_exists
 
         doc = Document()
-        cfg = root_config.body_text
+        cfg = root_config.body.text
         ensure_style_exists(doc, "Normal")
         style = doc.styles["Normal"]
 
@@ -213,9 +214,9 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_run_properties_sets_bold(self, root_config):
         """_fix_style_run_properties 应设置样式定义中的加粗属性。"""
-        
+
         from wordformat.style.defs import ensure_style_exists
-        
+
         doc = Document()
         cfg = NodeConfigRoot(bold=True)
         ensure_style_exists(doc, "Heading 1")
@@ -247,9 +248,9 @@ class TestHeadingCoverageBoost:
 
     def test_fix_style_paragraph_properties_sets_alignment(self, root_config):
         """_fix_style_paragraph_properties 应设置样式定义中的对齐方式。"""
-        
+
         from wordformat.style.defs import ensure_style_exists
-        
+
         doc = Document()
         cfg = NodeConfigRoot(alignment="居中对齐")
         ensure_style_exists(doc, "Heading 1")
@@ -631,6 +632,7 @@ class TestStyleEnumCoverageBoost:
         doc = Document()
         p = doc.add_paragraph()
         from docx.shared import Pt
+
         p.paragraph_format.first_line_indent = Pt(24)
         fli = FirstLineIndent("24pt")
         result = fli.get_from_paragraph(p)
@@ -641,6 +643,7 @@ class TestStyleEnumCoverageBoost:
         doc = Document()
         p = doc.add_paragraph()
         from docx.shared import Cm
+
         p.paragraph_format.first_line_indent = Cm(0.85)
         fli = FirstLineIndent("0.85cm")
         result = fli.get_from_paragraph(p)
@@ -651,6 +654,7 @@ class TestStyleEnumCoverageBoost:
         doc = Document()
         p = doc.add_paragraph()
         from docx.shared import Inches
+
         p.paragraph_format.first_line_indent = Inches(0.5)
         fli = FirstLineIndent("0.5inch")
         result = fli.get_from_paragraph(p)
@@ -669,9 +673,7 @@ class TestStyleEnumCoverageBoost:
         ensure_style_exists(doc, "TestStyleNoBase")
         # 清理
         try:
-            doc.styles.element.remove(
-                doc.styles["TestStyleNoBase"].element
-            )
+            doc.styles.element.remove(doc.styles["TestStyleNoBase"].element)
         except Exception:
             pass
 
@@ -756,7 +758,9 @@ class TestSetStyleCoverageBoost:
         config_model = NodeConfigRoot(
             global_format=NodeConfigRoot(),
             headings=NodeConfigRoot(
-                level_1=NodeConfigRoot(builtin_style_name="Heading 1", font_color="黑色"),
+                level_1=NodeConfigRoot(
+                    builtin_style_name="Heading 1", font_color="黑色"
+                ),
             ),
         )
 
@@ -811,6 +815,7 @@ class TestSetStyleCoverageBoost:
 
         当节点没有 check_format 方法时，跳过。
         """
+
         # 使用一个没有 check_format 的简单对象
         class SimpleNode:
             def __init__(self):
@@ -840,7 +845,9 @@ class TestSetStyleCoverageBoost:
 
         config = MagicMock()
         # load_config 会抛出异常
-        with patch.object(root_node, "load_config", side_effect=ValueError("test error")):
+        with patch.object(
+            root_node, "load_config", side_effect=ValueError("test error")
+        ):
             with pytest.raises(ValueError):
                 apply_format_check_to_all_nodes(root_node, doc, config, check=True)
 
@@ -951,6 +958,7 @@ class TestGetSomeCoverageBoost:
         """themeColor（主题色）返回 None：rgb 不确定。"""
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
+
         run = Document().add_paragraph().add_run("x")
         rPr = run._element.get_or_add_rPr()
         color = OxmlElement("w:color")
@@ -978,6 +986,7 @@ class TestGetSomeCoverageBoost:
         p = doc.add_paragraph()
         from docx.shared import Pt
         from docx.enum.text import WD_LINE_SPACING
+
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
         p.paragraph_format.line_spacing = 1.5
         result = paragraph_get_line_spacing(p)
@@ -988,6 +997,7 @@ class TestGetSomeCoverageBoost:
         doc = Document()
         p = doc.add_paragraph()
         from docx.enum.text import WD_LINE_SPACING
+
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.AT_LEAST
         result = paragraph_get_line_spacing(p)
         assert result is None
@@ -1155,6 +1165,7 @@ class TestUtilsCoverageBoost:
         new_dir = str(tmp_path / "new_subdir" / "nested")
         ensure_directory_exists(new_dir)
         import os
+
         assert os.path.isdir(new_dir)
 
     def test_ensure_directory_exists_already_exists(self, tmp_path):
@@ -1183,6 +1194,7 @@ class TestCoverageBoostRound2:
     def test_ensure_directory_exists_creates_dir(self, tmp_path):
         """确保目录不存在时创建。"""
         from wordformat.utils import ensure_directory_exists
+
         d = str(tmp_path / "new_dir")
         ensure_directory_exists(d)
         assert os.path.isdir(d)
@@ -1190,6 +1202,7 @@ class TestCoverageBoostRound2:
     def test_para_contains_image_false(self):
         """无图片的段落返回 False。"""
         from wordformat.utils import para_contains_image
+
         doc = Document()
         p = doc.add_paragraph("text")
         assert para_contains_image(p) is False
@@ -1197,6 +1210,7 @@ class TestCoverageBoostRound2:
     def test_remove_all_numbering(self):
         """remove_all_numbering 对空白文档不抛异常。"""
         from wordformat.utils import remove_all_numbering
+
         doc = Document()
         remove_all_numbering(doc)
 
@@ -1205,6 +1219,7 @@ class TestCoverageBoostRound2:
     def test_config_not_loaded_error(self):
         """ConfigNotLoadedError 可正常抛出和捕获。"""
         from wordformat.config.loader import ConfigNotLoadedError
+
         with pytest.raises(ConfigNotLoadedError):
             raise ConfigNotLoadedError("test")
 
@@ -1214,6 +1229,7 @@ class TestCoverageBoostRound2:
         """rPr_set_italic 传入 False 时移除 w:i。"""
         from wordformat.style.xml_ops import rPr_set_italic, ensure_rPr
         from docx.oxml import OxmlElement
+
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
         rPr.append(OxmlElement("w:i"))
@@ -1224,6 +1240,7 @@ class TestCoverageBoostRound2:
         """rPr_set_underline 传入 False 时移除 w:u。"""
         from wordformat.style.xml_ops import rPr_set_underline, ensure_rPr
         from docx.oxml import OxmlElement
+
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
         u = OxmlElement("w:u")
@@ -1238,10 +1255,15 @@ class TestCoverageBoostRound2:
         """print_tree 支持传入 JSON 文件路径。"""
         import json
         from wordformat.tree import print_tree
+
         json_path = tmp_path / "test.json"
-        json_path.write_text(json.dumps([
-            {"category": "body_text", "paragraph": "hello"},
-        ]))
+        json_path.write_text(
+            json.dumps(
+                [
+                    {"category": "body_text", "paragraph": "hello"},
+                ]
+            )
+        )
         # 不应抛异常
         with patch("sys.stdout", io.StringIO()):
             print_tree(str(json_path), show_index=True, show_confidence=True)
@@ -1252,6 +1274,7 @@ class TestCoverageBoostRound2:
         """numbering 禁用时不处理。"""
         from wordformat.numbering import process_heading_numbering
         from unittest.mock import MagicMock
+
         config = MagicMock()
         config.enabled = False
         process_heading_numbering(None, Document(), config)
@@ -1263,6 +1286,7 @@ class TestCoverageBoostRound2:
         from wordformat.pipeline.stages import FormattingExecutionStage
         from wordformat.rules.node import FormatNode
         from wordformat.settings import VOIDNODELIST
+
         stage = FormattingExecutionStage()
         root = FormatNode(value={"category": VOIDNODELIST[0]}, level=0)
         root.children = []
@@ -1271,29 +1295,38 @@ class TestCoverageBoostRound2:
 
     def test_summary_stage_adds_comment(self, doc):
         """SummaryGenerationStage 在 check 模式下添加批注。"""
-        from wordformat.pipeline.stages import SummaryGenerationStage, FormattingExecutionStage
+        from wordformat.pipeline.stages import (
+            SummaryGenerationStage,
+            FormattingExecutionStage,
+        )
         from wordformat.rules.node import FormatNode
+
         p = doc.add_paragraph("")
         root = FormatNode(value={"category": "top"}, level=0)
         root.children = []
         FormatNode.reset_stats()
         stage = SummaryGenerationStage()
         from wordformat.pipeline.context import FormatContext
+
         ctx = FormatContext(
-            json_path="", docx_path="", check=True,
-            config_path="", save_dir="/tmp",
-            document=doc, root_node=root,
+            json_path="",
+            docx_path="",
+            check=True,
+            config_path="",
+            save_dir="/tmp",
+            document=doc,
+            root_node=root,
         )
         stage.process(ctx)
 
     # --- utils/_docx.py more ---
-
 
     # --- style/xml_ops.py ---
 
     def test_rPr_set_bold_remove(self):
         """rPr_set_bold 传入 False 移除 w:b。"""
         from wordformat.style.xml_ops import rPr_set_bold, ensure_rPr
+
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
         rPr.append(OxmlElement("w:b"))
@@ -1303,6 +1336,7 @@ class TestCoverageBoostRound2:
     def test_line_rule_to_xml_unknown(self):
         """line_rule_to_xml 对未知值返回 auto。"""
         from wordformat.style.xml_ops import line_rule_to_xml
+
         assert line_rule_to_xml(999) == "auto"
 
     # --- style/defs.py ---
@@ -1310,6 +1344,7 @@ class TestCoverageBoostRound2:
     def test_fontsize_base_set_numeric(self):
         """FontSize.base_set 处理数字字符串。"""
         from wordformat.style.defs import FontSize
+
         doc = Document()
         p = doc.add_paragraph("test")
         run = p.add_run("x")
@@ -1320,6 +1355,7 @@ class TestCoverageBoostRound2:
     def test_fontname_base_set_english(self):
         """FontName.base_set 处理英文字体。"""
         from wordformat.style.defs import FontName
+
         doc = Document()
         p = doc.add_paragraph("test")
         run = p.add_run("x")
@@ -1330,6 +1366,7 @@ class TestCoverageBoostRound2:
     def test_unit_label_enum_eq_none(self):
         """UnitLabelEnum __eq__ 对 None 返回 rel_value == 0。"""
         from wordformat.style.defs import FirstLineIndent
+
         indent = FirstLineIndent("0字符")
         assert indent == None  # rel_value is 0, so equal to None
 
@@ -1338,6 +1375,7 @@ class TestCoverageBoostRound2:
     def test_auto_strip_numbering_empty_runs(self):
         """空 run 的段落 _auto_strip_numbering 返回 False。"""
         from wordformat.numbering import _auto_strip_numbering
+
         doc = Document()
         p = doc.add_paragraph("")
         assert _auto_strip_numbering(p, 0) is False
@@ -1348,6 +1386,7 @@ class TestCoverageBoostRound2:
         """未提供配置文件时使用默认配置。"""
         from wordformat.pipeline.stages import LoadConfigStage
         from wordformat.pipeline.context import FormatContext
+
         ctx = FormatContext(json_path="", docx_path="", check=True, config_path="")
         stage = LoadConfigStage()
         result = stage.process(ctx)
@@ -1355,9 +1394,9 @@ class TestCoverageBoostRound2:
 
     # --- utils/_fs.py ---
 
-
     def test_ensure_is_directory_missing(self, tmp_path):
         """ensure_is_directory 路径不存在时抛出 ValueError。"""
         from wordformat.utils import ensure_is_directory
+
         with pytest.raises(ValueError, match="不存在"):
             ensure_is_directory(str(tmp_path / "nonexistent"))

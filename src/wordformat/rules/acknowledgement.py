@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : acknowledgement.py
 
-from wordformat.config.dotdict import BASE_FORMAT
+from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 
@@ -14,24 +14,28 @@ class Acknowledgements(FormatNode):
 
     NODE_TYPE = "acknowledgements.title"
     NODE_LABEL = "致谢标题"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "居中对齐",
-        "first_line_indent": "0字符",
-        "chinese_font_name": "黑体",
-        "font_size": "小二",
-        "bold": True,
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {
+                "alignment": "居中对齐",
+                "first_line_indent": "0字符",
+            },
+            "font": {"chinese_font_name": "黑体", "font_size": "小二", "bold": True},
+        },
+    )
 
 
 @register("acknowledgements_content")
 class AcknowledgementsCN(FormatNode):
     """致谢内容"""
 
-    NODE_TYPE = "acknowledgements.content"
+    NODE_TYPE = "acknowledgements.body"
     NODE_LABEL = "致谢内容"
-    DEFAULTS = {
-        **BASE_FORMAT,
-        "alignment": "两端对齐",
-        "chinese_font_name": "宋体",
-    }
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {"alignment": "两端对齐"},
+            "font": {"chinese_font_name": "宋体"},
+        },
+    )

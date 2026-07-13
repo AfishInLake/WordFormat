@@ -1,6 +1,7 @@
 """
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -51,6 +52,7 @@ def _load_root_config(config_path):
 
 def _load_yaml(path):
     import yaml
+
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -59,6 +61,7 @@ def _load_yaml(path):
 def root_config(sample_yaml_config):
     """从 sample_yaml_config 加载 NodeConfigRoot，与示例文件解耦。"""
     from wordformat.config.loader import init_config
+
     init_config(sample_yaml_config)
     return _load_root_config(sample_yaml_config)
 
@@ -84,8 +87,6 @@ def run_with_text(para):
 # ---------------------------------------------------------------------------
 # 1. FormatNode 基类行为
 # ---------------------------------------------------------------------------
-
-
 
 
 class TestHeadingBug:
@@ -114,8 +115,6 @@ class TestHeadingBug:
 # ---------------------------------------------------------------------------
 
 
-
-
 class TestHeadingLevel1NodeBase:
     """覆盖 heading.py HeadingLevel1Node._base 的 diff/apply 逻辑。"""
 
@@ -142,7 +141,7 @@ class TestHeadingLevel1NodeBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
     def test_check_returns_issues_list(self, root_config):
         """返回值应为包含 issue 字典的列表。"""
@@ -168,8 +167,7 @@ class TestHeadingLevel1NodeBase:
             node.check_format(doc)
         # 空白 run 不应触发 comment
         run_comments = [
-            c for c in mock_comment.call_args_list
-            if c.kwargs.get("runs") is r1
+            c for c in mock_comment.call_args_list if c.kwargs.get("runs") is r1
         ]
         assert len(run_comments) == 0
 
@@ -177,8 +175,6 @@ class TestHeadingLevel1NodeBase:
 # ---------------------------------------------------------------------------
 # 19. HeadingLevel2Node._base 覆盖
 # ---------------------------------------------------------------------------
-
-
 
 
 class TestHeadingLevel2NodeBase:
@@ -206,7 +202,7 @@ class TestHeadingLevel2NodeBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
     def test_check_returns_issues(self, root_config):
         """返回值应包含 issue 字典。"""
@@ -222,8 +218,6 @@ class TestHeadingLevel2NodeBase:
 # ---------------------------------------------------------------------------
 # 20. HeadingLevel3Node._base 覆盖
 # ---------------------------------------------------------------------------
-
-
 
 
 class TestHeadingLevel3NodeBase:
@@ -251,7 +245,7 @@ class TestHeadingLevel3NodeBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1
+        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
 
     def test_check_returns_issues(self, root_config):
         """返回值应包含 issue 字典。"""
@@ -275,6 +269,7 @@ class TestHeadingLevelNodes:
     def test_heading_level1_load_config_dict(self):
         """HeadingLevel1Node.load_config with dict (lines 36-41)"""
         from wordformat.rules.heading import HeadingLevel1Node
+
         node = HeadingLevel1Node(
             value={"category": "headings.level_1", "fingerprint": "fp"},
             level=1,
@@ -294,6 +289,7 @@ class TestHeadingLevelNodes:
     def test_heading_level2_load_config_dict(self):
         """HeadingLevel2Node.load_config with dict (lines 52-58)"""
         from wordformat.rules.heading import HeadingLevel2Node
+
         node = HeadingLevel2Node(
             value={"category": "headings.level_2", "fingerprint": "fp"},
             level=2,
@@ -312,6 +308,7 @@ class TestHeadingLevelNodes:
     def test_heading_level3_load_config_dict(self):
         """HeadingLevel3Node.load_config with dict"""
         from wordformat.rules.heading import HeadingLevel3Node
+
         node = HeadingLevel3Node(
             value={"category": "headings.level_3", "fingerprint": "fp"},
             level=3,
@@ -331,6 +328,7 @@ class TestHeadingLevelNodes:
         """_base method with loaded config"""
         from wordformat.config.loader import init_config, get_config
         from wordformat.rules.heading import HeadingLevel1Node
+
         init_config(sample_yaml_config)
         config = get_config()
 
@@ -346,6 +344,4 @@ class TestHeadingLevelNodes:
         node.check_format(doc)  # 通过 RULES handler 执行格式检查
 
 
-
 # ==================== (o) set_style.py 额外覆盖测试 ====================
-

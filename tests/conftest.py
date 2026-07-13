@@ -3,6 +3,7 @@
 
 将所有测试文件中重复定义的 fixture 集中管理。
 """
+
 import os
 import json
 import pytest
@@ -17,6 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 
 # ==================== Document Fixtures ====================
+
 
 @pytest.fixture
 def doc():
@@ -97,24 +99,15 @@ global_format:
   underline: false
 abstract:
   chinese:
-    chinese_title:
+    title:
       alignment: '居中对齐'
       first_line_indent: '0字符'
       chinese_font_name: '黑体'
       font_size: '小二'
       bold: true
-    chinese_content:
+    body:
       alignment: '两端对齐'
-  english:
-    english_title:
-      alignment: '居中对齐'
-      first_line_indent: '0字符'
-      font_size: '四号'
-      bold: true
-    english_content:
-      alignment: '两端对齐'
-  keywords:
-    chinese:
+    keywords:
       label:
         chinese_font_name: '黑体'
         font_size: '三号'
@@ -131,7 +124,15 @@ abstract:
           count_max: 5
         trailing_punctuation:
           enabled: true
-    english:
+  english:
+    title:
+      alignment: '居中对齐'
+      first_line_indent: '0字符'
+      font_size: '四号'
+      bold: true
+    body:
+      alignment: '两端对齐'
+    keywords:
       label:
         font_size: '三号'
         bold: true
@@ -166,17 +167,24 @@ headings:
     chinese_font_name: '黑体'
     font_size: '小四'
     builtin_style_name: 'Heading 3'
-body_text:
-  alignment: '两端对齐'
-  chinese_font_name: '宋体'
-  english_font_name: 'Times New Roman'
-  font_size: '小四'
+body:
+  text:
+    alignment: '两端对齐'
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '小四'
 figures:
-  caption_prefix: '图'
+  caption:
+    caption_prefix: '图'
+  image:
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
 tables:
-  caption_prefix: '表'
-  content:
-    font_size: '五号'
+  caption:
+    caption_prefix: '表'
+  object:
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
 references:
   title:
     alignment: '居中对齐'
@@ -184,7 +192,7 @@ references:
     chinese_font_name: '黑体'
     font_size: '三号'
     bold: true
-  content:
+  entry:
     alignment: '左对齐'
     first_line_indent: '0字符'
     font_size: '五号'
@@ -195,12 +203,13 @@ acknowledgements:
     chinese_font_name: '黑体'
     font_size: '小二'
     bold: true
-  content:
+  body:
     alignment: '两端对齐'
     first_line_indent: '2字符'
 numbering:
   enabled: false
 """
+
 
 @pytest.fixture
 def config_path(tmp_path):
@@ -215,17 +224,24 @@ def mock_config():
     """创建一个 mock 配置对象，模拟 NodeConfigRoot"""
     config = MagicMock()
     config.style_checks_warning = MagicMock(
-        bold=True, italic=True, underline=True,
-        font_size=True, font_name=True, font_color=True,
-        alignment=True, space_before=True, space_after=True,
-        line_spacing=True, line_spacingrule=True,
-        left_indent=True, right_indent=True,
-        first_line_indent=True, builtin_style_name=True,
+        bold=True,
+        italic=True,
+        underline=True,
+        font_size=True,
+        font_name=True,
+        font_color=True,
+        alignment=True,
+        space_before=True,
+        space_after=True,
+        line_spacing=True,
+        line_spacingrule=True,
+        left_indent=True,
+        right_indent=True,
+        first_line_indent=True,
+        builtin_style_name=True,
     )
     config.numbering = MagicMock(enabled=False)
     return config
-
-
 
 
 @pytest.fixture
@@ -238,16 +254,18 @@ def sample_yaml_config(tmp_path):
 
 # ==================== Mock Fixtures ====================
 
+
 @pytest.fixture
 def mock_onnx_infer():
     """Mock ONNX 推理函数，返回可控结果"""
+
     def _infer(texts):
         if isinstance(texts, str):
             texts = [texts]
         return [
-            {"text": t, "label": "body_text", "pred_id": 0, "score": 0.9}
-            for t in texts
+            {"text": t, "label": "body_text", "pred_id": 0, "score": 0.9} for t in texts
         ]
+
     return _infer
 
 
@@ -261,6 +279,7 @@ def mock_onnx_single():
 def reset_config():
     """每个测试前后自动清理配置状态"""
     from wordformat.config.loader import clear_config
+
     clear_config()
     yield
     clear_config()
@@ -270,6 +289,7 @@ def reset_config():
 def reset_style_warning():
     """每个测试前后重置警告缓存。"""
     from wordformat.style import diff
+
     diff._warnings = None
     yield
     diff._warnings = None

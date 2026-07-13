@@ -3,6 +3,7 @@
 
 覆盖模块：cli.py, config, agent, set_style.py, set_tag.py, word_structure
 """
+
 import argparse
 import io
 import os
@@ -47,7 +48,9 @@ import wordformat.api
 from wordformat.rules.body import BodyText
 from wordformat.api import save_upload_file
 
-apply_format_check_to_all_nodes = FormattingExecutionStage().apply_format_check_to_all_nodes
+apply_format_check_to_all_nodes = (
+    FormattingExecutionStage().apply_format_check_to_all_nodes
+)
 
 
 # ==================== (h) CLI 集成测试 ====================
@@ -100,7 +103,14 @@ class TestCLIIntegration:
         out_dir = tempfile.mkdtemp()
         try:
             mock_argv.__getitem__.side_effect = lambda i: [
-                "wf", "gj", "-d", docx_path, "-c", cfg_path, "-o", out_dir
+                "wf",
+                "gj",
+                "-d",
+                docx_path,
+                "-c",
+                cfg_path,
+                "-o",
+                out_dir,
             ][i]
             mock_argv.__len__.return_value = 8
             main()
@@ -123,13 +133,25 @@ class TestCLIIntegration:
         out_dir = tempfile.mkdtemp()
         try:
             mock_argv.__getitem__.side_effect = lambda i: [
-                "wf", "cf", "-d", docx_path, "-c", cfg_path, "-f", json_path, "-o", out_dir
+                "wf",
+                "cf",
+                "-d",
+                docx_path,
+                "-c",
+                cfg_path,
+                "-f",
+                json_path,
+                "-o",
+                out_dir,
             ][i]
             mock_argv.__len__.return_value = 10
             main()
             mock_auto.assert_called_once_with(
-                jsonpath=json_path, docxpath=docx_path,
-                configpath=cfg_path, savepath=out_dir, check=True,
+                jsonpath=json_path,
+                docxpath=docx_path,
+                configpath=cfg_path,
+                savepath=out_dir,
+                check=True,
             )
         finally:
             for p in [docx_path, cfg_path, json_path]:
@@ -148,13 +170,25 @@ class TestCLIIntegration:
         out_dir = tempfile.mkdtemp()
         try:
             mock_argv.__getitem__.side_effect = lambda i: [
-                "wf", "af", "-d", docx_path, "-c", cfg_path, "-f", json_path, "-o", out_dir
+                "wf",
+                "af",
+                "-d",
+                docx_path,
+                "-c",
+                cfg_path,
+                "-f",
+                json_path,
+                "-o",
+                out_dir,
             ][i]
             mock_argv.__len__.return_value = 10
             main()
             mock_auto.assert_called_once_with(
-                jsonpath=json_path, docxpath=docx_path,
-                configpath=cfg_path, savepath=out_dir, check=False,
+                jsonpath=json_path,
+                docxpath=docx_path,
+                configpath=cfg_path,
+                savepath=out_dir,
+                check=False,
             )
         finally:
             for p in [docx_path, cfg_path, json_path]:
@@ -163,12 +197,13 @@ class TestCLIIntegration:
 
     @mock.patch("sys.argv")
     def test_main_startapi_rejects_invalid_port(self, mock_argv):
-        mock_argv.__getitem__.side_effect = lambda i: ["wf", "startapi", "-p", "99999"][i]
+        mock_argv.__getitem__.side_effect = lambda i: ["wf", "startapi", "-p", "99999"][
+            i
+        ]
         mock_argv.__len__.return_value = 4
         with mock.patch.dict("sys.modules", {"uvicorn": mock.MagicMock()}):
             with pytest.raises(SystemExit):
                 main()
-
 
 
 # ==================== (u) api/__init__.py 覆盖测试 ====================
@@ -179,10 +214,13 @@ class TestSaveUploadFile:
 
     def test_save_upload_file_normal(self, tmp_path):
         """正常保存上传文件"""
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-                mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"), \
-                mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"):
+        with (
+            mock.patch("wordformat.api.BASE_DIR", tmp_path),
+            mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"),
+            mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"),
+        ):
             from wordformat.api import save_upload_file
+
             wordformat.api.TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
             mock_file = mock.MagicMock()
@@ -196,9 +234,11 @@ class TestSaveUploadFile:
 
     def test_save_upload_file_name_conflict(self, tmp_path):
         """文件名冲突时自动重命名"""
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-                mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"), \
-                mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"):
+        with (
+            mock.patch("wordformat.api.BASE_DIR", tmp_path),
+            mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"),
+            mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"),
+        ):
             wordformat.api.TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
             # 预先创建同名文件
@@ -219,10 +259,13 @@ class TestSaveUploadFile:
 
     def test_save_upload_file_multiple_conflicts(self, tmp_path):
         """多次冲突时递增后缀"""
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-                mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"), \
-                mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"):
+        with (
+            mock.patch("wordformat.api.BASE_DIR", tmp_path),
+            mock.patch("wordformat.api.OUTPUT_DIR", tmp_path / "output"),
+            mock.patch("wordformat.api.TEMP_DIR", tmp_path / "temp"),
+        ):
             from wordformat.api import save_upload_file
+
             wordformat.api.TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
             (wordformat.api.TEMP_DIR / "test.docx").write_bytes(b"a")
@@ -237,7 +280,6 @@ class TestSaveUploadFile:
             assert result.endswith("test_3.docx")
 
 
-
 class TestAPIEndpoints:
     """覆盖 api/__init__.py 所有 API 端点"""
 
@@ -249,10 +291,13 @@ class TestAPIEndpoints:
         temp_dir.mkdir(parents=True, exist_ok=True)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        with mock.patch("wordformat.api.BASE_DIR", tmp_path), \
-                mock.patch("wordformat.api.TEMP_DIR", temp_dir), \
-                mock.patch("wordformat.api.OUTPUT_DIR", output_dir):
+        with (
+            mock.patch("wordformat.api.BASE_DIR", tmp_path),
+            mock.patch("wordformat.api.TEMP_DIR", temp_dir),
+            mock.patch("wordformat.api.OUTPUT_DIR", output_dir),
+        ):
             from wordformat.api import app
+
             client = TestClient(app)
             yield client, temp_dir, output_dir
 
@@ -260,7 +305,14 @@ class TestAPIEndpoints:
         """POST /generate-json 成功调用 set_tag_main"""
         client, temp_dir, output_dir = api_client
 
-        mock_result = [{"category": "body_text", "score": 0.9, "paragraph": "test", "fingerprint": "fp1"}]
+        mock_result = [
+            {
+                "category": "body_text",
+                "score": 0.9,
+                "paragraph": "test",
+                "fingerprint": "fp1",
+            }
+        ]
         with mock.patch("wordformat.api.set_tag_main", return_value=mock_result):
             docx_bytes = io.BytesIO(b"fake docx")
             yaml_bytes = io.BytesIO(b"key: value")
@@ -269,7 +321,11 @@ class TestAPIEndpoints:
                 "/generate-json",
                 files={
                     "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
+                    "config_file": (
+                        "config.yaml",
+                        yaml_bytes,
+                        "application/octet-stream",
+                    ),
                 },
             )
 
@@ -303,7 +359,9 @@ class TestAPIEndpoints:
         client, temp_dir, output_dir = api_client
 
         mock_result_path = str(output_dir / "test--标注版.docx")
-        with mock.patch("wordformat.api.auto_format_thesis_document", return_value=mock_result_path):
+        with mock.patch(
+            "wordformat.api.auto_format_thesis_document", return_value=mock_result_path
+        ):
             docx_bytes = io.BytesIO(b"fake docx")
             yaml_bytes = io.BytesIO(b"key: value")
             json_str = '[{"category": "body_text", "score": 0.9}]'
@@ -312,7 +370,11 @@ class TestAPIEndpoints:
                 "/check-format",
                 files={
                     "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
+                    "config_file": (
+                        "config.yaml",
+                        yaml_bytes,
+                        "application/octet-stream",
+                    ),
                 },
                 data={"json_data": json_str},
             )
@@ -328,7 +390,9 @@ class TestAPIEndpoints:
         client, temp_dir, output_dir = api_client
 
         mock_result_path = str(output_dir / "test--修改版.docx")
-        with mock.patch("wordformat.api.auto_format_thesis_document", return_value=mock_result_path):
+        with mock.patch(
+            "wordformat.api.auto_format_thesis_document", return_value=mock_result_path
+        ):
             docx_bytes = io.BytesIO(b"fake docx")
             yaml_bytes = io.BytesIO(b"key: value")
             json_str = '[{"category": "body_text", "score": 0.9}]'
@@ -337,7 +401,11 @@ class TestAPIEndpoints:
                 "/apply-format",
                 files={
                     "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
+                    "config_file": (
+                        "config.yaml",
+                        yaml_bytes,
+                        "application/octet-stream",
+                    ),
                 },
                 data={"json_data": json_str},
             )
@@ -372,7 +440,9 @@ class TestAPIEndpoints:
         """POST /generate-json 异常时返回 500"""
         client, temp_dir, output_dir = api_client
 
-        with mock.patch("wordformat.api.set_tag_main", side_effect=RuntimeError("test error")):
+        with mock.patch(
+            "wordformat.api.set_tag_main", side_effect=RuntimeError("test error")
+        ):
             docx_bytes = io.BytesIO(b"fake docx")
             yaml_bytes = io.BytesIO(b"key: value")
 
@@ -380,12 +450,15 @@ class TestAPIEndpoints:
                 "/generate-json",
                 files={
                     "docx_file": ("test.docx", docx_bytes, "application/octet-stream"),
-                    "config_file": ("config.yaml", yaml_bytes, "application/octet-stream"),
+                    "config_file": (
+                        "config.yaml",
+                        yaml_bytes,
+                        "application/octet-stream",
+                    ),
                 },
             )
 
         assert response.status_code == 500
-
 
 
 class TestCLIStartApiMode:
@@ -394,6 +467,7 @@ class TestCLIStartApiMode:
     def test_startapi_mode_calls_uvicorn(self):
         """startapi 模式调用 uvicorn.run"""
         import unittest.mock as um
+
         # uvicorn 在函数内部动态导入，需要 mock import
         with um.patch("sys.argv", ["wf", "startapi"]):
             with um.patch.dict("sys.modules", {"uvicorn": um.MagicMock()}):
@@ -401,6 +475,6 @@ class TestCLIStartApiMode:
                     main()
         # 验证 uvicorn.run 被调用
         import sys
+
         if "uvicorn" in sys.modules:
             sys.modules["uvicorn"].run.assert_called_once()
-
