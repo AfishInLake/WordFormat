@@ -23,7 +23,7 @@ def parse_markdown(md_text: str) -> list[dict[str, Any]]:
     供 DocumentCreationStage 创建多 run 段落时使用。
     """
     md = mistune.create_markdown(
-        renderer=None, plugins=["table", "strikethrough", "url"]
+        renderer=None, plugins=["math", "table", "strikethrough", "url"]
     )
     ast = md(md_text)
     result: list[dict[str, Any]] = []
@@ -43,7 +43,9 @@ def _walk_blocks(blocks: list[dict], result: list[dict]) -> None:
         if btype == "blank_line" or btype == "thematic_break":
             continue
 
-        if btype == "heading":
+        if btype == "block_math":
+            result.append(_make_block_math(block))
+        elif btype == "heading":
             result.append(_make_heading(block))
         elif btype in ("paragraph", "block_text"):
             item = _make_paragraph(block)
@@ -59,6 +61,17 @@ def _walk_blocks(blocks: list[dict], result: list[dict]) -> None:
             _walk_list(block, result)
         elif btype == "block_quote":
             _walk_blocks(block.get("children", []), result)
+
+
+def _make_block_math(block: dict) -> dict:
+    return {
+        "category": "math_block",
+        "paragraph": block.get("raw", ""),
+        "score": 1.0,
+        "inline_marks": [
+            {"text": block.get("raw", ""), "math": True, "math_display": True}
+        ],
+    }
 
 
 def _make_heading(block: dict) -> dict:
@@ -77,8 +90,10 @@ def _make_heading(block: dict) -> dict:
 def _make_paragraph(block: dict) -> dict | list[dict] | None:
     children = block.get("children", [])
 
-    # 仅含图片的段落
+    # 仅含图片或块级公式的段落
     non_empty = [c for c in children if c["type"] != "softbreak"]
+    if len(non_empty) == 1 and non_empty[0]["type"] == "block_math":
+        return _make_block_math(non_empty[0])
     if len(non_empty) == 1 and non_empty[0]["type"] == "image":
         img_node = non_empty[0]
         url = img_node["attrs"].get("url", "")
@@ -179,6 +194,10 @@ def _extract_text(children: list[dict]) -> str:
                 parts.append(node["raw"].replace("\r\n", "\n").replace("\r", "\n"))
             elif node["type"] == "codespan":
                 parts.append(node.get("raw", ""))
+            elif node["type"] == "inline_math":
+                parts.append(f"${node.get('raw', '')}$")
+            elif node["type"] == "block_math":
+                parts.append(f"$${node.get('raw', '')}$$")
             elif node["type"] == "softbreak":
                 parts.append(" ")
             elif node["type"] == "linebreak":
@@ -216,6 +235,17 @@ def _extract_segments(children: list[dict]) -> list[dict]:  # noqa: C901
                 )
             elif ntype == "codespan":
                 segments.append({"text": node.get("raw", ""), **attrs, "code": True})
+            elif ntype == "inline_math":
+                segments.append({"text": node.get("raw", ""), **attrs, "math": True})
+            elif ntype == "block_math":
+                segments.append(
+                    {
+                        "text": node.get("raw", ""),
+                        **attrs,
+                        "math": True,
+                        "math_display": True,
+                    }
+                )
             elif ntype == "softbreak":
                 segments.append({"text": " ", **attrs})
             elif ntype == "linebreak":

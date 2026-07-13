@@ -24,6 +24,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "latex2mathml>=3.81.0",
+    "lxml>=5.0.0",
+    "mathml2omml>=0.0.2",
     "fastapi>=0.128.1",
     "loguru>=0.7.3",
     "mistune>=3.0.0",

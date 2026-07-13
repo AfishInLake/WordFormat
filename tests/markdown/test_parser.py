@@ -203,3 +203,47 @@ class TestSpecialBlocks:
         result = parse_markdown("第一行  \n第二行")
         text = result[0]["paragraph"]
         assert "\n" in text  # linebreak preserved
+
+
+class TestMathParsing:
+    """测试 Markdown 中数学公式的解析。"""
+
+    def test_inline_math_segment(self):
+        result = parse_markdown("质能方程 $E=mc^2$ 是著名的")
+        assert len(result) == 1
+        assert result[0]["category"] == "body_text"
+        marks = result[0]["inline_marks"]
+        math_segs = [m for m in marks if m.get("math")]
+        assert len(math_segs) == 1
+        assert math_segs[0]["text"] == "E=mc^2"
+
+    def test_inline_math_preserved_in_text(self):
+        result = parse_markdown("The value $x^2$ is squared.")
+        text = result[0]["paragraph"]
+        assert "$x^2$" in text
+
+    def test_standalone_display_math_block(self):
+        result = parse_markdown("$$\n\\frac{1}{2}\n$$")
+        assert len(result) == 1
+        assert result[0]["category"] == "math_block"
+        assert result[0]["paragraph"] == "\\frac{1}{2}"
+
+    def test_display_math_in_paragraph_creates_display_segment(self):
+        """行内 $$...$$ 也应被识别"""
+        result = parse_markdown("公式 $$a^2 + b^2 = c^2$$ 是勾股定理")
+        marks = result[0]["inline_marks"]
+        math_segs = [m for m in marks if m.get("math_display")]
+        assert len(math_segs) >= 1
+
+    def test_multiple_inline_math_in_one_paragraph(self):
+        result = parse_markdown("$x_1$ 和 $x_2$ 都是变量")
+        marks = result[0]["inline_marks"]
+        math_segs = [m for m in marks if m.get("math")]
+        assert len(math_segs) == 2
+
+    def test_math_with_subscripts(self):
+        result = parse_markdown("权重 $w_{ij}$ 的计算公式如下。")
+        marks = result[0]["inline_marks"]
+        math_segs = [m for m in marks if m.get("math")]
+        assert len(math_segs) == 1
+        assert math_segs[0]["text"] == "w_{ij}"

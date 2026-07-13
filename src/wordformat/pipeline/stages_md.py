@@ -15,6 +15,7 @@ from docx import Document
 
 from wordformat.log_config import logger
 from wordformat.markdown.parser import parse_markdown
+from wordformat.math.omml import latex_to_omath, latex_to_omath_para
 from wordformat.rules.node import FormatNode
 
 from .context import FormatContext
@@ -57,15 +58,60 @@ class DocumentCreationStage:
             value = node.value
             text = value.get("paragraph", "") if isinstance(value, dict) else str(value)
             category = value.get("category", "") if isinstance(value, dict) else ""
+            inline_marks = (
+                value.get("inline_marks", []) if isinstance(value, dict) else []
+            )
             para = ctx.document.add_paragraph()
             # figure_image: 路径留给 FigureImage._try_insert_image 处理，这里只建空段落
             if category == "figure_image":
                 para.add_run("")
+            elif category == "math_block":
+                self._add_math_paragraph(para, text)
+            elif self._has_math(inline_marks):
+                self._add_math_runs(para, inline_marks)
             else:
                 para.add_run(text.strip())
             node.paragraph = para
 
         return ctx
+
+    @staticmethod
+    def _has_math(inline_marks: list[dict]) -> bool:
+        return any(m.get("math") for m in inline_marks)
+
+    @staticmethod
+    def _add_math_paragraph(para, latex: str):
+        """创建块级公式段落（居中显示）。"""
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        omp = latex_to_omath_para(latex)
+        if omp is not None:
+            para._p.append(omp)
+        else:
+            para.add_run(latex)
+
+    @staticmethod
+    def _add_math_runs(para, inline_marks: list[dict]):
+        """根据 inline_marks 创建段落，数学片段渲染为 OMML 元素。"""
+        for seg in inline_marks:
+            if seg.get("math"):
+                latex = seg.get("text", "")
+                if seg.get("math_display"):
+                    # 块级公式在段落中：使用 oMathPara
+                    omp = latex_to_omath_para(latex)
+                    if omp is not None:
+                        para._p.append(omp)
+                    else:
+                        para.add_run(latex)
+                else:
+                    om = latex_to_omath(latex)
+                    if om is not None:
+                        para._p.append(om)
+                    else:
+                        para.add_run(latex)
+            else:
+                para.add_run(seg.get("text", ""))
 
     @staticmethod
     def _flatten_tree_nodes(root_node: FormatNode) -> list[FormatNode]:
