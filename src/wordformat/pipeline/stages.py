@@ -18,6 +18,7 @@ from wordformat.rules.abstract import (
     AbstractTitleCN,
     AbstractTitleEN,
 )
+from wordformat.rules.acknowledgement import Acknowledgements, AcknowledgementsCN
 from wordformat.rules.caption import CaptionFigure, CaptionTable
 from wordformat.rules.keywords import KeywordsCN, KeywordsEN
 from wordformat.rules.node import FormatNode
@@ -124,6 +125,7 @@ class TreeNormalizationStage:
             AbstractTitleCN: AbstractContentCN,
             AbstractTitleEN: AbstractContentEN,
             References: ReferenceEntry,
+            Acknowledgements: AcknowledgementsCN,
         }
         for parent_cls, target_cls in mappings.items():
             promote_bodytext_in_subtrees_of_type(

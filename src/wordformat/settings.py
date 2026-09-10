@@ -40,9 +40,16 @@ MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
 ONNX_VERSION = "20260204"
 
+# ONNX 推理线程数：单次最多处理 BATCH_SIZE 条，2/1 线程已足够。
+# 全核开启会导致 CPU 温度飙升、上下文切换开销大，笔记本上尤其明显。
+ONNX_INTRA_OP_THREADS = int(os.getenv("ONNX_INTRA_OP_THREADS", "2"))
+ONNX_INTER_OP_THREADS = int(os.getenv("ONNX_INTER_OP_THREADS", "1"))
+
 VOIDNODELIST = [
     "top",
     "heading_mulu",
     "heading_fulu",
     "other",  # 封面、声明页等无需格式化的内容
+    "document_title",  # 文档标题（后处理扩展标签，不参与格式化）
+    "footer",  # 页脚/AI 生成声明（后处理扩展标签，不参与格式化）
 ]

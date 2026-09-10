@@ -1,10 +1,11 @@
 import json
-import os
 import time
 from typing import Dict, List, Optional
 
 import numpy as np
 from loguru import logger
+
+from wordformat.settings import ONNX_INTER_OP_THREADS, ONNX_INTRA_OP_THREADS
 
 # ===== 全局变量（初始为 None）=====
 _tokenizer: Optional["Tokenizer"] = None  # noqa F821
@@ -68,9 +69,9 @@ def _load_model():
     # 2. 优化ONNX推理器配置
     ort_options = ort.SessionOptions()
     ort_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    cpu_core_num = os.cpu_count() or 4
-    ort_options.intra_op_num_threads = cpu_core_num
-    ort_options.inter_op_num_threads = cpu_core_num
+    # 不再全核开启：2/1 线程足够处理分片后的 batch，且显著降低 CPU 温度
+    ort_options.intra_op_num_threads = ONNX_INTRA_OP_THREADS
+    ort_options.inter_op_num_threads = ONNX_INTER_OP_THREADS
     ort_options.log_severity_level = 3
     ort_options.enable_cpu_mem_arena = True
     ort_options.enable_mem_pattern = True

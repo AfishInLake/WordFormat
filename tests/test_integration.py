@@ -592,8 +592,8 @@ class TestAutoFormatThesisDocument:
             check=True,
         )
         assert (
-            mock_promote.call_count == 3
-        )  # AbstractTitleCN, AbstractTitleEN, References
+            mock_promote.call_count == 4
+        )  # AbstractTitleCN, AbstractTitleEN, References, Acknowledgements
 
     @mock.patch(
         "wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes"
@@ -906,9 +906,10 @@ class TestONNXInferExceptionHandling:
             m._ort_sess = original_sess
             m._id2label = original_id2
 
-    def test_load_model_cpu_core_num_zero_fallback(self):
-        """os.cpu_count() returns 0 -> fallback to 4 (line 100)"""
+    def test_load_model_uses_settings_thread_limits(self):
+        """C1：线程数取自 settings（默认 2/1），不再用 os.cpu_count() 全核开启。"""
         import wordformat.agent.onnx_infer as m
+        from wordformat.settings import ONNX_INTER_OP_THREADS, ONNX_INTRA_OP_THREADS
 
         original_tok, original_sess, original_id2 = (
             m._tokenizer,
@@ -929,7 +930,6 @@ class TestONNXInferExceptionHandling:
                     "wordformat.agent.onnx_infer._get_model_paths",
                     return_value=mock_paths,
                 ),
-                mock.patch("os.cpu_count", return_value=0),
                 mock.patch("tokenizers.Tokenizer") as mock_tok_cls,
                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls,
                 mock.patch("onnxruntime.SessionOptions") as mock_opts_cls,
@@ -940,9 +940,10 @@ class TestONNXInferExceptionHandling:
                 mock_sess = mock.MagicMock()
                 mock_sess_cls.return_value = mock_sess
                 _load_model()
-                # Check that intra_op_num_threads was set to 4 (fallback)
+                # 线程数应等于 settings 中的配置（默认 2/1）
                 opts_instance = mock_opts_cls.return_value
-                assert opts_instance.intra_op_num_threads == 4
+                assert opts_instance.intra_op_num_threads == ONNX_INTRA_OP_THREADS
+                assert opts_instance.inter_op_num_threads == ONNX_INTER_OP_THREADS
         finally:
             m._tokenizer = original_tok
             m._ort_sess = original_sess
@@ -1487,7 +1488,7 @@ class TestSetStyleAdditionalCoverage:
             savepath=str(tmp_path),
             check=True,
         )
-        assert mock_promote.call_count == 3
+        assert mock_promote.call_count == 4
 
     @mock.patch(
         "wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes"
