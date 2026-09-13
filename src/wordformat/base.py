@@ -145,16 +145,22 @@ class DocxBase:
                     "needs_review": False,
                 }
 
-        # 对非空段进行批量 AI 推理
+        # 对非空段进行批量 AI 推理（跨批次维护 PREV 上下文状态链）
+        prev_label = None
         for i in range(0, len(texts_for_ai), BATCH_SIZE):
             batch_texts = texts_for_ai[i : i + BATCH_SIZE]
             batch_indices = text_indices[i : i + BATCH_SIZE]
 
             try:
-                batch_results = onnx_batch_infer(batch_texts)
+                batch_results, prev_label = onnx_batch_infer(batch_texts, prev_label)
             except Exception as e:
                 logger.error(f"批量推理失败，降级到单条处理: {e}")
-                batch_results = [onnx_single_infer(t) for t in batch_texts]
+                batch_results = []
+                for t in batch_texts:
+                    r = onnx_single_infer(t, prev_label)
+                    batch_results.append(r)
+                    if r["label"]:
+                        prev_label = r["label"]
 
             for idx, text, pred in zip(
                 batch_indices, batch_texts, batch_results, strict=False

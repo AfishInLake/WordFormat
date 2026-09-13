@@ -357,3 +357,35 @@ python start_api.py
 启动后访问：http://127.0.0.1:8000/docs
 
 ---
+
+## 环境变量（运行时配置）
+
+所有配置均支持通过环境变量覆盖，也可以写入项目根目录的 `.env` 文件（自动加载）。
+
+### 工作目录与 API 服务
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `WORDFORMAT_BASE_DIR` | 自动探测 | 工作目录（模型、配置、输出等资源的根目录）；打包版自动取可执行文件所在目录 |
+| `HOST` | `127.0.0.1` | API 服务监听地址，局域网访问改为 `0.0.0.0` |
+| `PORT` | `8000` | API 服务端口 |
+| `WORDFORMAT_API_KEY` | 空 | API 访问密钥（为空时不校验） |
+
+> ⚠️ `WORDFORMAT_MODEL` / `WORDFORMAT_MODEL_URL` 为历史遗留变量，当前代码无任何调用（段落分类已完全走本地 ONNX 模型），无需配置。
+
+### ONNX 段落分类（识别速度/资源调优）
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `BATCH_SIZE` | `32` | 单批推理段落数。基准实测：32 处于吞吐最高梯队、峰值内存≈0；64 多占 25MB；128 多占 131MB 且吞吐不升反降 |
+| `ONNX_INTRA_OP_THREADS` | `2` | intra-op 线程数。2 核服务器设为 2 即可用满；机器与其他服务抢 CPU 时可降为 1（吞吐约减半，CPU 占用减半） |
+| `ONNX_INTER_OP_THREADS` | `1` | inter-op 线程数，保持 1 即可（intra 为 2 时再开多无收益） |
+
+示例（`.env`）：
+
+```bash
+# 轻量部署档（2 核 2G 服务器）
+BATCH_SIZE=32
+ONNX_INTRA_OP_THREADS=2
+ONNX_INTER_OP_THREADS=1
+```

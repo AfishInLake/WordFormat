@@ -227,7 +227,7 @@ class TestONNXInferIntegration:
             assert result == {"label": "", "score": 0.0}
 
     def test_batch_infer_error_format_matches_single(self):
-        """batch 失败与 single 失败应返回相同结构"""
+        """batch 失败降级为逐条推理后，label/score 与 single 一致"""
         with (
             mock.patch("wordformat.agent.onnx_infer._tokenizer") as mock_tok,
             mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess,
@@ -240,13 +240,17 @@ class TestONNXInferIntegration:
             enc.type_ids = [0, 0, 0]
             mock_tok.encode.return_value = enc
             mock_sess.run.side_effect = RuntimeError("OOM")
-            batch_result = onnx_batch_infer(["t1"])[0]
+            batch_results, _ = onnx_batch_infer(["t1"])
             single_result = onnx_single_infer("t1")
-            assert set(batch_result.keys()) == set(single_result.keys())
+            assert batch_results[0]["label"] == single_result["label"]
+            assert batch_results[0]["score"] == single_result["score"]
 
     @mock.patch("wordformat.agent.onnx_infer.onnx_batch_infer")
     def test_safe_batch_splits_correctly(self, mock_batch):
-        mock_batch.side_effect = lambda texts: [{"label": "x"} for _ in texts]
+        mock_batch.side_effect = lambda texts, prev=None: (
+            [{"label": "x"} for _ in texts],
+            "x",
+        )
         results = safe_batch_infer(["a", "b", "c", "d"], max_batch_size=2)
         assert len(results) == 4
         assert mock_batch.call_count == 2
@@ -844,19 +848,19 @@ class TestONNXInferExceptionHandling:
         ):
             assert _get_best_onnx_providers() == ["CPUExecutionProvider"]
 
-    def test_load_model_early_return_when_tokenizer_set(self):
-        """_tokenizer is not None -> early return (line 57)"""
+    def test_load_model_early_return_when_loaded(self):
+        """_ort_sess 已加载 -> early return，不重复初始化"""
         import wordformat.agent.onnx_infer as m
 
-        original = m._tokenizer
+        original = m._ort_sess
         try:
-            m._tokenizer = mock.MagicMock()
+            m._ort_sess = mock.MagicMock()
             with mock.patch("tokenizers.Tokenizer") as mock_tok_cls:
                 _load_model()
                 # Tokenizer.from_file should NOT be called
                 mock_tok_cls.from_file.assert_not_called()
         finally:
-            m._tokenizer = original
+            m._ort_sess = original
 
     def test_load_model_fallback_to_cpu(self):
         """Best provider fails -> fallback to CPU (lines 88-90)"""
@@ -871,15 +875,19 @@ class TestONNXInferExceptionHandling:
             m._tokenizer = None
             m._ort_sess = None
             m._id2label = None
-            mock_paths = {
-                "onnx": "/fake/model.onnx",
-                "tokenizer": "/fake/tokenizer.json",
-                "id2label": "/fake/id2label.json",
-            }
+            mock_dir = mock.MagicMock()
+            mock_dir.joinpath.return_value = "/fake/whatever"
+            open_mock = mock.mock_open()
+            open_mock.side_effect = [
+                mock.mock_open(
+                    read_data='{"onnx":"m.onnx","max_length":128}'
+                ).return_value,
+                mock.mock_open(read_data='{"0":"body_text"}').return_value,
+            ]
             with (
                 mock.patch(
-                    "wordformat.agent.onnx_infer._get_model_paths",
-                    return_value=mock_paths,
+                    "wordformat.agent.onnx_infer._get_model_dir",
+                    return_value=mock_dir,
                 ),
                 mock.patch(
                     "wordformat.agent.onnx_infer._get_best_onnx_providers",
@@ -887,9 +895,7 @@ class TestONNXInferExceptionHandling:
                 ),
                 mock.patch("tokenizers.Tokenizer") as mock_tok_cls,
                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls,
-                mock.patch(
-                    "builtins.open", mock.mock_open(read_data='{"0":"body_text"}')
-                ),
+                mock.patch("builtins.open", open_mock),
             ):
                 mock_sess_cls.side_effect = [
                     RuntimeError("CUDA fail"),
@@ -920,22 +926,24 @@ class TestONNXInferExceptionHandling:
             m._tokenizer = None
             m._ort_sess = None
             m._id2label = None
-            mock_paths = {
-                "onnx": "/fake/model.onnx",
-                "tokenizer": "/fake/tokenizer.json",
-                "id2label": "/fake/id2label.json",
-            }
+            mock_dir = mock.MagicMock()
+            mock_dir.joinpath.return_value = "/fake/whatever"
+            open_mock = mock.mock_open()
+            open_mock.side_effect = [
+                mock.mock_open(
+                    read_data='{"onnx":"m.onnx","max_length":128}'
+                ).return_value,
+                mock.mock_open(read_data='{"0":"body_text"}').return_value,
+            ]
             with (
                 mock.patch(
-                    "wordformat.agent.onnx_infer._get_model_paths",
-                    return_value=mock_paths,
+                    "wordformat.agent.onnx_infer._get_model_dir",
+                    return_value=mock_dir,
                 ),
                 mock.patch("tokenizers.Tokenizer") as mock_tok_cls,
                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls,
                 mock.patch("onnxruntime.SessionOptions") as mock_opts_cls,
-                mock.patch(
-                    "builtins.open", mock.mock_open(read_data='{"0":"body_text"}')
-                ),
+                mock.patch("builtins.open", open_mock),
             ):
                 mock_sess = mock.MagicMock()
                 mock_sess_cls.return_value = mock_sess
@@ -983,20 +991,20 @@ class TestONNXInferExceptionHandling:
         """Empty texts list returns [] (line 156)"""
         result = onnx_batch_infer([])
 
-    def test_batch_infer_loads_model_when_tokenizer_none(self):
-        """_tokenizer is None triggers _load_model (line 159)"""
+    def test_batch_infer_loads_model_when_session_none(self):
+        """_ort_sess is None 触发 _load_model"""
         import wordformat.agent.onnx_infer as m
 
-        original_tok = m._tokenizer
+        original_sess = m._ort_sess
         try:
-            m._tokenizer = None
+            m._ort_sess = None
             with mock.patch("wordformat.agent.onnx_infer._load_model") as mock_load:
                 mock_load.side_effect = RuntimeError("model not available")
                 with pytest.raises(RuntimeError):
                     onnx_batch_infer(["test"])
                 mock_load.assert_called_once()
         finally:
-            m._tokenizer = original_tok
+            m._ort_sess = original_sess
 
     def test_batch_infer_success_with_timing(self):
         """Batch inference success path with timing log (lines 198-199)"""
@@ -1017,12 +1025,13 @@ class TestONNXInferExceptionHandling:
             enc.type_ids = [0, 0, 0]
             m._tokenizer.encode.return_value = enc
             m._ort_sess.run.return_value = [np.array([[0.9, 0.1], [0.2, 0.8]])]
-            result = onnx_batch_infer(["text1", "text2"])
-            assert len(result) == 2
-            assert result[0]["label"] == "body_text"
-            assert result[0]["text"] == "text1"
-            assert result[1]["label"] == "heading"
-            assert result[1]["text"] == "text2"
+            results, last = onnx_batch_infer(["text1", "text2"])
+            assert len(results) == 2
+            assert results[0]["label"] == "body_text"
+            assert results[0]["text"] == "text1"
+            assert results[1]["label"] == "heading"
+            assert results[1]["text"] == "text2"
+            assert last == "heading"
         finally:
             m._tokenizer = original_tok
             m._ort_sess = original_sess
@@ -1056,16 +1065,17 @@ class TestONNXInferExceptionHandling:
                     ]
                 )
             ]
-            result = onnx_batch_infer(["t1", "t2", "t3"])
-            assert len(result) == 3
-            assert result[0]["label"] == "heading"
-            assert result[0]["pred_id"] == 1
-            assert result[1]["label"] == "body_text"
-            assert result[1]["pred_id"] == 0
-            assert result[2]["label"] == "abstract"
-            assert result[2]["pred_id"] == 2
+            results, last = onnx_batch_infer(["t1", "t2", "t3"])
+            assert len(results) == 3
+            assert results[0]["label"] == "heading"
+            assert results[0]["pred_id"] == 1
+            assert results[1]["label"] == "body_text"
+            assert results[1]["pred_id"] == 0
+            assert results[2]["label"] == "abstract"
+            assert results[2]["pred_id"] == 2
+            assert last == "abstract"
             # Check score is a float
-            assert isinstance(result[0]["score"], float)
+            assert isinstance(results[0]["score"], float)
         finally:
             m._tokenizer = original_tok
             m._ort_sess = original_sess

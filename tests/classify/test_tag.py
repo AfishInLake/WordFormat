@@ -88,7 +88,11 @@ class TestDocxBase:
             {"label": "body_text", "score": 0.75},
         ]
 
-        with patch("wordformat.base.onnx_batch_infer", return_value=mock_batch_results):
+        # 新接口返回 (results, last_label)
+        with patch(
+            "wordformat.base.onnx_batch_infer",
+            return_value=(mock_batch_results, "body_text"),
+        ):
             base = DocxBase(path, "/fake/config.yaml")
             result = base.parse()
 
@@ -106,7 +110,11 @@ class TestDocxBase:
             {"label": "heading_level_2", "score": 0.3},
         ]
 
-        with patch("wordformat.base.onnx_batch_infer", return_value=mock_batch_results):
+        # 新接口返回 (results, last_label)
+        with patch(
+            "wordformat.base.onnx_batch_infer",
+            return_value=(mock_batch_results, "heading_level_2"),
+        ):
             base = DocxBase(path, "/fake/config.yaml")
             result = base.parse()
 
@@ -153,10 +161,10 @@ class TestDocxBase:
 
         call_count = 0
 
-        def mock_batch(texts):
+        def mock_batch(texts, prev_label=None):
             nonlocal call_count
             call_count += 1
-            return [{"label": "body_text", "score": 0.9}] * len(texts)
+            return [{"label": "body_text", "score": 0.9}] * len(texts), "body_text"
 
         with patch("wordformat.base.onnx_batch_infer", side_effect=mock_batch):
             with patch("wordformat.base.BATCH_SIZE", 2):
@@ -233,9 +241,17 @@ class TestDocxBase:
 
         with patch(
             "wordformat.base.onnx_batch_infer",
-            return_value=[
-                {"text": "1. 绪论", "label": "body_text", "pred_id": 0, "score": 0.9}
-            ],
+            return_value=(
+                [
+                    {
+                        "text": "1. 绪论",
+                        "label": "body_text",
+                        "pred_id": 0,
+                        "score": 0.9,
+                    }
+                ],
+                "body_text",
+            ),
         ):
             base = DocxBase(path, "/fake/config.yaml")
             result = base.parse()
