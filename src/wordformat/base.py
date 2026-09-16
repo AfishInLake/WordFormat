@@ -102,6 +102,18 @@ APPENDIX_NEUTRALIZE = {
 # 目录标题（模型词表无 heading_mulu，用规则补齐）
 TOC_PATTERN = re.compile(r"^目\s*录$")
 
+# ===== 标题编号层级修正（正则校准）=====
+# 模型对标题层级泛化不足，常把 X.Y 二级标题误判为三级（或反之）。
+# 此处以编号格式为强约束：仅对模型已预测为 heading_level_* 的段落推断
+# 编号层级，与预测不符时以编号为准；无编号/无法确定时保持原判，避免误伤正文。
+HEADING_LEVEL_CATS = {"heading_level_1", "heading_level_2", "heading_level_3"}
+# 第X章 / 第1章（中文数字或阿拉伯数字）
+_HEADING_CHAPTER_RE = re.compile(r"^第\s*[一二三四五六七八九十百千零0-9]+\s*章")
+# 数字编号：1 / 1.1 / 1.1.1（编号后必须跟顿号/点/空格+标题文字，防止误吞正文数字）
+_HEADING_NUM_RE = re.compile(r"^(\d{1,2}(?:\.\d{1,2}){0,2})(?![.\d])(?:[、.．]?\s*\S)")
+# 中文数字编号：一、/ 二、…（须跟顿号/点/空格，防止"一是…"误判）
+_HEADING_CN_NUM_RE = re.compile(r"^[一二三四五六七八九十]{1,3}(?=[、.．]|\s+\S)")
+
 # ===== 摘要页标题回补（位置规则）=====
 # 合并式摘要正文（*_title_content）→ 其上方独立标题行应升格为的标题类别
 ABSTRACT_CONTENT_TO_TITLE = {
@@ -213,7 +225,8 @@ class DocxBase:
         # 后处理顺序很重要：
         # 1) 文档标题 → 2) 英文摘要标题兜底 → 3) 摘要合并段/封面保护
         # → 4) 摘要页标题回补 → 5) 页脚识别 → 6) 目录标题 → 7) 附录区中性化
-        # → 8) 章节状态机（置信度门控）→ 9) 序列修正
+        # → 8) 章节状态机（置信度门控）→ 9) 序列修正 → 10) 参考文献区位置门控
+        # → 11) 标题编号正则校准
         _fix_document_title(result)
         _fix_abstract_en_title(result)
         _fix_known_categories(result)
@@ -224,6 +237,8 @@ class DocxBase:
         _neutralize_appendix(result)
         _apply_section_state(result)
         _fix_sequence(result)
+        _fix_references_content(result)
+        _fix_heading_levels(result)
         return result
 
 
@@ -297,6 +312,64 @@ def _fix_toc(result: list[dict]) -> None:
             item["comment"] = "目录标题（规则覆盖）"
             item["score"] = 1.0
             item["needs_review"] = False
+
+
+def _heading_number_level(text: str) -> int | None:
+    """从段落编号格式推断标题层级（1/2/3）；无编号或无法确定返回 None。"""
+    t = (text or "").strip()
+    if not t:
+        return None
+    if _HEADING_CHAPTER_RE.match(t) or _HEADING_CN_NUM_RE.match(t):
+        return 1
+    m = _HEADING_NUM_RE.match(t)
+    if not m:
+        return None
+    return len(m.group(1).split("."))
+
+
+def _fix_references_content(result: list[dict]) -> None:
+    """参考文献内容位置门控：references_content 只能出现在首个参考文献标题之后。
+
+    正文综述段常因包含 [n] 引用标记被模型误判为参考文献条目（低置信度），
+    位置是强约束——参考文献条目不可能出现在参考文献标题之前。
+    """
+    first_title = None
+    for i, item in enumerate(result):
+        if item["category"] == "references_title":
+            first_title = i
+            break
+    if first_title is None:
+        return
+    for i in range(first_title):
+        item = result[i]
+        if item["category"] != "references_content":
+            continue
+        item["category"] = "body_text"
+        item["comment"] = (
+            "参考文献区位置门控（原：references_content，位于参考文献标题前）"
+        )
+        item["score"] = 1.0
+        item["needs_review"] = False
+
+
+def _fix_heading_levels(result: list[dict]) -> None:
+    """标题编号正则校准：模型常混淆标题层级（如把 X.Y 二级标题认成三级），
+    以段落编号格式为准修正预测层级。仅处理已被预测为 heading_level_* 的段落；
+    无编号或编号层级无法确定时保持原判，避免误伤正文段落。"""
+    for item in result:
+        cat = item["category"]
+        if cat not in HEADING_LEVEL_CATS:
+            continue
+        level = _heading_number_level(item.get("paragraph") or "")
+        if level is None:
+            continue
+        expected = f"heading_level_{level}"
+        if expected == cat:
+            continue
+        item["category"] = expected
+        item["comment"] = f"标题编号正则修正：{cat} → {expected}"
+        item["score"] = 1.0
+        item["needs_review"] = False
 
 
 def _neutralize_appendix(result: list[dict]) -> None:
@@ -465,6 +538,7 @@ def _gate_abstract_content(result: list[dict]) -> None:
         item["category"] = "body_text"
         prev_cat = result[j]["category"] if j >= 0 else None
         item["comment"] = f"摘要内容位置门控（原：{orig}，prev={prev_cat}）"
+        item["score"] = 1.0  # 位置规则已确认修正，重置分数避免前端按 body_text 阈值误标
         item["needs_review"] = False
 
 

@@ -42,7 +42,9 @@ from wordformat.base import (
     _fix_abstract_en_title,
     _fix_abstract_titles,
     _fix_document_title,
+    _fix_heading_levels,
     _fix_known_categories,
+    _fix_references_content,
     _fix_sequence,
     _fix_toc,
     _gate_abstract_content,
@@ -125,6 +127,28 @@ class TestDocxBase:
         assert result[1]["category"] == "heading_level_2"
         assert result[1]["needs_review"] is True
         assert "建议人工复核" in result[1]["comment"]
+
+    def test_parse_heading_level_regex_correction(self, tmp_path):
+        """端到端：模型把二级标题误判为三级时，编号正则校准回 heading_level_2。"""
+        path = self._create_multi_para_docx(
+            tmp_path, ["1 绪论", "1.1 研究背景与意义", "正文内容"]
+        )
+        # 模拟模型的常见误判：X.Y 二级标题 → heading_level_3
+        mock_batch_results = [
+            {"label": "heading_level_1", "score": 0.95},
+            {"label": "heading_level_3", "score": 0.82},
+            {"label": "body_text", "score": 0.75},
+        ]
+        with patch(
+            "wordformat.base.onnx_batch_infer",
+            return_value=(mock_batch_results, "heading_level_3"),
+        ):
+            base = DocxBase(path, "/fake/config.yaml")
+            result = base.parse()
+        assert result[0]["category"] == "heading_level_1"  # 预测正确，不动
+        assert result[1]["category"] == "heading_level_2"  # 3→2 正则校准
+        assert "正则修正" in result[1]["comment"]
+        assert result[1]["score"] == 1.0
 
     def test_parse_batch_failure_fallback_to_single(self, temp_docx):
         """测试批量推理失败时降级到单条推理"""
@@ -475,6 +499,7 @@ class TestPostProcessing:
         _gate_abstract_content(result)
         assert result[1]["category"] == "body_text"
         assert "位置门控" in result[1]["comment"]
+        assert result[1]["score"] == 1.0  # 位置规则修正后应重置分数，避免前端误标 error
 
     def test_gate_abstract_content_skips_empty_prev(self):
         """前一段为空段（图片占位）时向上跳过空段再判断。"""
@@ -485,6 +510,97 @@ class TestPostProcessing:
         ]
         _gate_abstract_content(result)
         assert result[2]["category"] == "abstract_english_content"
+
+    def test_fix_references_content_before_title_reverts_to_body(self):
+        """参考文献标题前的 references_content（正文误判）→ 回退 body_text。"""
+        result = [
+            _mk_item("heading_level_2", "1.1 国内外研究现状"),
+            _mk_item("references_content", "在多机器人协同方向，葛泉波等系统综述了…[5]。", score=0.245),
+            _mk_item("references_title", "参考文献"),
+            _mk_item("references_content", "[1] 张本希,刘春辉.改进A*算法的巡检机器人路径规划[J]."),
+        ]
+        _fix_references_content(result)
+        assert result[1]["category"] == "body_text"
+        assert "位置门控" in result[1]["comment"]
+        assert result[1]["score"] == 1.0  # 位置规则修正后重置分数，避免前端误标
+        assert result[1]["needs_review"] is False
+
+    def test_fix_references_content_keeps_after_title(self):
+        """参考文献标题后的引用条目不受影响。"""
+        result = [
+            _mk_item("references_title", "参考文献"),
+            _mk_item("references_content", "[1] 张三. 论文题目[J]. 期刊, 2020.", score=0.99),
+            _mk_item("references_content", "[2] 李四. 研究报告[R]. 2021.", score=0.99),
+        ]
+        _fix_references_content(result)
+        assert result[1]["category"] == "references_content"
+        assert result[2]["category"] == "references_content"
+
+    def test_fix_references_content_no_title_no_change(self):
+        """无 references_title 时门控不触发，避免误伤。"""
+        result = [
+            _mk_item("references_content", "含 [n] 标记的正文综述段", score=0.3),
+            _mk_item("body_text", "后续正文内容"),
+        ]
+        _fix_references_content(result)
+        assert result[0]["category"] == "references_content"
+
+    def test_fix_heading_levels_2_recovered_from_3(self):
+        """二级标题被误判为三级：编号 X.Y 正则校准回 heading_level_2。"""
+        result = [_mk_item("heading_level_3", "1.1 研究背景", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_2"
+        assert "正则修正" in result[0]["comment"]
+        assert result[0]["score"] == 1.0
+
+    def test_fix_heading_levels_3_recovered_from_2(self):
+        """三级标题被误判为二级：编号 X.Y.Z 正则校准回 heading_level_3。"""
+        result = [_mk_item("heading_level_2", "1.1.1 系统架构", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_3"
+
+    def test_fix_heading_levels_1_recovered_from_3(self):
+        """一级标题被误判为三级：第X章 正则校准回 heading_level_1。"""
+        result = [_mk_item("heading_level_3", "第1章 绪论", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_1"
+
+    def test_fix_heading_levels_cn_number_title(self):
+        """中文数字编号（一、研究内容）校准为一级。"""
+        result = [_mk_item("heading_level_3", "二、关键技术", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_1"
+
+    def test_fix_heading_levels_no_number_keeps(self):
+        """无编号的标题（纯文字）无法确定层级，保持原判。"""
+        result = [_mk_item("heading_level_2", "研究背景", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_2"
+
+    def test_fix_heading_levels_matching_keeps(self):
+        """编号层级与预测一致时不动。"""
+        result = [_mk_item("heading_level_2", "1.1 研究背景", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_2"
+        assert result[0]["score"] == 0.9  # 置信度不被覆盖
+
+    def test_fix_heading_levels_ignores_body_text(self):
+        """body_text 就算以编号开头也不修正（只在标题类内部校准）。"""
+        result = [_mk_item("body_text", "1.1 实验环境与数据准备，详见下节。", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "body_text"
+
+    def test_fix_heading_levels_deep_number_keeps(self):
+        """超过三层的编号（1.1.1.1）超出词表范围，保持原判不误改。"""
+        result = [_mk_item("heading_level_3", "1.1.1.1 附加说明", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_3"
+
+    def test_fix_heading_levels_no_space_number(self):
+        """编号与标题无空格（1.1研究背景）也能识别。"""
+        result = [_mk_item("heading_level_3", "1.1研究背景", score=0.9)]
+        _fix_heading_levels(result)
+        assert result[0]["category"] == "heading_level_2"
 
     def test_fix_toc_overrides_to_heading_mulu(self):
         """目录：独立成段的“目录”→heading_mulu（模型词表无此标签）。"""

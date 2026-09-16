@@ -503,7 +503,8 @@ class TestAutoFormatThesisDocument:
     ):
         """check=True 模式：返回 --标注版.docx 路径 (lines 170-176)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
@@ -527,7 +528,8 @@ class TestAutoFormatThesisDocument:
     ):
         """check=False 模式：返回 --修改版.docx 路径 (line 173)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
@@ -560,11 +562,18 @@ class TestAutoFormatThesisDocument:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
+        # 构造 2 段文档，与 mock 树的 2 个节点保持 1:1（对齐阶段会校验数量）
+        two_para_doc = Document()
+        two_para_doc.add_paragraph("正文段落")
+        two_para_doc.add_paragraph("标题段落")
+        two_para_path = str(tmp_path / "two_para.docx")
+        two_para_doc.save(two_para_path)
+
         from wordformat.pipeline.orchestrate import auto_format_thesis_document
 
         auto_format_thesis_document(
             jsonpath=temp_docx,
-            docxpath=temp_docx,
+            docxpath=two_para_path,
             configpath=config_path,
             savepath=str(tmp_path),
             check=True,
@@ -582,7 +591,8 @@ class TestAutoFormatThesisDocument:
     ):
         """promote_bodytext_in_subtrees_of_type 应被调用 (lines 153-161)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
@@ -608,7 +618,8 @@ class TestAutoFormatThesisDocument:
     ):
         """节点处理异常时 raise e (lines 53-55)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.side_effect = RuntimeError("test error")
 
@@ -633,7 +644,8 @@ class TestAutoFormatThesisDocument:
         """配置加载失败时 raise (lines 126-128)"""
         bad_config = str(tmp_path / "nonexistent.yaml")
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
 
         from wordformat.pipeline.orchestrate import auto_format_thesis_document
@@ -656,7 +668,8 @@ class TestAutoFormatThesisDocument:
     ):
         """check=False 时列出可用样式 (lines 139-143)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
@@ -1431,7 +1444,8 @@ class TestSetStyleAdditionalCoverage:
     ):
         """Node exception: logs warning then raises (lines 53-55)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.side_effect = RuntimeError("traverse error")
 
@@ -1463,11 +1477,18 @@ class TestSetStyleAdditionalCoverage:
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
+        # 构造 2 段文档，与 mock 树的 2 个节点保持 1:1（对齐阶段会校验数量）
+        two_para_doc = Document()
+        two_para_doc.add_paragraph("正文段落")
+        two_para_doc.add_paragraph("标题段落")
+        two_para_path = str(tmp_path / "two_para.docx")
+        two_para_doc.save(two_para_path)
+
         from wordformat.pipeline.orchestrate import auto_format_thesis_document
 
         auto_format_thesis_document(
             jsonpath=temp_docx,
-            docxpath=temp_docx,
+            docxpath=two_para_path,
             configpath=config_path,
             savepath=str(tmp_path),
             check=True,
@@ -1485,7 +1506,8 @@ class TestSetStyleAdditionalCoverage:
     ):
         """promote_bodytext_in_subtrees_of_type is called (line 150)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
@@ -1510,7 +1532,8 @@ class TestSetStyleAdditionalCoverage:
     ):
         """Numbering processing when enabled (lines 167-168)"""
         root_node = mock.MagicMock()
-        root_node.children = []
+        # mock 树的 1 个节点需与 temp_docx 的 1 个段落保持 1:1（对齐阶段会校验数量）
+        root_node.children = [mock.MagicMock()]
         mock_builder.build_from_json.return_value = root_node
         mock_apply.return_value = None
 
