@@ -45,6 +45,7 @@ from wordformat.base import (
     _fix_known_categories,
     _fix_sequence,
     _fix_toc,
+    _gate_abstract_content,
     _neutralize_appendix,
 )
 from wordformat import settings
@@ -453,6 +454,37 @@ class TestPostProcessing:
         _neutralize_appendix(result)
         assert result[1]["category"] == "body_text"  # 附录内→中性化
         assert result[3]["category"] == "keywords_english"  # 已退出附录，保留
+
+    def test_gate_abstract_content_keeps_chained_content(self):
+        """多段摘要内容链：prev 为摘要标题/摘要内容本身，应保持。"""
+        result = [
+            _mk_item("abstract_chinese_title", "摘 要"),
+            _mk_item("abstract_chinese_content", "本研究依托 FastAPI 开发框架，融合多种算法。"),
+            _mk_item("abstract_chinese_content", "本系统已经完成数据采集与预测的全部流程。"),
+        ]
+        _gate_abstract_content(result)
+        assert result[1]["category"] == "abstract_chinese_content"
+        assert result[2]["category"] == "abstract_chinese_content"
+
+    def test_gate_abstract_content_after_heading_reverts_to_body(self):
+        """绪论首段被误判为摘要内容：prev 是标题 → 回退正文。"""
+        result = [
+            _mk_item("heading_level_2", "1.1 本设计研究目的"),
+            _mk_item("abstract_chinese_content", "紧跟人工智能和大数据技术的发展步伐，围绕…"),
+        ]
+        _gate_abstract_content(result)
+        assert result[1]["category"] == "body_text"
+        assert "位置门控" in result[1]["comment"]
+
+    def test_gate_abstract_content_skips_empty_prev(self):
+        """前一段为空段（图片占位）时向上跳过空段再判断。"""
+        result = [
+            _mk_item("abstract_english_title", "Abstract"),
+            _mk_item("body_text", ""),
+            _mk_item("abstract_english_content", "This design develops a system."),
+        ]
+        _gate_abstract_content(result)
+        assert result[2]["category"] == "abstract_english_content"
 
     def test_fix_toc_overrides_to_heading_mulu(self):
         """目录：独立成段的“目录”→heading_mulu（模型词表无此标签）。"""

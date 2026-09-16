@@ -98,6 +98,19 @@ ABSTRACT_TITLE_PREV_CATS = {
 COVER_MARKER_PATTERN = re.compile(
     r"(签\s*名|日\s*期|学\s*号|学\s*院|专\s*业|指导教师|职\s*称|声\s*明|导\s*师|班\s*级|姓\s*名)"
 )
+
+# ===== 摘要内容位置门控 =====
+# 摘要开场句与绪论首段在词面上同构（“随着…发展”“目前…”），仅凭文本难以区分；
+# 摘要内容段只允许紧跟摘要标题/上一段摘要内容出现，否则回退为正文。
+ABSTRACT_CONTENT_GATE_CATS = {"abstract_chinese_content", "abstract_english_content"}
+ABSTRACT_CONTENT_GATE_ALLOWED_PREV = {
+    "abstract_chinese_title",
+    "abstract_chinese_title_content",
+    "abstract_chinese_content",
+    "abstract_english_title",
+    "abstract_english_title_content",
+    "abstract_english_content",
+}
 # 摘要页标题最大长度（中文标题短，英文标题放宽；超长多为正文句子）
 ABSTRACT_TITLE_MAXLEN = 120
 
@@ -184,6 +197,7 @@ class DocxBase:
         _fix_abstract_en_title(result)
         _fix_known_categories(result)
         _fix_abstract_titles(result)
+        _gate_abstract_content(result)
         _apply_footer(result)
         _fix_toc(result)
         _neutralize_appendix(result)
@@ -409,6 +423,28 @@ def _fix_abstract_titles(result: list[dict]) -> None:
         prev["comment"] = f"摘要页标题（位置规则，原：{prev_cat}）"
         prev["score"] = 1.0
         prev["needs_review"] = False
+
+
+def _gate_abstract_content(result: list[dict]) -> None:
+    """摘要内容段位置门控：前一段不是摘要标题/摘要内容时，回退为正文。
+
+    摘要开场句与绪论首段词面同构（“随着…发展”“目前…”），模型仅凭文本无法
+    区分；而摘要内容在文档中的位置是强约束——它只能紧跟摘要标题或上一段
+    摘要内容。prev 不在允许集合内时回退为 body_text（绪论误吸入摘要）。
+    """
+    for i, item in enumerate(result):
+        orig = item["category"]
+        if orig not in ABSTRACT_CONTENT_GATE_CATS:
+            continue
+        j = i - 1
+        while j >= 0 and not (result[j].get("paragraph") or "").strip():
+            j -= 1
+        if j >= 0 and result[j]["category"] in ABSTRACT_CONTENT_GATE_ALLOWED_PREV:
+            continue
+        item["category"] = "body_text"
+        prev_cat = result[j]["category"] if j >= 0 else None
+        item["comment"] = f"摘要内容位置门控（原：{orig}，prev={prev_cat}）"
+        item["needs_review"] = False
 
 
 def _fix_sequence(result: list[dict]) -> None:  # noqa C901
