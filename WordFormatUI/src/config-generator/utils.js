@@ -103,7 +103,8 @@ export const defaultConfig = {
           bold: false
         }),
         rules: {
-          keyword_count: { enabled: true, count_min: 3, count_max: 5 }
+          keyword_count: { enabled: true, count_min: 3, count_max: 5 },
+          trailing_punctuation: { enabled: true, forbidden_chars: ";,." }
         }
       })
     }

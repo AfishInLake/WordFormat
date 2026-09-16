@@ -18,6 +18,7 @@ from wordformat.rules.abstract import (
     AbstractTitleCN,
     AbstractTitleEN,
 )
+from wordformat.rules.acknowledgement import Acknowledgements, AcknowledgementsCN
 from wordformat.rules.caption import CaptionFigure, CaptionTable
 from wordformat.rules.keywords import KeywordsCN, KeywordsEN
 from wordformat.rules.node import FormatNode
@@ -99,7 +100,20 @@ class ParagraphAlignmentStage:
 
     def process(self, ctx: FormatContext) -> FormatContext:
         nodes = self._flatten_tree_nodes(ctx.root_node)
-        for node, para in zip(nodes, ctx.document.paragraphs, strict=False):
+        paragraphs = ctx.document.paragraphs
+        if len(nodes) != len(paragraphs):
+            # 节点数不等于段落数时，zip 会静默错位：后面的节点整体前移，
+            # 导致 keywords_chinese/caption_figure/heading_level_* 等规则
+            # 被应用到错误段落（如正文被加“图1.1”前缀）。必须显式报错。
+            # 常见诱因：生成节点后更换了文档；或前端页面版本过旧
+            # （旧版会过滤 figure_image 占位节点）。
+            raise ValueError(
+                f"当前文档({len(paragraphs)} 段)与节点 JSON({len(nodes)} 节点)不一致，"
+                "两者必须一一对应。可能是生成节点后又换过文档，"
+                "或页面版本过旧（旧版会过滤占位节点）。"
+                "请刷新页面后重新上传文档并点击「生成节点JSON」，再执行格式化。"
+            )
+        for node, para in zip(nodes, paragraphs, strict=True):
             node.paragraph = para
         return ctx
 
@@ -124,6 +138,7 @@ class TreeNormalizationStage:
             AbstractTitleCN: AbstractContentCN,
             AbstractTitleEN: AbstractContentEN,
             References: ReferenceEntry,
+            Acknowledgements: AcknowledgementsCN,
         }
         for parent_cls, target_cls in mappings.items():
             promote_bodytext_in_subtrees_of_type(

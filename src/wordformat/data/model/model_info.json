@@ -1,0 +1,9 @@
+{
+  "base_model": "uer/chinese_roberta_L-4_H-256",
+  "fp32_onnx": "thesis_paragraph_classifier.onnx",
+  "max_length": 128,
+  "name": "thesis_paragraph_classifier",
+  "onnx": "thesis_paragraph_classifier_int8.onnx",
+  "quantized": true,
+  "use_prev_context": true
+}

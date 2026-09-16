@@ -37,12 +37,21 @@ API_KEY = os.getenv("WORDFORMAT_API_KEY", "")
 MODEL = os.getenv("WORDFORMAT_MODEL", "")
 MODEL_URL = os.getenv("WORDFORMAT_MODEL_URL", "")
 
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
+# 单次最多处理的段落数。基准（int8，2/1 线程）：batch 32 处于吞吐最高梯队，
+# 峰值内存增量≈0；64 多占 25MB、128 多占 131MB 且吞吐不升反降。
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
 ONNX_VERSION = "20260204"
+
+# ONNX 推理线程数：2 核服务器上用满（intra=2），inter 保持 1。
+# 机器与其他服务争抢 CPU 时，环境变量 ONNX_INTRA_OP_THREADS=1 可降档省一半 CPU。
+ONNX_INTRA_OP_THREADS = int(os.getenv("ONNX_INTRA_OP_THREADS", "2"))
+ONNX_INTER_OP_THREADS = int(os.getenv("ONNX_INTER_OP_THREADS", "1"))
 
 VOIDNODELIST = [
     "top",
     "heading_mulu",
     "heading_fulu",
     "other",  # 封面、声明页等无需格式化的内容
+    "document_title",  # 文档标题（后处理扩展标签，不参与格式化）
+    "footer",  # 页脚/AI 生成声明（后处理扩展标签，不参与格式化）
 ]

@@ -73,7 +73,7 @@
       <!-- 节点列表 -->
       <NodeListPanel
           :node-data="filteredNodeData"
-          :selected-index="selectedNodeIndex"
+          :selected-index="selectedDisplayIndex"
           :is-file-loaded="isFileLoaded"
           :is-loading="isLoading"
           :loading-text="loadingText"
@@ -85,9 +85,9 @@
       <NodeDetailPanel
           :current-node="currentNode"
           :category-config="CATEGORY_CONFIG"
-          :score-threshold="SCORE_THRESHOLD"
-          :total-nodes="nodeData.length"
-          :node-index="selectedNodeIndex + 1"
+          :score-threshold="thresholdFor(currentNode?.category)"
+          :total-nodes="visibleNodeData.length"
+          :node-index="selectedDisplayIndex + 1"
           @update-category="handleCategoryChange"
       />
     </div>
@@ -102,7 +102,7 @@ import NodeListPanel from './NodeListPanel.vue'
 import NodeDetailPanel from './NodeDetailPanel.vue'
 import {
   CATEGORY_CONFIG,
-  SCORE_THRESHOLD,
+  thresholdFor,
   checkTagError
 } from '../composables/useTagHelpers'
 
@@ -145,28 +145,46 @@ const currentNode = computed(() => {
   return selectedNodeIndex.value >= 0 ? nodeData.value[selectedNodeIndex.value] : null
 })
 
-const nodeCount = computed(() => nodeData.value.length)
+// 可见节点：figure_image 占位节点仅在显示层隐藏，绝不能从 nodeData 删除——
+// 否则节点数组与文档段落失去 1:1 对应，后端按位置 zip 时整段错位，
+// 会把 keywords_chinese/caption_figure/heading_level_* 的规则写到错误段落上。
+const visibleNodeData = computed(() =>
+    nodeData.value.filter(node => node.category !== 'figure_image')
+)
+
+const nodeCount = computed(() => visibleNodeData.value.length)
 
 const errorCount = computed(() =>
-    nodeData.value.filter(node => checkTagError(node, SCORE_THRESHOLD)).length
+    visibleNodeData.value.filter(node => checkTagError(node)).length
 )
 
 const otherCount = computed(() =>
-    nodeData.value.filter(node => node.category === 'other').length
+    visibleNodeData.value.filter(node => node.category === 'other').length
 )
 
 const filteredNodeData = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
-  if (!term) return nodeData.value
-  return nodeData.value.filter(node =>
+  const base = visibleNodeData.value
+  if (!term) return base
+  return base.filter(node =>
       node.paragraph.toLowerCase().includes(term)
   )
 })
 
+// 列表渲染用的是过滤后的索引，当前选中节点需要换算回过滤列表中的位置
+// （selectedNodeIndex 保存的是 nodeData 中的原始索引）
+const selectedDisplayIndex = computed(() => {
+  if (selectedNodeIndex.value < 0) return -1
+  const node = nodeData.value[selectedNodeIndex.value]
+  if (!node) return -1
+  return filteredNodeData.value.indexOf(node)
+})
+
 // ====== 方法 ======
-// 选择节点
+// 选择节点：index 来自列表渲染（filteredNodeData）的索引，需换算回 nodeData 原始索引
 const selectNode = (index) => {
-  selectedNodeIndex.value = index
+  const node = filteredNodeData.value[index]
+  selectedNodeIndex.value = node ? nodeData.value.indexOf(node) : -1
 }
 
 // 修改当前节点的分类标签
@@ -213,8 +231,9 @@ const callGenerateJsonApi = async () => {
     )
 
     if (res.data && Array.isArray(res.data.json_data)) {
+      // 保留全部节点（含 figure_image 占位），保证与文档段落 1:1 对应；
+      // 隐藏 figure_image 交给显示层 filteredNodeData 处理
       nodeData.value = res.data.json_data
-        .filter(node => node.category !== 'figure_image')
         .map((node, idx) => ({
           ...node,
           id: idx
@@ -283,6 +302,16 @@ const callCheckFormatApi = async () => {
 // 执行自动格式化
 const callApplyFormatApi = async () => {
   if (!isFileLoaded.value) return
+
+  // 低置信节点（建议人工复核）会被按当前标签强制执行，先提醒用户
+  const reviewCount = visibleNodeData.value.filter(n => n.needs_review).length
+  if (reviewCount > 0) {
+    const ok = window.confirm(
+        `有 ${reviewCount} 个节点置信度低于阈值（已标记“建议人工复核”），` +
+        '格式化将按当前标签强制应用。建议先核对并修正这些节点，是否仍要继续？'
+    )
+    if (!ok) return
+  }
 
   const ok = window.confirm('此操作将根据当前标签生成新文档，是否继续？');
   if (!ok) return;
@@ -371,9 +400,9 @@ async function downloadFileFromResponse(response) {
 const checkAllTags = () => {
   if (!isFileLoaded.value) return
 
-  const errors = nodeData.value
+  const errors = visibleNodeData.value
       .map((node, idx) => ({...node, idx}))
-      .filter(n => checkTagError(n, SCORE_THRESHOLD) || n.category === 'other')
+      .filter(n => checkTagError(n) || n.category === 'other')
 
   if (errors.length === 0) {
     alert('✅ 所有节点标签均通过阈值校验！')
@@ -417,13 +446,12 @@ const handleJsonImport = async (e) => {
       alert('JSON 格式错误：期望一个节点数组')
       return
     }
-    // 补全缺失的 id 字段，并过滤无内容的 figure_image
-    nodeData.value = json
-      .filter(node => node.category !== 'figure_image')
-      .map((node, idx) => ({
-        ...node,
-        id: node.id ?? idx
-      }))
+    // 补全缺失的 id 字段；保留全部节点（含 figure_image），
+    // 保证与文档段落 1:1 对应，避免后端按位置 zip 时错位
+    nodeData.value = json.map((node, idx) => ({
+      ...node,
+      id: node.id ?? idx
+    }))
     isFileLoaded.value = true
     selectedNodeIndex.value = -1
     alert(`导入成功：${nodeData.value.length} 个节点`)

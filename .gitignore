@@ -26,6 +26,12 @@ api.log
 dist
 build
 src/wordformat/data/model/*.onnx
+!src/wordformat/data/model/*_int8.onnx
+src/wordformat/data/model/*.onnx.data
+
+# 训练与实验资产（训练集/测试集/训练脚本/checkpoint，体积大，不入库）
+training/
+*.docx
 src/wordformat.egg-info
 node_modules/
 .env
