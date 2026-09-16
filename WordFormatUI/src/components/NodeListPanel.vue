@@ -37,8 +37,8 @@
           <div class="node-score">{{ node.score.toFixed(4) }}</div>
           <div class="node-content" v-html="highlightSearchText(node.paragraph, globalSearchTerm)"></div>
           <span v-if="node.replace" class="replace-badge" title="有替换内容">R</span>
-          <div class="node-meta" :title="node.comment || ''">
-            <span class="node-comment">{{ node.comment || '无注释' }}</span>
+          <div v-if="node.comment" class="node-meta" :title="node.comment">
+            <span class="node-comment">{{ node.comment }}</span>
           </div>
         </div>
       </div>
@@ -82,6 +82,7 @@ defineEmits(['select-node'])
 }
 .node-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 0.5rem;
   margin: 2px 0;
@@ -127,11 +128,12 @@ defineEmits(['select-node'])
   line-height: 1.5;
 }
 .node-meta {
+  /* 注释独占第二行，不与正文争宽度；超长截断，hover 看全文 */
   font-size: 11px;
   color: var(--text-muted);
   flex: 0 1 auto;
+  width: 100%;
   min-width: 0;
-  max-width: 30%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
