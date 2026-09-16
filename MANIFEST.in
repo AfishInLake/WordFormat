@@ -1,0 +1,18 @@
+# sdist 打包防御：旧模型与开发/训练资产永不进包。
+# wheel 侧由 pyproject.toml 的 package-data 白名单控制（data/**/* 已收窄）。
+# 注意：MANIFEST.in 只影响 sdist；本地构建前仍需清理 data/model 下的残留。
+
+# 旧 99MB 模型（曾因 cache 残留混入发布包）
+exclude src/wordformat/data/model/bert_paragraph_classifier.onnx
+exclude src/wordformat/data/model/*.onnx.data
+
+# 开发/训练/输出资产
+prune temp
+prune training
+prune output
+prune WordFormatUI
+prune dist
+prune build
+prune tests
+prune docs
+prune scripts

@@ -83,9 +83,10 @@ pip install wordformat
    pip install -e .
    ```
 
-3. **下载模型**
+3. **（可选）确认模型就绪**
+   int8 分类模型已随包分发（`wordformat/data/model/thesis_paragraph_classifier_int8.onnx`），无需额外下载。
    ```bash
-   python scripts/download_model.py
+   python scripts/download_model.py  # 仅校验模型存在并提示，无下载动作
    ```
 
 ## 核心使用方法

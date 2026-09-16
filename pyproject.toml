@@ -1,6 +1,6 @@
 [project]
 name = "wordformat"
-version = "1.6.0"
+version = "1.6.1"
 description = "论文格式自动化处理工具"
 readme = "README.md"
 license = "Apache-2.0"
@@ -127,7 +127,18 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-wordformat = ["data/**/*", "api/static/**/*"]
+# 只收集明确清单，绝不使用 `data/**/*` 通配收集整个目录：
+# 磁盘上残留的旧模型（bert_paragraph_classifier.onnx 等）会被无差别打进包。
+wordformat = [
+    "data/model/*_int8.onnx",
+    "data/model/id2label.json",
+    "data/model/label2id.json",
+    "data/model/model_info.json",
+    "data/model/tokenizer.json",
+    "data/model/.model_version",
+    "data/system_prompt.txt",
+    "api/static/**/*",
+]
 
 [project.scripts]
 wordformat = "wordformat.cli:main"

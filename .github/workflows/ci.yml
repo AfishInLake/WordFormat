@@ -164,15 +164,6 @@ jobs:
           name: ui-dist
           path: src/wordformat/api/static/
 
-      - name: Cache ONNX Model
-        uses: actions/cache@v5.0.3
-        id: cache-model
-        with:
-          path: src/wordformat/data
-          key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
-        env:
-          MODEL_VERSION: "modelv1.0"
-
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
@@ -183,10 +174,6 @@ jobs:
 
       - name: Install project dependencies
         run: uv pip install --system -e .
-
-      - name: Download Model (if not cached)
-        if: steps.cache-model.outputs.cache-hit != 'true'
-        run: python scripts/download_model.py
 
       - name: Install build dependencies
         run: uv pip install --system build
