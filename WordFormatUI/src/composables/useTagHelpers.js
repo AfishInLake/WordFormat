@@ -35,11 +35,43 @@ export const LEVEL_MAP = {
 };
 
 export const LEVEL_COLORS = ['#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#9ca3af'];
-export const SCORE_THRESHOLD = 0.8;
+
+// 分级置信度阈值：与后端 src/wordformat/base.py CONF_THRESHOLDS 保持一致
+// （2026-09 基于 6 篇留出集上 int8 模型的每类正确段 p10 校准）
+export const CONF_THRESHOLDS = {
+    body_text: 0.6,
+    heading_mulu: 0.6,
+    caption_figure: 0.6,
+    heading_level_1: 0.6,
+    heading_level_2: 0.6,
+    heading_level_3: 0.6,
+    other: 0.6,
+    references_content: 0.55,
+    acknowledgements_content: 0.55,
+    keywords_english: 0.55,
+    abstract_chinese_content: 0.55,
+    acknowledgements_title: 0.55,
+    document_title: 0.5,
+    caption_table: 0.5,
+    abstract_chinese_title_content: 0.5,
+    keywords_chinese: 0.4,
+    abstract_chinese_title: 0.4,
+    references_title: 0.4,
+    abstract_english_title: 0.35,
+    abstract_english_title_content: 0.35,
+    abstract_english_content: 0.35,
+    heading_fulu: 0.35,
+    default: 0.5
+};
+
+export function thresholdFor(category) {
+    return CONF_THRESHOLDS[category] ?? CONF_THRESHOLDS.default;
+}
 
 // 工具函数
-export function checkTagError(node, threshold = SCORE_THRESHOLD) {
-    return node?.score < threshold;
+export function checkTagError(node, threshold = null) {
+    const t = threshold ?? thresholdFor(node?.category);
+    return node?.score < t;
 }
 
 export function getNodeIndent(node, levelMap = LEVEL_MAP) {

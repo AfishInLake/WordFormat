@@ -14,17 +14,38 @@ from wordformat.utils import get_paragraph_numbering_text, para_contains_image
 
 # ===== 分级置信度阈值（C2）=====
 # 低于阈值不再硬砍为 body_text，而是保留原标签并标记 needs_review 供人工复核。
+# 2026-09 校准：以 6 篇留出集（1798 段，教师强制 PREV）上 int8 模型的每类正确段
+# p10 为基准分档——保证每类误标率 ≤~10%，小摘要类阈值降到正确分布下沿。
+# 注意与 WordFormatUI/src/composables/useTagHelpers.js 的 CONF_THRESHOLDS 保持一致。
 CONF_THRESHOLDS = {
-    "abstract_chinese_title": 0.3,
-    "abstract_english_title": 0.3,
-    "abstract_chinese_title_content": 0.4,
-    "abstract_english_title_content": 0.4,
-    "references_title": 0.4,
-    "acknowledgements_title": 0.4,
-    "heading_fulu": 0.4,
+    # 0.6 档：主要段落类（正确段 p10 ≥ 0.64）
+    "body_text": 0.6,
+    "heading_mulu": 0.6,
+    "caption_figure": 0.6,
+    "heading_level_1": 0.6,
+    "heading_level_2": 0.6,
+    "heading_level_3": 0.6,
+    "other": 0.6,
+    # 0.55 档：内容/标题类（正确段 p10 0.55~0.61）
+    "references_content": 0.55,
+    "acknowledgements_content": 0.55,
+    "keywords_english": 0.55,
+    "abstract_chinese_content": 0.55,
+    "acknowledgements_title": 0.55,
+    # 0.5 档：短标题/题注类（正确段 p10 0.50~0.58）
+    "document_title": 0.5,
+    "caption_table": 0.5,
+    "abstract_chinese_title_content": 0.5,
+    # 0.4 档：小样本标题/关键词类
     "keywords_chinese": 0.4,
-    "keywords_english": 0.4,
-    "default": 0.6,
+    "abstract_chinese_title": 0.4,
+    "references_title": 0.4,
+    # 0.35 档：天然低置信但验证准确的小类（英文摘要/附录标题）
+    "abstract_english_title": 0.35,
+    "abstract_english_title_content": 0.35,
+    "abstract_english_content": 0.35,
+    "heading_fulu": 0.35,
+    "default": 0.5,
 }
 
 # ===== 章节状态机（C5）：章节起点标签 → 章节状态 =====

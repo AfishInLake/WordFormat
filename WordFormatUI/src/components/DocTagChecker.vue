@@ -85,7 +85,7 @@
       <NodeDetailPanel
           :current-node="currentNode"
           :category-config="CATEGORY_CONFIG"
-          :score-threshold="SCORE_THRESHOLD"
+          :score-threshold="thresholdFor(currentNode?.category)"
           :total-nodes="nodeData.length"
           :node-index="selectedNodeIndex + 1"
           @update-category="handleCategoryChange"
@@ -102,7 +102,7 @@ import NodeListPanel from './NodeListPanel.vue'
 import NodeDetailPanel from './NodeDetailPanel.vue'
 import {
   CATEGORY_CONFIG,
-  SCORE_THRESHOLD,
+  thresholdFor,
   checkTagError
 } from '../composables/useTagHelpers'
 
@@ -148,7 +148,7 @@ const currentNode = computed(() => {
 const nodeCount = computed(() => nodeData.value.length)
 
 const errorCount = computed(() =>
-    nodeData.value.filter(node => checkTagError(node, SCORE_THRESHOLD)).length
+    nodeData.value.filter(node => checkTagError(node)).length
 )
 
 const otherCount = computed(() =>
@@ -373,7 +373,7 @@ const checkAllTags = () => {
 
   const errors = nodeData.value
       .map((node, idx) => ({...node, idx}))
-      .filter(n => checkTagError(n, SCORE_THRESHOLD) || n.category === 'other')
+      .filter(n => checkTagError(n) || n.category === 'other')
 
   if (errors.length === 0) {
     alert('✅ 所有节点标签均通过阈值校验！')
