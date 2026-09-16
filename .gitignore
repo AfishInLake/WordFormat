@@ -28,7 +28,6 @@ build
 src/wordformat/data/model/*.onnx
 !src/wordformat/data/model/*_int8.onnx
 src/wordformat/data/model/*.onnx.data
-src/wordformat/data/model/backup_legacy_bert/
 
 # 训练与实验资产（训练集/测试集/训练脚本/checkpoint，体积大，不入库）
 training/

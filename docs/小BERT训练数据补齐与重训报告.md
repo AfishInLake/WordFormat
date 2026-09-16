@@ -87,7 +87,7 @@
 
 | 资产 | 状态 |
 |---|---|
-| 本地生产模型（int8/fp32/checkpoint/标签表） | ✅ 已更新为含合成数据的新版本 |
-| 旧模型备份 | temp/pre_synth_model/（76MB，可回滚） |
-| GitHub Release `thesis_model_20260913` | ⚠️ 仍是旧模型，新模型待上传新 tag |
-| scripts/download_model.py | ⚠️ 仍指向旧 tag `bert_paragraph_classifier.onnx`，未适配新 Release |
+| 生产模型 | ✅ int8 ONNX（8.6MB）+ tokenizer + 标签表直接入库分发（不再走 Release），生产加载 int8 |
+| 旧模型清理 | ✅ 已删除：旧 BERT-base 备份（104MB）、合成前旧版本 checkpoint（76MB）、fp32 原件（68MB，可由 training/checkpoints/model_small_bert 重导恢复） |
+| GitHub Release `thesis_model_20260913` | 遗留，不再用于模型分发 |
+| scripts/download_model.py | ⚠️ 仍指向旧 tag `bert_paragraph_classifier.onnx`，待改造成仓库内模型或删除 |
