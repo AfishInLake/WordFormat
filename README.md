@@ -161,6 +161,16 @@ python -m wordformat startapi
 - [贡献指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/contributing.md) - 如何为项目贡献代码和文档
 - [技术架构](https://github.com/AfishInLake/WordFormat/blob/master/docs/architecture.md) - 项目的技术架构和实现原理
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=AfishInLake%2FWordFormat&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AfishInLake/WordFormat&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AfishInLake/WordFormat&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=AfishInLake/WordFormat&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## 许可证
 
 [Apache License 2.0](LICENSE) - 允许自由使用、修改和分发，需保留原作者声明。
