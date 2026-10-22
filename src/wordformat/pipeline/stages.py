@@ -94,9 +94,15 @@ class TreeBuildingStage:
     否则从 ctx.json_path 加载 JSON 文件。
     """
 
+    def __init__(self, registry=None):
+        """registry: 领域注册表实例（get_registry(domain)），None = 默认论文域。"""
+        self._registry = registry
+
     def process(self, ctx: FormatContext) -> FormatContext:
         source = ctx.paragraphs if ctx.paragraphs else ctx.json_path
-        ctx.root_node = DocumentBuilder.build_from_json(source, config=ctx.config_model)
+        ctx.root_node = DocumentBuilder.build_from_json(
+            source, config=ctx.config_model, registry=self._registry
+        )
         # 文档树构建完成 hook：预设可自定义节点分类
         from wordformat.hooks import hooks
 

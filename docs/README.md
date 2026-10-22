@@ -10,7 +10,9 @@
 - [配置文件说明](https://github.com/AfishInLake/WordFormat/blob/master/docs/configuration.md) - 格式规范配置项和自定义配置方法
 - [常见问题](https://github.com/AfishInLake/WordFormat/blob/master/docs/faq.md) - 常见问题及解决方案
 - [贡献指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/contributing.md) - 如何为项目贡献代码和文档
-- [技术架构](https://github.com/AfishInLake/WordFormat/blob/master/docs/architecture.md) - 项目的技术架构和实现原理
+- [规则 Handler 开发指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/rule-handler-guide.md) - 声明式规则引擎的 handler 开发方法
+- [领域包开发指南](领域包开发指南.md) - 开发新文档领域包（节点、分类后处理、hook 事件的注册与装配）
+- [领域包拆分可行性分析](领域包拆分可行性分析.md) - 领域化架构的论证与分期路线（缝 A/B 已落地）
 
 ## 快速导航
 

@@ -6,32 +6,12 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from wordformat.config.models import NodeConfigRoot
-from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    AcknowledgementsCN,
-    BodyText,
-    CaptionFigure,
-    CaptionTable,
-    FormatNode,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
+from wordformat.domains.thesis.rules import (
     KeywordsCN,
     KeywordsEN,
-    ReferenceEntry,
-    References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -186,7 +166,7 @@ class TestKeywordsENBase:
 
     def _make_en_node(self, config_dict=None):
         """Helper to create a KeywordsEN node with config loaded"""
-        from wordformat.rules.keywords import KeywordsEN
+        from wordformat.domains.thesis.rules.keywords import KeywordsEN
 
         node = KeywordsEN(
             value={"category": "abstract.keywords.english", "fingerprint": "fp"},
@@ -198,7 +178,7 @@ class TestKeywordsENBase:
 
     def test_empty_run_skip(self, sample_yaml_config):
         """Empty run text is skipped (line 114)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -214,7 +194,7 @@ class TestKeywordsENBase:
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 121)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -230,7 +210,7 @@ class TestKeywordsENBase:
 
     def test_content_style_check(self, sample_yaml_config):
         """Content run style is checked (lines 130-135)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -247,7 +227,7 @@ class TestKeywordsENBase:
 
     def test_keyword_count_validation_min(self, sample_yaml_config):
         """Keyword count < count_min triggers warning (via _run_rules)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -264,7 +244,7 @@ class TestKeywordsENBase:
 
     def test_keyword_count_validation_max(self, sample_yaml_config):
         """Keyword count > count_max triggers warning (via _run_rules)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()

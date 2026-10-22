@@ -23,6 +23,9 @@ import re
 from wordformat.domains import register_domain
 from wordformat.hooks import HookRegistry, hooks
 
+# 导入即注册论文域分类后处理整链（框架侧分派: get_postprocess("thesis")）
+from . import postprocess as _postprocess  # noqa: F401, E402
+
 # 领域回调名（预设可用 hooks.unregister(事件, 名字) 禁用）
 NAME_TREE_NORMALIZE = "thesis.tree_normalize"
 NAME_CAPTION_NUMBERING = "thesis.caption_numbering"
@@ -39,17 +42,20 @@ def _thesis_mappings():
     """论文子树提升映射（惰性 import 论文规则类）。"""
     global _MAPPINGS
     if _MAPPINGS is None:
-        from wordformat.rules.abstract import (
+        from wordformat.domains.thesis.rules.abstract import (
             AbstractContentCN,
             AbstractContentEN,
             AbstractTitleCN,
             AbstractTitleEN,
         )
-        from wordformat.rules.acknowledgement import (
+        from wordformat.domains.thesis.rules.acknowledgement import (
             Acknowledgements,
             AcknowledgementsCN,
         )
-        from wordformat.rules.references import ReferenceEntry, References
+        from wordformat.domains.thesis.rules.references import (
+            ReferenceEntry,
+            References,
+        )
 
         _MAPPINGS = [
             (AbstractTitleCN, AbstractContentCN),
@@ -165,7 +171,7 @@ def _build_summary(data: dict):
 
 def _compose_summary(root_node, document, config_model) -> str:
     """遍历树和错误统计，生成论文检测报告摘要文本（字数/关键词/参考文献规范校验）。"""
-    from wordformat.rules.keywords import KeywordsCN, KeywordsEN
+    from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
     from wordformat.rules.node import FormatNode
     from wordformat.utils import count_chinese_chars, has_chinese
 

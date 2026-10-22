@@ -28,7 +28,7 @@ def create_citation_hyperlinks(root_node, document):
         root_node: 文档树根节点
         document: docx Document 对象
     """
-    from wordformat.rules.references import ReferenceEntry
+    from wordformat.domains.thesis.rules.references import ReferenceEntry
 
     # 1. 按文档顺序收集所有 ReferenceEntry 节点
     ref_entries = []

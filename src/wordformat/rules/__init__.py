@@ -2,37 +2,21 @@
 # @Time    : 2026/1/9 20:08
 # @Author  : afish
 # @File    : __init__.py.py
+"""框架通用格式规则节点。
 
-from .abstract import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-)
-from .acknowledgement import Acknowledgements, AcknowledgementsCN
+仅含跨文体通用的结构节点与节点机制（FormatNode）。论文专属节点（摘要/
+参考文献/致谢/关键词）已迁至 wordformat.domains.thesis.rules。
+"""
+
 from .body import BodyText
 from .caption import CaptionFigure, CaptionTable
 from .heading import HeadingLevel1Node, HeadingLevel2Node, HeadingLevel3Node
-from .keywords import KeywordsCN, KeywordsEN
 from .math import MathBlock
 from .node import FormatNode
 from .object import FigureImage, TableObject
-from .references import ReferenceEntry, References
 
 __all__ = [
-    "AbstractTitleCN",
-    "AbstractTitleContentCN",
-    "AbstractTitleEN",
-    "AbstractTitleContentEN",
-    "AbstractContentCN",
-    "AbstractContentEN",
-    "KeywordsEN",
-    "KeywordsCN",
     "MathBlock",
-    "Acknowledgements",
-    "AcknowledgementsCN",
     "BodyText",
     "CaptionFigure",
     "CaptionTable",
@@ -41,7 +25,5 @@ __all__ = [
     "HeadingLevel1Node",
     "HeadingLevel2Node",
     "HeadingLevel3Node",
-    "References",
-    "ReferenceEntry",
     "FormatNode",
 ]

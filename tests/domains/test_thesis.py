@@ -180,18 +180,21 @@ class TestCaptionNumbering:
 
 class TestTreeNormalize:
     def test_promotes_bodytext_in_thesis_subtrees(self):
-        from wordformat.rules.abstract import (
+        from wordformat.domains.thesis.rules.abstract import (
             AbstractContentCN,
             AbstractContentEN,
             AbstractTitleCN,
             AbstractTitleEN,
         )
-        from wordformat.rules.acknowledgement import (
+        from wordformat.domains.thesis.rules.acknowledgement import (
             Acknowledgements,
             AcknowledgementsCN,
         )
+        from wordformat.domains.thesis.rules.references import (
+            ReferenceEntry,
+            References,
+        )
         from wordformat.rules.body import BodyText
-        from wordformat.rules.references import ReferenceEntry, References
 
         registry = _registry_with_thesis()
 
@@ -255,9 +258,12 @@ class TestSummaryBuild:
         FormatNode._error_stats = original
 
     def test_summary_counts_abstract_keywords_references(self, doc):
-        from wordformat.rules.abstract import AbstractContentCN, AbstractContentEN
-        from wordformat.rules.keywords import KeywordsCN, KeywordsEN
-        from wordformat.rules.references import ReferenceEntry
+        from wordformat.domains.thesis.rules.abstract import (
+            AbstractContentCN,
+            AbstractContentEN,
+        )
+        from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
+        from wordformat.domains.thesis.rules.references import ReferenceEntry
 
         registry = _registry_with_thesis()
         root = _node("top")

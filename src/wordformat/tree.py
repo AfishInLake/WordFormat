@@ -193,36 +193,25 @@ def _load_tree_from_json(json_path: str) -> tuple[TreeNode, list[dict]]:
 
 def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
     """从扁平段落列表构建简单树（不依赖 config，仅用于展示）"""
+    from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
     from wordformat.tree import Stack
 
-    HEADING_CATEGORIES = {
-        "heading_level_1",
-        "heading_level_2",
-        "heading_level_3",
-        "heading_mulu",
-        "heading_fulu",
-        "references_title",
-        "acknowledgements_title",
-        "abstract_chinese_title",
-        "abstract_english_title",
-        "abstract_chinese_title_content",
-        "abstract_english_title_content",
+    # 展示用标题类别/层级从注册表派生（与树构建共享同一权威来源，
+    # 消除硬编码副本——多领域标签集不同时展示树仍正确）。
+    # 排除非标题/非挂载节点：正文、图表、公式与后处理扩展的占位类别。
+    _NON_HEADING = {
+        "body_text",
+        "math_block",
+        "figure_image",
+        "table_object",
+        "other",
+        "document_title",
+        "footer",
+        "keywords_chinese",
+        "keywords_english",
     }
-    LEVEL_MAP = {
-        "heading_level_1": 1,
-        "heading_level_2": 2,
-        "heading_level_3": 3,
-        "heading_mulu": 1,
-        "heading_fulu": 1,
-        "references_title": 1,
-        "acknowledgements_title": 1,
-        "abstract_chinese_title": 1,
-        "abstract_english_title": 1,
-        "abstract_chinese_title_content": 1,
-        "abstract_english_title_content": 1,
-        "keywords_chinese": 3,
-        "keywords_english": 3,
-    }
+    HEADING_CATEGORIES = {k for k in CATEGORY_TO_CLASS if k not in _NON_HEADING}
+    LEVEL_MAP = {k: v for k, v in LEVEL_MAP.items() if k in HEADING_CATEGORIES}
 
     stack = Stack()
     stack.push(root)

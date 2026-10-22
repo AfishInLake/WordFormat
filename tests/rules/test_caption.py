@@ -6,32 +6,13 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from docx.oxml.ns import qn
 from docx.shared import Pt
 
 from wordformat.config.models import NodeConfigRoot
 from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    AcknowledgementsCN,
-    BodyText,
     CaptionFigure,
     CaptionTable,
-    FormatNode,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    ReferenceEntry,
-    References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -158,10 +139,9 @@ class TestCaptionTableBase:
 
 """题注编号处理模块的单元测试。"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from docx import Document
 
 # CaptionNumberingConfig replaced by dict
 
@@ -844,6 +824,7 @@ class TestCaptionEdgeCases:
     def test_replace_paragraph_text_empty_runs(self):
         """空 runs 列表不抛异常。"""
         from docx import Document
+
         from wordformat.rules.caption import _replace_paragraph_text
 
         doc = Document()
@@ -853,7 +834,7 @@ class TestCaptionEdgeCases:
 
     def test_check_caption_numbering_no_paragraph(self):
         """paragraph 为 None 时直接返回。"""
-        from wordformat.rules.caption import _check_caption_numbering, CaptionFigure
+        from wordformat.rules.caption import CaptionFigure, _check_caption_numbering
 
         node = CaptionFigure(value={"category": "test"}, level=0)
         node.paragraph = None
@@ -867,7 +848,7 @@ class TestCaptionEdgeCases:
 
     def test_apply_caption_numbering_no_paragraph(self):
         """paragraph 为 None 时直接返回。"""
-        from wordformat.rules.caption import _apply_caption_numbering, CaptionFigure
+        from wordformat.rules.caption import CaptionFigure, _apply_caption_numbering
 
         node = CaptionFigure(value={"category": "test"}, level=0)
         node.paragraph = None
@@ -880,20 +861,17 @@ class TestNodeConfigRoot:
     """覆盖 config/models.py NodeConfigRoot。"""
 
     def test_setattr(self):
-        from wordformat.config.models import NodeConfigRoot
 
         cfg = NodeConfigRoot()
         cfg.template_name = "测试"
         assert cfg["template_name"] == "测试"
 
     def test_getattr_missing_returns_none(self):
-        from wordformat.config.models import NodeConfigRoot
 
         cfg = NodeConfigRoot()
         assert cfg.nonexistent is None
 
     def test_model_dump(self):
-        from wordformat.config.models import NodeConfigRoot
 
         cfg = NodeConfigRoot(a=1, b=2)
         assert cfg.model_dump() == {"a": 1, "b": 2}

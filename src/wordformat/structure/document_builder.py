@@ -28,10 +28,13 @@ class DocumentBuilder:
                 return json.load(f)
 
     @classmethod
-    def build_from_json(cls, json_path: str | list, config) -> FormatNode:
+    def build_from_json(
+        cls, json_path: str | list, config, registry=None
+    ) -> FormatNode:
+        """加载 JSON 构建文档树；registry 为领域注册表实例（可空，默认论文域）。"""
         paragraphs = cls.load_paragraphs(json_path)
         logger.debug(f"共有 {len(paragraphs)} 条语料")
         DocumentTreeBuilder.CONFIG = config
-        builder = DocumentTreeBuilder()
+        builder = DocumentTreeBuilder(registry=registry)
         builder._config = config
         return builder.build_tree(paragraphs)
