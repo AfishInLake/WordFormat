@@ -10,6 +10,11 @@ import os
 import sys
 from pathlib import Path
 
+# Windows 控制台默认 cp1252，中文输出会抛 UnicodeEncodeError
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # ================== 配置 ==================
 # 旧模型下载地址已废弃（bert_paragraph_classifier.onnx 99MB）
 OUTPUT_DIR = Path("src/wordformat/data/model")
