@@ -234,8 +234,7 @@ class TestJsonToDocx:
             "abstract:\n"
             "  chinese:\n"
             "    body:\n"
-            "      font:\n"
-            "        font_size: '三号'\n",
+            "      font_size: '三号'\n",
             encoding="utf-8",
         )
         items = [

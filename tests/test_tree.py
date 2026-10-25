@@ -433,6 +433,64 @@ class TestDotDict:
         assert result["a"]["b"] == 99  # overridden
         assert result["a"]["c"] == 2  # kept
 
+    def test_flatten_style_config_recursively_merges_groups(self):
+        from wordformat.config.dotdict import flatten_style_config
+
+        flattened = flatten_style_config(
+            {
+                "paragraph": {"alignment": "居中", "first_line_indent": "0字符"},
+                "font": {"font_size": "四号", "bold": True},
+                "title": {
+                    "paragraph": {"alignment": "左对齐"},
+                    "font": {"font_size": "三号"},
+                    "font_size": "小二",
+                },
+            }
+        )
+
+        assert flattened["alignment"] == "居中"
+        assert flattened["font_size"] == "四号"
+        assert flattened["title"]["alignment"] == "左对齐"
+        assert flattened["title"]["font_size"] == "小二"  # 顶层覆盖分组
+        assert "paragraph" not in flattened
+        assert "font" not in flattened["title"]
+
+
+class TestConfigLoader:
+    """配置文件只接受平铺写法。"""
+
+    def test_load_config_accepts_flat_fields(self, tmp_path):
+        from wordformat.config.loader import load_config
+
+        path = tmp_path / "flat.yaml"
+        path.write_text(
+            "headings:\n  level_1:\n    alignment: '居中对齐'\n    font_size: '三号'\n",
+            encoding="utf-8",
+        )
+
+        cfg = load_config(str(path))
+
+        assert cfg.headings.level_1.alignment == "居中对齐"
+        assert cfg.headings.level_1.font_size == "三号"
+
+    def test_load_config_rejects_nested_style_fields(self, tmp_path):
+        import pytest
+
+        from wordformat.config.loader import load_config
+
+        path = tmp_path / "nested.yaml"
+        path.write_text(
+            "abstract:\n"
+            "  chinese:\n"
+            "    title:\n"
+            "      font:\n"
+            "        font_size: '小二'\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError, match="abstract.chinese.title.font"):
+            load_config(str(path))
+
 
 class TestExportDefaults:
     """覆盖 structure/registry.py export_defaults()。"""
@@ -453,3 +511,12 @@ class TestExportDefaults:
         assert "abstract" in data
         assert "headings" in data
         assert "body" in data
+
+    def test_export_uses_flat_style_fields(self):
+        from wordformat.structure.registry import export_defaults
+
+        data = export_defaults()
+        title = data["abstract"]["chinese"]["title"]
+        assert "font_size" in title
+        assert "paragraph" not in title
+        assert "font" not in title

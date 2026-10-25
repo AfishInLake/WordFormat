@@ -10,7 +10,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.config.dotdict import DotDict, deep_merge
+from wordformat.config.dotdict import DotDict, deep_merge, flatten_style_config
 
 # 字符格式化中可被内容级强调保护的属性
 _EMPHASIS_DIFF_TYPES = ("bold", "italic", "underline")
@@ -51,8 +51,8 @@ class TreeNode:
             yaml_node = {}
         self._yaml_config = yaml_node
 
-        # 合并：DEFAULTS 为底，YAML 覆盖
-        defaults = getattr(type(self), "DEFAULTS", {})
+        # 合并：DEFAULTS 为底，YAML 覆盖；DEFAULTS 的 paragraph/font 分组摊平
+        defaults = flatten_style_config(getattr(type(self), "DEFAULTS", {}))
         merged = deep_merge(defaults, yaml_node) if defaults else yaml_node
         self._config = DotDict(merged)
 
@@ -309,13 +309,7 @@ class FormatNode(TreeNode):
         if not self.protected_inline:
             return False
         yaml_config = self._yaml_config or {}
-        # YAML 既可平铺（bold: true）也可写在 font 子节下（font.bold: true）
-        font_config = yaml_config.get("font")
-        if not isinstance(font_config, dict):
-            font_config = {}
-        return not any(
-            key in yaml_config or key in font_config for key in _EMPHASIS_DIFF_TYPES
-        )
+        return not any(key in yaml_config for key in _EMPHASIS_DIFF_TYPES)
 
     @staticmethod
     def _filter_emphasis(diffs: list, keep: bool) -> list:

@@ -716,15 +716,11 @@ class ParagraphStyle:
 
         kwargs = {}
         for field in fields:
-            value = None
-            if isinstance(config, dict):
-                value = config.get(field)
-                if value is None:
-                    paragraph_cfg = config.get("paragraph")
-                    if isinstance(paragraph_cfg, dict):
-                        value = paragraph_cfg.get(field)
-            else:
-                value = getattr(config, field, None)
+            value = (
+                config.get(field)
+                if isinstance(config, dict)
+                else getattr(config, field, None)
+            )
             if value is not None:
                 kwargs[field] = value
 

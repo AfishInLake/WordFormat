@@ -13,23 +13,16 @@
 wordf config -o my_config.yaml
 ```
 
-段落与字符字段支持两种写法，二者等价（缺省值导出的为嵌套写法，示例配置用的是平铺写法）：
+样式字段统一使用平铺写法，段落与字符属性直接写在节点下：
 
 ```yaml
-# 平铺
 headings:
   level_1:
-    chinese_font_name: '黑体'
     alignment: '居中对齐'
-
-# 嵌套
-headings:
-  level_1:
-    paragraph:
-      alignment: '居中对齐'
-    font:
-      chinese_font_name: '黑体'
+    chinese_font_name: '黑体'
 ```
+
+不再支持 `paragraph:` / `font:` 嵌套写法；配置加载时会直接报错并指出对应节点。
 
 所有配置项均有清晰注释，便于理解和修改。
 
@@ -268,14 +261,12 @@ tables:
         font_size: '五号'
         font_color: '黑色'
   caption:                              # 表格题注（与插图题注同构）
-    paragraph:
-      alignment: '居中对齐'
-      first_line_indent: '0字符'
-      builtin_style_name: '题注'
-    font:
-      chinese_font_name: '宋体'
-      english_font_name: 'Times New Roman'
-      font_size: '五号'
+    alignment: '居中对齐'
+    first_line_indent: '0字符'
+    builtin_style_name: '题注'
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '五号'
     caption_prefix: '表'
     rules:
       caption_numbering:

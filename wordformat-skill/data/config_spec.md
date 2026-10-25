@@ -2,46 +2,44 @@
 
 ## 基础字段
 
-所有配置节点基于 `global_format` 定义，通过 `<<: *global_format` 继承。分为三个组：
+所有配置节点基于 `global_format` 定义，通过 `<<: *global_format` 继承。样式字段统一平铺，`paragraph:` / `font:` 嵌套写法已移除。
 
 ```yaml
 global_format: &global_format
-  paragraph:             # 段落格式
-    alignment: '两端对齐'
-    space_before: "0行"
-    space_after: "0行"
-    line_spacingrule: "1.5倍行距"
-    line_spacing: '1.5倍'
-    left_indent: "0字符"
-    right_indent: "0字符"
-    first_line_indent: '2字符'
-    builtin_style_name: '正文'
-  font:                  # 字符格式
-    chinese_font_name: '宋体'
-    english_font_name: 'Times New Roman'
-    font_size: '小四'
-    font_color: '黑色'
-    bold: false
-    italic: false
-    underline: false
+  # 段落格式
+  alignment: '两端对齐'
+  space_before: "0行"
+  space_after: "0行"
+  line_spacingrule: "1.5倍行距"
+  line_spacing: '1.5倍'
+  left_indent: "0字符"
+  right_indent: "0字符"
+  first_line_indent: '2字符'
+  builtin_style_name: '正文'
+  # 字符格式
+  chinese_font_name: '宋体'
+  english_font_name: 'Times New Roman'
+  font_size: '小四'
+  font_color: '黑色'
+  bold: false
+  italic: false
+  underline: false
 ```
 
-| 组 | 字段 | 可选值 |
-|----|------|--------|
-| paragraph | `alignment` | 左对齐 / 居中对齐 / 右对齐 / 两端对齐 / 分散对齐 |
-| paragraph | `space_before/after` | "0行" "0.5行" "12磅" "0.5cm" |
-| paragraph | `line_spacingrule` | 单倍行距 / 1.5倍行距 / 2倍行距 / 最小值 / 固定值 / 多倍行距 |
-| paragraph | `line_spacing` | "1.5倍" "20磅" |
-| paragraph | `left/right_indent` | "0字符" "2字符" "20磅" |
-| paragraph | `first_line_indent` | 正值=首行缩进，负值=悬挂缩进 |
-| paragraph | `builtin_style_name` | 正文 / Heading 1/2/3 / 题注 |
-| font | `chinese_font_name` | 宋体 / 黑体 / 楷体 / 仿宋 |
-| font | `english_font_name` | Times New Roman / Arial |
-| font | `font_size` | 三号 / 小三 / 四号 / 小四 / 五号 / 12 / 14 |
-| font | `font_color` | 黑色 / 红色 / #FF0000 |
-| font | `bold/italic/underline` | true / false |
-
-> 覆盖时可直接用平铺字段（如 `alignment: '居中对齐'`），框架自动区分 paragraph/font。
+| 类别 | 字段 | 可选值 |
+|------|------|--------|
+| 段落 | `alignment` | 左对齐 / 居中对齐 / 右对齐 / 两端对齐 / 分散对齐 |
+| 段落 | `space_before/after` | "0行" "0.5行" "12磅" "0.5cm" |
+| 段落 | `line_spacingrule` | 单倍行距 / 1.5倍行距 / 2倍行距 / 最小值 / 固定值 / 多倍行距 |
+| 段落 | `line_spacing` | "1.5倍" "20磅" |
+| 段落 | `left/right_indent` | "0字符" "2字符" "20磅" |
+| 段落 | `first_line_indent` | 正值=首行缩进，负值=悬挂缩进 |
+| 段落 | `builtin_style_name` | 正文 / Heading 1/2/3 / 题注 |
+| 字符 | `chinese_font_name` | 宋体 / 黑体 / 楷体 / 仿宋 |
+| 字符 | `english_font_name` | Times New Roman / Arial |
+| 字符 | `font_size` | 三号 / 小三 / 四号 / 小四 / 五号 / 12 / 14 |
+| 字符 | `font_color` | 黑色 / 红色 / #FF0000 |
+| 字符 | `bold/italic/underline` | true / false |
 
 ## 配置路径
 

@@ -23,14 +23,7 @@ class NodeConfigRoot(dict):
         try:
             val = self[key]
         except KeyError:
-            # fallback：到 paragraph / font 子字典中查找
-            for sub in ("paragraph", "font"):
-                sub_dict = self.get(sub)
-                if isinstance(sub_dict, dict) and key in sub_dict:
-                    val = sub_dict[key]
-                    break
-            else:
-                return None
+            return None
         if isinstance(val, dict) and not isinstance(val, NodeConfigRoot):
             return NodeConfigRoot(**val)
         return val
@@ -103,30 +96,11 @@ class NumberingConfig(dict):
         return val
 
 
-_STYLE_SUBDICT_KEYS = ("paragraph", "font")
-
 # 这些配置项不是实际段落，不能参与样式定义收集
 _STYLE_EXCLUDED_PATHS = {
     ("global_format",),
     ("tables", "object"),
 }
-
-
-def _flatten_style_config(obj: dict) -> dict:
-    """把嵌套的 paragraph / font 字段摊平到节点配置。
-
-    顶层字段优先于子字典字段，与 DotDict/NodeConfigRoot 的点号查找顺序
-    保持一致。
-    """
-    merged: dict = {}
-    for sub_key in _STYLE_SUBDICT_KEYS:
-        sub_cfg = obj.get(sub_key)
-        if isinstance(sub_cfg, dict):
-            merged.update(sub_cfg)
-    merged.update(
-        {key: value for key, value in obj.items() if key not in _STYLE_SUBDICT_KEYS}
-    )
-    return merged
 
 
 def _intersect_configs(configs: list[dict]) -> dict:
@@ -146,12 +120,9 @@ def _walk_config_for_styles(obj, occurrences: dict[str, list[dict]], path=()) ->
         return
     if path in _STYLE_EXCLUDED_PATHS:
         return
-    style_cfg = _flatten_style_config(obj)
-    eng_name = _resolve_builtin_style_name(style_cfg)
+    eng_name = _resolve_builtin_style_name(obj)
     if eng_name and isinstance(eng_name, str):
-        occurrences.setdefault(eng_name, []).append(style_cfg)
+        occurrences.setdefault(eng_name, []).append(dict(obj))
     for key, val in obj.items():
-        # paragraph / font 已合并进当前节点，不能作为独立节点重复收集
-        if key in _STYLE_SUBDICT_KEYS or not isinstance(val, dict):
-            continue
-        _walk_config_for_styles(val, occurrences, (*path, key))
+        if isinstance(val, dict):
+            _walk_config_for_styles(val, occurrences, (*path, key))

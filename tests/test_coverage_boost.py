@@ -159,21 +159,17 @@ class TestHeadingCoverageBoost:
         assert "Heading 1" in style_names
         assert "Normal" not in style_names
 
-    def test_collect_style_configs_merges_paragraph_and_font(self):
-        """嵌套的 paragraph/font 字段应合并进样式配置。"""
+    def test_collect_style_configs_reads_flat_fields(self):
+        """平铺的段落/字符字段应写入样式配置。"""
         cfg = NodeConfigRoot(
             headings={
                 "level_1": {
-                    "paragraph": {
-                        "alignment": "居中对齐",
-                        "builtin_style_name": "Heading 1",
-                    },
-                    "font": {
-                        "chinese_font_name": "黑体",
-                        "english_font_name": "Arial",
-                        "font_size": "二号",
-                        "bold": True,
-                    },
+                    "alignment": "居中对齐",
+                    "builtin_style_name": "Heading 1",
+                    "chinese_font_name": "黑体",
+                    "english_font_name": "Arial",
+                    "font_size": "二号",
+                    "bold": True,
                 }
             }
         )
@@ -185,28 +181,24 @@ class TestHeadingCoverageBoost:
         assert style_cfg["english_font_name"] == "Arial"
         assert style_cfg["font_size"] == "二号"
         assert style_cfg["bold"] is True
-        assert "paragraph" not in style_cfg
-        assert "font" not in style_cfg
 
     def test_collect_style_configs_keeps_only_consistent_fields(self):
         """同名样式仅保留各节点取值一致的字段，冲突字段不写入样式定义。"""
         cfg = NodeConfigRoot(
             body={
                 "text": {
-                    "paragraph": {
-                        "alignment": "右对齐",
-                        "builtin_style_name": "正文",
-                    },
-                    "font": {"italic": True, "bold": False},
+                    "alignment": "右对齐",
+                    "builtin_style_name": "正文",
+                    "italic": True,
+                    "bold": False,
                 }
             },
             references={
                 "entry": {
-                    "paragraph": {
-                        "alignment": "两端对齐",
-                        "builtin_style_name": "正文",
-                    },
-                    "font": {"italic": False, "bold": False},
+                    "alignment": "两端对齐",
+                    "builtin_style_name": "正文",
+                    "italic": False,
+                    "bold": False,
                 }
             },
         )
@@ -217,21 +209,17 @@ class TestHeadingCoverageBoost:
         assert "alignment" not in normal_cfg
         assert "italic" not in normal_cfg
 
-    def test_fix_all_style_definitions_applies_nested_config(self):
+    def test_fix_all_style_definitions_applies_flat_config(self):
         """样式定义修正应真正写入字符与段落属性（回归：dict 配置曾被静默跳过）。"""
         cfg = NodeConfigRoot(
             headings={
                 "level_1": {
-                    "paragraph": {
-                        "alignment": "居中对齐",
-                        "builtin_style_name": "Heading 1",
-                    },
-                    "font": {
-                        "chinese_font_name": "黑体",
-                        "english_font_name": "Arial",
-                        "font_size": "二号",
-                        "bold": True,
-                    },
+                    "alignment": "居中对齐",
+                    "builtin_style_name": "Heading 1",
+                    "chinese_font_name": "黑体",
+                    "english_font_name": "Arial",
+                    "font_size": "二号",
+                    "bold": True,
                 }
             }
         )
@@ -254,20 +242,16 @@ class TestHeadingCoverageBoost:
         cfg = NodeConfigRoot(
             body={
                 "text": {
-                    "paragraph": {
-                        "alignment": "右对齐",
-                        "builtin_style_name": "正文",
-                    },
-                    "font": {"italic": True},
+                    "alignment": "右对齐",
+                    "builtin_style_name": "正文",
+                    "italic": True,
                 }
             },
             references={
                 "entry": {
-                    "paragraph": {
-                        "alignment": "两端对齐",
-                        "builtin_style_name": "正文",
-                    },
-                    "font": {"italic": False},
+                    "alignment": "两端对齐",
+                    "builtin_style_name": "正文",
+                    "italic": False,
                 }
             },
         )

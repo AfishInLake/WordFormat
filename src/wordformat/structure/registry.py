@@ -73,8 +73,9 @@ class Registry:
     def export_defaults(self) -> dict:
         """遍历本实例注册的 FormatNode 子类，根据 DEFAULTS + NODE_TYPE 生成完整配置。
 
-        返回可直接写入 .yaml 的嵌套 dict。
+        返回可直接写入 .yaml 的 dict，样式字段为平铺写法。
         """
+        from wordformat.config.dotdict import flatten_style_config
         from wordformat.style.diff import WarningConfig
 
         result: dict = {}
@@ -92,7 +93,7 @@ class Registry:
             defaults = getattr(cls, "DEFAULTS", {})
             node_type = getattr(cls, "NODE_TYPE", "")
             if defaults and node_type:
-                _deep_set(result, node_type, dict(defaults))
+                _deep_set(result, node_type, flatten_style_config(defaults))
 
         return result
 

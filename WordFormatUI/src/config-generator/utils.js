@@ -22,7 +22,7 @@ const defaultFont = {
   underline: false
 }
 
-// 默认全局格式（平铺，向后兼容）
+// 默认全局格式（唯一支持的平铺写法）
 export const defaultGlobalFormat = {
   ...defaultParagraph,
   ...defaultFont
@@ -54,10 +54,7 @@ export const defaultConfig = {
     first_line_indent: true,
     builtin_style_name: true
   },
-  global_format: {
-    paragraph: { ...defaultParagraph },
-    font: { ...defaultFont }
-  },
+  global_format: { ...defaultGlobalFormat },
   abstract: {
     chinese: {
       title: createConfigWithGlobalInheritance({
@@ -266,7 +263,7 @@ export const mergeWithDefaults = (config, defaults) => {
 // 应用全局格式到所有局部配置
 export const applyGlobalFormatToAll = (userConfig) => {
   const gf = userConfig.global_format
-  const flat = { ...(gf.paragraph || {}), ...(gf.font || {}) }
+  const flat = { ...gf }
 
   // 摘要
   const abs = userConfig.abstract

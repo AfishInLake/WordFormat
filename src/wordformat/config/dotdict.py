@@ -12,14 +12,7 @@ class DotDict(dict):
         try:
             val = self[key]
         except KeyError:
-            # 框架抽象：key 不在当前层时，自动到 paragraph / font 子字典中查找
-            for sub in ("paragraph", "font"):
-                sub_dict = self.get(sub)
-                if isinstance(sub_dict, dict) and key in sub_dict:
-                    val = sub_dict[key]
-                    break
-            else:
-                return None
+            return None
         if isinstance(val, dict):
             return DotDict(val)
         return val
@@ -68,4 +61,24 @@ def deep_merge(base: dict, override: dict) -> dict:
             result[k] = deep_merge(result[k], v)
         else:
             result[k] = v
+    return result
+
+
+def flatten_style_config(obj: dict) -> dict:
+    """把代码内 DEFAULTS 的 paragraph/font 分组摊平成与 YAML 一致的平铺结构。
+
+    顶层字段优先于分组字段，供节点配置合并与 ``wordf config`` 导出使用。
+    YAML 配置本身只接受平铺写法，因此该函数只处理 Python 常量。
+    """
+    if not isinstance(obj, dict):
+        return obj
+    result: dict = {}
+    for group in ("paragraph", "font"):
+        sub = obj.get(group)
+        if isinstance(sub, dict):
+            result.update(sub)
+    for key, value in obj.items():
+        if key in ("paragraph", "font"):
+            continue
+        result[key] = flatten_style_config(value) if isinstance(value, dict) else value
     return result

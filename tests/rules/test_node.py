@@ -263,16 +263,12 @@ class TestInlineEmphasisProtection:
         assert node._keep_inline_emphasis() is False
 
     def test_flat_yaml_emphasis_disables_protection(self):
-        node = self._node({"body": {"text": {"bold": True}}})
-        assert node._keep_inline_emphasis() is False
-
-    def test_nested_font_emphasis_disables_protection(self):
-        # YAML 实际写法为 font.bold/font.italic/font.underline
-        node = self._node({"body": {"text": {"font": {"italic": True}}}})
-        assert node._keep_inline_emphasis() is False
+        for field in ("bold", "italic", "underline"):
+            node = self._node({"body": {"text": {field: True}}})
+            assert node._keep_inline_emphasis() is False
 
     def test_unrelated_yaml_keeps_protection(self):
-        node = self._node({"body": {"text": {"font": {"font_size": "小四"}}}})
+        node = self._node({"body": {"text": {"font_size": "小四"}}})
         assert node._keep_inline_emphasis() is True
 
 

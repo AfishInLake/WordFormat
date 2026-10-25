@@ -8,10 +8,27 @@ from wordformat.utils import load_yaml_with_merge
 
 _config: NodeConfigRoot | None = None
 
+_STYLE_GROUPS = ("paragraph", "font")
+
+
+def _reject_nested_style_config(obj, path: tuple[str, ...] = ()) -> None:
+    """拒绝已移除的 paragraph/font 嵌套写法，避免样式字段被静默忽略。"""
+    if not isinstance(obj, dict):
+        return
+    for key, value in obj.items():
+        if key in _STYLE_GROUPS and isinstance(value, dict):
+            parent = ".".join(path) or "配置根"
+            raise ValueError(
+                f"配置 {'.'.join(path + (key,))} 使用了已移除的嵌套写法；"
+                f"请把 {key} 下的字段直接平铺到 {parent} 下"
+            )
+        _reject_nested_style_config(value, (*path, key))
+
 
 def load_config(path: str) -> NodeConfigRoot:
     global _config
     raw = load_yaml_with_merge(path)
+    _reject_nested_style_config(raw)
     _config = NodeConfigRoot(**raw)
     return _config
 
