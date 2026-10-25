@@ -66,10 +66,6 @@ jobs:
       - name: Install project dependencies
         run: uv pip install --system -e ".[dev]"
 
-      - name: Download Model (if not cached)
-        if: steps.cache-model.outputs.cache-hit != 'true'
-        run: python scripts/download_model.py
-
       - name: Run tests
         run: make tests
 

@@ -6,32 +6,12 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from wordformat.config.models import NodeConfigRoot
-from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    AcknowledgementsCN,
-    BodyText,
-    CaptionFigure,
-    CaptionTable,
-    FormatNode,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
+from wordformat.domains.thesis.rules import (
     ReferenceEntry,
     References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers

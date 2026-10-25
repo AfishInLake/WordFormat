@@ -7,61 +7,56 @@
 
 import io
 import os
-import re
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor
-from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt
 
 from wordformat.config.models import NodeConfigRoot
+from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
+from wordformat.numbering import (
+    _auto_strip_numbering,
+    _build_numbering_rPr,
+    _convert_to_twips,
+    _set_indent_value,
+)
+from wordformat.pipeline.stages import (
+    FormattingExecutionStage,
+    StyleDefinitionFixStage,
+)
 from wordformat.rules.heading import (
     HeadingLevel1Node,
     HeadingLevel2Node,
-    HeadingLevel3Node,
-)
-from wordformat.rules.keywords import KeywordsCN, KeywordsEN
-from wordformat.numbering import (
-    _convert_to_twips,
-    _set_indent_value,
-    _build_numbering_rPr,
-    _auto_strip_numbering,
 )
 from wordformat.style.defs import (
-    BuiltInStyle,
     FirstLineIndent,
     ensure_style_exists,
-)
-from wordformat.pipeline.stages import (
-    StyleDefinitionFixStage,
-    FormattingExecutionStage,
 )
 
 _fix_stage = StyleDefinitionFixStage()
 _format_stage = FormattingExecutionStage()
 apply_format_check_to_all_nodes = _format_stage.apply_format_check_to_all_nodes
 from wordformat.style.reader import (
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
+    GetIndent,
     paragraph_get_builtin_style_name,
+    paragraph_get_line_spacing,
+    paragraph_get_space_after,
+    paragraph_get_space_before,
+    run_get_font_color,
     run_get_font_name,
     run_get_font_size_pt,
-    run_get_font_color,
-    GetIndent,
 )
 from wordformat.utils import (
-    get_paragraph_numbering_text,
     _count_numbering_levels,
     _format_number,
     _to_chinese_num,
     _to_roman,
     ensure_directory_exists,
+    get_paragraph_numbering_text,
 )
-
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -763,7 +758,6 @@ class TestStyleEnumCoverageBoost:
         """覆盖行 155: FirstLineIndent 使用 cm 单位。"""
         doc = Document()
         p = doc.add_paragraph()
-        from docx.shared import Cm
 
         p.paragraph_format.first_line_indent = Cm(0.85)
         fli = FirstLineIndent("0.85cm")
@@ -1105,7 +1099,6 @@ class TestGetSomeCoverageBoost:
         """覆盖行 222-226: MULTIPLE 行距类型返回 float。"""
         doc = Document()
         p = doc.add_paragraph()
-        from docx.shared import Pt
         from docx.enum.text import WD_LINE_SPACING
 
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
@@ -1348,8 +1341,9 @@ class TestCoverageBoostRound2:
 
     def test_rPr_set_italic_remove(self):
         """rPr_set_italic 传入 False 时移除 w:i。"""
-        from wordformat.style.xml_ops import rPr_set_italic, ensure_rPr
         from docx.oxml import OxmlElement
+
+        from wordformat.style.xml_ops import ensure_rPr, rPr_set_italic
 
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
@@ -1359,8 +1353,9 @@ class TestCoverageBoostRound2:
 
     def test_rPr_set_underline_remove(self):
         """rPr_set_underline 传入 False 时移除 w:u。"""
-        from wordformat.style.xml_ops import rPr_set_underline, ensure_rPr
         from docx.oxml import OxmlElement
+
+        from wordformat.style.xml_ops import ensure_rPr, rPr_set_underline
 
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
@@ -1375,6 +1370,7 @@ class TestCoverageBoostRound2:
     def test_print_tree_from_json(self, tmp_path):
         """print_tree 支持传入 JSON 文件路径。"""
         import json
+
         from wordformat.tree import print_tree
 
         json_path = tmp_path / "test.json"
@@ -1393,8 +1389,9 @@ class TestCoverageBoostRound2:
 
     def test_process_heading_numbering_disabled(self):
         """numbering 禁用时不处理。"""
-        from wordformat.numbering import process_heading_numbering
         from unittest.mock import MagicMock
+
+        from wordformat.numbering import process_heading_numbering
 
         config = MagicMock()
         config.enabled = False
@@ -1418,7 +1415,6 @@ class TestCoverageBoostRound2:
         """SummaryGenerationStage 在 check 模式下添加批注。"""
         from wordformat.pipeline.stages import (
             SummaryGenerationStage,
-            FormattingExecutionStage,
         )
         from wordformat.rules.node import FormatNode
 
@@ -1446,7 +1442,7 @@ class TestCoverageBoostRound2:
 
     def test_rPr_set_bold_remove(self):
         """rPr_set_bold 传入 False 移除 w:b。"""
-        from wordformat.style.xml_ops import rPr_set_bold, ensure_rPr
+        from wordformat.style.xml_ops import ensure_rPr, rPr_set_bold
 
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
@@ -1505,8 +1501,8 @@ class TestCoverageBoostRound2:
 
     def test_load_config_stage_no_config(self):
         """未提供配置文件时使用默认配置。"""
-        from wordformat.pipeline.stages import LoadConfigStage
         from wordformat.pipeline.context import FormatContext
+        from wordformat.pipeline.stages import LoadConfigStage
 
         ctx = FormatContext(json_path="", docx_path="", check=True, config_path="")
         stage = LoadConfigStage()

@@ -10,7 +10,7 @@ import pytest
 from docx import Document
 from docx.shared import Pt
 
-from wordformat.rules.references import (
+from wordformat.domains.thesis.rules.references import (
     _GBT_DOC_TYPES,
     _TYPE_CHECKS,
     ReferenceEntry,

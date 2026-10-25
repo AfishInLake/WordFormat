@@ -113,6 +113,27 @@ class TestCaptionNumbering:
         # 普通节点注入当前章节号（BodyText 第一章引用上标需要）
         assert body.value["chapter_number"] == 2
 
+    def test_toc_entries_do_not_increment_chapter(self, doc):
+        """目录条目（模型常判为 heading_level_1 的 "1 绪论\t1" 形态）不递增章节号。"""
+        registry = _registry_with_thesis()
+        registry.emit("on_format_begin")
+
+        toc1 = _emit_node(registry, "heading_level_1", "1 绪论\t1", doc)
+        toc2 = _emit_node(registry, "heading_level_1", "2 总体方案设计\t7", doc)
+        toc3 = _emit_node(
+            registry, "heading_level_1", "1.3 论文研究内容............13", doc
+        )
+        h1 = _emit_node(registry, "heading_level_1", "1 绪论", doc)
+        fig = _emit_node(registry, "caption_figure", "图1.1 系统架构", doc)
+
+        # 目录条目不递增；正文一级标题才递增
+        assert toc1.value["chapter_number"] == 0
+        assert toc2.value["chapter_number"] == 0
+        assert toc3.value["chapter_number"] == 0
+        assert h1.value["chapter_number"] == 1
+        assert fig.value["chapter_number"] == 1
+        assert fig.value["sequence_number"] == 1
+
     def test_continued_caption_keeps_existing_number(self, doc):
         registry = _registry_with_thesis()
         registry.emit("on_format_begin")
@@ -159,18 +180,21 @@ class TestCaptionNumbering:
 
 class TestTreeNormalize:
     def test_promotes_bodytext_in_thesis_subtrees(self):
-        from wordformat.rules.abstract import (
+        from wordformat.domains.thesis.rules.abstract import (
             AbstractContentCN,
             AbstractContentEN,
             AbstractTitleCN,
             AbstractTitleEN,
         )
-        from wordformat.rules.acknowledgement import (
+        from wordformat.domains.thesis.rules.acknowledgement import (
             Acknowledgements,
             AcknowledgementsCN,
         )
+        from wordformat.domains.thesis.rules.references import (
+            ReferenceEntry,
+            References,
+        )
         from wordformat.rules.body import BodyText
-        from wordformat.rules.references import ReferenceEntry, References
 
         registry = _registry_with_thesis()
 
@@ -199,6 +223,11 @@ class TestTreeNormalize:
         assert isinstance(abs_title_en.children[0], AbstractContentEN)
         assert isinstance(ref_title.children[0], ReferenceEntry)
         assert isinstance(ack_title.children[0], AcknowledgementsCN)
+        # 实例类变更后 category 身份字段同步（结构契约，供 numbering 等 category 判断消费）
+        assert abs_title.children[0].value["category"] == "abstract_chinese_content"
+        assert abs_title_en.children[0].value["category"] == "abstract_english_content"
+        assert ref_title.children[0].value["category"] == "references_content"
+        assert ack_title.children[0].value["category"] == "acknowledgements_content"
 
     def test_leaves_other_subtrees_untouched(self):
         from wordformat.rules.body import BodyText
@@ -229,9 +258,12 @@ class TestSummaryBuild:
         FormatNode._error_stats = original
 
     def test_summary_counts_abstract_keywords_references(self, doc):
-        from wordformat.rules.abstract import AbstractContentCN, AbstractContentEN
-        from wordformat.rules.keywords import KeywordsCN, KeywordsEN
-        from wordformat.rules.references import ReferenceEntry
+        from wordformat.domains.thesis.rules.abstract import (
+            AbstractContentCN,
+            AbstractContentEN,
+        )
+        from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
+        from wordformat.domains.thesis.rules.references import ReferenceEntry
 
         registry = _registry_with_thesis()
         root = _node("top")

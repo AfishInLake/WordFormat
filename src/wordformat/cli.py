@@ -46,7 +46,7 @@ def _show_config():
     """遍历所有注册的 FormatNode，打印完整配置树及默认值。"""
     import yaml
 
-    from wordformat.rules import (  # noqa: F401 触发 @register
+    from wordformat.domains.thesis.rules import (  # noqa: F401 触发 @register（论文域）
         AbstractContentCN,
         AbstractContentEN,
         AbstractTitleCN,
@@ -55,6 +55,12 @@ def _show_config():
         AbstractTitleEN,
         Acknowledgements,
         AcknowledgementsCN,
+        KeywordsCN,
+        KeywordsEN,
+        ReferenceEntry,
+        References,
+    )
+    from wordformat.rules import (  # noqa: F401 触发 @register（通用结构）
         BodyText,
         CaptionFigure,
         CaptionTable,
@@ -62,10 +68,6 @@ def _show_config():
         HeadingLevel1Node,
         HeadingLevel2Node,
         HeadingLevel3Node,
-        KeywordsCN,
-        KeywordsEN,
-        ReferenceEntry,
-        References,
         TableObject,
     )
     from wordformat.structure.registry import export_defaults
@@ -388,7 +390,7 @@ wordf startapi -H 127.0.0.1 -p 8000
         if args.o:
             import yaml
 
-            from wordformat.rules import (  # noqa: F401 触发 @register
+            from wordformat.domains.thesis.rules import (  # noqa: F401 触发 @register（论文域）
                 AbstractContentCN,
                 AbstractContentEN,
                 AbstractTitleCN,
@@ -397,6 +399,12 @@ wordf startapi -H 127.0.0.1 -p 8000
                 AbstractTitleEN,
                 Acknowledgements,
                 AcknowledgementsCN,
+                KeywordsCN,
+                KeywordsEN,
+                ReferenceEntry,
+                References,
+            )
+            from wordformat.rules import (  # noqa: F401 触发 @register（通用结构）
                 BodyText,
                 CaptionFigure,
                 CaptionTable,
@@ -404,10 +412,6 @@ wordf startapi -H 127.0.0.1 -p 8000
                 HeadingLevel1Node,
                 HeadingLevel2Node,
                 HeadingLevel3Node,
-                KeywordsCN,
-                KeywordsEN,
-                ReferenceEntry,
-                References,
                 TableObject,
             )
             from wordformat.structure.registry import export_defaults

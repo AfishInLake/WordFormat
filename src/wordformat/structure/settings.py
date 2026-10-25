@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : settings.py
 
-from wordformat.rules import (  # noqa: F401 — 触发 @register 装饰器注册
+from wordformat.domains.thesis.rules import (  # noqa: F401 — 论文域节点，触发 @register
     AbstractContentCN,
     AbstractContentEN,
     AbstractTitleCN,
@@ -11,6 +11,11 @@ from wordformat.rules import (  # noqa: F401 — 触发 @register 装饰器注�
     AbstractTitleContentEN,
     AbstractTitleEN,
     Acknowledgements,
+    KeywordsCN,
+    KeywordsEN,
+    References,
+)
+from wordformat.rules import (  # noqa: F401 — 通用结构节点，触发 @register
     BodyText,
     CaptionFigure,
     CaptionTable,
@@ -18,9 +23,6 @@ from wordformat.rules import (  # noqa: F401 — 触发 @register 装饰器注�
     HeadingLevel1Node,
     HeadingLevel2Node,
     HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    References,
     TableObject,
 )
 from wordformat.structure.registry import _level_registry, _registry

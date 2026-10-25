@@ -30,10 +30,50 @@ _model_info: Optional[dict] = None
 MAX_LENGTH = 128
 
 
-def _get_model_dir():
+def _get_model_dir(domain: str = "thesis"):
+    """解析模型目录：领域包内 model/ 子目录优先（约定优于配置），
+    回退默认 data/model（论文模型沿用现有路径）。
+    尚未被 _load_model 使用（推理侧仍为单模型全局缓存）；首个带独立模型的
+    新领域接入时，将 _load_model 改为按领域目录加载并引入多模型缓存即可。
+    """
+    local = _domain_model_dir(domain)
+    if local is not None:
+        return local
     from importlib.resources import files
 
     return files("wordformat.data.model")
+
+
+def _domain_model_dir(domain: str) -> Optional[object]:
+    """按领域解析模型目录：领域包内 model/ 子目录（含 model_info.json 才算）。
+
+    新领域只需要在 domains/<name>/model/ 下放置模型文件与元数据，
+    即自动被框架发现——无需注册/改框架代码。不存在返回 None。
+    """
+    try:
+        from importlib.resources import files
+
+        path = files(f"wordformat.domains.{domain}.model")
+        if path.joinpath("model_info.json").is_file():
+            return path
+    except ModuleNotFoundError:
+        pass
+    return None
+
+
+def _read_model_info(domain: str) -> Optional[dict]:
+    """读取领域模型元数据（model_info.json）；领域目录缺失/不可读返回 None。
+
+    只读元数据、不加载模型（推理仍走全局单模型缓存）。
+    """
+    local = _domain_model_dir(domain)
+    if local is None:
+        return None
+    try:
+        with open(local.joinpath("model_info.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
 
 
 def _get_best_onnx_providers() -> List[str]:
@@ -103,6 +143,23 @@ def _load_model() -> None:
 
     with open(model_dir.joinpath("id2label.json"), encoding="utf-8") as f:
         _id2label = {int(k): v for k, v in json.load(f).items()}
+
+
+def get_thresholds(domain: str = "thesis") -> Optional[dict]:
+    """模型自带的分类置信度阈值（model_info.json 的 thresholds 字段，随模型发布）。
+
+    标签集（id2label.json）与阈值同为模型属性，新领域训练自己的模型时在
+    所属领域包 model/ 目录的 model_info.json 中写入对应阈值即可，框架侧无需
+    改代码。按领域解析：领域包内 model/model_info.json 优先；默认领域
+    （thesis）读全局模型缓存——模型未加载或元数据缺该字段时返回 None，
+    由调用方决定回退策略（分类后处理回退内置 CONF_THRESHOLDS）。
+    """
+    info = _read_model_info(domain)
+    if info is not None:
+        return info.get("thresholds")
+    if _model_info is None:
+        return None
+    return _model_info.get("thresholds")
 
 
 def _prompt(prev_label: Optional[str], text: str) -> str:

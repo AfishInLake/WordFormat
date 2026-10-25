@@ -8,7 +8,7 @@ import pytest
 from docx import Document
 from docx.shared import Pt
 
-from wordformat.rules import (
+from wordformat.domains.thesis.rules import (
     KeywordsCN,
     KeywordsEN,
 )
@@ -166,7 +166,7 @@ class TestKeywordsENBase:
 
     def _make_en_node(self, config_dict=None):
         """Helper to create a KeywordsEN node with config loaded"""
-        from wordformat.rules.keywords import KeywordsEN
+        from wordformat.domains.thesis.rules.keywords import KeywordsEN
 
         node = KeywordsEN(
             value={"category": "abstract.keywords.english", "fingerprint": "fp"},

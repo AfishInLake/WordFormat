@@ -23,6 +23,9 @@ import re
 from wordformat.domains import register_domain
 from wordformat.hooks import HookRegistry, hooks
 
+# 导入即注册论文域分类后处理整链（框架侧分派: get_postprocess("thesis")）
+from . import postprocess as _postprocess  # noqa: F401, E402
+
 # 领域回调名（预设可用 hooks.unregister(事件, 名字) 禁用）
 NAME_TREE_NORMALIZE = "thesis.tree_normalize"
 NAME_CAPTION_NUMBERING = "thesis.caption_numbering"
@@ -39,17 +42,20 @@ def _thesis_mappings():
     """论文子树提升映射（惰性 import 论文规则类）。"""
     global _MAPPINGS
     if _MAPPINGS is None:
-        from wordformat.rules.abstract import (
+        from wordformat.domains.thesis.rules.abstract import (
             AbstractContentCN,
             AbstractContentEN,
             AbstractTitleCN,
             AbstractTitleEN,
         )
-        from wordformat.rules.acknowledgement import (
+        from wordformat.domains.thesis.rules.acknowledgement import (
             Acknowledgements,
             AcknowledgementsCN,
         )
-        from wordformat.rules.references import ReferenceEntry, References
+        from wordformat.domains.thesis.rules.references import (
+            ReferenceEntry,
+            References,
+        )
 
         _MAPPINGS = [
             (AbstractTitleCN, AbstractContentCN),
@@ -196,6 +202,14 @@ def _reset_caption_state(data: dict):
         _state["caption_global"] = True
 
 
+# 目录条目形态：编号前缀 + 制表符页码（"1 绪论\t1"）或点线页码（"1.1 引言……7"）。
+# 模型常把目录行判为 heading_level_1，章节计数必须排除，否则题注章节号整体偏移。
+_TOC_ENTRY_RE = re.compile(
+    r"^\s*(?:第[一二三四五六七八九十百\d]+[章节篇]|\d+(?:\.\d+)*|[一二三四五六七八九十]+、)"
+    r".*?(?:\t\d+|[.．·]{2,}\s*\d+)\s*$"
+)
+
+
 def _inject_caption_numbering(data: dict):
     """题注节点注入章节号与顺序号，其余节点 setdefault 当前章节号。
 
@@ -211,13 +225,15 @@ def _inject_caption_numbering(data: dict):
 
     # 一级标题：优先采用标题文本中的章节号（第3章 / 3 系统设计），
     # 避免正文里被误判为一级标题的短行把章节计数推高；无编号时顺序递增。
+    # 目录条目（带制表符/点线页码）不属于正文章节，不参与计数。
     if category == "heading_level_1":
         text = _node_text(node)
-        parsed_chapter = _parse_chapter_number(text)
-        if parsed_chapter is not None and parsed_chapter > 0:
-            _state["chapter"] = parsed_chapter
-        else:
-            _state["chapter"] += 1
+        if not _TOC_ENTRY_RE.match(text):
+            parsed_chapter = _parse_chapter_number(text)
+            if parsed_chapter is not None and parsed_chapter > 0:
+                _state["chapter"] = parsed_chapter
+            else:
+                _state["chapter"] += 1
     chapter = _state["chapter"]
 
     # 题注节点：注入章节号 + 顺序号（续表/续图保留原标题注编号）
@@ -296,7 +312,7 @@ def _build_summary(data: dict):
 
 def _compose_summary(root_node, document, config_model) -> str:
     """遍历树和错误统计，生成论文检测报告摘要文本（字数/关键词/参考文献规范校验）。"""
-    from wordformat.rules.keywords import KeywordsCN, KeywordsEN
+    from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
     from wordformat.rules.node import FormatNode
     from wordformat.utils import count_chinese_chars, has_chinese
 
