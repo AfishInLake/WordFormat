@@ -41,16 +41,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
-      - name: Cache ONNX Model
-        uses: actions/cache@v5.0.3
-        id: cache-model
-        with:
-          path: src/wordformat/data
-          key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
-          enableCrossOsArchive: true
-        env:
-          MODEL_VERSION: "modelv1.0"
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v6.2.0
         with:
