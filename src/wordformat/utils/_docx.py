@@ -64,3 +64,13 @@ def para_contains_image(para) -> bool:
         if r.find(qn("w:drawing")) is not None:
             return True
     return False
+
+
+def para_contains_math(para) -> bool:
+    """检查段落是否包含公式（OMML）。
+
+    paragraph.text 只取 w:t，公式文字在 m:t 里不计入，所以含公式的段落可能
+    读起来是空段或只剩公式编号，只能按 XML 结构判定。
+    m:oMathPara 内部必含 m:oMath，一条 .//m:oMath 即可覆盖两种形态。
+    """
+    return bool(para._p.xpath(".//m:oMath"))

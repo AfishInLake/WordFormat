@@ -56,6 +56,8 @@ class HookRegistry:
     def __init__(self):
         self._callbacks: Dict[str, List[tuple]] = defaultdict(list)
         self._has_handlers = False
+        # 已成功注册的预设名：同一 registry 重复 load_preset 时不重复挂回调
+        self._loaded_presets: set[str] = set()
 
     # ------------------------------------------------------------------
     # 注册
@@ -114,6 +116,14 @@ class HookRegistry:
         """unregister 后重算 has_handlers。"""
         self._has_handlers = any(bool(cbs) for cbs in self._callbacks.values())
 
+    def is_preset_loaded(self, name: str) -> bool:
+        """该 registry 是否已成功注册过指定预设。"""
+        return name in self._loaded_presets
+
+    def mark_preset_loaded(self, name: str) -> None:
+        """标记预设已注册，供 load_preset 做幂等控制。"""
+        self._loaded_presets.add(name)
+
     # ------------------------------------------------------------------
     # 触发
     # ------------------------------------------------------------------
@@ -159,9 +169,10 @@ class HookRegistry:
         return [item for cbs in self._callbacks.values() for item in cbs]
 
     def clear(self) -> None:
-        """清空所有回调（测试与热重载用）。"""
+        """清空所有回调与预设加载标记（测试与热重载用）。"""
         self._callbacks.clear()
         self._has_handlers = False
+        self._loaded_presets.clear()
 
     @property
     def has_handlers(self) -> bool:

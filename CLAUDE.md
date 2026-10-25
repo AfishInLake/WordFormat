@@ -160,7 +160,7 @@ wordf gj (generate JSON)          wordf cf / wordf af (check/apply format)
 
 Each `FormatNode` subclass declares class-level attributes and optionally implements `_base(doc, p, r)`:
 
-- `NODE_TYPE` — dot-separated YAML path (e.g. `"abstract.chinese.chinese_title"`)
+- `NODE_TYPE` — dot-separated YAML path (e.g. `"abstract.chinese.title"`, `"references.entry"`, `"body.text"`)
 - `NODE_LABEL` — Chinese label for comment annotations
 - `DEFAULTS` — dict of default formatting values, merged with YAML overrides at load time
 - `RULES` — optional dict of `rule_name → handler_method` for config-gated business rules

@@ -146,15 +146,18 @@ def print_tree(
     show_confidence: bool = False,
     show_index: bool = False,
     filter_categories: list[str] | None = None,
+    console=None,
 ) -> None:
     """以树形结构打印多叉树（使用 rich 渲染）。
 
-    支持直接传入 TreeNode 或 JSON 文件路径。
+    支持直接传入 TreeNode 或 JSON 文件路径；``console`` 可注入自定义
+    ``rich.console.Console``（如写入 StringIO，供 API/报告复用）。
     """
     from rich.console import Console
     from rich.table import Table
 
-    console = Console()
+    if console is None:
+        console = Console()
 
     if isinstance(node_or_jsonpath, str):
         node_or_jsonpath, paragraphs = _load_tree_from_json(node_or_jsonpath)
@@ -178,6 +181,30 @@ def print_tree(
         node_or_jsonpath, show_confidence, show_index, filter_categories
     )
     console.print(rich_tree)
+
+
+def render_tree(
+    node_or_jsonpath: TreeNode | str,
+    show_confidence: bool = False,
+    show_index: bool = False,
+    filter_categories: list[str] | None = None,
+    width: int = 120,
+) -> str:
+    """渲染结构树为纯文本（无 ANSI 颜色），供 API 返回或写入报告。"""
+    from io import StringIO
+
+    from rich.console import Console
+
+    buffer = StringIO()
+    console = Console(file=buffer, width=width, force_terminal=False, color_system=None)
+    print_tree(
+        node_or_jsonpath,
+        show_confidence=show_confidence,
+        show_index=show_index,
+        filter_categories=filter_categories,
+        console=console,
+    )
+    return buffer.getvalue()
 
 
 def _load_tree_from_json(json_path: str) -> tuple[TreeNode, list[dict]]:
@@ -272,7 +299,8 @@ def _format_node_label(
     if isinstance(value, dict):
         cat = value.get("category", "unknown")
         para = str(value.get("paragraph", ""))[:50]
-        conf = value.get("confidence", None)
+        # gj/agent 产出的字段名是 score；confidence 为旧数据兼容
+        conf = value.get("score", value.get("confidence"))
         conf_str = f" ({conf:.0%})" if show_confidence and conf is not None else ""
         return f"{idx_str}[dim]{cat}[/dim]{conf_str} {para}"
     if hasattr(value, "paragraph") and isinstance(value.paragraph, dict):

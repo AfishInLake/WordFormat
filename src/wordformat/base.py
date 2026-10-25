@@ -10,7 +10,12 @@ from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
 from wordformat.settings import BATCH_SIZE
-from wordformat.utils import get_paragraph_numbering_text, para_contains_image
+from wordformat.utils import (
+    get_paragraph_numbering_text,
+    para_contains_image,
+    para_contains_math,
+    parse_caption_text,
+)
 
 # ===== 分级置信度阈值（C2）=====
 # 低于阈值不再硬砍为 body_text，而是保留原标签并标记 needs_review 供人工复核。
@@ -102,6 +107,62 @@ APPENDIX_NEUTRALIZE = {
 # 目录标题（模型词表无 heading_mulu，用规则补齐）
 TOC_PATTERN = re.compile(r"^目\s*录$")
 
+# ===== 目录条目识别（规则）=====
+# 目录条目既不是正文也不是标题：样式为 toc 1/2/3，或文本以“制表符 + 页码”结尾
+# （未套用 toc 样式、被静态化的目录）。若不排除，目录项会被当成标题参与层级
+# 计数与章节状态传播，导致题注章节号和正文格式出现大量误报。
+TOC_ENTRY_STYLE_PATTERN = re.compile(r"^toc\s*\d+$", re.IGNORECASE)
+TOC_ENTRY_TAIL_PATTERN = re.compile(r"\t\s*(?:\d+|[ivxlcdm]+)\s*$", re.IGNORECASE)
+TOC_TITLE_PATTERN = re.compile(r"^(?:目\s*录|图\s*目\s*录|表\s*目\s*录)$")
+
+# 附录标题：模型对小标题/代码区标题置信度低，常误判为一级标题。
+# 命中后整段区域按附录处理（子树不参与格式化），避免源码被逐行当正文检查。
+APPENDIX_HEADING_PATTERN = re.compile(
+    r"^(?:附\s*录(?:\s*[A-Za-z0-9一二三四五六七八九十]+)?"
+    r"(?:\s*[：:].*)?|程\s*序\s*代\s*码|源\s*代\s*码|源\s*程\s*序|附\s*件)\s*$"
+)
+
+
+def _is_toc_entry_text(text: str) -> bool:
+    return bool(TOC_ENTRY_TAIL_PATTERN.search(text))
+
+
+# ===== 独立公式行识别（结构规则）=====
+# 模型词表没有公式类，且 paragraph.text 不含 OMML 文字，公式段读起来往往是
+# 空段或只剩右侧编号。这里按 XML 结构短路判定，不走 AI 推理。
+# 编号形态：（2-1）/(2.1)/[3-12]，允许前后空白与制表符；必须整段只有编号，
+# 含其他文字的段落（如"由式（2-1）可得"）仍交给模型分类，避免吞掉正文。
+EQUATION_NUMBER_PATTERN = re.compile(
+    r"^[\s\t]*[（(\[]\s*\d{1,2}\s*[-–—.．]\s*\d{1,3}\s*[)）\]][\s\t]*$"
+)
+
+
+def _is_display_formula(para, text: str) -> bool:
+    """段落是否为独立公式行。
+
+    可见文字（para.text 不含 OMML 的 m:t）只剩公式编号时判定为公式行；
+    "由式（2-1）可得"这类带正文的段落仍交给模型分类。
+    """
+    return para_contains_math(para) and bool(EQUATION_NUMBER_PATTERN.match(text))
+
+
+def _structural_item(para, text: str) -> dict:
+    """按 XML 结构短路判定的段落条目（图片 / 公式 / 空段）。"""
+    if para_contains_image(para):
+        category, note = "figure_image", "图片段落"
+    elif para_contains_math(para):
+        category, note = "math_block", "公式段落"
+    else:
+        category, note = "body_text", "空段落"
+    return {
+        "category": category,
+        "score": 1.0,
+        "comment": note,
+        "paragraph": text,
+        "needs_review": False,
+    }
+
+
 # ===== 标题编号层级修正（正则校准）=====
 # 模型对标题层级泛化不足，常把 X.Y 二级标题误判为三级（或反之）。
 # 此处以编号格式为强约束：仅对模型已预测为 heading_level_* 的段落推断
@@ -166,30 +227,28 @@ class DocxBase:
         #     raise
 
     def parse(self) -> list[dict]:
-        # 收集所有段落（含空段），空段/图片段直接标记，不走 AI 推理
+        # 收集所有段落（含空段）：空段按结构判定（图片/公式/空段），
+        # 独立公式行短路，其余走 AI 推理
         all_paras = list(self.document.paragraphs)
+        result: list = [None] * len(all_paras)
         text_indices = []
         texts_for_ai = []
         for idx, para in enumerate(all_paras):
             text = para.text.strip()
             if not text:
+                result[idx] = _structural_item(para, "")
+                continue
+            if TOC_ENTRY_STYLE_PATTERN.match(_paragraph_style_name(para)):
+                result[idx] = _toc_entry_item(text)
+                continue
+            if _is_display_formula(para, text):
+                # 编号文字要保留，否则 jd 重建会丢掉 (2-1)
+                result[idx] = _structural_item(para, text)
                 continue
             numbering_text = get_paragraph_numbering_text(para)
             full_text = f"{numbering_text} {text}" if numbering_text else para.text
             texts_for_ai.append(full_text)
             text_indices.append(idx)
-
-        result = [None] * len(all_paras)
-        for i, para in enumerate(all_paras):
-            if i not in text_indices:
-                has_image = para_contains_image(para)
-                result[i] = {
-                    "category": "figure_image" if has_image else "body_text",
-                    "score": 1.0,
-                    "comment": "图片段落" if has_image else "空段落",
-                    "paragraph": "",
-                    "needs_review": False,
-                }
 
         # 对非空段进行批量 AI 推理（跨批次维护 PREV 上下文状态链）
         prev_label = None
@@ -234,12 +293,63 @@ class DocxBase:
         _gate_abstract_content(result)
         _apply_footer(result)
         _fix_toc(result)
+        _fix_toc_entries(result, all_paras)
+        _fix_appendix_heading(result)
         _neutralize_appendix(result)
+        _fix_title_categories(result)
         _apply_section_state(result)
         _fix_sequence(result)
+        _fix_keyword_categories(result)
         _fix_references_content(result)
         _fix_heading_levels(result)
-        return result
+        return self._interleave_tables(result)
+
+    def _interleave_tables(self, result: list[dict]) -> list[dict]:
+        """把文档中的表格按文档序导出为 table_object 条目。
+
+        ``document.paragraphs`` 只含 body 直接子级段落，表格单元格不在其中，
+        原表格在 gj JSON 中完全不可见。此处按 body XML 顺序遍历 w:p / w:tbl，
+        在每个表格前记录已出现的段落数，把表格条目插入对应位置。
+
+        表格条目为**独立项**：不占用段落槽位，带 ``exists=True`` 供 zip 侧
+        跳过段落绑定（建树阶段不绑定原表格）；``table_rows`` 为全部单元格
+        文本（行优先，合并单元格按 python-docx 语义拍平）。
+        """
+        from docx.oxml.ns import qn
+
+        body = self.document.element.body
+        tables = []
+        p_count = 0
+        for el in body.iterchildren():
+            if el.tag == qn("w:p"):
+                p_count += 1
+            elif el.tag == qn("w:tbl"):
+                tables.append((p_count, el))
+        if not tables:
+            return result
+
+        out = list(result)
+        for k, (pos, tbl_el) in enumerate(tables):
+            out.insert(
+                min(pos + k, len(out)),
+                {
+                    "category": "table_object",
+                    "paragraph": "",
+                    "score": 1.0,
+                    "comment": "原文档表格（内容只读，不参与格式检查）",
+                    "table_rows": self._extract_table_rows(tbl_el),
+                    "exists": True,
+                    "needs_review": False,
+                },
+            )
+        return out
+
+    def _extract_table_rows(self, tbl_el) -> list[list[str]]:
+        """提取表格全部单元格文本（行优先）。"""
+        from docx.table import Table
+
+        table = Table(tbl_el, self.document._body)
+        return [[cell.text for cell in row.cells] for row in table.rows]
 
 
 def _apply_threshold(item: dict) -> None:
@@ -314,6 +424,47 @@ def _fix_toc(result: list[dict]) -> None:
             item["needs_review"] = False
 
 
+def _paragraph_style_name(para) -> str:
+    style = getattr(para, "style", None)
+    return (getattr(style, "name", "") or "").strip()
+
+
+def _toc_entry_item(text: str) -> dict:
+    return {
+        "category": "toc_entry",
+        "score": 1.0,
+        "comment": "目录条目（规则识别，跳过格式化）",
+        "paragraph": text,
+        "needs_review": False,
+    }
+
+
+def _fix_toc_entries(result: list[dict], paragraphs) -> None:
+    """把目录条目标记为 ``toc_entry``，与正文/标题彻底隔离。
+
+    两类来源：
+    1. 段落样式为 ``toc 1`` / ``toc 2`` / ``toc 3``（Word 自动目录）；
+    2. 静态化目录：``目录`` 标题之后、以“制表符 + 页码”结尾的连续段落。
+       目录块遇到第一个非条目段落即结束，避免误伤正文。
+    """
+    in_toc = False
+    for item, para in zip(result, paragraphs, strict=False):
+        text = (para.text or "").strip()
+        if TOC_ENTRY_STYLE_PATTERN.match(_paragraph_style_name(para)):
+            item.update(_toc_entry_item(text))
+            in_toc = True
+            continue
+        if not text:
+            continue
+        if TOC_TITLE_PATTERN.match(text):
+            in_toc = True
+            continue
+        if in_toc and _is_toc_entry_text(text):
+            item.update(_toc_entry_item(text))
+            continue
+        in_toc = False
+
+
 def _heading_number_level(text: str) -> int | None:
     """从段落编号格式推断标题层级（1/2/3）；无编号或无法确定返回 None。"""
     t = (text or "").strip()
@@ -372,9 +523,30 @@ def _fix_heading_levels(result: list[dict]) -> None:
         item["needs_review"] = False
 
 
+def _fix_appendix_heading(result: list[dict]) -> None:
+    """附录标题规则补齐：``附录``/``程序代码``/``源代码`` 等小标题直接标为
+    ``heading_fulu``。
+
+    模型对代码区标题置信度低（常见 0.6~0.65），会误判为一级标题，使后续
+    源码段落挂进正文并被逐行检查。只对短标题且当前为标题/正文类的段落生效。
+    """
+    for item in result:
+        text = (item.get("paragraph") or "").strip()
+        if not text or len(text) > 20:
+            continue
+        if item["category"] not in HEADING_LEVEL_CATS | {"body_text", "other"}:
+            continue
+        if not APPENDIX_HEADING_PATTERN.match(text):
+            continue
+        item["category"] = "heading_fulu"
+        item["comment"] = "附录标题（规则识别）"
+        item["score"] = 1.0
+        item["needs_review"] = False
+
+
 def _neutralize_appendix(result: list[dict]) -> None:
     """附录区中性化：可信 heading_fulu（附录）之后，把摘要/关键词/致谢等前置类
-    标签强制回 body_text。
+    标签强制回 body_text，并把低置信度的伪标题（源码里的 ``end`` 等）降为正文。
 
     附录通常放源码或截图，不含这些结构；模型会把代码行（import/class/:param 等）
     误判为英文摘要/关键词，若不中性化会拉低准确率并污染文档树（产生伪标题节点）。
@@ -391,7 +563,11 @@ def _neutralize_appendix(result: list[dict]) -> None:
         if cat == "heading_level_1" and score >= STATE_MIN_CONF:
             in_appendix = False
             continue
-        if in_appendix and cat in APPENDIX_NEUTRALIZE:
+        if not in_appendix:
+            continue
+        if cat in APPENDIX_NEUTRALIZE or (
+            cat in HEADING_LEVEL_CATS and score < STATE_MIN_CONF
+        ):
             item["category"] = "body_text"
             item["comment"] = f"附录区中性化：{cat} → body_text"
             item["score"] = 1.0
@@ -458,9 +634,275 @@ def _mark_cover_as_other(result: list[dict]) -> None:
             result[i]["needs_review"] = False
 
 
-def _fix_known_categories(result: list[dict]) -> None:
+# 代码块残留被模型当成标题：正文里嵌入的源码行（如 MATLAB 的 end）常以
+# 低置信度命中 heading_level_*，会把章节计数器带偏（题注章节号随之错位）。
+CODE_HEADING_PATTERN = re.compile(
+    r"^(?:end|return|break|continue|else|case|default|\{|\}|\)|\])\s*[;.]?$",
+    re.IGNORECASE,
+)
+
+# 伪一级标题：以“第X章——”起头的整句（常出现在正文叙述中）、以及 1) 2）这类
+# 列表序号行。它们被模型判为 heading_level_1 会把题注章节号带偏。
+PSEUDO_HEADING_PATTERNS = (
+    re.compile(r"^第\s*[0-9一二三四五六七八九十百零〇]+\s*章\s*[—–\-－~～]"),
+    re.compile(r"^\d+\s*[)）]"),
+    # 图/表引用句、被拆出的题注残片（“如5.1 实物照片”“图2.1 系统框图”）
+    re.compile(r"^\s*(?:如|见)\s*[图表]?\s*\d+\s*[.．\-—]\s*\d"),
+    re.compile(r"^\s*[图表]\s*\d+\s*[.．\-—]\s*\d"),
+)
+# 以“第一章/第2章”开头但很长的标题是正文叙述（“第一章介绍研究目的……”）
+_CHAPTER_LABEL_RE = re.compile(r"^第\s*[0-9一二三四五六七八九十百零〇]+\s*章")
+_CHAPTER_LABEL_MAXLEN = 25
+# 章内中文序号小节（一、方案确定 / 二 筛子的材料）
+_CN_ITEM_RE = re.compile(r"^\s*[一二三四五六七八九十]+\s*[、.．\s　]")
+# 真章节名（无编号时也不能当小节降级）
+_CHAPTER_NAME_PREFIXES = (
+    "绪论",
+    "引言",
+    "概述",
+    "结论",
+    "结束语",
+    "总结",
+    "致谢",
+    "参考文献",
+    "摘要",
+    "目录",
+    "附录",
+)
+# 纯数字编号的一级标题（“2 系统总体设计”），用于向下看二级标题编号是否同源
+_NUMERIC_L1_RE = re.compile(r"^\s*(\d{1,2})(?:[、.．\s　])\s*\S")
+_NUMERIC_CHILD_RE = re.compile(r"^\s*(\d{1,2})[.．]\d")
+# 数字后直接跟中文的章节标题（“3核心工作部件设计”）
+_DIGIT_CHAPTER_RE = re.compile(r"^\s*(\d{1,2})(?=[一-鿿])")
+_LIST_ITEM_RE = re.compile(r"^\s*\d+\s*[)）]")
+
+
+def _is_chapter_heading_text(text: str) -> bool:
+    """粗判文本是否像一级章节标题（用于定位封面内容的边界）。"""
+    if not text:
+        return False
+    if _CHAPTER_LABEL_RE.match(text) or _DIGIT_CHAPTER_RE.match(text):
+        return True
+    if _NUMERIC_L1_RE.match(text) and not _LIST_ITEM_RE.match(text):
+        return True
+    m = _CN_ITEM_RE.match(text)
+    if m:
+        rest = text[m.end() :].strip()
+        return any(rest.startswith(p) for p in _CHAPTER_NAME_PREFIXES)
+    return any(text.startswith(p) for p in _CHAPTER_NAME_PREFIXES)
+
+
+def _find_first_chapter_index(result: list[dict]) -> int | None:
+    for idx, item in enumerate(result):
+        if item["category"] not in HEADING_LEVEL_CATS:
+            continue
+        text = (item.get("paragraph") or "").strip()
+        if _is_chapter_heading_text(text):
+            return idx
+    return None
+
+
+def _caption_chapter_conflict(result: list[dict], idx: int, number: int) -> bool:
+    """候选章节标题后紧跟的题注章号与候选编号不一致。
+
+    真章节通常在首个二级标题前不会出现题注；若出现且章号为 M≠N，说明该候选
+    实际是当前章内的小节（“3 温度传感器模块”后面紧跟“图2.3 …”）。
+    一旦先遇到二级标题，说明标题层级已经向下展开，不再据此判断。
+    """
+    for other in result[idx + 1 :]:
+        cat = other["category"]
+        if cat in ("heading_level_1", "heading_level_2"):
+            return False
+        if cat in ("caption_figure", "caption_table"):
+            parsed = parse_caption_text((other.get("paragraph") or "").strip())
+            chapter = parsed.get("chapter_num") if parsed else None
+            if chapter is not None and chapter != number:
+                return True
+    return False
+
+
+def _fix_known_categories(result: list[dict]) -> None:  # noqa C901
     """用已知文本模式修正摘要分类，并保护封面/声明内容。"""
     _mark_cover_as_other(result)
+    # 第一个真章节之前的标题属于封面题名/声明页，不按一级标题校验格式。
+    first_chapter_idx = _find_first_chapter_index(result)
+    if first_chapter_idx:
+        for item in result[:first_chapter_idx]:
+            if item["category"] in HEADING_LEVEL_CATS:
+                item["category"] = "other"
+                item["comment"] = "封面/摘要前标题，跳过格式化"
+                item["score"] = 1.0
+                item["needs_review"] = False
+    # 正文叙述句以“图5.1展示了……”开头时会被误判为题注；题注名很短，
+    # 超过 60 字或带叙述动词/句号的长句多为正文，降级后不再占用题注顺序号。
+    # 以句号收尾的短名词性题注（“图3.3 系统流程图。”）是正常写法，不能一律降级。
+    for item in result:
+        if item["category"] not in ("caption_figure", "caption_table"):
+            continue
+        text = (item.get("paragraph") or "").strip()
+        narrative = len(text) > 60 or (
+            re.search(r"[。！？!?]$", text)
+            and (
+                re.search(r"(所示|如图|见图|给出了|展示了|表示为|说明|描述|如下)", text)
+                or re.match(
+                    r"^[图表]\s*\d+(?:\s*[.．\-—]\s*\d+)?\s*(?:为|是|给出)",
+                    text,
+                )
+            )
+        )
+        if narrative:
+            item["category"] = "body_text"
+            item["comment"] = "长句降级为正文（疑似题注叙述句）"
+            item["score"] = 1.0
+            item["needs_review"] = False
+    # 预先判定哪些一级标题是“真·阿拉伯数字章节”（2 系统总体设计）。
+    # “1 加速度传感器模块”这类章内小节编号会与后续二级标题编号不同源。
+    numeric_chapter_ids: set[int] = set()
+    for idx, item in enumerate(result):
+        if item["category"] != "heading_level_1":
+            continue
+        text = (item.get("paragraph") or "").strip()
+        if "章" in text[:6]:
+            continue
+        m = _NUMERIC_L1_RE.match(text)
+        if not m:
+            continue
+        # 只看本章范围内的二级标题：没有二级标题的章节（“2 系统总体方案设计”）
+        # 是正常的，不能因为下一章的 3.1 编号不同就把本章标题降级。
+        chapter_end = next(
+            (
+                j
+                for j in range(idx + 1, len(result))
+                if result[j]["category"] == "heading_level_1"
+            ),
+            len(result),
+        )
+        next_l2 = next(
+            (
+                (other.get("paragraph") or "").strip()
+                for other in result[idx + 1 : chapter_end]
+                if other["category"] == "heading_level_2"
+            ),
+            None,
+        )
+        child = _NUMERIC_CHILD_RE.match(next_l2 or "")
+        if not child or child.group(1) == m.group(1):
+            numeric_chapter_ids.add(idx)
+    first_numeric_chapter = min(numeric_chapter_ids) if numeric_chapter_ids else None
+
+    last_numeric_chapter: int | None = None
+    demoted: set[int] = set()
+    for idx, item in enumerate(result):
+        if item["category"] not in HEADING_LEVEL_CATS:
+            continue
+        text = (item.get("paragraph") or "").strip()
+
+        def demote(reason: str, item=item, idx=idx) -> None:
+            item["category"] = "body_text"
+            item["comment"] = reason
+            item["score"] = 1.0
+            item["needs_review"] = False
+            demoted.add(idx)
+
+        if any(pat.match(text) for pat in PSEUDO_HEADING_PATTERNS):
+            demote("伪标题（叙述句/列表序号）降级为正文")
+            continue
+        if item["category"] == "heading_level_1":
+            # 以句号结尾的是叙述句（“……实物图如图2.4所示。”）
+            if re.search(r"[。！？.!?]$", text):
+                demote("叙述句降级为正文（句末标点）")
+                continue
+            # “第一章介绍研究目的与意义……”超长的是正文叙述，不是标题
+            if _CHAPTER_LABEL_RE.match(text) and len(text) > _CHAPTER_LABEL_MAXLEN:
+                demote("长句降级为正文（第X章开头的叙述句）")
+                continue
+            # 文档用阿拉伯数字编章时，“一、方案确定”是章内小节
+            if numeric_chapter_ids and _CN_ITEM_RE.match(text):
+                demote("中文序号小节降级为正文")
+                continue
+            # 已进入数字编章后，短小且无编号的一级标题多为小节名
+            if (
+                first_numeric_chapter is not None
+                and idx > first_numeric_chapter
+                and len(text) <= 15
+                and not _NUMERIC_L1_RE.match(text)
+                and not _CHAPTER_LABEL_RE.match(text)
+                and not _CN_ITEM_RE.match(text)
+                and not any(text.startswith(p) for p in _CHAPTER_NAME_PREFIXES)
+                and any(j > idx for j in numeric_chapter_ids)
+            ):
+                demote("无编号短标题降级为正文（章内小节）")
+                continue
+        # 章内小节重新从 1 编号时（“1 加速度传感器模块”），模型常误判为
+        # 一级标题。真章节编号必须递增，且标题后紧跟的题注章号必须自洽。
+        l1_number: int | None = None
+        if item["category"] == "heading_level_1":
+            m_num = _NUMERIC_L1_RE.match(text) or _DIGIT_CHAPTER_RE.match(text)
+            if m_num and "章" not in text[:6]:
+                candidate = int(m_num.group(1))
+                if (
+                    last_numeric_chapter is not None
+                    and candidate <= last_numeric_chapter
+                ):
+                    demote("章内编号小节降级为正文（章节编号未递增）")
+                    continue
+                if _caption_chapter_conflict(result, idx, candidate):
+                    demote("章内编号小节降级为正文（题注章号与编号不符）")
+                    continue
+                l1_number = candidate
+        # 真章节标题下方的首个二级标题编号必然同源（2 → 2.x）。
+        if item["category"] == "heading_level_1" and idx not in numeric_chapter_ids:
+            m = _NUMERIC_L1_RE.match(text)
+            if m and "章" not in text[:6]:
+                demote("章内编号小节降级为正文（编号与二级标题不同源）")
+                continue
+        if l1_number is not None:
+            last_numeric_chapter = l1_number
+        if item.get("score", 0.0) >= STATE_MIN_CONF:
+            continue
+        if CODE_HEADING_PATTERN.match(text):
+            item["category"] = "body_text"
+            item["comment"] = "代码行降级为正文（低置信度标题）"
+            item["score"] = 1.0
+            item["needs_review"] = False
+    # 章节标题被模型判为正文（“3核心工作部件设计”“2 系统总体方案设计”）：
+    # 编号不与已有章节号重复、标题较短时补回一级标题，避免按正文字号校验。
+    existing_chapters = set()
+    for item in result:
+        if item["category"] != "heading_level_1":
+            continue
+        m = _NUMERIC_L1_RE.match((item.get("paragraph") or "").strip())
+        if m:
+            existing_chapters.add(int(m.group(1)))
+    for idx, item in enumerate(result):
+        if item["category"] != "body_text" or idx in demoted:
+            continue
+        text = (item.get("paragraph") or "").strip()
+        if (
+            not text
+            or len(text) > 30
+            or _LIST_ITEM_RE.match(text)
+            or _NUMERIC_CHILD_RE.match(text)
+        ):
+            continue
+        if re.search(r"[。！？.!?；;，,]$", text):
+            continue
+        m = _NUMERIC_L1_RE.match(text) or _DIGIT_CHAPTER_RE.match(text)
+        if not m:
+            continue
+        try:
+            number = int(m.group(1))
+        except (TypeError, ValueError):
+            continue
+        rest = text[m.end() :].strip()
+        if len(re.findall(r"[一-鿿]", rest)) < 4 or number in existing_chapters:
+            continue
+        item["category"] = "heading_level_1"
+        item["comment"] = "章节标题补识别（编号与已有章节号不重复）"
+        item["score"] = 1.0
+        item["needs_review"] = False
+        existing_chapters.add(number)
+
     abstract_patterns = [
         (r"^(摘要)\s*$", "abstract_chinese_title"),
         (r"^(Abstract)\s*$", "abstract_english_title"),
@@ -483,13 +925,27 @@ def _fix_known_categories(result: list[dict]) -> None:
                 break
 
 
-def _fix_abstract_titles(result: list[dict]) -> None:
+def _fix_abstract_titles(result: list[dict]) -> None:  # noqa C901
     """摘要页标题回补：紧邻“摘要：/Abstract:”正文上方的独立标题行升格为摘要标题。
 
     模型常把摘要页的中/英文标题误判为 other（封面保护）/body_text/keywords_english，
     导致标题拿不到标题格式。此处从合并式摘要正文（*_title_content）向上找最近非空段，
     若其为标题样式（不太长、无句末/冒号标点、非摘要关键词行、非封面声明字段）则升格。
     """
+
+    def title_key(value: str) -> str:
+        return re.sub(r"\s+", "", value)
+
+    # 摘要在封面之后单独成页时，页首常重复一遍论文题名（字号同封面）。
+    # 这类行不是“摘要”标题，不应按摘要标题字号校验。
+    cover_title_indices: dict[str, set[int]] = {}
+    for i, item in enumerate(result):
+        if item["category"] not in ("other", "document_title"):
+            continue
+        key = title_key(item.get("paragraph") or "")
+        if key:
+            cover_title_indices.setdefault(key, set()).add(i)
+
     for i, item in enumerate(result):
         target = ABSTRACT_CONTENT_TO_TITLE.get(item["category"])
         if not target:
@@ -518,6 +974,22 @@ def _fix_abstract_titles(result: list[dict]) -> None:
         prev["score"] = 1.0
         prev["needs_review"] = False
 
+    # 升格后的摘要标题若与封面题名相同，说明这是摘要页页首重复的论文题名，
+    # 应跳过格式校验，而不是按“摘要”标题要求字号。
+    for idx, item in enumerate(result):
+        if item["category"] not in ("abstract_chinese_title", "abstract_english_title"):
+            continue
+        key = title_key((item.get("paragraph") or "").strip())
+        if len(key) < 4:
+            continue
+        # 需要另一处封面/题名行同文，才判定为重复题名（该行自身不算）
+        if not any(i != idx for i in cover_title_indices.get(key, ())):
+            continue
+        item["category"] = "document_title"
+        item["comment"] = "摘要页重复的论文题名（按文档题名处理，不做格式校验）"
+        item["score"] = 1.0
+        item["needs_review"] = False
+
 
 def _gate_abstract_content(result: list[dict]) -> None:
     """摘要内容段位置门控：前一段不是摘要标题/摘要内容时，回退为正文。
@@ -530,6 +1002,21 @@ def _gate_abstract_content(result: list[dict]) -> None:
         orig = item["category"]
         if orig not in ABSTRACT_CONTENT_GATE_CATS:
             continue
+        text = (item.get("paragraph") or "").strip()
+        # 合并式摘要段（“Abstract：正文……”“摘要：正文……”）自带标题前缀，
+        # 不能因前一段不是摘要标题而回退为正文。
+        merged = re.match(r"^(摘\s*要|Abstract)\s*[:：]", text, re.IGNORECASE)
+        if merged:
+            zh = "摘" in merged.group(1)
+            item["category"] = (
+                "abstract_chinese_title_content"
+                if zh
+                else "abstract_english_title_content"
+            )
+            item["comment"] = f"合并式摘要段（原：{orig}）"
+            item["score"] = 1.0
+            item["needs_review"] = False
+            continue
         j = i - 1
         while j >= 0 and not (result[j].get("paragraph") or "").strip():
             j -= 1
@@ -540,6 +1027,120 @@ def _gate_abstract_content(result: list[dict]) -> None:
         item["comment"] = f"摘要内容位置门控（原：{orig}，prev={prev_cat}）"
         item["score"] = 1.0  # 位置规则已确认修正，重置分数避免前端按 body_text 阈值误标
         item["needs_review"] = False
+
+
+def _looks_like_thesis_title_en(text: str) -> bool:
+    """英文论文题名（非 Abstract 标题行）。
+
+    AbstractTitleEN 节点同时承担英文论文题名；这类题名较长、含英文单词、
+    且不以 Abstract/Keywords 开头、不以句末标点结尾，不能按“文本必须等于
+    abstract”降级，否则会被当成正文去校验正文格式。
+    """
+    return (
+        len(text) >= 20
+        and re.search(r"[A-Za-z]", text) is not None
+        and not re.match(r"^(abstract|keywords?)\b", text, re.IGNORECASE)
+        # 英文题名常以句点收尾，句点不算叙述句标志
+        and not re.search(r"[。！？!?]$", text)
+    )
+
+
+def _fix_title_categories(result: list[dict]) -> None:  # noqa C901
+    """按标题文本校订参考文献/致谢/摘要标题的识别结果。
+
+    模型会把“感谢父母……”（致谢首段）、“冯勋.基于……”（参考文献条目）、
+    英文论文题名等误判为对应章节的标题，置信度往往只有 0.5~0.6。标题的
+    文本形式是强约束：去掉空白后必须恰为“致谢”“参考文献”“摘要”或
+    “Abstract”。先按文本补出真标题，再把不匹配的伪标题降级到该章节正文，
+    避免用标题字号（小二/三号）去要求普通正文，产生成片误报。
+    """
+    title_cats = {
+        "acknowledgements_title": "致谢",
+        "references_title": "参考文献",
+        "abstract_chinese_title": "摘要",
+        "abstract_english_title": "abstract",
+    }
+
+    def _normalized(text: str) -> str:
+        return re.sub(r"\s+", "", (text or "")).rstrip(":：")
+
+    # 合并式摘要（“摘要：正文……”“Abstract：正文……”）被模型标成标题时，
+    # 转入 *_title_content 混合节点，标题前缀按标题样式、其余按正文样式。
+    merged_pat = re.compile(r"^(摘\s*要|Abstract)\s*[:：]", re.IGNORECASE)
+    merged_cats = {
+        "abstract_chinese_title",
+        "abstract_english_title",
+        "body_text",
+        "other",
+    }
+    for item in result:
+        if item["category"] not in merged_cats:
+            continue
+        text = (item.get("paragraph") or "").strip()
+        m = merged_pat.match(text)
+        if not m:
+            continue
+        zh = "摘" in m.group(1)
+        orig = item["category"]
+        new_cat = (
+            "abstract_chinese_title_content" if zh else "abstract_english_title_content"
+        )
+        item["category"] = new_cat
+        item["comment"] = f"合并式摘要标题（原：{orig}）"
+        item["score"] = 1.0
+        item["needs_review"] = False
+
+    # 第一遍：文本命中标题模式 → 直接认定为标题（TOC 条目已在前面排除）
+    for item in result:
+        norm = _normalized(item.get("paragraph") or "")
+        for cat, label in title_cats.items():
+            if norm.lower() == label:
+                if item["category"] != cat:
+                    item["category"] = cat
+                    item["comment"] = f"标题文本修正：{item['category']} → {cat}"
+                    item["score"] = 1.0
+                    item["needs_review"] = False
+                break
+
+    # 第二遍：标题类别但文本不符 → 降级到对应正文
+    ack_title_idx = next(
+        (
+            i
+            for i, item in enumerate(result)
+            if item["category"] == "acknowledgements_title"
+        ),
+        None,
+    )
+    for idx, item in enumerate(result):
+        cat = item["category"]
+        label = title_cats.get(cat)
+        if label is None:
+            continue
+        text = (item.get("paragraph") or "").strip()
+        if _normalized(text).lower() == label:
+            continue
+        if cat == "references_title":
+            new_cat = (
+                "references_content" if REF_ITEM_PATTERN.match(text) else "body_text"
+            )
+        elif cat == "acknowledgements_title":
+            new_cat = (
+                "acknowledgements_content"
+                if ack_title_idx is not None and idx > ack_title_idx
+                else "body_text"
+            )
+        elif cat == "abstract_english_title" and _looks_like_thesis_title_en(text):
+            continue
+        else:
+            new_cat = "body_text"
+        item["category"] = new_cat
+        item["comment"] = f"标题文本不符，降级：{cat} → {new_cat}"
+        item["score"] = 1.0
+        item["needs_review"] = False
+
+    # 合并式摘要转入 *_title_content 后，紧邻其上的独立标题行（英文论文题名等）
+    # 需要再跑一次位置规则才能升格为摘要标题。
+    _fix_abstract_titles(result)
 
 
 def _fix_sequence(result: list[dict]) -> None:  # noqa C901
@@ -626,3 +1227,45 @@ def _fix_sequence(result: list[dict]) -> None:  # noqa C901
             continue
         if in_ack and cat == "body_text" and _text(i):
             _set(i, "acknowledgements_content", "序列修正：致谢正文")
+
+
+_KEYWORD_LABEL_RE = re.compile(
+    r"^\s*(?:关\s*键\s*词|key\s*words?|keywords)\s*[:：]?\s*", re.IGNORECASE
+)
+
+
+def _looks_like_keyword_list(text: str) -> bool:
+    """关键词段应是短词列表，而非功能说明/代码行。
+
+    模型会把 "K1（菜单键）：进入设置菜单；" 这类按键说明、以及源码行
+    误判为关键词；判定后降级为正文，避免“关键词数量过少/末尾标点”误报。
+    """
+    has_label = bool(_KEYWORD_LABEL_RE.match(text))
+    body = _KEYWORD_LABEL_RE.sub("", text).strip()
+    if not body:
+        return True
+    if re.match(r"^(?://|/\*|#)", body):
+        return False
+    if re.search(r"[。！？!?：:（）(){}]", body):
+        return False
+    if re.search(r"\s=\s|[;{}]\s*$", body) and not re.search(r"[；;]\s*\S", body):
+        return False
+    if has_label:
+        # 标签明确时即使不足两个词也保留，交给关键词数量规则报错
+        return True
+    parts = [p.strip() for p in re.split(r"[；;、,，]", body) if p.strip()]
+    return len(parts) >= 2
+
+
+def _fix_keyword_categories(result: list[dict]) -> None:
+    """非词表的 keywords_* 段落降级为正文。"""
+    for item in result:
+        if item["category"] not in ("keywords_chinese", "keywords_english"):
+            continue
+        text = (item.get("paragraph") or "").strip()
+        if not text or _looks_like_keyword_list(text):
+            continue
+        item["category"] = "body_text"
+        item["comment"] = "非关键词列表，降级为正文"
+        item["score"] = 1.0
+        item["needs_review"] = False

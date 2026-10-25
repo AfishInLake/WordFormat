@@ -246,7 +246,18 @@ class TestSummaryBuild:
         kw_en.paragraph = doc.add_paragraph("Keywords: deep learning; machine learning")
         ref_cn = _node("references_content", "参考文献一", doc, ReferenceEntry)
         ref_en = _node("references_content", "Reference one", doc, ReferenceEntry)
-        root.children = [abs_cn, abs_en, kw_cn, kw_en, ref_cn, ref_en]
+        from wordformat.rules.object import TableObject
+
+        table = TableObject(
+            value={
+                "category": "table_object",
+                "paragraph": "",
+                "table_rows": [["a", "b"]],
+                "exists": True,
+            },
+            level=999,
+        )
+        root.children = [abs_cn, abs_en, kw_cn, kw_en, ref_cn, ref_en, table]
 
         result = registry.emit(
             "on_summary_build", root_node=root, document=doc, config=None, check=True
@@ -261,6 +272,29 @@ class TestSummaryBuild:
         assert "中文关键词：规范：3-5个，原文：3个" in summary
         assert "英文关键词：规范：3-5个，原文：2个" in summary
         assert "参考文献：规范：不少于15条，原文：中文1条;外文1条" in summary
+        assert "表格：1 个（表格内容不参与检查）" in summary
+
+    def test_summary_ignores_sync_skipped_table(self, doc):
+        # af --sync 忽略的新增表格未写入文档，不应计入表格数量
+        from wordformat.rules.object import TableObject
+
+        registry = _registry_with_thesis()
+        root = _node("top")
+        root.children = [
+            TableObject(
+                value={
+                    "category": "table_object",
+                    "paragraph": "",
+                    "table_rows": [["a"]],
+                    "sync_skip": True,
+                },
+                level=999,
+            )
+        ]
+        result = registry.emit(
+            "on_summary_build", root_node=root, document=doc, config=None, check=True
+        )
+        assert "表格：" not in result.get("summary", "")
 
     def test_summary_skipped_on_apply_mode(self, doc):
         registry = _registry_with_thesis()

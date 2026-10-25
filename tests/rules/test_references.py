@@ -125,7 +125,7 @@ class TestReferencesBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

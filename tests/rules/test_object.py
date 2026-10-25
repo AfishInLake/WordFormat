@@ -1,7 +1,6 @@
 """FigureImage 和 TableObject 单元测试。"""
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from docx import Document
 
 from wordformat.rules.object import FigureImage, TableObject
@@ -102,7 +101,7 @@ class TestTableObject:
         """表格移动到段落后，不是文档末尾。"""
         doc = Document()
         p1 = doc.add_paragraph("段落1")
-        p2 = doc.add_paragraph("段落2")
+        doc.add_paragraph("段落2")
         node = TableObject(
             value={
                 "category": "table_object",
@@ -115,13 +114,25 @@ class TestTableObject:
         node._try_insert_table(doc)
         # 表格应该在 p1 之后
         body = doc.element.body
-        p_elements = body.findall(
-            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
-        )
         tbl_elements = body.findall(
             "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tbl"
         )
         assert len(tbl_elements) == 1
+        assert [p.text for p in doc.paragraphs] == ["段落1", "段落2"]
+
+    def test_empty_anchor_removed_after_insert(self):
+        """空锚段仅用于定位，插表后应移除，避免表格前多一个空段。"""
+        doc = Document()
+        anchor = doc.add_paragraph("")
+        node = TableObject(
+            value={"category": "table_object", "table_rows": [["X"]]},
+            level=1,
+            paragraph=anchor,
+        )
+        node.load_config({})
+        node._try_insert_table(doc)
+        assert doc.paragraphs == []
+        assert len(doc.tables) == 1
 
     def test_apply_format_calls_try_insert(self):
         """apply_format 触发 _try_insert_table。"""

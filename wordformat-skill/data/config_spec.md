@@ -64,6 +64,8 @@ global_format: &global_format
 | `acknowledgements.title` | 致谢标题 |
 | `acknowledgements.body` | 致谢正文 |
 
+> `tables.object`（表格对象）是只读导出，没有格式配置；`abstract.chinese` / `abstract.english` 是"摘要和正文同段"的混合节点，同时读取该节下的 `title` 与 `body`。
+
 ## 特殊节点字段
 
 ### 关键词 (abstract.{zh/en}.keywords)
@@ -100,12 +102,30 @@ rules:
 
 ### 正文 (body.text)
 
-基础字段 + `rules`:
+基础字段 + `rules`（0 = 不限制该项）：
 
 ```yaml
 rules:
   punctuation:
     enabled: true
+  paragraph_length:
+    enabled: true
+    min_chars: 0        # 字数下限
+    max_chars: 0        # 字数上限
+    min_sentences: 0    # 句数下限
+    max_sentences: 0    # 句数上限
+```
+
+### 图片段落 (figures.image)
+
+基础字段 + `rules`：
+
+```yaml
+rules:
+  figure_layout:
+    enabled: true
+    wrap: null          # 要求的环绕方式（null = 不查）；如 inline/四周型
+    max_width: '版心'    # 允许最大宽度；'版心' = 页宽 − 左右边距，或写 '14cm' 等
 ```
 
 ### style_checks_warning
@@ -118,12 +138,12 @@ rules:
 | `space_before/after` | bool | true |
 | `line_spacing/line_spacing_rule` | bool | true |
 | `left/right/first_line_indent` | bool | true |
-| `builtin_style_name` | bool | true |
+| `builtin_style_name` | bool | false |
 | `font_size` | bool | true |
 | `font_name_cn/font_name_en` | bool | false |
 | `font_color` | bool | false |
 | `bold` | bool | true |
-| `italic/underline` | bool | false |
+| `italic/underline` | bool | true |
 
 ## numbering（自动编号）
 
@@ -141,3 +161,85 @@ numbering:
     template: '[%1]'
     suffix: space
 ```
+
+## header_footer（页眉页脚 / 页面设置）
+
+`enabled` 与 `header`/`footer` 有内置缺省；`page_setup` 是 opt-in —— 只写了才校验（各校边距差异大，避免误报）。
+
+```yaml
+header_footer:
+  enabled: true
+  update_fields_on_open: false   # 打开文档时自动更新域（w:updateFields）
+  header:
+    chinese_font_name: '宋体'
+    english_font_name: 'Times New Roman'
+    font_size: '小五'
+    alignment: '居中对齐'
+    require_content: false       # 要求页眉非空
+    page_number: false           # 要求存在 PAGE 页码域（apply 会插入）
+  footer: { ...同上... }
+  page_setup:
+    top_margin: '2.54cm'
+    bottom_margin: '2.54cm'
+    left_margin: '3.18cm'
+    right_margin: '3.18cm'
+    header_distance: '1.5cm'
+    footer_distance: '1.75cm'
+    page_size: 'A4'              # A3 / A4 / A5 / B5 / Letter
+    orientation: '纵向'          # 纵向 / 横向
+    page_number_start: 1         # w:pgNumType/@w:start
+    page_number_format: '小写罗马数字'
+    different_first_page: false  # 首页不同（w:titlePg）
+    odd_even_pages: false        # 奇偶页不同（w:evenAndOddHeaders）
+```
+
+页眉页脚只检查四项：字号、中文字体、英文字体、对齐。
+
+## tables（表格样式档案）
+
+镜像 OOXML tblPr/trPr/tcPr，缺省 = Table Grid。条目可用 `table_style` 指定档案名。
+
+```yaml
+tables:
+  default: grid
+  styles:
+    grid:
+      style: "Table Grid"        # Word 样式名；null = 不套样式，全由 XML 定义
+      layout: autofit            # autofit|fixed
+      width: {type: auto}        # auto|pct|dxa|cm
+      alignment: center          # left|center|right
+      indent_cm: 0
+      borders:                   # 边名：top/left/bottom/right/inside_h/inside_v
+        top: {style: single, size_pt: 1.5, color: "000000"}
+        left: {style: none}
+        inside_h: {style: single, size_pt: 0.75}
+      cell_margins_cm: {top: 0, bottom: 0, left: 0.19, right: 0.19}
+      col_widths: {mode: equal}      # equal|auto|custom（custom: [4, 6, 6]）
+      header_row: {repeat: true, cant_split: true}
+      row_bands: [{rows: [0], fill: "EEEEEE", bold: true}]   # rows: all | 整数 | 整数列表
+      cell_run: {chinese_font_name: 宋体, english_font_name: Times New Roman, font_size: 小四}
+```
+
+`borders` 的边可写简写字符串（`top: double` 等价 `top: {style: double}`）；`style` 取 OOXML val（none/single/double/dashed/...）。
+
+## inline（行内富文本）
+
+`md` / `jd` 按 JSON 的 `inline_marks` 生成多 run 时使用：
+
+```yaml
+inline:
+  code_font: {chinese_font_name: 宋体, english_font_name: Consolas, font_size: 五号}
+  link: {style: Hyperlink, color: theme, underline: true}   # color: theme|<RRGGBB>
+```
+
+## structure（结构类别策略）
+
+按类别名单驱动，不绑定业务语义：
+
+```yaml
+structure:
+  void_categories: [top, heading_mulu, heading_fulu, other, document_title, footer, toc_entry]
+  skip_children_categories: [heading_mulu, heading_fulu, other]
+```
+
+名单是权威的：显式写空列表（`void_categories: []`）表示不排除任何类别，不会回退到默认值。直接挂在 root 下的 `body_text` 始终被隐式跳过。

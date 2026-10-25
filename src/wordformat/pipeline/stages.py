@@ -10,6 +10,7 @@ from docx.document import Document as DocumentObject
 from docx.shared import Pt, RGBColor
 
 from wordformat.config.loader import load_config
+from wordformat.config.models import NodeConfigRoot
 from wordformat.log_config import logger
 from wordformat.rules.node import FormatNode
 from wordformat.settings import VOIDNODELIST
@@ -55,8 +56,6 @@ class LoadConfigStage:
                 logger.error(f"配置加载失败: {str(e)}")
                 raise
         else:
-            from wordformat.config.models import NodeConfigRoot
-
             ctx.config_model = NodeConfigRoot()
             logger.info("未提供配置文件，使用默认配置")
 
@@ -67,7 +66,6 @@ class LoadConfigStage:
             merged = dict(ctx.config_model)
             for manifest in ctx.preset_manifests:
                 merged = deep_merge(manifest, merged)
-            from wordformat.config.models import NodeConfigRoot
 
             ctx.config_model = NodeConfigRoot(**merged)
 
@@ -76,6 +74,13 @@ class LoadConfigStage:
 
         result = hooks.emit("on_config_loaded", config=ctx.config_model)
         ctx.config_model = result.get("config", ctx.config_model)
+
+        # 结构类别策略：YAML `structure` 段覆盖默认值（哪些类别格式化/隔离子树）
+        from wordformat.settings import resolve_structure_categories
+
+        resolved = resolve_structure_categories(ctx.config_model)
+        ctx.void_categories = resolved["void"]
+        ctx.skip_children_categories = resolved["skip_children"]
         return ctx
 
 
@@ -110,22 +115,32 @@ class TreeBuildingStage:
 class ParagraphAlignmentStage:
     """展平树并对齐段落 pipline"""
 
+    @staticmethod
+    def _is_detached_table(node) -> bool:
+        """原文档已有表格（exists）或 sync 忽略的表格不占用段落槽位。"""
+        value = getattr(node, "value", None)
+        if not isinstance(value, dict) or value.get("category") != "table_object":
+            return False
+        return bool(value.get("exists") or value.get("sync_skip"))
+
     def process(self, ctx: FormatContext) -> FormatContext:
         nodes = self._flatten_tree_nodes(ctx.root_node)
+        # 表格节点（exists/sync_skip）不绑定段落，因此不参与 zip 计数
+        paragraph_nodes = [n for n in nodes if not self._is_detached_table(n)]
         paragraphs = ctx.document.paragraphs
-        if len(nodes) != len(paragraphs):
+        if len(paragraph_nodes) != len(paragraphs):
             # 节点数不等于段落数时，zip 会静默错位：后面的节点整体前移，
             # 导致 keywords_chinese/caption_figure/heading_level_* 等规则
             # 被应用到错误段落（如正文被加“图1.1”前缀）。必须显式报错。
             # 常见诱因：生成节点后更换了文档；或前端页面版本过旧
             # （旧版会过滤 figure_image 占位节点）。
             raise ValueError(
-                f"当前文档({len(paragraphs)} 段)与节点 JSON({len(nodes)} 节点)不一致，"
+                f"当前文档({len(paragraphs)} 段)与节点 JSON({len(paragraph_nodes)} 节点)不一致，"
                 "两者必须一一对应。可能是生成节点后又换过文档，"
                 "或页面版本过旧（旧版会过滤占位节点）。"
                 "请刷新页面后重新上传文档并点击「生成节点JSON」，再执行格式化。"
             )
-        for node, para in zip(nodes, paragraphs, strict=True):
+        for node, para in zip(paragraph_nodes, paragraphs, strict=True):
             node.paragraph = para
         return ctx
 
@@ -297,18 +312,29 @@ class StyleDefinitionFixStage:
         """在格式化开始前，统一修正文档中所有使用的样式定义。
 
         遍历配置中所有段（body_text、headings、abstract、figures、tables、
-        references、acknowledgements 等），收集唯一的 builtin_style_name，
-        然后修正每个样式定义的字符格式和段落格式，使其与配置一致。
+        references、acknowledgements 等），收集唯一的 builtin_style_name
+        及其在所有节点间一致的格式字段，然后修正样式定义。
 
         修正内容：
         1. 字符格式：中英文字体、字号、颜色（清除主题色）、加粗、斜体、下划线
         2. 段落格式：对齐方式
         3. 确保样式定义存在（不存在则创建）
+
+        注意：
+        - 同名样式被多个节点复用时，只应用取值一致的字段，冲突字段由
+          各节点的直接格式保证，避免把某一节点的缩进/字体泄漏给其他段落。
+        - Normal 是表格单元格、页眉页脚、题注等的公共基样式，正文/参考
+          文献/致谢对它的配置通常互相冲突；写入任一份都会污染这些未显式
+          覆盖的段落，因此不修改 Normal 定义本身。
         """
 
         style_configs = config_model.collect_style_configs()
 
         for eng_style_name, cfg in style_configs.items():
+            if eng_style_name == "Normal":
+                logger.debug("跳过共享基样式定义修正: Normal")
+                continue
+
             ensure_style_exists(document, eng_style_name)
 
             try:
@@ -317,8 +343,12 @@ class StyleDefinitionFixStage:
                 logger.warning(f"样式 '{eng_style_name}' 创建失败，跳过修正")
                 continue
 
-            self._fix_style_run_properties(style, cfg, eng_style_name)
-            self._fix_style_paragraph_properties(style, cfg, eng_style_name)
+            # collect_style_configs 返回普通 dict；转成支持点号访问的容器，
+            # 否则 getattr(cfg, ...) 全部取到 None，修正会静默失效。
+            cfg_view = NodeConfigRoot()
+            cfg_view.update(cfg)
+            self._fix_style_run_properties(style, cfg_view, eng_style_name)
+            self._fix_style_paragraph_properties(style, cfg_view, eng_style_name)
 
             logger.debug(f"已修正样式定义: {eng_style_name}")
 
@@ -335,7 +365,13 @@ class FormattingExecutionStage:
         self.skip_comments = skip_comments
 
     def apply_format_check_to_all_nodes(
-        self, root_node: FormatNode, document, config, check=True
+        self,
+        root_node: FormatNode,
+        document,
+        config,
+        check=True,
+        void_categories=None,
+        skip_children_categories=None,
     ):
         """
         递归遍历文档树中的所有节点，
@@ -345,8 +381,18 @@ class FormattingExecutionStage:
         :param document: docx文档的实例
         :param config: 配置文件
         :param check: 用来控制是仅检查还是仅修改
+        :param void_categories: 不参与格式化的类别集合（None = 内置 VOIDNODELIST；[] = 不排除任何类别）
+        :param skip_children_categories: 子树不遍历的类别集合（None = 内置默认；[] = 全部遍历）
         """
         from wordformat.hooks import hooks
+        from wordformat.settings import DEFAULT_SKIP_CHILDREN_CATEGORIES
+
+        void_set = set(VOIDNODELIST if void_categories is None else void_categories)
+        skip_children_set = set(
+            DEFAULT_SKIP_CHILDREN_CATEGORIES
+            if skip_children_categories is None
+            else skip_children_categories
+        )
 
         def traverse(node, parent_category=""):
             category = (
@@ -360,7 +406,7 @@ class FormattingExecutionStage:
                     is_top_direct_body_text = (
                         parent_category == "top" and category == "body_text"
                     )
-                    if category not in VOIDNODELIST and not is_top_direct_body_text:
+                    if category not in void_set and not is_top_direct_body_text:
                         node.load_config(config)
 
                         if node.paragraph:
@@ -391,9 +437,8 @@ class FormattingExecutionStage:
                     logger.warning(f"Node {node} not format, because: {str(e)}")
                     raise e
 
-            # 目录、附录、封面/声明的子节点跳过格式化
-            SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu", "other"}
-            if category not in SKIP_CHILDREN_CATEGORIES:
+            # 目录、附录、封面/声明等 skip_children 类别的子节点跳过格式化
+            if category not in skip_children_set:
                 for child in node.children:
                     traverse(child, parent_category=category)
 
@@ -413,7 +458,12 @@ class FormattingExecutionStage:
             check=ctx.check,
         )
         self.apply_format_check_to_all_nodes(
-            ctx.root_node, ctx.document, ctx.config_model, ctx.check
+            ctx.root_node,
+            ctx.document,
+            ctx.config_model,
+            ctx.check,
+            void_categories=ctx.void_categories,
+            skip_children_categories=ctx.skip_children_categories,
         )
         return ctx
 

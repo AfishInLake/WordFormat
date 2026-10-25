@@ -204,13 +204,11 @@ class TestLoadConfig:
         assert node.pydantic_config.caption_prefix == "表"
 
     def test_caption_table_content_font_size(self, root_config):
-        """YAML 中 tables.content.font_size 覆盖 DEFAULTS。"""
+        """YAML 中 tables.content.font_size 不应泄漏到题注节点。"""
         node = _make_node(CaptionTable)
         node.load_config(root_config)
-        # YAML: tables.content.font_size = '五号'
-        assert (
-            node.pydantic_config.font_size == "小四"
-        )  # DEFAULTS 值（非 content 子对象）
+        # 题注 DEFAULTS 允许 小四/五号 两档（表内说明文字常混用）
+        assert node.pydantic_config.font_size == ["小四", "五号"]
 
     def test_references(self, root_config):
         node = _make_node(References)
@@ -248,6 +246,35 @@ class TestLoadConfig:
         node = _make_node(KeywordsEN)
         node.load_config(root_config)
         assert node.pydantic_config.label.font_size == "三号"
+
+
+class TestInlineEmphasisProtection:
+    """行内强调保护：YAML 显式声明 bold/italic/underline 时以配置为准。"""
+
+    @staticmethod
+    def _node(config):
+        node = BodyText(value={}, level=0)
+        node.load_config(config)
+        node.protected_inline = True
+        return node
+
+    def test_unprotected_returns_false(self):
+        node = BodyText(value={}, level=0)
+        node.load_config({"body": {"text": {}}})
+        assert node._keep_inline_emphasis() is False
+
+    def test_flat_yaml_emphasis_disables_protection(self):
+        node = self._node({"body": {"text": {"bold": True}}})
+        assert node._keep_inline_emphasis() is False
+
+    def test_nested_font_emphasis_disables_protection(self):
+        # YAML 实际写法为 font.bold/font.italic/font.underline
+        node = self._node({"body": {"text": {"font": {"italic": True}}}})
+        assert node._keep_inline_emphasis() is False
+
+    def test_unrelated_yaml_keeps_protection(self):
+        node = self._node({"body": {"text": {"font": {"font_size": "小四"}}}})
+        assert node._keep_inline_emphasis() is True
 
 
 # ---------------------------------------------------------------------------

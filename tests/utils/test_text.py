@@ -127,10 +127,13 @@ class TestParseCaptionText:
     def test_plain_text_returns_none(self):
         assert parse_caption_text("这是一段普通正文") is None
 
-    def test_no_space_before_name_returns_none(self):
-        """编号后无空格无法可靠提取名称，返回 None。"""
+    def test_no_space_before_name_still_parsed(self):
+        """编号与名称间无空格的作品很常见（图2.2干扰对…），仍应解析出名称。"""
         result = parse_caption_text("图1.1测试")
-        assert result is None
+        assert result is not None
+        assert result["chapter_num"] == 1
+        assert result["number_num"] == 1
+        assert result["name"] == "测试"
 
     def test_space_after_label(self):
         """标签后有空格：图 1.1 测试。"""
@@ -140,6 +143,15 @@ class TestParseCaptionText:
         assert result["chapter_num"] == 1
         assert result["number_num"] == 1
         assert result["name"] == "系统架构图"
+
+    def test_space_around_separator(self):
+        """WPS 常在分隔符后带空格：表2. 1 测试数据 仍应解析出 2.1。"""
+        result = parse_caption_text("表2. 1 测试数据")
+        assert result is not None
+        assert result["chapter_num"] == 2
+        assert result["number_num"] == 1
+        assert result["separator"] == "."
+        assert result["name"] == "测试数据"
 
     def test_continued_table_caption(self):
         """续表 5.3 API接口测试结果 → 正确解析"""

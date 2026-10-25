@@ -149,6 +149,11 @@ def run_get_font_size_pt(run: Run) -> float:
     return _run(run, x_size_pt, 12.0)
 
 
+def run_get_font_size_pt_or_none(run: Run) -> float | None:
+    """字号（pt），沿继承链；均未设置返回 None（无法判定时不做校验）。"""
+    return _run(run, x_size_pt, None)
+
+
 def run_get_font_color(run: Run) -> tuple[int, int, int] | None:
     """字体颜色 (r,g,b)；主题色返回 None（不确定），未设置返回 (0,0,0)。"""
     return _run(run, x_color_rgb, (0, 0, 0))

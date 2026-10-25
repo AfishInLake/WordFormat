@@ -13,7 +13,11 @@ from loguru import logger
 from rich.console import Console
 
 from wordformat.classify.tag import set_tag_main
-from wordformat.pipeline.orchestrate import auto_format_thesis_document, md_to_docx
+from wordformat.pipeline.orchestrate import (
+    auto_format_thesis_document,
+    json_to_docx,
+    md_to_docx,
+)
 from wordformat.settings import VERSION
 from wordformat.tree import print_tree
 
@@ -188,6 +192,11 @@ wordf startapi -H 127.0.0.1 -p 8000
     )
     p_af.add_argument("-o", default="output/", help="输出目录")
     p_af.add_argument(
+        "--sync",
+        action="store_true",
+        help="按编辑后的 JSON 在原 docx 上同步增/删/改/重排段落（JSON 与原段落数可不等）",
+    )
+    p_af.add_argument(
         "--preset",
         action="append",
         default=None,
@@ -238,6 +247,32 @@ wordf startapi -H 127.0.0.1 -p 8000
     )
     p_md.add_argument("-o", default="output/", help="输出目录（默认output/）")
     p_md.add_argument(
+        "--preset",
+        action="append",
+        default=None,
+        help="预设名（presets/ 目录下的 .py，可多次指定，后者覆盖前者）",
+    )
+
+    # ------------------------------
+    # 6b. jd = JSON 转 Docx（重建模式）
+    # ------------------------------
+    p_jd = subparsers.add_parser(
+        "jd", help="JSON 转 Docx（从识别/编辑后的 JSON 生成全新文档）"
+    )
+    p_jd.add_argument(
+        "-f",
+        required=True,
+        type=lambda x: validate_file(x, "JSON文件", [".json"]),
+        help="JSON文件路径（gj 产出或 agent 编辑后）",
+    )
+    p_jd.add_argument(
+        "-c",
+        default=None,
+        type=lambda x: validate_file(x, "配置", [".yaml", ".yml"]),
+        help="YAML 配置路径（可选）",
+    )
+    p_jd.add_argument("-o", default="output/", help="输出目录（默认output/）")
+    p_jd.add_argument(
         "--preset",
         action="append",
         default=None,
@@ -332,6 +367,8 @@ wordf startapi -H 127.0.0.1 -p 8000
         }
         if args.preset:
             call_args["presets"] = args.preset
+        if args.sync:
+            call_args["sync"] = True
         auto_format_thesis_document(**call_args)
         logger.success(f"✅ 格式化完成！新文件保存在：{args.o}")
 
@@ -396,6 +433,18 @@ wordf startapi -H 127.0.0.1 -p 8000
             call_args["presets"] = args.preset
         md_to_docx(**call_args)
         logger.success(f"✅ 转换完成！文件保存在：{args.o}")
+
+    elif args.mode == "jd":
+        logger.info("📝 开始 JSON → Docx 重建...")
+        call_args = {
+            "json_path": args.f,
+            "config_path": args.c,
+            "save_dir": args.o,
+        }
+        if args.preset:
+            call_args["presets"] = args.preset
+        out_path = json_to_docx(**call_args)
+        logger.success(f"✅ 重建完成！文件保存在：{out_path}")
 
     elif args.mode == "list-presets":
         from wordformat.preset_loader import list_presets, preset_dir

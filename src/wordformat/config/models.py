@@ -42,9 +42,22 @@ class NodeConfigRoot(dict):
         return dict(self)
 
     def collect_style_configs(self) -> dict[str, dict]:
-        style_map: dict[str, dict] = {}
-        _walk_config_for_styles(self, style_map)
-        return style_map
+        """收集每个内置样式在所有节点中一致的格式字段。
+
+        同名样式常被多个节点复用（Normal 被正文、参考文献、致谢共享）。
+        Word 的样式定义只有一份，若直接写入某个节点的完整配置，会把该
+        节点的字体/缩进等泄漏给其他未显式覆盖该属性的段落（典型如表格
+        单元格、页眉页脚）。因此这里只保留所有节点都显式给出且取值相同
+        的字段；存在冲突的字段交给各节点的直接格式处理。
+
+        锚点模板（global_format）和表格对象（tables.object）不对应实际
+        段落，跳过以免污染同名样式。
+        """
+        occurrences: dict[str, list[dict]] = {}
+        _walk_config_for_styles(self, occurrences)
+        return {
+            name: _intersect_configs(configs) for name, configs in occurrences.items()
+        }
 
 
 def _resolve_builtin_style_name(cfg) -> str | None:
@@ -90,12 +103,55 @@ class NumberingConfig(dict):
         return val
 
 
-def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
+_STYLE_SUBDICT_KEYS = ("paragraph", "font")
+
+# 这些配置项不是实际段落，不能参与样式定义收集
+_STYLE_EXCLUDED_PATHS = {
+    ("global_format",),
+    ("tables", "object"),
+}
+
+
+def _flatten_style_config(obj: dict) -> dict:
+    """把嵌套的 paragraph / font 字段摊平到节点配置。
+
+    顶层字段优先于子字典字段，与 DotDict/NodeConfigRoot 的点号查找顺序
+    保持一致。
+    """
+    merged: dict = {}
+    for sub_key in _STYLE_SUBDICT_KEYS:
+        sub_cfg = obj.get(sub_key)
+        if isinstance(sub_cfg, dict):
+            merged.update(sub_cfg)
+    merged.update(
+        {key: value for key, value in obj.items() if key not in _STYLE_SUBDICT_KEYS}
+    )
+    return merged
+
+
+def _intersect_configs(configs: list[dict]) -> dict:
+    """只保留所有配置都显式给出且取值一致的字段。"""
+    common_keys = set(configs[0])
+    for cfg in configs[1:]:
+        common_keys &= set(cfg)
+    return {
+        key: configs[0][key]
+        for key in common_keys
+        if all(cfg[key] == configs[0][key] for cfg in configs[1:])
+    }
+
+
+def _walk_config_for_styles(obj, occurrences: dict[str, list[dict]], path=()) -> None:
     if not isinstance(obj, dict):
         return
-    eng_name = _resolve_builtin_style_name(obj)
+    if path in _STYLE_EXCLUDED_PATHS:
+        return
+    style_cfg = _flatten_style_config(obj)
+    eng_name = _resolve_builtin_style_name(style_cfg)
     if eng_name and isinstance(eng_name, str):
-        style_map[eng_name] = obj
-    for _key, val in obj.items():
-        if isinstance(val, dict):
-            _walk_config_for_styles(val, style_map)
+        occurrences.setdefault(eng_name, []).append(style_cfg)
+    for key, val in obj.items():
+        # paragraph / font 已合并进当前节点，不能作为独立节点重复收集
+        if key in _STYLE_SUBDICT_KEYS or not isinstance(val, dict):
+            continue
+        _walk_config_for_styles(val, occurrences, (*path, key))

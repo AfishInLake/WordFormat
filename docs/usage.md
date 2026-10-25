@@ -221,11 +221,16 @@ wordf startapi -H 0.0.0.0 -p 8080
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/generate-json` | 上传 docx + 可选 yaml，返回文档结构 JSON |
-| `POST` | `/check-format` | 上传 docx + json_data + 可选 yaml，返回标注版文档下载链接 |
-| `POST` | `/apply-format` | 上传 docx + json_data + 可选 yaml，返回修改版文档下载链接 |
+| `POST` | `/check-format` | 上传 docx + json_data + 可选 yaml + `presets`，返回标注版文档下载链接 |
+| `POST` | `/apply-format` | 上传 docx + json_data + 可选 yaml + `presets` + `sync`，返回修改版文档下载链接 |
+| `POST` | `/markdown-to-docx` | 上传 md + 可选 yaml + `presets`，返回生成版文档下载链接（对应 `md`） |
+| `POST` | `/json-to-docx` | 上传 json + 可选 yaml + `presets`，返回按 JSON 重建的文档下载链接（对应 `jd`） |
+| `POST` | `/tree` | 上传 json + `show_confidence`/`show_index`/`filter_categories`，返回纯文本结构树（对应 `tree`） |
 | `GET` | `/download/{filename}` | 下载处理后的结果文档 |
 | `GET` | `/docs` | Swagger UI 接口文档 |
 | `GET` | `/redoc` | ReDoc 接口文档 |
+
+> `presets` 为逗号分隔的预设名（等价 CLI 可重复的 `--preset`，后者覆盖前者）；`sync=true` 等价 `af --sync`，在原 docx 上按 JSON 增/删/改/重排段落，而不是整篇重排。
 
 #### 配置界面
 ![配置界面预览](./image/config.png)
@@ -282,15 +287,19 @@ wordf af -d "tmp/毕业设计说明书.docx" -c "example/undergrad_thesis.yaml" 
 | `wordf gj` | generate-json | 生成文档结构 JSON | `-d`（`-c` 推荐） |
 | `wordf tree` | tree | 查看文档结构树 | `-f` |
 | `wordf cf` | check-format | 检查格式并添加批注 | `-d`,`-c`,`-f` |
-| `wordf af` | apply-format | 自动格式化论文 | `-d`,`-c`,`-f` |
+| `wordf af` | apply-format | 自动格式化论文（`--sync` 为按 JSON 同步原文档） | `-d`,`-c`,`-f` |
+| `wordf md` | markdown-to-docx | Markdown 转 Docx | `-d` |
+| `wordf jd` | json-to-docx | 按 JSON 从空白文档重建 Docx | `-f` |
 | `wordf startapi` | start-api | 启动Web可视化界面 | 无 |
 
 | 参数 | 作用 | 必填 |
 |------|------|------|
-| `-d` | Word 文档路径 | 是（gj/cf/af） |
+| `-d` | Word 文档路径（`md` 为 Markdown 路径） | 是（gj/cf/af/md） |
 | `-c` | YAML 配置路径 | 推荐（gj）/ 是（cf/af），不传使用默认配置 |
-| `-f` | JSON 文件路径 | 是（cf/af/tree） |
+| `-f` | JSON 文件路径 | 是（cf/af/tree/jd） |
 | `-o` | 输出目录 | 否（默认 output） |
+| `--preset` | 预设名（可重复，后者覆盖前者） | 否（cf/af/md/jd） |
+| `--sync` | 按编辑后的 JSON 在原 docx 上同步段落 | 否（仅 af） |
 | `-H` | API服务地址 | 否（默认 127.0.0.1） |
 | `-p` | API服务端口 | 否（默认 8000） |
 

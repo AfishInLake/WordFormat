@@ -7,8 +7,7 @@ export const CATEGORY_CONFIG = {
     "abstract_english_title_content": "当且仅当摘要和正文在一个段落中",
     "keywords_chinese": "包含“关键词”或“关键字”，后面跟着术语列表",
     "keywords_english": "包含“Keywords”（大小写不敏感），后面跟着英文术语",
-    "chinese_title": "论文中文题目（通常简短且无编号）",
-    "english_title": "论文英文题目（通常简短且无编号）",
+    "document_title": "论文题名（通常简短且无编号，封面与摘要页常重复出现）",
     "heading_level_1": "段落必须以“第X章”或单个阿拉伯数字（如“1”“2”）开头，后接空格和标题文字；仅为名词短语",
     "heading_level_2": "段落必须以“X.Y”格式开头（如“1.1”），仅含一个“.”；后接标题文字无完整句子",
     "heading_level_3": "段落必须以“X.Y.Z”格式开头（如“1.1.1”），仅含两个“.”；后接标题文字无完整句子",
@@ -22,10 +21,12 @@ export const CATEGORY_CONFIG = {
     "other": "标记跳过：后端处理时直接忽略该节点（防止误删，仅标记）"
 };
 
+// 层级与后端规则注册表（structure/settings.py LEVEL_MAP，来自各 @register(level=N)）一致：
+// keywords_* 为 3（与 heading_level_3 同层），题名用 document_title。
 export const LEVEL_MAP = {
-    "chinese_title": 1, "english_title": 1,
+    "document_title": 1,
     "abstract_chinese_title": 1, "abstract_english_title": 1,
-    "keywords_chinese": 2, "keywords_english": 2,
+    "keywords_chinese": 3, "keywords_english": 3,
     "references_title": 1, "acknowledgements_title": 1,
     "heading_fulu": 1,
     "heading_mulu": 1,

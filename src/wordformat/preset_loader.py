@@ -118,10 +118,17 @@ def load_preset(
             f"预设 '{name}' 未定义 register(hooks) 函数，请参考 presets/_template.py"
         )
 
-    register_fn(registry)
-    logger.info(f"预设 '{name}' 已加载（{path.name}）")
     manifest = getattr(module, "PRESET_MANIFEST", None)
-    return dict(manifest) if isinstance(manifest, dict) else {}
+    manifest_dict = dict(manifest) if isinstance(manifest, dict) else {}
+    if registry.is_preset_loaded(name):
+        # 幂等：长驻服务/测试中重复加载同一预设不得重复注册回调
+        logger.debug(f"预设 '{name}' 已加载，跳过重复注册")
+        return manifest_dict
+
+    register_fn(registry)
+    registry.mark_preset_loaded(name)
+    logger.info(f"预设 '{name}' 已加载（{path.name}）")
+    return manifest_dict
 
 
 def load_presets(

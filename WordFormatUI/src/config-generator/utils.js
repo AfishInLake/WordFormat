@@ -247,8 +247,8 @@ export const chineseFontOptions = ["宋体", "黑体", "楷体", "仿宋", "微�
 // 英文字体选项
 export const englishFontOptions = ["Times New Roman", "Arial", "Calibri", "Courier New", "Helvetica"]
 
-// 字号选项
-export const fontSizeOptions = ["一号", "小一", "二号", "小二", "三号", "小三", "四号", "小四", "五号", "小五", "六号", "七号"]
+// 字号选项（与后端 style/defs.py FontSize._LABEL_MAP 的 16 档一致）
+export const fontSizeOptions = ["初号", "小初", "一号", "小一", "二号", "小二", "三号", "小三", "四号", "小四", "五号", "小五", "六号", "小六", "七号", "八号"]
 
 // 深度合并：用 defaults 填充 config 中缺失的字段
 export const mergeWithDefaults = (config, defaults) => {

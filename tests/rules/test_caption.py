@@ -105,7 +105,9 @@ class TestCaptionFigureBase:
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
-        """apply 模式：应修正格式。"""
+        """apply 模式：缩进/段间距按配置修正，不再产生残留批注。"""
+        from wordformat.style.diff import ParagraphStyle
+
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("图1 测试图片")
@@ -114,7 +116,14 @@ class TestCaptionFigureBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
+        residual = {
+            d.diff_type
+            for d in ParagraphStyle.from_config(node.pydantic_config).diff_from_paragraph(p)
+        }
+        # 缩进与段间距应已被修正（行距属不可自动转换项，允许残留）
+        assert "first_line_indent" not in residual
+        assert not {"space_before", "space_after"} & residual
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +147,9 @@ class TestCaptionTableBase:
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
-        """apply 模式：应修正格式。"""
+        """apply 模式：缩进/段间距按配置修正，不再产生残留批注。"""
+        from wordformat.style.diff import ParagraphStyle
+
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("表1 测试表格")
@@ -147,7 +158,13 @@ class TestCaptionTableBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
+        residual = {
+            d.diff_type
+            for d in ParagraphStyle.from_config(node.pydantic_config).diff_from_paragraph(p)
+        }
+        assert "first_line_indent" not in residual
+        assert not {"space_before", "space_after"} & residual
 
 
 # ---------------------------------------------------------------------------
@@ -777,6 +794,20 @@ class TestCheckCaptionNumbering:
 
         doc = Document()
         p = self._make_paragraph("续表5.3 测试")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = {"enabled": True, "separator": "."}
+
+        with patch.object(node, "add_comment") as mock_comment:
+            _check_caption_numbering(node, doc, "表", cfg)
+
+        mock_comment.assert_not_called()
+
+    def test_bare_continuation_marker_no_comment(self):
+        """独立的“续表”占位行（无编号）不报格式错误。"""
+        from wordformat.rules.caption import _check_caption_numbering
+
+        doc = Document()
+        p = self._make_paragraph("续表")
         node = self._make_caption_figure(p, chapter=5, seq=3)
         cfg = {"enabled": True, "separator": "."}
 

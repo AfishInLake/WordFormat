@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+import re
+
 from wordformat.domains import register_domain
 from wordformat.hooks import HookRegistry, hooks
 
@@ -79,12 +81,119 @@ def _normalize_subtrees(data: dict):
 # ----------------------------------------------------------------------
 # 遍历状态：章节号、图表顺序号计数器（before_node_format 按 DFS 顺序调用，
 # 与流水线遍历顺序一致；on_format_begin 时重置）
-_state = {"chapter": 0, "fig": {}, "tab": {}}
+_state = {
+    "chapter": 0,
+    "fig": {},
+    "tab": {},
+    # 全文图表统一编号（图1.1、图1.2…跨章连续）而非“章.序”编号
+    "caption_global": False,
+    "fig_global": 0,
+    "tab_global": 0,
+    # 已识别出一级标题的章节号，用于判断题注章节号是否为真错误
+    "heading_chapters": set(),
+}
+
+_CHAPTER_LABEL_RE = re.compile(r"^\s*第\s*([0-9]+|[一二三四五六七八九十百零〇]+)\s*章")
+_CHAPTER_ARABIC_RE = re.compile(r"^\s*(\d{1,2})(?:[.、．\s　]|(?=[一-鿿]))")
+_CN_DIGITS = {
+    "零": 0,
+    "〇": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+}
+_CN_UNITS = {"十": 10, "百": 100}
+
+
+def _chinese_to_int(text: str) -> int | None:
+    total = 0
+    current = 0
+    for ch in text:
+        if ch in _CN_DIGITS:
+            current = _CN_DIGITS[ch]
+        elif ch in _CN_UNITS:
+            total += (current or 1) * _CN_UNITS[ch]
+            current = 0
+        else:
+            return None
+    return total + current
+
+
+def _node_text(node) -> str:
+    """取节点段落文本；非真实段落（None/Mock）返回空串。"""
+    para = getattr(node, "paragraph", None)
+    text = getattr(para, "text", "") if para is not None else ""
+    return text if isinstance(text, str) else ""
+
+
+def _parse_chapter_number(text: str) -> int | None:
+    """从一级标题文本解析章节号：第X章 / 1 绪论 均可。
+
+    仅有标题文字（如“绪论”）时返回 None，交由调用方顺序递增。
+    """
+    if not isinstance(text, str):
+        return None
+    text = text.strip()
+    m = _CHAPTER_LABEL_RE.match(text)
+    if m:
+        raw = m.group(1)
+        return int(raw) if raw.isdigit() else _chinese_to_int(raw)
+    m = _CHAPTER_ARABIC_RE.match(text)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 def _reset_caption_state(data: dict):
-    """格式化开始：重置题注编号所需的章节/图序/表序状态。"""
-    _state.update(chapter=0, fig={}, tab={})
+    """格式化开始：重置题注编号所需的章节/图序/表序状态。
+
+    同时预扫描两份信息：
+    - 是否全文图表统一编号（所有题注章节号相同），此时不做章节号校验；
+    - 一级标题里实际出现的章节号，供题注章节号校验区分“识别漏章”与“题注写错”。
+    """
+    _state.update(
+        chapter=0,
+        fig={},
+        tab={},
+        caption_global=False,
+        fig_global=0,
+        tab_global=0,
+        heading_chapters=set(),
+    )
+    root = data.get("root_node")
+    if root is None:
+        return
+    from wordformat.utils import parse_caption_text
+
+    caption_chapters: list[int] = []
+
+    def walk(node):
+        value = node.value if isinstance(node.value, dict) else {}
+        category = value.get("category", "")
+        text = _node_text(node)
+        if category == "heading_level_1":
+            parsed_chapter = _parse_chapter_number(text)
+            if parsed_chapter is not None and parsed_chapter > 0:
+                _state["heading_chapters"].add(parsed_chapter)
+        elif category in ("caption_figure", "caption_table") and text:
+            parsed = parse_caption_text(text)
+            if parsed and parsed.get("chapter_num") is not None:
+                caption_chapters.append(parsed["chapter_num"])
+        for child in node.children:
+            walk(child)
+
+    try:
+        walk(root)
+    except Exception:
+        return
+    if len(caption_chapters) >= 3 and len(set(caption_chapters)) == 1:
+        _state["caption_global"] = True
 
 
 def _inject_caption_numbering(data: dict):
@@ -100,16 +209,22 @@ def _inject_caption_numbering(data: dict):
     value = node.value if isinstance(node.value, dict) else {}
     category = value.get("category", "")
 
-    # 遇到一级标题时递增章节号
+    # 一级标题：优先采用标题文本中的章节号（第3章 / 3 系统设计），
+    # 避免正文里被误判为一级标题的短行把章节计数推高；无编号时顺序递增。
     if category == "heading_level_1":
-        _state["chapter"] += 1
+        text = _node_text(node)
+        parsed_chapter = _parse_chapter_number(text)
+        if parsed_chapter is not None and parsed_chapter > 0:
+            _state["chapter"] = parsed_chapter
+        else:
+            _state["chapter"] += 1
     chapter = _state["chapter"]
 
     # 题注节点：注入章节号 + 顺序号（续表/续图保留原标题注编号）
     if category in ("caption_figure", "caption_table"):
         from wordformat.utils import parse_caption_text
 
-        text = node.paragraph.text.strip() if node.paragraph else ""
+        text = _node_text(node)
         parsed = parse_caption_text(text)
         if (
             parsed
@@ -120,10 +235,40 @@ def _inject_caption_numbering(data: dict):
             chapter = parsed["chapter_num"]
             seq = parsed["number_num"]
         else:
-            chapter = chapter if chapter > 0 else 0
-            counter = _state["fig"] if category == "caption_figure" else _state["tab"]
-            counter[chapter] = counter.get(chapter, 0) + 1
-            seq = counter[chapter]
+            counter_key = "fig" if category == "caption_figure" else "tab"
+            global_key = "fig_global" if category == "caption_figure" else "tab_global"
+            actual_chapter = parsed.get("chapter_num") if parsed else None
+            if _state["caption_global"]:
+                # 统一编号文档：章节号沿用题注自身，序号按全文连续
+                if actual_chapter is not None:
+                    chapter = actual_chapter
+                _state[global_key] += 1
+                seq = _state[global_key]
+            else:
+                chapter = chapter if chapter > 0 else 0
+                # 章节标题漏识别（如“3核心工作部件设计”被判为正文）导致章号
+                # 系统性偏移时，以题注为准重新对齐；若该章标题确实存在，
+                # 则保留原章号，让检查报出这个真正写错的题注。
+                if (
+                    actual_chapter is not None
+                    and chapter > 0
+                    # 只有确实识别到带章节号的一级标题时才对齐，否则
+                    # 无从判断是“标题漏识别”还是“题注写错”
+                    and _state["heading_chapters"]
+                    and actual_chapter != chapter
+                    and actual_chapter not in _state["heading_chapters"]
+                ):
+                    chapter = actual_chapter
+                    # 同步章节状态，否则下一条题注会再次触发对齐并重置序号
+                    _state["chapter"] = chapter
+                    _state[counter_key][chapter] = 0
+                counter = _state[counter_key]
+                expected = counter.get(chapter, 0) + 1
+                seq = expected
+                # 出现重号/跳号时只报这一处，随后按题注实际编号继续，
+                # 避免一个重号把后续所有题注都误报成错。
+                actual_seq = parsed.get("number_num") if parsed else None
+                counter[chapter] = actual_seq if actual_seq is not None else expected
         value["chapter_number"] = chapter
         value["sequence_number"] = seq
     else:
@@ -161,6 +306,12 @@ def _compose_summary(root_node, document, config_model) -> str:
     def _collect_section(node, sections):
         cls_name = type(node).__name__
         para = node.paragraph
+        if cls_name == "TableObject":
+            # 表格为只读导出（无绑定段落），仅统计数量；
+            # sync 忽略的新增表格未真正写入文档，不计入统计
+            value = node.value if isinstance(node.value, dict) else {}
+            if not value.get("sync_skip"):
+                sections["table_count"] = sections.get("table_count", 0) + 1
         if para and para.text.strip():
             text = para.text.strip()
             if cls_name == "AbstractContentCN":
@@ -257,6 +408,9 @@ def _compose_summary(root_node, document, config_model) -> str:
     if word_issues:
         lines.append("字数问题：")
         lines.extend(word_issues)
+    table_count = sections.get("table_count", 0)
+    if table_count:
+        lines.append(f"表格：{table_count} 个（表格内容不参与检查）")
 
     lines.append("说明：")
     lines.append(

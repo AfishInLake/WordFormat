@@ -34,13 +34,14 @@ class DotDict(dict):
             raise AttributeError(key) from e
 
 
-# 全局格式默认值，所有节点以此为底
+# 全局格式默认值，所有节点以此为底（与 example/undergrad_thesis.yaml 的
+# global_format 保持一致：0 行段前段后、1.5 倍行距、正文两端对齐）
 BASE_FORMAT: dict[str, object] = {
     "paragraph": {
-        "alignment": "左对齐",
-        "space_before": "0.5行",
-        "space_after": "0.5行",
-        "line_spacingrule": "单倍行距",
+        "alignment": "两端对齐",
+        "space_before": "0行",
+        "space_after": "0行",
+        "line_spacingrule": "1.5倍行距",
         "line_spacing": "1.5倍",
         "left_indent": "0字符",
         "right_indent": "0字符",

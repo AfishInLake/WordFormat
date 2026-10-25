@@ -331,6 +331,19 @@ class TestParagraphStyleApplyToParagraph:
         assert any(d.diff_type == "first_line_indent" for d in diffs)
         _clear_warning()
 
+    def test_apply_physical_spacing_units(self, doc, mock_warning):
+        """space_before/after 使用磅等物理单位时应能应用（不能 TypeError）。"""
+        _set_warning(mock_warning)
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(24)
+        p.paragraph_format.space_after = Pt(30)
+        ps = ParagraphStyle(space_before="6磅", space_after="12磅")
+        diffs = ps.apply_to_paragraph(p)
+        assert {"space_before", "space_after"} <= {d.diff_type for d in diffs}
+        assert p.paragraph_format.space_before == Pt(6)
+        assert p.paragraph_format.space_after == Pt(12)
+        _clear_warning()
+
     def test_apply_unknown_diff_type_skipped(self, doc, mock_warning):
         """apply_to_paragraph with unknown diff_type -> logged and skipped (line 348-353)"""
         _set_warning(mock_warning)

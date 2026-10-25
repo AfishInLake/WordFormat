@@ -118,3 +118,10 @@ class TestInspect:
         reg.clear()
         assert reg.registered_events() == []
         assert reg.has_handlers is False
+
+    def test_preset_loaded_state_reset_by_clear(self):
+        reg = HookRegistry()
+        reg.mark_preset_loaded("p")
+        assert reg.is_preset_loaded("p") is True
+        reg.clear()
+        assert reg.is_preset_loaded("p") is False

@@ -143,6 +143,25 @@ class TestLoadPreset:
         assert first == second == {"a": 1}
         assert "wordformat_preset_p5" in sys.modules
 
+    def test_load_same_preset_twice_registers_once(self, presets_dir):
+        from wordformat.preset_loader import load_preset
+
+        _write_preset(presets_dir, "p6")
+        registry = HookRegistry()
+        load_preset("p6", registry=registry)
+        load_preset("p6", registry=registry)
+        assert len(registry.registered_callbacks("on_comment")) == 1
+
+    def test_clear_allows_preset_reload(self, presets_dir):
+        from wordformat.preset_loader import clear_presets, load_preset
+
+        _write_preset(presets_dir, "p7")
+        registry = HookRegistry()
+        load_preset("p7", registry=registry)
+        clear_presets(registry)
+        load_preset("p7", registry=registry)
+        assert len(registry.registered_callbacks("on_comment")) == 1
+
     def test_load_presets_returns_manifests_in_order(self, presets_dir):
         from wordformat.preset_loader import load_presets
 

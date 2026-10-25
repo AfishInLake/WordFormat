@@ -116,8 +116,8 @@ class TestAbstractTitleCNBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        # apply 模式格式应用成功，不产生批注（check 模式才写批注）
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        # apply 收敛：格式修正后不再残留差异（check 模式才写批注）
+        mock_comment.assert_not_called()
 
     def test_check_no_runs_skips_without_error(self, root_config):
         """段落无 run 时（空段），check_format 安全跳过不报错。"""
@@ -279,7 +279,7 @@ class TestAbstractTitleENBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

@@ -159,9 +159,130 @@ class TestHeadingCoverageBoost:
         """collect_style_configs 应收集配置中所有唯一的样式名。"""
         style_map = root_config.collect_style_configs()
         assert len(style_map) > 0
-        # 应包含 Normal（body_text 使用）和 Heading 1/2/3
+        # 应包含 Heading 1/2/3；global_format 是锚点模板，不是实际段落
         style_names = list(style_map.keys())
-        assert any("Normal" in s for s in style_names)
+        assert "Heading 1" in style_names
+        assert "Normal" not in style_names
+
+    def test_collect_style_configs_merges_paragraph_and_font(self):
+        """嵌套的 paragraph/font 字段应合并进样式配置。"""
+        cfg = NodeConfigRoot(
+            headings={
+                "level_1": {
+                    "paragraph": {
+                        "alignment": "居中对齐",
+                        "builtin_style_name": "Heading 1",
+                    },
+                    "font": {
+                        "chinese_font_name": "黑体",
+                        "english_font_name": "Arial",
+                        "font_size": "二号",
+                        "bold": True,
+                    },
+                }
+            }
+        )
+
+        style_cfg = cfg.collect_style_configs()["Heading 1"]
+
+        assert style_cfg["alignment"] == "居中对齐"
+        assert style_cfg["chinese_font_name"] == "黑体"
+        assert style_cfg["english_font_name"] == "Arial"
+        assert style_cfg["font_size"] == "二号"
+        assert style_cfg["bold"] is True
+        assert "paragraph" not in style_cfg
+        assert "font" not in style_cfg
+
+    def test_collect_style_configs_keeps_only_consistent_fields(self):
+        """同名样式仅保留各节点取值一致的字段，冲突字段不写入样式定义。"""
+        cfg = NodeConfigRoot(
+            body={
+                "text": {
+                    "paragraph": {
+                        "alignment": "右对齐",
+                        "builtin_style_name": "正文",
+                    },
+                    "font": {"italic": True, "bold": False},
+                }
+            },
+            references={
+                "entry": {
+                    "paragraph": {
+                        "alignment": "两端对齐",
+                        "builtin_style_name": "正文",
+                    },
+                    "font": {"italic": False, "bold": False},
+                }
+            },
+        )
+
+        normal_cfg = cfg.collect_style_configs()["Normal"]
+
+        assert normal_cfg["bold"] is False
+        assert "alignment" not in normal_cfg
+        assert "italic" not in normal_cfg
+
+    def test_fix_all_style_definitions_applies_nested_config(self):
+        """样式定义修正应真正写入字符与段落属性（回归：dict 配置曾被静默跳过）。"""
+        cfg = NodeConfigRoot(
+            headings={
+                "level_1": {
+                    "paragraph": {
+                        "alignment": "居中对齐",
+                        "builtin_style_name": "Heading 1",
+                    },
+                    "font": {
+                        "chinese_font_name": "黑体",
+                        "english_font_name": "Arial",
+                        "font_size": "二号",
+                        "bold": True,
+                    },
+                }
+            }
+        )
+        doc = Document()
+
+        _fix_stage._fix_all_style_definitions(doc, cfg)
+
+        style = doc.styles["Heading 1"]
+        assert style.font.size == Pt(22)
+        assert style.font.bold is True
+        rPr = style.element.find(qn("w:rPr"))
+        rFonts = rPr.find(qn("w:rFonts"))
+        assert rFonts.get(qn("w:eastAsia")) == "黑体"
+        assert rFonts.get(qn("w:ascii")) == "Arial"
+        pPr = style.element.find(qn("w:pPr"))
+        assert pPr.find(qn("w:jc")).get(qn("w:val")) == "center"
+
+    def test_fix_all_style_definitions_skips_normal_base_style(self):
+        """Normal 是表格/页眉页脚的公共基样式，不应写入正文字体或缩进。"""
+        cfg = NodeConfigRoot(
+            body={
+                "text": {
+                    "paragraph": {
+                        "alignment": "右对齐",
+                        "builtin_style_name": "正文",
+                    },
+                    "font": {"italic": True},
+                }
+            },
+            references={
+                "entry": {
+                    "paragraph": {
+                        "alignment": "两端对齐",
+                        "builtin_style_name": "正文",
+                    },
+                    "font": {"italic": False},
+                }
+            },
+        )
+        doc = Document()
+
+        _fix_stage._fix_all_style_definitions(doc, cfg)
+
+        normal = doc.styles["Normal"]
+        assert normal.paragraph_format.alignment is None
+        assert normal.font.italic is None
 
     def test_fix_all_style_definitions_handles_document(self, root_config):
         """_fix_all_style_definitions 应对文档中存在的样式定义进行修正。"""
