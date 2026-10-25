@@ -4,16 +4,11 @@ Core 模块综合测试
 覆盖 tree.py, utils.py, rules/node.py, numbering.py, settings.py
 """
 
-import os
-import pytest
-from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from docx import Document
 from docx.oxml.ns import qn
 
-from wordformat.tree import Tree, Stack, print_tree
-from wordformat.rules.node import TreeNode, FormatNode
 from wordformat.numbering import (
     _auto_strip_numbering,
     _strip_reference_numbering,
@@ -21,22 +16,14 @@ from wordformat.numbering import (
     create_numbering_definition,
     process_heading_numbering,
 )
+from wordformat.rules.node import FormatNode, TreeNode
 from wordformat.utils import (
-    get_file_name,
-    ensure_is_directory,
-    ensure_directory_exists,
-    _to_roman,
-    _to_chinese_num,
-    load_yaml_with_merge,
-    get_paragraph_numbering_text,
-    remove_all_numbering,
+    _count_numbering_levels,
     _format_number,
     _get_level_fmt,
-    _count_numbering_levels,
+    get_paragraph_numbering_text,
+    remove_all_numbering,
 )
-from wordformat.base import DocxBase
-from wordformat import settings
-
 
 # ============================================================
 # tree.py — Tree
@@ -273,9 +260,9 @@ class TestGetParagraphNumberingText:
         self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"
     ):
         """辅助方法：为文档创建 numbering part 和编号定义"""
-        from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from docx.opc.packuri import PackURI
+        from docx.oxml import OxmlElement
         from docx.parts.numbering import NumberingPart
 
         # 先移除已有的 numbering 关系（Document() 默认模板有 numbering part）
@@ -402,9 +389,9 @@ class TestGetParagraphNumberingText:
 
     def test_missing_abstract_num_returns_empty(self, doc):
         """abstractNumId 对应的 abstractNum 不存在时返回空字符串"""
-        from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from docx.opc.packuri import PackURI
+        from docx.oxml import OxmlElement
         from docx.parts.numbering import NumberingPart
 
         # 先移除已有的 numbering 关系
@@ -438,9 +425,9 @@ class TestGetParagraphNumberingText:
 
     def test_missing_lvl_returns_empty(self, doc):
         """abstractNum 中没有对应 ilvl 的 lvl 时返回空字符串"""
-        from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from docx.opc.packuri import PackURI
+        from docx.oxml import OxmlElement
         from docx.parts.numbering import NumberingPart
 
         # 先移除已有的 numbering 关系
@@ -1104,12 +1091,12 @@ class TestCreateReferenceNumberingDefinition:
 class TestProcessReferenceNumbering:
     def test_reference_entry_gets_numbering(self, doc):
         """参考文献条目节点应被应用自动编号"""
-        from wordformat.rules.references import ReferenceEntry
         from wordformat.config.models import NumberingConfig, NumberingLevelConfig
+        from wordformat.domains.thesis.rules.references import ReferenceEntry
 
         p = doc.add_paragraph("Some reference text")
         node = ReferenceEntry(
-            value={"category": "body_text", "fingerprint": "abc123"},
+            value={"category": "references_content", "fingerprint": "abc123"},
             level=2,
             paragraph=p,
         )
@@ -1135,12 +1122,12 @@ class TestProcessReferenceNumbering:
 
     def test_reference_entry_strips_manual_then_applies_numbering(self, doc):
         """参考文献条目：先清除手动编号再应用自动编号"""
-        from wordformat.rules.references import ReferenceEntry
         from wordformat.config.models import NumberingConfig, NumberingLevelConfig
+        from wordformat.domains.thesis.rules.references import ReferenceEntry
 
         p = doc.add_paragraph("[1] Some reference text")
         node = ReferenceEntry(
-            value={"category": "body_text", "fingerprint": "abc456"},
+            value={"category": "references_content", "fingerprint": "abc456"},
             level=2,
             paragraph=p,
         )
@@ -1434,9 +1421,9 @@ class TestCountNumberingLevels:
         self, doc, num_fmt="decimal", lvl_text="%1.", num_id="1", abstract_num_id="0"
     ):
         """辅助方法：为文档创建 numbering part"""
-        from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from docx.opc.packuri import PackURI
+        from docx.oxml import OxmlElement
         from docx.parts.numbering import NumberingPart
 
         # 移除已有的 numbering 关系

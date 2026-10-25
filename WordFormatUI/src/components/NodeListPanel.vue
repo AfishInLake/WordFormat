@@ -166,8 +166,7 @@ defineEmits(['select-node'])
 .node-tag.abstract_english_title_content { background: #341a4a; color: #d8b4fe; }
 .node-tag.keywords_chinese { background: #3d2a12; color: #fde68a; }
 .node-tag.keywords_english { background: #3d1a1a; color: #fecaca; }
-.node-tag.chinese_title { background: #1a3540; color: #7dd3fc; }
-.node-tag.english_title { background: #1a3d2e; color: #6ee7b7; }
+.node-tag.document_title { background: #1a3540; color: #7dd3fc; }
 .node-tag.heading_level_1 { background: #1f1d3d; color: #c7d2fe; }
 .node-tag.heading_level_2 { background: #2d1a4a; color: #d8b4fe; }
 .node-tag.heading_level_3 { background: #341a4a; color: #e9d5ff; }

@@ -1,6 +1,6 @@
 [project]
 name = "wordformat"
-version = "1.6.1"
+version = "1.7.0"
 description = "论文格式自动化处理工具"
 readme = "README.md"
 license = "Apache-2.0"
@@ -102,7 +102,12 @@ max-complexity = 10
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
 "cli.py" = ["C901"]
+"presets/_template.py" = ["C901", "F841"]  # 模板为演示代码，故意保留未用变量示例
 "**/body.py" = ["C901"]
+"**/rules/caption.py" = ["C901"]
+"**/header_footer.py" = ["C901"]
+"**/base.py" = ["C901"]
+"**/domains/thesis/__init__.py" = ["C901"]
 "**/pipeline/stages.py" = ["C901"]
 "**/markdown/parser.py" = ["C901"]
 "**/utils/_text.py" = ["C901"]

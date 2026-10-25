@@ -6,12 +6,14 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
 from wordformat.config.loader import get_config
 from wordformat.style.reader import (
+    paragraph_get_line_spacing,
     run_get_font_bold,
     run_get_font_color,
     run_get_font_italic,
@@ -59,7 +61,9 @@ class WarningConfig:
     left_indent: bool = True
     right_indent: bool = True
     first_line_indent: bool = True
-    builtin_style_name: bool = True
+    # Word 样式名只反映模板用法：大量中文论文用“正文/普通”样式 + 直接格式，
+    # 命中 Heading 1 之类的样式名并不等于排版错误，默认不作为判定项。
+    builtin_style_name: bool = False
 
 
 _warnings: WarningConfig | None = None
@@ -135,6 +139,29 @@ def _format_para_value(diff_type: str, value) -> str:
     return str(value)
 
 
+def _as_option_values(value) -> list:
+    """配置值 → 候选值列表；列表表示“任一满足即可”的等价规范。"""
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+# diff_type → CharacterStyle 属性名（force 模式下直接写入时使用）
+_FORCE_FIELD_MAP = {
+    "font_name_cn": "font_name_cn",
+    "font_name_en": "font_name_en",
+    "font_size": "font_size",
+    "font_color": "font_color",
+    "bold": "bold",
+    "italic": "italic",
+    "underline": "underline",
+}
+
+
+# Word 字号以半磅为单位，11.5pt 与 12pt(小四) 属同一档，不逐 run 报错
+_FONT_SIZE_TOL_PT = 0.5
+
+
 @dataclass
 class DIFFResult:
     """
@@ -185,9 +212,14 @@ class CharacterStyle:
     ):
         self.font_name_cn: FontName = FontName(font_name_cn)
         self.font_name_en: FontName = FontName(font_name_en)
-        self.font_size: FontSize = FontSize(font_size)
+        size_values = _as_option_values(font_size)
+        self.font_size: FontSize = FontSize(size_values[0])
+        # YAML 可用列表声明等价字号（如 references.entry 的 [五号, 小四]），
+        # 校验时任一命中即通过，修正时统一落到第一个值。
+        self.font_size_options: list[FontSize] = [FontSize(v) for v in size_values]
         self.font_color: FontColor = FontColor(font_color)
-        self.bold: bool = bold
+        # None 表示该属性不做校验（如英文摘要标题兼作论文题名，加粗与否因校而异）
+        self.bold: bool | None = bold
         self.italic: bool = italic
         self.underline: bool = underline
 
@@ -200,7 +232,7 @@ class CharacterStyle:
 
         # 1. 加粗（沿继承链：直接→字符样式→段落样式→docDefaults）
         bold = run_get_font_bold(run)
-        if bold != self.bold:
+        if self.bold is not None and bold != self.bold:
             diffs.append(
                 DIFFResult(
                     "bold",
@@ -236,9 +268,12 @@ class CharacterStyle:
                 )
             )
 
-        # 4. 字号
+        # 4. 字号（列表表示等价规范，任一命中即可；半磅级偏差视为排版取整）
         current_size = run_get_font_size_pt(run)
-        if current_size != self.font_size:
+        if not any(
+            abs(current_size - float(opt.rel_value)) <= _FONT_SIZE_TOL_PT
+            for opt in self.font_size_options
+        ):
             diffs.append(
                 DIFFResult(
                     "font_size",
@@ -294,9 +329,29 @@ class CharacterStyle:
 
         return sorted(diffs, key=lambda x: x.level)
 
-    def apply_to_run(self, run: Run):
-        """将字符样式应用到 docx.Run 对象"""
-        diffs = self.diff_from_run(run)
+    def apply_to_run(  # noqa C901
+        self, run: Run, only: set[str] | None = None, force: bool = False
+    ):
+        """将字符样式应用到 docx.Run 对象。
+
+        Args:
+            only: 仅处理这些 diff_type（如只应用显式配置的字段）；
+                None 表示应用全部差异。
+            force: 跳过差异判定，直接写入 only 指定的字段。用于“显式配置必须
+                落到 run 上”的场景（如表格 cell_run），此时当前值恰好落在容差
+                内也不应省略写入。
+        """
+        if force:
+            wanted = only if only is not None else set(_FORCE_FIELD_MAP)
+            diffs = [
+                DIFFResult(field, getattr(self, _FORCE_FIELD_MAP[field]), None, "")
+                for field in wanted
+                if field in _FORCE_FIELD_MAP
+            ]
+        else:
+            diffs = self.diff_from_run(run)
+            if only is not None:
+                diffs = [d for d in diffs if d.diff_type in only]
         result = []
         for diff in diffs:
             tmp_str = ""
@@ -377,28 +432,55 @@ class ParagraphStyle:
 
     def __init__(
         self,
-        alignment: str = "左对齐",
-        space_before: str = "0.5行",
-        space_after: str = "0.5行",
+        alignment: str | list[str] = "左对齐",
+        space_before: str | list[str] = "0.5行",
+        space_after: str | list[str] = "0.5行",
         line_spacing: str = "1.5倍",
-        line_spacingrule: str = "单倍行距",
-        first_line_indent: str = "0字符",
+        line_spacingrule: str | list[str] = "单倍行距",
+        first_line_indent: str | list[str] = "0字符",
         right_indent: str = "0字符",
         left_indent: str = "0字符",
         builtin_style_name: str = "正文",
     ):
-        self.alignment: Alignment = Alignment(alignment)
-        self.space_before: SpaceBefore = SpaceBefore(space_before)
-        self.space_after: SpaceAfter = SpaceAfter(space_after)
+        alignment_values = _as_option_values(alignment)
+        self.alignment: Alignment = Alignment(alignment_values[0])
+        self.alignment_options: list[Alignment] = [
+            Alignment(v) for v in alignment_values
+        ]
+        before_values = _as_option_values(space_before)
+        self.space_before: SpaceBefore = SpaceBefore(before_values[0])
+        self.space_before_options: list[SpaceBefore] = [
+            SpaceBefore(v) for v in before_values
+        ]
+        after_values = _as_option_values(space_after)
+        self.space_after: SpaceAfter = SpaceAfter(after_values[0])
+        self.space_after_options: list[SpaceAfter] = [
+            SpaceAfter(v) for v in after_values
+        ]
         self.line_spacing: LineSpacing | float = LineSpacing(line_spacing)
-        self.line_spacingrule: LineSpacingRule = LineSpacingRule(line_spacingrule)
-        self.first_line_indent: FirstLineIndent = FirstLineIndent(first_line_indent)
+        rule_values = _as_option_values(line_spacingrule)
+        self.line_spacingrule: LineSpacingRule = LineSpacingRule(rule_values[0])
+        self.line_spacingrule_options: list[LineSpacingRule] = [
+            LineSpacingRule(v) for v in rule_values
+        ]
+        indent_values = _as_option_values(first_line_indent)
+        self.first_line_indent: FirstLineIndent = FirstLineIndent(indent_values[0])
+        # 列表 = 等价规范（如参考文献条目允许悬挂/无缩进两种排版）
+        self.first_line_indent_options: list[FirstLineIndent] = [
+            FirstLineIndent(v) for v in indent_values
+        ]
         self.left_indent: LeftIndent = LeftIndent(left_indent)
         self.right_indent: RightIndent = RightIndent(right_indent)
         self.builtin_style_name: BuiltInStyle = BuiltInStyle(builtin_style_name)
 
-    def apply_to_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
-        """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果"""
+    def apply_to_paragraph(  # noqa C901
+        self, paragraph: Paragraph, skip: set[str] | None = None
+    ) -> list[DIFFResult]:
+        """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果。
+
+        skip: 本次不适用的 diff_type 集合（如短行标题的 first_line_indent）。
+        """
+        skip = skip or set()
         # 先检测当前段落与目标样式的差异
         diffs = self.diff_from_paragraph(paragraph)
         result = []
@@ -418,7 +500,7 @@ class ParagraphStyle:
 
         # 第二步：应用其他段落格式（对齐、缩进、间距等）
         for diff in diffs:
-            if diff.diff_type == "builtin_style_name":
+            if diff.diff_type == "builtin_style_name" or diff.diff_type in skip:
                 continue
             tmp_str = ""
             match diff.diff_type:
@@ -463,9 +545,11 @@ class ParagraphStyle:
         if not paragraph:
             return []
         diffs = []
-        # 对齐方式
+        # 对齐方式（未设置 → 继承自样式/文档默认，不报告）
         alignment = self.alignment.get_from_paragraph(paragraph)
-        if self.alignment != alignment:
+        if alignment is not None and not any(
+            opt == alignment for opt in self.alignment_options
+        ):
             diffs.append(
                 DIFFResult(
                     "alignment",
@@ -475,9 +559,11 @@ class ParagraphStyle:
                     0,
                 )
             )
-        # 段前间距
+        # 段前间距（未显式设置/继承链无值 → 视为未规定，不报告）
         space_before = self.space_before.get_from_paragraph(paragraph)
-        if self.space_before != space_before:
+        if space_before is not None and not any(
+            opt == space_before for opt in self.space_before_options
+        ):
             diffs.append(
                 DIFFResult(
                     "space_before",
@@ -487,9 +573,11 @@ class ParagraphStyle:
                     1,
                 )
             )
-        # 段后间距
+        # 段后间距（未设置 → 不报告）
         space_after = self.space_after.get_from_paragraph(paragraph)
-        if self.space_after != space_after:
+        if space_after is not None and not any(
+            opt == space_after for opt in self.space_after_options
+        ):
             diffs.append(
                 DIFFResult(
                     "space_after",
@@ -499,9 +587,15 @@ class ParagraphStyle:
                     1,
                 )
             )
-        # 行距选项
+        # 行距选项（未设置 → 不报告；显式多倍行距才参与比较）
         linespacingrule = self.line_spacingrule.get_from_paragraph(paragraph)
-        if self.line_spacingrule != linespacingrule:
+        line_spacing_value = paragraph_get_line_spacing(paragraph)
+        line_spacing_unset = (
+            linespacingrule == WD_LINE_SPACING.MULTIPLE and line_spacing_value is None
+        )
+        if not line_spacing_unset and not any(
+            opt == linespacingrule for opt in self.line_spacingrule_options
+        ):
             diffs.append(
                 DIFFResult(
                     "line_spacing_rule",
@@ -511,9 +605,9 @@ class ParagraphStyle:
                     2,
                 )
             )
-        # 行距
+        # 行距（未设置 → 不报告）
         line_spacing = self.line_spacing.get_from_paragraph(paragraph)
-        if self.line_spacing != line_spacing:
+        if line_spacing is not None and self.line_spacing != line_spacing:
             diffs.append(
                 DIFFResult(
                     "line_spacing",
@@ -523,9 +617,15 @@ class ParagraphStyle:
                     3,
                 )
             )
-        # 首行缩进
+        # 首行缩进（居中对齐时缩进无视觉意义，且常从正文样式继承，不检查）
+        centered = (
+            alignment == WD_ALIGN_PARAGRAPH.CENTER
+            or self.alignment.rel_value == WD_ALIGN_PARAGRAPH.CENTER
+        )
         first_line_indent = self.first_line_indent.get_from_paragraph(paragraph)
-        if self.first_line_indent != first_line_indent:
+        if not centered and not any(
+            opt == first_line_indent for opt in self.first_line_indent_options
+        ):
             diffs.append(
                 DIFFResult(
                     "first_line_indent",
@@ -616,8 +716,12 @@ class ParagraphStyle:
 
         kwargs = {}
         for field in fields:
-            if hasattr(config, field):
-                kwargs[field] = getattr(config, field)
-            # 如果没有，则使用 __init__ 的默认值（无需处理）
+            value = (
+                config.get(field)
+                if isinstance(config, dict)
+                else getattr(config, field, None)
+            )
+            if value is not None:
+                kwargs[field] = value
 
         return cls(**kwargs)

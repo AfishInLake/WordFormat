@@ -146,15 +146,18 @@ def print_tree(
     show_confidence: bool = False,
     show_index: bool = False,
     filter_categories: list[str] | None = None,
+    console=None,
 ) -> None:
     """以树形结构打印多叉树（使用 rich 渲染）。
 
-    支持直接传入 TreeNode 或 JSON 文件路径。
+    支持直接传入 TreeNode 或 JSON 文件路径；``console`` 可注入自定义
+    ``rich.console.Console``（如写入 StringIO，供 API/报告复用）。
     """
     from rich.console import Console
     from rich.table import Table
 
-    console = Console()
+    if console is None:
+        console = Console()
 
     if isinstance(node_or_jsonpath, str):
         node_or_jsonpath, paragraphs = _load_tree_from_json(node_or_jsonpath)
@@ -180,6 +183,30 @@ def print_tree(
     console.print(rich_tree)
 
 
+def render_tree(
+    node_or_jsonpath: TreeNode | str,
+    show_confidence: bool = False,
+    show_index: bool = False,
+    filter_categories: list[str] | None = None,
+    width: int = 120,
+) -> str:
+    """渲染结构树为纯文本（无 ANSI 颜色），供 API 返回或写入报告。"""
+    from io import StringIO
+
+    from rich.console import Console
+
+    buffer = StringIO()
+    console = Console(file=buffer, width=width, force_terminal=False, color_system=None)
+    print_tree(
+        node_or_jsonpath,
+        show_confidence=show_confidence,
+        show_index=show_index,
+        filter_categories=filter_categories,
+        console=console,
+    )
+    return buffer.getvalue()
+
+
 def _load_tree_from_json(json_path: str) -> tuple[TreeNode, list[dict]]:
     """从 JSON 文件加载段落列表并构建简单树。"""
     import json
@@ -193,36 +220,26 @@ def _load_tree_from_json(json_path: str) -> tuple[TreeNode, list[dict]]:
 
 def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
     """从扁平段落列表构建简单树（不依赖 config，仅用于展示）"""
+    from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
     from wordformat.tree import Stack
 
-    HEADING_CATEGORIES = {
-        "heading_level_1",
-        "heading_level_2",
-        "heading_level_3",
-        "heading_mulu",
-        "heading_fulu",
-        "references_title",
-        "acknowledgements_title",
-        "abstract_chinese_title",
-        "abstract_english_title",
-        "abstract_chinese_title_content",
-        "abstract_english_title_content",
+    # 展示用标题类别/层级从注册表派生（与树构建共享同一权威来源，
+    # 消除硬编码副本——多领域标签集不同时展示树仍正确）。
+    # 排除非标题/非挂载节点：正文、图表、公式与后处理扩展的占位类别。
+    _NON_HEADING = {
+        "body_text",
+        "math_block",
+        "figure_image",
+        "table_object",
+        "toc_entry",
+        "other",
+        "document_title",
+        "footer",
+        "keywords_chinese",
+        "keywords_english",
     }
-    LEVEL_MAP = {
-        "heading_level_1": 1,
-        "heading_level_2": 2,
-        "heading_level_3": 3,
-        "heading_mulu": 1,
-        "heading_fulu": 1,
-        "references_title": 1,
-        "acknowledgements_title": 1,
-        "abstract_chinese_title": 1,
-        "abstract_english_title": 1,
-        "abstract_chinese_title_content": 1,
-        "abstract_english_title_content": 1,
-        "keywords_chinese": 3,
-        "keywords_english": 3,
-    }
+    HEADING_CATEGORIES = {k for k in CATEGORY_TO_CLASS if k not in _NON_HEADING}
+    LEVEL_MAP = {k: v for k, v in LEVEL_MAP.items() if k in HEADING_CATEGORIES}
 
     stack = Stack()
     stack.push(root)
@@ -272,7 +289,8 @@ def _format_node_label(
     if isinstance(value, dict):
         cat = value.get("category", "unknown")
         para = str(value.get("paragraph", ""))[:50]
-        conf = value.get("confidence", None)
+        # gj/agent 产出的字段名是 score；confidence 为旧数据兼容
+        conf = value.get("score", value.get("confidence"))
         conf_str = f" ({conf:.0%})" if show_confidence and conf is not None else ""
         return f"{idx_str}[dim]{cat}[/dim]{conf_str} {para}"
     if hasattr(value, "paragraph") and isinstance(value.paragraph, dict):

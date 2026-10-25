@@ -3,7 +3,7 @@
 # @Author  : afish
 # @File    : settings.py
 
-from wordformat.rules import (  # noqa: F401 — 触发 @register 装饰器注册
+from wordformat.domains.thesis.rules import (  # noqa: F401 — 论文域节点，触发 @register
     AbstractContentCN,
     AbstractContentEN,
     AbstractTitleCN,
@@ -11,6 +11,11 @@ from wordformat.rules import (  # noqa: F401 — 触发 @register 装饰器注�
     AbstractTitleContentEN,
     AbstractTitleEN,
     Acknowledgements,
+    KeywordsCN,
+    KeywordsEN,
+    References,
+)
+from wordformat.rules import (  # noqa: F401 — 通用结构节点，触发 @register
     BodyText,
     CaptionFigure,
     CaptionTable,
@@ -18,9 +23,6 @@ from wordformat.rules import (  # noqa: F401 — 触发 @register 装饰器注�
     HeadingLevel1Node,
     HeadingLevel2Node,
     HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    References,
     TableObject,
 )
 from wordformat.structure.registry import _level_registry, _registry
@@ -36,6 +38,7 @@ CATEGORY_TO_CLASS.setdefault("footer", BodyText)  # 页脚/AI 生成声明（后
 # （heading_fulu 是模型真实标签，附录段落必然触发；heading_mulu 为结构性 terminal 类别）。
 CATEGORY_TO_CLASS.setdefault("heading_mulu", BodyText)  # 目录标题
 CATEGORY_TO_CLASS.setdefault("heading_fulu", BodyText)  # 附录标题
+CATEGORY_TO_CLASS.setdefault("toc_entry", BodyText)  # 目录条目（跳过格式化）
 
 LEVEL_MAP = _level_registry
 # 无对应 FormatNode 的特殊 terminal 类别

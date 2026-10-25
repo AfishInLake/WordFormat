@@ -3,6 +3,7 @@
 # @Author  : afish
 # @File    : caption.py
 
+import re
 
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
@@ -45,6 +46,9 @@ def _check_caption_numbering(
 
     text = paragraph.text.strip()
     if not text:
+        return
+    # “续表：/续表”只是跨页续表的引导标签，本身不带编号，不参与编号校验
+    if re.fullmatch(r"续?[图表]\s*[:：]?", text):
         return
 
     parsed = parse_caption_text(text)
@@ -110,6 +114,13 @@ def _check_caption_numbering(
         )
 
     if issues:
+        # 题注检查 hook：预设可追加自定义题注规则（追加到 issues 或覆写）
+        from wordformat.hooks import hooks
+
+        result = hooks.emit("on_caption_check", node=node, parsed=parsed, issues=issues)
+        issues = result.get("issues", issues)
+
+    if issues:
         node.add_comment(document, paragraph.runs, "\n".join(issues))
 
 
@@ -151,6 +162,21 @@ class CaptionFigure(FormatNode):
     DEFAULTS = deep_merge(
         BASE_FORMAT,
         {
+            "paragraph": {
+                # 题注常借用正文样式，居中/两端/左对齐、0/2 字符缩进都常见
+                "alignment": ["居中对齐", "两端对齐", "左对齐"],
+                "first_line_indent": ["0字符", "2字符"],
+                "space_before": ["0行", "0.5行"],
+                "space_after": ["0行", "0.5行"],
+                "line_spacingrule": [
+                    "1.5倍行距",
+                    "单倍行距",
+                    "固定值",
+                    "多倍行距",
+                ],
+                "builtin_style_name": "题注",
+            },
+            "font": {"font_size": ["五号", "小四"]},
             "caption_prefix": "图",
             "rules": {
                 "caption_numbering": {
@@ -162,6 +188,10 @@ class CaptionFigure(FormatNode):
         },
     )
     RULES = {"caption_numbering": "_handle_caption_numbering"}
+
+    def _para_checks_to_skip(self) -> set[str]:
+        # 题注只有一行，行距数值没有视觉意义
+        return {"line_spacing"}
 
     def _handle_caption_numbering(self, doc, rule_cfg, p: bool):
         """题注编号校验/修正"""
@@ -181,6 +211,20 @@ class CaptionTable(FormatNode):
     DEFAULTS = deep_merge(
         BASE_FORMAT,
         {
+            "paragraph": {
+                "alignment": ["两端对齐", "居中对齐", "左对齐"],
+                "first_line_indent": ["2字符", "0字符"],
+                "space_before": ["0行", "0.5行"],
+                "space_after": ["0行", "0.5行"],
+                "line_spacingrule": [
+                    "1.5倍行距",
+                    "单倍行距",
+                    "固定值",
+                    "多倍行距",
+                ],
+                "builtin_style_name": "题注",
+            },
+            "font": {"font_size": ["小四", "五号"]},
             "caption_prefix": "表",
             "rules": {
                 "caption_numbering": {
@@ -192,6 +236,9 @@ class CaptionTable(FormatNode):
         },
     )
     RULES = {"caption_numbering": "_handle_caption_numbering"}
+
+    def _para_checks_to_skip(self) -> set[str]:
+        return {"line_spacing"}
 
     def _handle_caption_numbering(self, doc, rule_cfg, p: bool):
         """题注编号校验/修正"""

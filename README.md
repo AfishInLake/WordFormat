@@ -16,6 +16,7 @@
 
 ### 核心能力
 - **智能文档结构解析**：基于 ONNX 模型自动识别文档中的标题、摘要、正文、关键词、参考文献等段落类型，生成结构化 JSON 配置文件
+- **结构短路识别**：图片段、公式段（OMML，含独立公式编号如「（2-1）」）与表格按 XML 结构直接判定，不依赖模型置信度，公式段还能按配置居中排版
 - **精细化格式校验**：支持段落格式（对齐、行距、缩进、段间距）和字符格式（字体、字号、颜色、加粗/斜体/下划线）的全维度检查
 - **多级别标题管理**：精准识别一级/二级/三级标题，支持自定义标题格式规范校验
 - **多语言适配**：区分中英文字体/格式规则，完美支持中英文混合文档的格式检查
@@ -27,6 +28,7 @@
 - **文档结构可视化**：通过 `wordf tree` 命令以树形结构展示文档段落分类和层级关系，支持按类别过滤、显示置信度
 - **格式一键修正**：支持根据规范自动修正部分常见格式问题（如标题字号、正文行距）
 - **标题自动编号**：支持自动清除手动编号并应用 Word 自动编号，可自定义编号模板（如"第X章"、"1.1.1"）、编号后缀（制表符/空格/无）和缩进设置
+- **页眉页脚与页面设置**：逐节校验字号/字体/对齐/内容缺失，修正时可插入 PAGE 页码域，并写入页边距、纸张尺寸与方向、起始页码与页码格式、首页不同、奇偶页不同、打开时更新域
 - **Web 可视化界面**：内置 Vue 前端界面，通过 `wordf startapi` 一键启动图形化操作面板，告别命令行
 - **自定义配置**：通过 YAML 配置文件灵活定义格式规范，适配不同学校/期刊的格式要求
 - **跨平台兼容**：支持 Windows/macOS/Linux 系统，基于 python-docx 实现跨平台 Word 文档处理
@@ -147,7 +149,13 @@ python -m wordformat startapi
 
 ## 预设配置
 
-项目内置了多所高校的论文格式预设，保存在 `presets/` 目录下，可直接使用或在此基础上修改。
+预设机制位于 `presets/` 目录：仓库内提供 `presets/_template.py` 作为编写范例，各校预设需自行添加后使用。
+复制 `_template.py` 为 `presets/<你的预设名>.py` 并实现 `register(hooks)`，约定与可用事件见该文件顶部说明。
+
+```bash
+# 查看当前已安装的预设（未添加时提示暂无可用预设）
+wordf list-presets
+```
 
 ## 详细文档
 
@@ -159,7 +167,7 @@ python -m wordformat startapi
 - [Markdown 转 Word](https://github.com/AfishInLake/WordFormat/blob/master/docs/md-to-docx.md) - Markdown → Docx 转换功能介绍与使用说明
 - [常见问题](https://github.com/AfishInLake/WordFormat/blob/master/docs/faq.md) - 常见问题及解决方案
 - [贡献指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/contributing.md) - 如何为项目贡献代码和文档
-- [技术架构](https://github.com/AfishInLake/WordFormat/blob/master/docs/architecture.md) - 项目的技术架构和实现原理
+- [规则处理器指南](https://github.com/AfishInLake/WordFormat/blob/master/docs/rule-handler-guide.md) - 如何新增/自定义格式规则节点
 
 ## Star History
 

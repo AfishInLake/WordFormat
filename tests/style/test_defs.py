@@ -137,16 +137,31 @@ class TestFontSize:
     @pytest.mark.parametrize(
         "label,expected",
         [
-            ("小四", 12),
-            ("四号", 14),
-            ("三号", 16),
-            ("五号", 10.5),
+            ("初号", 42),
+            ("小初", 36),
             ("一号", 26),
+            ("小一", 24),
+            ("二号", 22),
+            ("小二", 18),
+            ("三号", 16),
+            ("小三", 15),
+            ("四号", 14),
+            ("小四", 12),
+            ("五号", 10.5),
+            ("小五", 9),
+            ("六号", 7.5),
+            ("小六", 6.5),
             ("七号", 5.5),
+            ("八号", 5),
         ],
     )
     def test_label_map(self, label, expected):
+        """SKILL 附带的字号对照表（16 档）必须全部可解析。"""
         assert FontSize(label).rel_value == expected
+
+    def test_all_labels_have_unique_pt(self):
+        values = list(FontSize._LABEL_MAP.values())
+        assert len(values) == len(set(values))
 
     def test_bare_number_rel_value_is_float(self):
         """裸数字（无单位）→ float 转换。"""
@@ -921,3 +936,22 @@ class TestBuiltInStyleBaseSetElseBranch:
         # This should succeed since Normal is a valid style
         bis.base_set(p)
         assert p.style.name == "Normal"
+
+
+class TestIndentEqualityTolerance:
+    """WPS 微调量补偿（0.25/0.26 字符微调、2.2 字符悬挂）在视觉上等同规范值。"""
+
+    def test_left_indent_within_tolerance_is_equal(self):
+        assert LeftIndent("0.25字符") == LeftIndent("0字符")
+        assert LeftIndent("0.25字符") == 0.0
+
+    def test_left_indent_beyond_tolerance_differs(self):
+        assert not (LeftIndent("1字符") == LeftIndent("0字符"))
+
+    def test_first_line_indent_half_char_tolerance(self):
+        # 2.2 字符（WPS 五号下名义 2 字符）应在容差内
+        assert FirstLineIndent("2.2字符") == FirstLineIndent("2字符")
+        assert not (FirstLineIndent("3字符") == FirstLineIndent("2字符"))
+
+    def test_indent_hashable(self):
+        assert len({LeftIndent("2.2字符"), LeftIndent("2.2字符")}) == 1

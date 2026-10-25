@@ -4,11 +4,20 @@
 # @File    : tree_builder.py
 # wordformat/tree_builder.py
 
+from typing import Optional
+
 from wordformat.rules.node import FormatNode
+from wordformat.structure.registry import Registry
 from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 from wordformat.tree import Stack
 
-_NON_HEADING = {"body_text", "math_block", "figure_image", "table_object"}
+_NON_HEADING = {
+    "body_text",
+    "math_block",
+    "figure_image",
+    "table_object",
+    "toc_entry",
+}
 
 _HEADING_CATEGORIES = {
     k: v for k, v in CATEGORY_TO_CLASS.items() if k not in _NON_HEADING
@@ -21,9 +30,18 @@ class DocumentTreeBuilder:
     HEADING_CATEGORIES = _HEADING_CATEGORIES
     CONFIG = {}
 
-    def __init__(self):
+    def __init__(self, registry: Optional[Registry] = None):
         self.stack = Stack()
         self._config = {}
+        # 领域注册表实例；None = 默认领域（论文），与历史行为一致
+        self._registry = registry
+
+    def _heading_categories(self) -> dict:
+        """标题类别表：领域注册表优先（多领域标签集不同时树构建仍正确），
+        默认实例回退类级静态表（导入时快照，兼容既有引用）。"""
+        if self._registry is not None:
+            return {k: v for k, v in self._registry.items() if k not in _NON_HEADING}
+        return self.HEADING_CATEGORIES
 
     def build_tree(self, items: list[dict]) -> FormatNode:
         """
@@ -58,15 +76,14 @@ class DocumentTreeBuilder:
 
     def _determine_level(self, category: str) -> int:
         """根据 category 映射到逻辑层级"""
+        if self._registry is not None:
+            return self._registry.level_of(category)
         return LEVEL_MAP.get(category, 999)
 
-    # 目录和附录：作为标题节点挂载，隔离子树，但不参与格式化
-    TERMINAL_CATEGORIES = {"heading_mulu", "heading_fulu"}
-
+    # 标题类类别：目录/附录已注册进 CATEGORY_TO_CLASS，自动落在 HEADING_CATEGORIES 中，
+    # 其子树隔离依赖 LEVEL_MAP 给定的层级（heading_mulu/heading_fulu = 1）
     def _is_heading_category(self, category: str) -> bool:
-        return (
-            category in self.HEADING_CATEGORIES or category in self.TERMINAL_CATEGORIES
-        )
+        return category in self._heading_categories()
 
     def _attach_heading_node(self, node: FormatNode):
         """处理标题类节点：维护栈层级"""

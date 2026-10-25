@@ -23,14 +23,7 @@ class NodeConfigRoot(dict):
         try:
             val = self[key]
         except KeyError:
-            # fallback：到 paragraph / font 子字典中查找
-            for sub in ("paragraph", "font"):
-                sub_dict = self.get(sub)
-                if isinstance(sub_dict, dict) and key in sub_dict:
-                    val = sub_dict[key]
-                    break
-            else:
-                return None
+            return None
         if isinstance(val, dict) and not isinstance(val, NodeConfigRoot):
             return NodeConfigRoot(**val)
         return val
@@ -42,9 +35,22 @@ class NodeConfigRoot(dict):
         return dict(self)
 
     def collect_style_configs(self) -> dict[str, dict]:
-        style_map: dict[str, dict] = {}
-        _walk_config_for_styles(self, style_map)
-        return style_map
+        """收集每个内置样式在所有节点中一致的格式字段。
+
+        同名样式常被多个节点复用（Normal 被正文、参考文献、致谢共享）。
+        Word 的样式定义只有一份，若直接写入某个节点的完整配置，会把该
+        节点的字体/缩进等泄漏给其他未显式覆盖该属性的段落（典型如表格
+        单元格、页眉页脚）。因此这里只保留所有节点都显式给出且取值相同
+        的字段；存在冲突的字段交给各节点的直接格式处理。
+
+        锚点模板（global_format）和表格对象（tables.object）不对应实际
+        段落，跳过以免污染同名样式。
+        """
+        occurrences: dict[str, list[dict]] = {}
+        _walk_config_for_styles(self, occurrences)
+        return {
+            name: _intersect_configs(configs) for name, configs in occurrences.items()
+        }
 
 
 def _resolve_builtin_style_name(cfg) -> str | None:
@@ -90,12 +96,33 @@ class NumberingConfig(dict):
         return val
 
 
-def _walk_config_for_styles(obj, style_map: dict[str, object]) -> None:
+# 这些配置项不是实际段落，不能参与样式定义收集
+_STYLE_EXCLUDED_PATHS = {
+    ("global_format",),
+    ("tables", "object"),
+}
+
+
+def _intersect_configs(configs: list[dict]) -> dict:
+    """只保留所有配置都显式给出且取值一致的字段。"""
+    common_keys = set(configs[0])
+    for cfg in configs[1:]:
+        common_keys &= set(cfg)
+    return {
+        key: configs[0][key]
+        for key in common_keys
+        if all(cfg[key] == configs[0][key] for cfg in configs[1:])
+    }
+
+
+def _walk_config_for_styles(obj, occurrences: dict[str, list[dict]], path=()) -> None:
     if not isinstance(obj, dict):
+        return
+    if path in _STYLE_EXCLUDED_PATHS:
         return
     eng_name = _resolve_builtin_style_name(obj)
     if eng_name and isinstance(eng_name, str):
-        style_map[eng_name] = obj
-    for _key, val in obj.items():
+        occurrences.setdefault(eng_name, []).append(dict(obj))
+    for key, val in obj.items():
         if isinstance(val, dict):
-            _walk_config_for_styles(val, style_map)
+            _walk_config_for_styles(val, occurrences, (*path, key))

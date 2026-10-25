@@ -6,32 +6,13 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from wordformat.config.models import NodeConfigRoot
 from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    AcknowledgementsCN,
-    BodyText,
-    CaptionFigure,
-    CaptionTable,
-    FormatNode,
     HeadingLevel1Node,
     HeadingLevel2Node,
     HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    ReferenceEntry,
-    References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -141,7 +122,7 @@ class TestHeadingLevel1NodeBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
     def test_check_returns_issues_list(self, root_config):
         """返回值应为包含 issue 字典的列表。"""
@@ -202,7 +183,7 @@ class TestHeadingLevel2NodeBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
     def test_check_returns_issues(self, root_config):
         """返回值应包含 issue 字典。"""
@@ -245,7 +226,7 @@ class TestHeadingLevel3NodeBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
     def test_check_returns_issues(self, root_config):
         """返回值应包含 issue 字典。"""
@@ -326,7 +307,7 @@ class TestHeadingLevelNodes:
 
     def test_heading_base_with_config(self, sample_yaml_config):
         """_base method with loaded config"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
         from wordformat.rules.heading import HeadingLevel1Node
 
         init_config(sample_yaml_config)

@@ -88,14 +88,18 @@ class KeywordsEN(BaseKeywordsNode):
     DEFAULTS = deep_merge(
         BASE_FORMAT,
         {
-            "paragraph": {"first_line_indent": "0字符"},
+            "paragraph": {
+                "alignment": "两端对齐",
+                "first_line_indent": "2字符",
+            },
             "font": {"chinese_font_name": "宋体", "font_size": "小四"},
             "label": {
                 "chinese_font_name": "黑体",
                 "english_font_name": "Times New Roman",
-                "font_size": "三号",
+                "font_size": ["四号", "小四"],
                 "font_color": "黑色",
-                "bold": True,
+                # 关键词标签常用黑体加粗，也有不加粗的模板，不做硬性要求
+                "bold": None,
                 "italic": False,
                 "underline": False,
             },
@@ -191,9 +195,9 @@ class KeywordsEN(BaseKeywordsNode):
             cstyle = label_style if is_label else content_style
             target = f"{self.NODE_LABEL}标签" if is_label else f"{self.NODE_LABEL}内容"
             if p:
-                diff = cstyle.diff_from_run(run)
+                diff = self._diff_run_style(cstyle, run)
             else:
-                diff = cstyle.apply_to_run(run)
+                diff = self._apply_run_style(cstyle, run)
             if diff:
                 self.add_comment(
                     doc=doc,
@@ -217,14 +221,18 @@ class KeywordsCN(BaseKeywordsNode):
     DEFAULTS = deep_merge(
         BASE_FORMAT,
         {
-            "paragraph": {"first_line_indent": "0字符"},
+            "paragraph": {
+                "alignment": "两端对齐",
+                "first_line_indent": "2字符",
+            },
             "font": {"chinese_font_name": "宋体", "font_size": "小四"},
             "label": {
                 "chinese_font_name": "黑体",
                 "english_font_name": "Times New Roman",
-                "font_size": "三号",
+                "font_size": ["四号", "小四"],
                 "font_color": "黑色",
-                "bold": True,
+                # 关键词标签常用黑体加粗，也有不加粗的模板，不做硬性要求
+                "bold": None,
                 "italic": False,
                 "underline": False,
             },
@@ -353,9 +361,9 @@ class KeywordsCN(BaseKeywordsNode):
             cstyle = label_style if is_label else content_style
             target = f"{self.NODE_LABEL}标签" if is_label else f"{self.NODE_LABEL}内容"
             if p:
-                diff = cstyle.diff_from_run(run)
+                diff = self._diff_run_style(cstyle, run)
             else:
-                diff = cstyle.apply_to_run(run)
+                diff = self._apply_run_style(cstyle, run)
             if diff:
                 self.add_comment(
                     doc=doc,

@@ -29,6 +29,9 @@ jobs:
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
@@ -37,16 +40,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
-
-      - name: Cache ONNX Model
-        uses: actions/cache@v5.0.3
-        id: cache-model
-        with:
-          path: src/wordformat/data
-          key: ${{ runner.os }}-onnx-model-${{ env.MODEL_VERSION }}
-          enableCrossOsArchive: true
-        env:
-          MODEL_VERSION: "modelv1.0"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6.2.0
@@ -65,10 +58,6 @@ jobs:
 
       - name: Install project dependencies
         run: uv pip install --system -e ".[dev]"
-
-      - name: Download Model (if not cached)
-        if: steps.cache-model.outputs.cache-hit != 'true'
-        run: python scripts/download_model.py
 
       - name: Run tests
         run: make tests

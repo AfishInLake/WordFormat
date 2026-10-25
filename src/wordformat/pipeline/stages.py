@@ -10,22 +10,11 @@ from docx.document import Document as DocumentObject
 from docx.shared import Pt, RGBColor
 
 from wordformat.config.loader import load_config
-from wordformat.hyperlinks import create_citation_hyperlinks
+from wordformat.config.models import NodeConfigRoot
 from wordformat.log_config import logger
-from wordformat.rules.abstract import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleEN,
-)
-from wordformat.rules.acknowledgement import Acknowledgements, AcknowledgementsCN
-from wordformat.rules.caption import CaptionFigure, CaptionTable
-from wordformat.rules.keywords import KeywordsCN, KeywordsEN
 from wordformat.rules.node import FormatNode
-from wordformat.rules.references import ReferenceEntry, References
 from wordformat.settings import VOIDNODELIST
 from wordformat.structure.document_builder import DocumentBuilder
-from wordformat.structure.utils import promote_bodytext_in_subtrees_of_type
 from wordformat.style.defs import (
     Alignment,
     FirstLineIndent,
@@ -48,11 +37,8 @@ from wordformat.style.xml_ops import (
     ensure_pPr,
 )
 from wordformat.utils import (
-    count_chinese_chars,
     ensure_directory_exists,
     get_file_name,
-    has_chinese,
-    parse_caption_text,
 )
 
 from .context import FormatContext
@@ -70,7 +56,31 @@ class LoadConfigStage:
                 logger.error(f"配置加载失败: {str(e)}")
                 raise
         else:
+            ctx.config_model = NodeConfigRoot()
             logger.info("未提供配置文件，使用默认配置")
+
+        # 预设 manifest 深合并：用户配置最优先，后加载预设覆盖先加载预设
+        if ctx.preset_manifests:
+            from wordformat.config.dotdict import deep_merge
+
+            merged = dict(ctx.config_model)
+            for manifest in ctx.preset_manifests:
+                merged = deep_merge(manifest, merged)
+
+            ctx.config_model = NodeConfigRoot(**merged)
+
+        # 配置加载完成 hook：预设可修改/补充配置
+        from wordformat.hooks import hooks
+
+        result = hooks.emit("on_config_loaded", config=ctx.config_model)
+        ctx.config_model = result.get("config", ctx.config_model)
+
+        # 结构类别策略：YAML `structure` 段覆盖默认值（哪些类别格式化/隔离子树）
+        from wordformat.settings import resolve_structure_categories
+
+        resolved = resolve_structure_categories(ctx.config_model)
+        ctx.void_categories = resolved["void"]
+        ctx.skip_children_categories = resolved["skip_children"]
         return ctx
 
 
@@ -89,31 +99,54 @@ class TreeBuildingStage:
     否则从 ctx.json_path 加载 JSON 文件。
     """
 
+    def __init__(self, registry=None):
+        """registry: 领域注册表实例（get_registry(domain)），None = 默认论文域。"""
+        self._registry = registry
+
     def process(self, ctx: FormatContext) -> FormatContext:
         source = ctx.paragraphs if ctx.paragraphs else ctx.json_path
-        ctx.root_node = DocumentBuilder.build_from_json(source, config=ctx.config_model)
+        ctx.root_node = DocumentBuilder.build_from_json(
+            source, config=ctx.config_model, registry=self._registry
+        )
+        # 文档树构建完成 hook：预设可自定义节点分类
+        from wordformat.hooks import hooks
+
+        result = hooks.emit(
+            "on_tree_built", root_node=ctx.root_node, config=ctx.config_model
+        )
+        ctx.root_node = result.get("root_node", ctx.root_node)
         return ctx
 
 
 class ParagraphAlignmentStage:
     """展平树并对齐段落 pipline"""
 
+    @staticmethod
+    def _is_detached_table(node) -> bool:
+        """原文档已有表格（exists）或 sync 忽略的表格不占用段落槽位。"""
+        value = getattr(node, "value", None)
+        if not isinstance(value, dict) or value.get("category") != "table_object":
+            return False
+        return bool(value.get("exists") or value.get("sync_skip"))
+
     def process(self, ctx: FormatContext) -> FormatContext:
         nodes = self._flatten_tree_nodes(ctx.root_node)
+        # 表格节点（exists/sync_skip）不绑定段落，因此不参与 zip 计数
+        paragraph_nodes = [n for n in nodes if not self._is_detached_table(n)]
         paragraphs = ctx.document.paragraphs
-        if len(nodes) != len(paragraphs):
+        if len(paragraph_nodes) != len(paragraphs):
             # 节点数不等于段落数时，zip 会静默错位：后面的节点整体前移，
             # 导致 keywords_chinese/caption_figure/heading_level_* 等规则
             # 被应用到错误段落（如正文被加“图1.1”前缀）。必须显式报错。
             # 常见诱因：生成节点后更换了文档；或前端页面版本过旧
             # （旧版会过滤 figure_image 占位节点）。
             raise ValueError(
-                f"当前文档({len(paragraphs)} 段)与节点 JSON({len(nodes)} 节点)不一致，"
+                f"当前文档({len(paragraphs)} 段)与节点 JSON({len(paragraph_nodes)} 节点)不一致，"
                 "两者必须一一对应。可能是生成节点后又换过文档，"
                 "或页面版本过旧（旧版会过滤占位节点）。"
                 "请刷新页面后重新上传文档并点击「生成节点JSON」，再执行格式化。"
             )
-        for node, para in zip(nodes, paragraphs, strict=True):
+        for node, para in zip(paragraph_nodes, paragraphs, strict=True):
             node.paragraph = para
         return ctx
 
@@ -131,19 +164,17 @@ class ParagraphAlignmentStage:
 
 
 class TreeNormalizationStage:
-    """提升子树（摘要、参考文献）"""
+    """提升子树（摘要、参考文献）—— 机制由论文领域 handler 承担。"""
 
     def process(self, ctx: FormatContext) -> FormatContext:
-        mappings = {
-            AbstractTitleCN: AbstractContentCN,
-            AbstractTitleEN: AbstractContentEN,
-            References: ReferenceEntry,
-            Acknowledgements: AcknowledgementsCN,
-        }
-        for parent_cls, target_cls in mappings.items():
-            promote_bodytext_in_subtrees_of_type(
-                ctx.root_node, parent_type=parent_cls, target_type=target_cls
-            )
+        from wordformat.hooks import hooks
+
+        hooks.emit(
+            "on_tree_normalize",
+            root_node=ctx.root_node,
+            config=ctx.config_model,
+            check=ctx.check,
+        )
         return ctx
 
 
@@ -287,18 +318,29 @@ class StyleDefinitionFixStage:
         """在格式化开始前，统一修正文档中所有使用的样式定义。
 
         遍历配置中所有段（body_text、headings、abstract、figures、tables、
-        references、acknowledgements 等），收集唯一的 builtin_style_name，
-        然后修正每个样式定义的字符格式和段落格式，使其与配置一致。
+        references、acknowledgements 等），收集唯一的 builtin_style_name
+        及其在所有节点间一致的格式字段，然后修正样式定义。
 
         修正内容：
         1. 字符格式：中英文字体、字号、颜色（清除主题色）、加粗、斜体、下划线
         2. 段落格式：对齐方式
         3. 确保样式定义存在（不存在则创建）
+
+        注意：
+        - 同名样式被多个节点复用时，只应用取值一致的字段，冲突字段由
+          各节点的直接格式保证，避免把某一节点的缩进/字体泄漏给其他段落。
+        - Normal 是表格单元格、页眉页脚、题注等的公共基样式，正文/参考
+          文献/致谢对它的配置通常互相冲突；写入任一份都会污染这些未显式
+          覆盖的段落，因此不修改 Normal 定义本身。
         """
 
         style_configs = config_model.collect_style_configs()
 
         for eng_style_name, cfg in style_configs.items():
+            if eng_style_name == "Normal":
+                logger.debug("跳过共享基样式定义修正: Normal")
+                continue
+
             ensure_style_exists(document, eng_style_name)
 
             try:
@@ -307,8 +349,12 @@ class StyleDefinitionFixStage:
                 logger.warning(f"样式 '{eng_style_name}' 创建失败，跳过修正")
                 continue
 
-            self._fix_style_run_properties(style, cfg, eng_style_name)
-            self._fix_style_paragraph_properties(style, cfg, eng_style_name)
+            # collect_style_configs 返回普通 dict；转成支持点号访问的容器，
+            # 否则 getattr(cfg, ...) 全部取到 None，修正会静默失效。
+            cfg_view = NodeConfigRoot()
+            cfg_view.update(cfg)
+            self._fix_style_run_properties(style, cfg_view, eng_style_name)
+            self._fix_style_paragraph_properties(style, cfg_view, eng_style_name)
 
             logger.debug(f"已修正样式定义: {eng_style_name}")
 
@@ -325,7 +371,13 @@ class FormattingExecutionStage:
         self.skip_comments = skip_comments
 
     def apply_format_check_to_all_nodes(
-        self, root_node: FormatNode, document, config, check=True
+        self,
+        root_node: FormatNode,
+        document,
+        config,
+        check=True,
+        void_categories=None,
+        skip_children_categories=None,
     ):
         """
         递归遍历文档树中的所有节点，
@@ -335,23 +387,23 @@ class FormattingExecutionStage:
         :param document: docx文档的实例
         :param config: 配置文件
         :param check: 用来控制是仅检查还是仅修改
+        :param void_categories: 不参与格式化的类别集合（None = 内置 VOIDNODELIST；[] = 不排除任何类别）
+        :param skip_children_categories: 子树不遍历的类别集合（None = 内置默认；[] = 全部遍历）
         """
+        from wordformat.hooks import hooks
+        from wordformat.settings import DEFAULT_SKIP_CHILDREN_CATEGORIES
 
-        chapter_index: int = 0
-        figure_counter: dict[int, int] = {}
-        table_counter: dict[int, int] = {}
+        void_set = set(VOIDNODELIST if void_categories is None else void_categories)
+        skip_children_set = set(
+            DEFAULT_SKIP_CHILDREN_CATEGORIES
+            if skip_children_categories is None
+            else skip_children_categories
+        )
 
-        def traverse(node, parent_category="", current_chapter: int = 0):
-            nonlocal chapter_index
-
+        def traverse(node, parent_category=""):
             category = (
                 node.value.get("category", "") if isinstance(node.value, dict) else ""
             )
-
-            # 遇到一级标题时递增章节号
-            if category == "heading_level_1":
-                chapter_index += 1
-                current_chapter = chapter_index
 
             if hasattr(node, "check_format"):
                 try:
@@ -360,182 +412,70 @@ class FormattingExecutionStage:
                     is_top_direct_body_text = (
                         parent_category == "top" and category == "body_text"
                     )
-                    if category not in VOIDNODELIST and not is_top_direct_body_text:
+                    if category not in void_set and not is_top_direct_body_text:
                         node.load_config(config)
-
-                        # 对题注节点注入章节号和顺序号
-                        if isinstance(node, (CaptionFigure, CaptionTable)):
-                            # 检查是否为续表/续图：保留原标题注编号，不递增计数器
-                            text = node.paragraph.text.strip() if node.paragraph else ""
-                            parsed = parse_caption_text(text)
-                            if (
-                                parsed
-                                and parsed.get("is_continued")
-                                and parsed.get("chapter_num") is not None
-                                and parsed.get("number_num") is not None
-                            ):
-                                chapter = parsed["chapter_num"]
-                                seq = parsed["number_num"]
-                            else:
-                                chapter = current_chapter if current_chapter > 0 else 0
-                                if isinstance(node, CaptionFigure):
-                                    counter = figure_counter
-                                else:
-                                    counter = table_counter
-                                counter[chapter] = counter.get(chapter, 0) + 1
-                                seq = counter[chapter]
-                            node.value["chapter_number"] = chapter
-                            node.value["sequence_number"] = seq
-
-                        # 给所有节点注入章节号（BodyText 引用上标需要）
-                        if isinstance(node.value, dict):
-                            node.value.setdefault("chapter_number", current_chapter)
 
                         if node.paragraph:
                             # 先执行内容替换（check/format 两种模式均执行）
                             node.apply_replace(document)
+                            # 节点格式化 hook：领域（题注编号注入）与预设都在此处理
+                            hooks.emit(
+                                "before_node_format",
+                                node=node,
+                                paragraph=node.paragraph,
+                                config=config,
+                                check=check,
+                            )
                             if check:
                                 node.check_format(document)
                             elif self.skip_comments:
                                 node.apply_style(document)
                             else:
                                 node.apply_format(document)
+                            hooks.emit(
+                                "after_node_format",
+                                node=node,
+                                paragraph=node.paragraph,
+                                config=config,
+                                check=check,
+                            )
                 except Exception as e:
                     logger.warning(f"Node {node} not format, because: {str(e)}")
                     raise e
 
-            # 目录、附录、封面/声明的子节点跳过格式化
-            SKIP_CHILDREN_CATEGORIES = {"heading_mulu", "heading_fulu", "other"}
-            if category not in SKIP_CHILDREN_CATEGORIES:
+            # 目录、附录、封面/声明等 skip_children 类别的子节点跳过格式化
+            if category not in skip_children_set:
                 for child in node.children:
-                    traverse(
-                        child, parent_category=category, current_chapter=current_chapter
-                    )
+                    traverse(child, parent_category=category)
 
         traverse(root_node)
 
     def process(self, ctx: FormatContext) -> FormatContext:
         if ctx.check:
             FormatNode.reset_stats()
+        # 格式化开始 hook：领域 handler 在此重置自己的遍历状态（如论文题注编号）
+        from wordformat.hooks import hooks
+
+        hooks.emit(
+            "on_format_begin",
+            root_node=ctx.root_node,
+            document=ctx.document,
+            config=ctx.config_model,
+            check=ctx.check,
+        )
         self.apply_format_check_to_all_nodes(
-            ctx.root_node, ctx.document, ctx.config_model, ctx.check
+            ctx.root_node,
+            ctx.document,
+            ctx.config_model,
+            ctx.check,
+            void_categories=ctx.void_categories,
+            skip_children_categories=ctx.skip_children_categories,
         )
         return ctx
 
 
 class SummaryGenerationStage:
-    """生成检测报告摘要（仅 check 模式）"""
-
-    def _build_check_summary(self, root_node, document, config_model) -> str:
-        """遍历树和错误统计，生成检测报告摘要文本。"""
-        stats = FormatNode._error_stats
-        total = stats["total"]
-
-        # 遍历树，收集文档级统计
-
-        def _collect_section(node, sections):
-            cls_name = type(node).__name__
-            para = node.paragraph
-            if para and para.text.strip():
-                text = para.text.strip()
-                if cls_name == "AbstractContentCN":
-                    cn_chars = count_chinese_chars(text)
-                    if cn_chars:
-                        sections["abstract_cn_chars"] = (
-                            sections.get("abstract_cn_chars", 0) + cn_chars
-                        )
-                elif cls_name == "AbstractContentEN":
-                    sections["abstract_en_words"] = sections.get(
-                        "abstract_en_words", 0
-                    ) + len(text.split())
-                elif cls_name == "KeywordsCN":
-                    kws = KeywordsCN.extract_keywords(text)
-                    if kws:
-                        sections["keyword_cn_count"] = len(kws)
-                elif cls_name == "KeywordsEN":
-                    kws = KeywordsEN.extract_keywords(text)
-                    if kws:
-                        sections["keyword_en_count"] = len(kws)
-                elif cls_name == "ReferenceEntry":
-                    if has_chinese(text):
-                        sections["ref_cn"] = sections.get("ref_cn", 0) + 1
-                    else:
-                        sections["ref_en"] = sections.get("ref_en", 0) + 1
-            # 处理混合节点：AbstractTitleContentCN/EN 的子 BodyText 是摘要正文
-            if cls_name == "AbstractTitleContentCN":
-                for child in node.children:
-                    cp = child.paragraph
-                    if cp and cp.text.strip():
-                        cnt = count_chinese_chars(cp.text.strip())
-                        sections["abstract_cn_chars"] = (
-                            sections.get("abstract_cn_chars", 0) + cnt
-                        )
-            elif cls_name == "AbstractTitleContentEN":
-                for child in node.children:
-                    cp = child.paragraph
-                    if cp and cp.text.strip():
-                        cnt = len(cp.text.strip().split())
-                        sections["abstract_en_words"] = (
-                            sections.get("abstract_en_words", 0) + cnt
-                        )
-            for child in node.children:
-                _collect_section(child, sections)
-
-        sections: dict = {}
-        _collect_section(root_node, sections)
-
-        # 计算万字差错率
-        total_chars = sum(
-            len(p.text) for p in document.paragraphs if p.text and p.text.strip()
-        )
-        error_rate = (total / max(total_chars, 1)) * 10000 if total else 0
-
-        # 模板名（从 config 读取）
-        template_name = getattr(config_model, "template_name", None) or "未知模板"
-
-        lines = [
-            "检测结果：",
-            f"检测模板：《{template_name}》",
-            f"检测错误数：{total}，万字差错率：{error_rate:.1f}",
-            f"错误：{stats.get('错误', 0)}，提醒：{stats.get('提醒', 0)}",
-        ]
-
-        # 字数问题
-        word_issues = []
-        if sections.get("abstract_cn_chars"):
-            word_issues.append(
-                f"中文摘要：规范：300字左右，原文：{sections['abstract_cn_chars']}字"
-            )
-        if sections.get("abstract_en_words"):
-            word_issues.append(
-                f"英文摘要：规范：300字左右，原文：{sections['abstract_en_words']}词"
-            )
-        if sections.get("keyword_cn_count"):
-            word_issues.append(
-                f"中文关键词：规范：3-5个，原文：{sections['keyword_cn_count']}个"
-            )
-        if sections.get("keyword_en_count"):
-            word_issues.append(
-                f"英文关键词：规范：3-5个，原文：{sections['keyword_en_count']}个"
-            )
-        ref_cn = sections.get("ref_cn", 0)
-        ref_en = sections.get("ref_en", 0)
-        if ref_cn or ref_en:
-            word_issues.append(
-                f"参考文献：规范：不少于15条，原文：中文{ref_cn}条;外文{ref_en}条"
-            )
-        if word_issues:
-            lines.append("字数问题：")
-            lines.extend(word_issues)
-
-        lines.append("说明：")
-        lines.append(
-            "1.请确保文档中正确使用换行符，硬回车（Enter）：指换行且生成新段落；软回车（Shift+Enter）：指换行但不生成新段落。"
-        )
-        lines.append("2.图片请使用“嵌入型”环绕方式，表格为无环绕方式。")
-        lines.append("3.提醒不计算错误。")
-
-        return "\n".join(lines)
+    """生成检测报告摘要（仅 check 模式）—— 摘要文本由 on_summary_build 内置 handler 产出。"""
 
     def _add_summary_comment(self, document, summary: str) -> None:
         """将检测报告摘要作为批注添加到文档第一段。空段临时塞空 run 做锚点。"""
@@ -548,36 +488,18 @@ class SummaryGenerationStage:
 
     def process(self, ctx: FormatContext) -> FormatContext:
         if ctx.check:
-            summary = self._build_check_summary(
-                ctx.root_node, ctx.document, ctx.config_model
+            from wordformat.hooks import hooks
+
+            result = hooks.emit(
+                "on_summary_build",
+                root_node=ctx.root_node,
+                document=ctx.document,
+                config=ctx.config_model,
+                check=ctx.check,
             )
+            summary = result.get("summary")
             if summary:
                 self._add_summary_comment(ctx.document, summary)
-        return ctx
-
-
-class PostProcessingStage:
-    """后处理（编号 + 超链接，仅 apply 模式）"""
-
-    def process(self, ctx: FormatContext) -> FormatContext:
-        if ctx.check:
-            return ctx
-        config_model = ctx.config_model
-        # 标题编号
-        numbering = config_model.numbering
-        if numbering and getattr(numbering, "enabled", False):
-            from wordformat.numbering import process_heading_numbering
-
-            process_heading_numbering(
-                ctx.root_node,
-                ctx.document,
-                numbering,
-                config_model.headings,
-            )
-
-        # 引用超链接
-        create_citation_hyperlinks(ctx.root_node, ctx.document)
-
         return ctx
 
 
@@ -585,6 +507,17 @@ class DocumentSavingStage:
     """保存文档"""
 
     def process(self, ctx: FormatContext) -> FormatContext:
+        # 保存前 hook：机制（标题编号/超链接、页眉页脚修正等）及预设都在此触发
+        from wordformat.hooks import hooks
+
+        hooks.emit(
+            "before_document_save",
+            document=ctx.document,
+            config=ctx.config_model,
+            ctx=ctx,
+            check=ctx.check,
+        )
+
         ensure_directory_exists(ctx.save_dir)
         filename = get_file_name(ctx.docx_path)
         suffix = "--标注版.docx" if ctx.check else "--修改版.docx"

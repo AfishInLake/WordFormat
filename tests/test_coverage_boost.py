@@ -7,61 +7,56 @@
 
 import io
 import os
-import re
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor
-from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt
 
 from wordformat.config.models import NodeConfigRoot
+from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
+from wordformat.numbering import (
+    _auto_strip_numbering,
+    _build_numbering_rPr,
+    _convert_to_twips,
+    _set_indent_value,
+)
+from wordformat.pipeline.stages import (
+    FormattingExecutionStage,
+    StyleDefinitionFixStage,
+)
 from wordformat.rules.heading import (
     HeadingLevel1Node,
     HeadingLevel2Node,
-    HeadingLevel3Node,
-)
-from wordformat.rules.keywords import KeywordsCN, KeywordsEN
-from wordformat.numbering import (
-    _convert_to_twips,
-    _set_indent_value,
-    _build_numbering_rPr,
-    _auto_strip_numbering,
 )
 from wordformat.style.defs import (
-    BuiltInStyle,
     FirstLineIndent,
     ensure_style_exists,
-)
-from wordformat.pipeline.stages import (
-    StyleDefinitionFixStage,
-    FormattingExecutionStage,
 )
 
 _fix_stage = StyleDefinitionFixStage()
 _format_stage = FormattingExecutionStage()
 apply_format_check_to_all_nodes = _format_stage.apply_format_check_to_all_nodes
 from wordformat.style.reader import (
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
+    GetIndent,
     paragraph_get_builtin_style_name,
+    paragraph_get_line_spacing,
+    paragraph_get_space_after,
+    paragraph_get_space_before,
+    run_get_font_color,
     run_get_font_name,
     run_get_font_size_pt,
-    run_get_font_color,
-    GetIndent,
 )
 from wordformat.utils import (
-    get_paragraph_numbering_text,
     _count_numbering_levels,
     _format_number,
     _to_chinese_num,
     _to_roman,
     ensure_directory_exists,
+    get_paragraph_numbering_text,
 )
-
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -159,9 +154,114 @@ class TestHeadingCoverageBoost:
         """collect_style_configs 应收集配置中所有唯一的样式名。"""
         style_map = root_config.collect_style_configs()
         assert len(style_map) > 0
-        # 应包含 Normal（body_text 使用）和 Heading 1/2/3
+        # 应包含 Heading 1/2/3；global_format 是锚点模板，不是实际段落
         style_names = list(style_map.keys())
-        assert any("Normal" in s for s in style_names)
+        assert "Heading 1" in style_names
+        assert "Normal" not in style_names
+
+    def test_collect_style_configs_reads_flat_fields(self):
+        """平铺的段落/字符字段应写入样式配置。"""
+        cfg = NodeConfigRoot(
+            headings={
+                "level_1": {
+                    "alignment": "居中对齐",
+                    "builtin_style_name": "Heading 1",
+                    "chinese_font_name": "黑体",
+                    "english_font_name": "Arial",
+                    "font_size": "二号",
+                    "bold": True,
+                }
+            }
+        )
+
+        style_cfg = cfg.collect_style_configs()["Heading 1"]
+
+        assert style_cfg["alignment"] == "居中对齐"
+        assert style_cfg["chinese_font_name"] == "黑体"
+        assert style_cfg["english_font_name"] == "Arial"
+        assert style_cfg["font_size"] == "二号"
+        assert style_cfg["bold"] is True
+
+    def test_collect_style_configs_keeps_only_consistent_fields(self):
+        """同名样式仅保留各节点取值一致的字段，冲突字段不写入样式定义。"""
+        cfg = NodeConfigRoot(
+            body={
+                "text": {
+                    "alignment": "右对齐",
+                    "builtin_style_name": "正文",
+                    "italic": True,
+                    "bold": False,
+                }
+            },
+            references={
+                "entry": {
+                    "alignment": "两端对齐",
+                    "builtin_style_name": "正文",
+                    "italic": False,
+                    "bold": False,
+                }
+            },
+        )
+
+        normal_cfg = cfg.collect_style_configs()["Normal"]
+
+        assert normal_cfg["bold"] is False
+        assert "alignment" not in normal_cfg
+        assert "italic" not in normal_cfg
+
+    def test_fix_all_style_definitions_applies_flat_config(self):
+        """样式定义修正应真正写入字符与段落属性（回归：dict 配置曾被静默跳过）。"""
+        cfg = NodeConfigRoot(
+            headings={
+                "level_1": {
+                    "alignment": "居中对齐",
+                    "builtin_style_name": "Heading 1",
+                    "chinese_font_name": "黑体",
+                    "english_font_name": "Arial",
+                    "font_size": "二号",
+                    "bold": True,
+                }
+            }
+        )
+        doc = Document()
+
+        _fix_stage._fix_all_style_definitions(doc, cfg)
+
+        style = doc.styles["Heading 1"]
+        assert style.font.size == Pt(22)
+        assert style.font.bold is True
+        rPr = style.element.find(qn("w:rPr"))
+        rFonts = rPr.find(qn("w:rFonts"))
+        assert rFonts.get(qn("w:eastAsia")) == "黑体"
+        assert rFonts.get(qn("w:ascii")) == "Arial"
+        pPr = style.element.find(qn("w:pPr"))
+        assert pPr.find(qn("w:jc")).get(qn("w:val")) == "center"
+
+    def test_fix_all_style_definitions_skips_normal_base_style(self):
+        """Normal 是表格/页眉页脚的公共基样式，不应写入正文字体或缩进。"""
+        cfg = NodeConfigRoot(
+            body={
+                "text": {
+                    "alignment": "右对齐",
+                    "builtin_style_name": "正文",
+                    "italic": True,
+                }
+            },
+            references={
+                "entry": {
+                    "alignment": "两端对齐",
+                    "builtin_style_name": "正文",
+                    "italic": False,
+                }
+            },
+        )
+        doc = Document()
+
+        _fix_stage._fix_all_style_definitions(doc, cfg)
+
+        normal = doc.styles["Normal"]
+        assert normal.paragraph_format.alignment is None
+        assert normal.font.italic is None
 
     def test_fix_all_style_definitions_handles_document(self, root_config):
         """_fix_all_style_definitions 应对文档中存在的样式定义进行修正。"""
@@ -642,7 +742,6 @@ class TestStyleEnumCoverageBoost:
         """覆盖行 155: FirstLineIndent 使用 cm 单位。"""
         doc = Document()
         p = doc.add_paragraph()
-        from docx.shared import Cm
 
         p.paragraph_format.first_line_indent = Cm(0.85)
         fli = FirstLineIndent("0.85cm")
@@ -984,7 +1083,6 @@ class TestGetSomeCoverageBoost:
         """覆盖行 222-226: MULTIPLE 行距类型返回 float。"""
         doc = Document()
         p = doc.add_paragraph()
-        from docx.shared import Pt
         from docx.enum.text import WD_LINE_SPACING
 
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
@@ -1227,8 +1325,9 @@ class TestCoverageBoostRound2:
 
     def test_rPr_set_italic_remove(self):
         """rPr_set_italic 传入 False 时移除 w:i。"""
-        from wordformat.style.xml_ops import rPr_set_italic, ensure_rPr
         from docx.oxml import OxmlElement
+
+        from wordformat.style.xml_ops import ensure_rPr, rPr_set_italic
 
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
@@ -1238,8 +1337,9 @@ class TestCoverageBoostRound2:
 
     def test_rPr_set_underline_remove(self):
         """rPr_set_underline 传入 False 时移除 w:u。"""
-        from wordformat.style.xml_ops import rPr_set_underline, ensure_rPr
         from docx.oxml import OxmlElement
+
+        from wordformat.style.xml_ops import ensure_rPr, rPr_set_underline
 
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
@@ -1254,6 +1354,7 @@ class TestCoverageBoostRound2:
     def test_print_tree_from_json(self, tmp_path):
         """print_tree 支持传入 JSON 文件路径。"""
         import json
+
         from wordformat.tree import print_tree
 
         json_path = tmp_path / "test.json"
@@ -1272,8 +1373,9 @@ class TestCoverageBoostRound2:
 
     def test_process_heading_numbering_disabled(self):
         """numbering 禁用时不处理。"""
-        from wordformat.numbering import process_heading_numbering
         from unittest.mock import MagicMock
+
+        from wordformat.numbering import process_heading_numbering
 
         config = MagicMock()
         config.enabled = False
@@ -1297,7 +1399,6 @@ class TestCoverageBoostRound2:
         """SummaryGenerationStage 在 check 模式下添加批注。"""
         from wordformat.pipeline.stages import (
             SummaryGenerationStage,
-            FormattingExecutionStage,
         )
         from wordformat.rules.node import FormatNode
 
@@ -1325,7 +1426,7 @@ class TestCoverageBoostRound2:
 
     def test_rPr_set_bold_remove(self):
         """rPr_set_bold 传入 False 移除 w:b。"""
-        from wordformat.style.xml_ops import rPr_set_bold, ensure_rPr
+        from wordformat.style.xml_ops import ensure_rPr, rPr_set_bold
 
         style = Document().styles["Normal"]
         rPr = ensure_rPr(style.element)
@@ -1384,8 +1485,8 @@ class TestCoverageBoostRound2:
 
     def test_load_config_stage_no_config(self):
         """未提供配置文件时使用默认配置。"""
-        from wordformat.pipeline.stages import LoadConfigStage
         from wordformat.pipeline.context import FormatContext
+        from wordformat.pipeline.stages import LoadConfigStage
 
         ctx = FormatContext(json_path="", docx_path="", check=True, config_path="")
         stage = LoadConfigStage()

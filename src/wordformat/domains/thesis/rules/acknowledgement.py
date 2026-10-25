@@ -18,12 +18,21 @@ class Acknowledgements(FormatNode):
         BASE_FORMAT,
         {
             "paragraph": {
-                "alignment": "居中对齐",
+                "alignment": ["居中对齐", "两端对齐", "左对齐"],
+                "space_before": ["0行", "0.5行", "1行"],
+                "space_after": ["0行", "0.5行", "1行"],
                 "first_line_indent": "0字符",
             },
-            "font": {"chinese_font_name": "黑体", "font_size": "小二", "bold": True},
+            "font": {
+                "chinese_font_name": "黑体",
+                "font_size": ["小二", "三号", "小三", "小四"],
+                "bold": False,
+            },
         },
     )
+
+    def _para_checks_to_skip(self) -> set[str]:
+        return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
 @register("acknowledgements_content")
@@ -36,6 +45,6 @@ class AcknowledgementsCN(FormatNode):
         BASE_FORMAT,
         {
             "paragraph": {"alignment": "两端对齐"},
-            "font": {"chinese_font_name": "宋体"},
+            "font": {"chinese_font_name": "宋体", "font_size": "小四"},
         },
     )

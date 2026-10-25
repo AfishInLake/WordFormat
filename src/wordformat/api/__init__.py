@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
-from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
@@ -17,13 +17,21 @@ from starlette.responses import FileResponse
 from wordformat.classify.tag import set_tag_main
 
 # 复用原有项目的核心函数和校验工具
-from wordformat.pipeline.orchestrate import auto_format_thesis_document
+from wordformat.pipeline.orchestrate import (
+    auto_format_thesis_document,
+    json_to_docx,
+    md_to_docx,
+)
 from wordformat.settings import BASE_DIR, SERVER_HOST, VERSION
+from wordformat.tree import render_tree
 
 # ---------------------- 初始化FastAPI应用 ----------------------
 app = FastAPI(
     title="学位论文格式自动校验工具-WebAPI",
-    description="基于FastAPI实现，支持generate-json/check-format/apply-format三种模式，兼容原有YAML配置",
+    description=(
+        "基于FastAPI实现，支持generate-json/check-format/apply-format/"
+        "markdown-to-docx/json-to-docx/tree，兼容原有YAML配置与预设"
+    ),
     version=VERSION,
     docs_url="/docs",  # Swagger UI接口文档地址（推荐）
     redoc_url="/redoc",  # ReDoc接口文档地址（备选）
@@ -91,6 +99,41 @@ def save_upload_file(upload_file: UploadFile, save_dir: Path) -> str:
         raise HTTPException(status_code=500, detail=f"文件保存失败：{str(e)}") from e
 
 
+def _parse_presets(value: Optional[str]) -> Optional[list[str]]:
+    """逗号分隔的预设名 → 列表（等价 CLI 可重复的 --preset）。"""
+    if not value:
+        return None
+    names = [name.strip() for name in value.split(",") if name.strip()]
+    return names or None
+
+
+def _saved_file_data(original_name: Optional[str], saved_path: str) -> dict:
+    """生成版文件的统一下载信息。"""
+    final_filename = os.path.basename(saved_path)
+    return {
+        "original_file": original_name,
+        "final_filename": final_filename,
+        "download_url": f"/download/{quote(final_filename)}",
+        "tips": "文件已保存至服务端output目录，点击链接直接下载",
+    }
+
+
+def _suffix_error(
+    upload_file: UploadFile, suffixes: tuple[str, ...], label: str
+) -> Optional[OperationResult]:
+    """校验上传文件扩展名；合法返回 None。"""
+    name = (upload_file.filename or "").lower()
+    if name.endswith(suffixes):
+        return None
+    return OperationResult(
+        code=400,
+        msg=(
+            f"上传失败：仅支持 {label}（{'/'.join(suffixes)}），"
+            f"你当前上传的是：{upload_file.filename}"
+        ),
+    )
+
+
 # ---------------------- 核心API接口 ----------------------
 @app.post(
     "/generate-json", response_model=OperationResult, summary="生成文档结构JSON文件"
@@ -141,11 +184,14 @@ async def api_generate_json(
     summary="仅执行格式校验（需先生成JSON）",
 )
 async def api_check_format(
-    docx_file: UploadFile = File(..., description="待校验的Word文档（.docx格式）"),  # noqa B008
+    docx_file: UploadFile = File(..., description="待校验的Word文档（.docx格式）"),  # noqa: B008
     config_file: Optional[UploadFile] = File(  # noqa: B008
         None, description="格式配置YAML文件（可选）"
     ),
     json_data: str = Body(..., description="从/generate-json获取的文档结构JSON数据"),
+    presets: Optional[str] = Form(  # noqa: B008
+        None, description="预设名（presets/ 目录下的 .py），多个用逗号分隔"
+    ),
 ):
     """
     对应原命令行check-format模式：仅执行格式校验，生成【原文件名+--标注版.docx】
@@ -158,13 +204,17 @@ async def api_check_format(
         config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
 
         # 2. 执行校验逻辑，获取【函数返回的实际保存文件路径】（核心！）
-        actual_save_path = auto_format_thesis_document(
-            jsonpath=json_data,
-            docxpath=docx_path,
-            configpath=config_path,
-            savepath=OUTPUT_DIR,
-            check=True,  # 仅校验模式
-        )
+        call_args = {
+            "jsonpath": json_data,
+            "docxpath": docx_path,
+            "configpath": config_path,
+            "savepath": OUTPUT_DIR,
+            "check": True,  # 仅校验模式
+        }
+        parsed_presets = _parse_presets(presets)
+        if parsed_presets:
+            call_args["presets"] = parsed_presets
+        actual_save_path = auto_format_thesis_document(**call_args)
 
         # 3. 从真实路径中提取最终文件名（如：1 (1)_2--标注版.docx）
         final_filename = os.path.basename(actual_save_path)
@@ -195,15 +245,23 @@ async def api_check_format(
     "/apply-format", response_model=OperationResult, summary="执行格式应用/自动格式化"
 )
 async def api_apply_format(
-    docx_file: UploadFile = File(..., description="待格式化的Word文档（.docx格式）"),  # noqa B008
+    docx_file: UploadFile = File(..., description="待格式化的Word文档（.docx格式）"),  # noqa: B008
     config_file: Optional[UploadFile] = File(  # noqa: B008
         None, description="格式配置YAML文件（可选）"
     ),
     json_data: str = Body(..., description="从/generate-json获取的文档结构JSON数据"),
+    presets: Optional[str] = Form(  # noqa: B008
+        None, description="预设名（presets/ 目录下的 .py），多个用逗号分隔"
+    ),
+    sync: bool = Form(  # noqa: B008
+        False,
+        description="按编辑后的 JSON 在原 docx 上同步增/删/改/重排段落（对应 af --sync）",
+    ),
 ):
     """
     对应原命令行apply-format模式：自动应用格式，生成【原文件名+--修改版.docx】
     - 基于函数返回的真实路径拼接下载链接，彻底解决404问题
+    - sync=true 时不重新排版整篇，而是在原文档上按 JSON 同步段落
     """
     _ensure_dirs()
     try:
@@ -212,13 +270,19 @@ async def api_apply_format(
         config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
 
         # 2. 执行格式化逻辑，获取【函数返回的实际保存文件路径】（核心！）
-        actual_save_path = auto_format_thesis_document(
-            jsonpath=json_data,
-            docxpath=docx_path,
-            configpath=config_path,
-            savepath=OUTPUT_DIR,
-            check=False,  # 格式化模式
-        )
+        call_args = {
+            "jsonpath": json_data,
+            "docxpath": docx_path,
+            "configpath": config_path,
+            "savepath": OUTPUT_DIR,
+            "check": False,  # 格式化模式
+        }
+        parsed_presets = _parse_presets(presets)
+        if parsed_presets:
+            call_args["presets"] = parsed_presets
+        if sync:
+            call_args["sync"] = True
+        actual_save_path = auto_format_thesis_document(**call_args)
 
         # 3. 从真实路径提取最终文件名（如：1 (1)_2--修改版.docx）
         final_filename = os.path.basename(actual_save_path)
@@ -245,12 +309,138 @@ async def api_apply_format(
         raise HTTPException(status_code=500, detail=f"文档格式化失败：{str(e)}") from e
 
 
+@app.post(
+    "/markdown-to-docx",
+    response_model=OperationResult,
+    summary="Markdown 转 Docx（对应 md 命令）",
+)
+async def api_markdown_to_docx(
+    md_file: UploadFile = File(..., description="Markdown 文件（.md）"),  # noqa: B008
+    config_file: Optional[UploadFile] = File(  # noqa: B008
+        None, description="格式配置YAML文件（可选）"
+    ),
+    presets: Optional[str] = Form(  # noqa: B008
+        None, description="预设名（presets/ 目录下的 .py），多个用逗号分隔"
+    ),
+):
+    """读 Markdown 生成全新 docx，返回下载链接。"""
+    _ensure_dirs()
+    suffix_error = _suffix_error(md_file, (".md",), "Markdown 文件")
+    if suffix_error:
+        return suffix_error
+    try:
+        md_path = save_upload_file(md_file, TEMP_DIR)
+        config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
+        out_path = md_to_docx(
+            md_path=md_path,
+            config_path=config_path,
+            save_dir=str(OUTPUT_DIR),
+            presets=_parse_presets(presets),
+        )
+        logger.info(f"Markdown 转换完成，结果保存：{out_path}")
+        return OperationResult(
+            code=200,
+            msg="Markdown 转换成功",
+            data=_saved_file_data(md_file.filename, out_path),
+        )
+    except Exception as e:
+        logger.error(f"Markdown 转换失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Markdown 转换失败：{str(e)}"
+        ) from e
+
+
+@app.post(
+    "/json-to-docx",
+    response_model=OperationResult,
+    summary="JSON 转 Docx（对应 jd 命令，重建模式）",
+)
+async def api_json_to_docx(
+    json_file: UploadFile = File(  # noqa: B008
+        ..., description="文档结构JSON文件（gj 产出或编辑后）"
+    ),
+    config_file: Optional[UploadFile] = File(  # noqa: B008
+        None, description="格式配置YAML文件（可选）"
+    ),
+    presets: Optional[str] = Form(  # noqa: B008
+        None, description="预设名（presets/ 目录下的 .py），多个用逗号分隔"
+    ),
+):
+    """按 JSON 从空白文档重建 docx，返回下载链接。"""
+    _ensure_dirs()
+    suffix_error = _suffix_error(json_file, (".json",), "JSON 文件")
+    if suffix_error:
+        return suffix_error
+    try:
+        json_path = save_upload_file(json_file, TEMP_DIR)
+        config_path = save_upload_file(config_file, TEMP_DIR) if config_file else None
+        out_path = json_to_docx(
+            json_path=json_path,
+            config_path=config_path,
+            save_dir=str(OUTPUT_DIR),
+            presets=_parse_presets(presets),
+        )
+        logger.info(f"JSON 重建完成，结果保存：{out_path}")
+        return OperationResult(
+            code=200,
+            msg="JSON 重建成功",
+            data=_saved_file_data(json_file.filename, out_path),
+        )
+    except Exception as e:
+        logger.error(f"JSON 重建失败：{str(e)}")
+        raise HTTPException(status_code=500, detail=f"JSON 重建失败：{str(e)}") from e
+
+
+@app.post(
+    "/tree",
+    response_model=OperationResult,
+    summary="查看文档结构树（对应 tree 命令）",
+)
+async def api_tree(
+    json_file: UploadFile = File(..., description="文档结构JSON文件（gj 产出）"),  # noqa: B008
+    show_confidence: bool = Form(  # noqa: B008
+        False, description="显示 AI 置信度"
+    ),
+    show_index: bool = Form(False, description="显示节点序号"),  # noqa: B008
+    filter_categories: Optional[str] = Form(  # noqa: B008
+        None, description="仅显示指定类别（逗号分隔，如 heading_level_1,body_text）"
+    ),
+):
+    """把 JSON 渲染为纯文本结构树（无 ANSI 颜色，便于前端直接展示）。"""
+    _ensure_dirs()
+    suffix_error = _suffix_error(json_file, (".json",), "JSON 文件")
+    if suffix_error:
+        return suffix_error
+    try:
+        json_path = save_upload_file(json_file, TEMP_DIR)
+        filters = (
+            [c.strip() for c in filter_categories.split(",") if c.strip()]
+            if filter_categories
+            else None
+        )
+        tree_text = render_tree(
+            json_path,
+            show_confidence=show_confidence,
+            show_index=show_index,
+            filter_categories=filters,
+        )
+        return OperationResult(
+            code=200, msg="文档结构树生成成功", data={"tree": tree_text}
+        )
+    except Exception as e:
+        logger.error(f"结构树生成失败：{str(e)}")
+        raise HTTPException(status_code=500, detail=f"结构树生成失败：{str(e)}") from e
+
+
 @app.get("/download/{filename}", summary="下载格式化/校验后的Word文档")
 def download_file(filename: str):
     """
     下载接口：基于真实文件名匹配，增加多层校验，保证下载稳定
     """
     try:
+        # 拒绝路径穿越：下载名只能是 output 目录下的纯文件名
+        if os.path.basename(filename) != filename:
+            raise HTTPException(status_code=400, detail="文件名不合法")
         # 拼接服务端实际文件路径
         file_path = os.path.join(OUTPUT_DIR, filename)
         # 校验1：文件是否存在
@@ -299,6 +489,8 @@ def list_configs():
 @app.get("/configs/{filename}", summary="读取指定配置文件内容")
 def read_config(filename: str):
     """返回配置文件 YAML 内容。"""
+    if Path(filename).name != filename:
+        raise HTTPException(status_code=404, detail=f"配置文件 {filename} 不存在")
     file_path = CONFIGS_DIR / filename
     if not file_path.is_file():
         raise HTTPException(status_code=404, detail=f"配置文件 {filename} 不存在")
@@ -317,13 +509,16 @@ class SaveConfigRequest(BaseModel):
 @app.post("/configs/save", summary="保存配置文件到 configs 目录")
 def save_config(req: SaveConfigRequest):
     """将 YAML 内容保存到 configs 目录。"""
-    if not req.filename.endswith((".yaml", ".yml")):
-        req.filename += ".yaml"
-    file_path = CONFIGS_DIR / req.filename
+    if Path(req.filename).name != req.filename:
+        raise HTTPException(status_code=400, detail="文件名不合法：不允许包含路径")
+    filename = req.filename
+    if not filename.endswith((".yaml", ".yml")):
+        filename += ".yaml"
+    file_path = CONFIGS_DIR / filename
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(req.content)
-        return {"code": 200, "msg": f"配置已保存到 configs/{req.filename}"}
+        return {"code": 200, "msg": f"配置已保存到 configs/{filename}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

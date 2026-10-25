@@ -140,64 +140,64 @@ class SetSpacing:
             logger.error(f"设置段落{spacing_type}间距{value}行失败: {e}")
 
     @staticmethod
-    def set_pt(paragraph: Paragraph, spacing_type: str, target_value: float):
+    def set_pt(paragraph: Paragraph, spacing_type: str, value: float):
         """
         使用 PT/磅 为单位设置间距（1磅=1PT）
         Args:
             paragraph: 目标段落对象
             spacing_type: 间距类型（"before"=段前，"after"=段后）
-            target_value: PT/磅数值
+            value: PT/磅数值
         """
         SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
-            paragraph.paragraph_format.space_before = Pt(target_value)
+            paragraph.paragraph_format.space_before = Pt(value)
         else:
-            paragraph.paragraph_format.space_after = Pt(target_value)
+            paragraph.paragraph_format.space_after = Pt(value)
 
     @staticmethod
-    def set_cm(paragraph: Paragraph, spacing_type: str, target_value: float):
+    def set_cm(paragraph: Paragraph, spacing_type: str, value: float):
         """
         使用 厘米(cm/CM) 为单位设置间距
         Args:
             paragraph: 目标段落对象
             spacing_type: 间距类型（"before"=段前，"after"=段后）
-            target_value: 厘米数值
+            value: 厘米数值
         """
         SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
-            paragraph.paragraph_format.space_before = Cm(target_value)
+            paragraph.paragraph_format.space_before = Cm(value)
         else:
-            paragraph.paragraph_format.space_after = Cm(target_value)
+            paragraph.paragraph_format.space_after = Cm(value)
 
     @staticmethod
-    def set_inch(paragraph: Paragraph, spacing_type: str, target_value: float):
+    def set_inch(paragraph: Paragraph, spacing_type: str, value: float):
         """
         使用 英寸(inch/Inches) 为单位设置间距
         Args:
             paragraph: 目标段落对象
             spacing_type: 间距类型（"before"=段前，"after"=段后）
-            target_value: 英寸数值
+            value: 英寸数值
         """
         SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
-            paragraph.paragraph_format.space_before = Inches(target_value)
+            paragraph.paragraph_format.space_before = Inches(value)
         else:
-            paragraph.paragraph_format.space_after = Inches(target_value)
+            paragraph.paragraph_format.space_after = Inches(value)
 
     @staticmethod
-    def set_mm(paragraph: Paragraph, spacing_type: str, target_value: float):
+    def set_mm(paragraph: Paragraph, spacing_type: str, value: float):
         """
         使用 毫米(mm/MM) 为单位设置间距
         Args:
             paragraph: 目标段落对象
             spacing_type: 间距类型（"before"=段前，"after"=段后）
-            target_value: 毫米数值
+            value: 毫米数值
         """
         SetSpacing._clear_conflicting_attrs(paragraph, spacing_type)
         if spacing_type == "before":
-            paragraph.paragraph_format.space_before = Mm(target_value)
+            paragraph.paragraph_format.space_before = Mm(value)
         else:
-            paragraph.paragraph_format.space_after = Mm(target_value)
+            paragraph.paragraph_format.space_after = Mm(value)
 
 
 class SetLineSpacing:

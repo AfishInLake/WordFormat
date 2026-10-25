@@ -111,8 +111,9 @@ wordf gj (generate JSON)          wordf cf / wordf af (check/apply format)
 **Phase 3 — Matching & formatting** (`pipeline/stages.py`):
 - Each paragraph in the document is matched to a tree node by position order: `_flatten_tree_nodes()` converts the tree to a flat DFS list, then `zip()` pairs nodes with `document.paragraphs` by index.
 - Before formatting, `node.apply_replace(doc)` checks for a `replace` field in the JSON value dict; if present, it substitutes the paragraph's run text with the replacement string.
-- The tree is also mutated: `promote_bodytext_in_subtrees_of_type()` replaces generic `body_text` nodes under specific parents (e.g. `AbstractTitleCN`) with typed content nodes (e.g. `AbstractContentCN`).
-- `apply_format_check_to_all_nodes()` recursively traverses the tree. For each node it calls `node.check_format(doc)` or `node.apply_format(doc)`, which delegate to `node._base(doc, p, r)` — the boolean flags control whether paragraph styles (`p`) and run styles (`r`) are checked (diffed) or applied (written).
+- The tree is also mutated by hook callbacks: the thesis domain registers `thesis.tree_normalize` on `on_tree_normalize`, which calls `promote_bodytext_in_subtrees_of_type()` to replace generic `body_text` nodes under specific parents (e.g. `AbstractTitleCN`) with typed content nodes (e.g. `AbstractContentCN`).
+- `apply_format_check_to_all_nodes()` recursively traverses the tree. Around each node it emits `before_node_format` / `after_node_format` hooks; the thesis domain's `thesis.caption_numbering` consumes `before_node_format` to maintain chapter/figure/table counters and inject `chapter_number` into caption node values.
+- For each node it calls `node.check_format(doc)` or `node.apply_format(doc)`, which delegate to `node._base(doc, p, r)` — the boolean flags control whether paragraph styles (`p`) and run styles (`r`) are checked (diffed) or applied (written).
 
 **Phase 4 — Numbering** (apply mode only, `numbering.py`):
 - `process_heading_numbering()` strips manual heading numbers from run text and applies Word auto-numbering definitions.
@@ -123,24 +124,25 @@ wordf gj (generate JSON)          wordf cf / wordf af (check/apply format)
 |------|---------|
 | `src/wordformat/cli.py` | CLI entry point (`gj`/`cf`/`af`/`tree`/`config`/`startapi` subcommands) |
 | `src/wordformat/classify/tag.py` | Classification entry point: loads doc, calls `DocxBase`, returns JSON |
-| `src/wordformat/base.py` | `DocxBase`: docx loading + ONNX batch inference |
-| `src/wordformat/pipeline/stages.py` | Orchestrator: tree flattening, position-based paragraph matching, subtree promotion, text replace, calls check/apply on each node |
-| `src/wordformat/pipeline/orchestrate.py` | Top-level orchestration: `auto_format_thesis_document()` |
+| `src/wordformat/base.py` | `DocxBase`: docx loading + ONNX batch inference + domain postprocess dispatch (`get_postprocess(domain)`, unregistered domain skips) |
+| `src/wordformat/pipeline/stages.py` | Orchestrator: tree flattening, position-based paragraph matching, text replace, emits hook events, calls check/apply on each node |
+| `src/wordformat/pipeline/orchestrate.py` | Top-level orchestration: `auto_format_thesis_document()`; assembles builtin handlers, document domain, presets into the hook registry |
+| `src/wordformat/hooks.py` | `HookRegistry`: event registration / emitting / unregister; events `on_tree_normalize`, `on_format_begin`, `before_node_format`, `after_node_format`, `on_summary_build`, `before_document_save`, `on_comment` |
+| `src/wordformat/handlers.py` | Builtin (domain-agnostic) mechanisms registered as `builtin.post_process` / `builtin.header_footer` |
+| `src/wordformat/domains/` | Document-domain registry (`@register_domain` / `load_domain` / auto-discovery via pkgutil) and domain assemblies. A domain is a self-contained package: `domains/thesis/` = entry (`__init__.py`: `register_handlers` hook callbacks) + `rules/` (domain nodes) + `postprocess.py` (classification chain, registers via `register_postprocess`). Frame-side dispatch: `domains/postprocess.py` (classification) + `structure/registry.py` (nodes) |
+| `src/wordformat/preset_loader.py` | Preset loading: `PRESET_MANIFEST` + `register(hooks)`, loaded after builtin handlers and domain so presets can override anything |
 | `src/wordformat/rules/node.py` | `FormatNode` base class and `TreeNode` |
-| `src/wordformat/rules/abstract.py` | Abstract title/content/title-content nodes (CN + EN) |
 | `src/wordformat/rules/heading.py` | Heading level 1/2/3 nodes (no longer overrides `load_config`) |
-| `src/wordformat/rules/keywords.py` | Keywords nodes with tag detection and count validation |
 | `src/wordformat/rules/body.py` | Body text node with punctuation checking |
 | `src/wordformat/rules/caption.py` | Caption formatting and numbering check/apply |
-| `src/wordformat/rules/references.py` | References title and entry nodes |
-| `src/wordformat/rules/acknowledgement.py` | Acknowledgements title and content nodes |
 | `src/wordformat/rules/object.py` | FigureImage and TableObject nodes |
+| `src/wordformat/domains/thesis/rules/` | Thesis-specific nodes: abstract / keywords / references / acknowledgement (CN + EN) — registered via `@register` into the domain registry |
 | `src/wordformat/style/diff.py` | `CharacterStyle` and `ParagraphStyle` with diff/apply logic |
 | `src/wordformat/style/defs.py` | Enums: `FontSize`, `FontColor`, `FontName`, `Alignment`, `LineSpacingRule`, etc. |
 | `src/wordformat/config/models.py` | `NodeConfigRoot` (dict subclass with dot access + `collect_style_configs()`) |
 | `src/wordformat/config/loader.py` | `LazyConfig` (normal class, not singleton) for YAML loading |
 | `src/wordformat/config/dotdict.py` | `DotDict` (dict with dot access), `BASE_FORMAT` defaults, `deep_merge` |
-| `src/wordformat/structure/registry.py` | `@register` decorator, `export_defaults()` — auto-registration of FormatNode subclasses |
+| `src/wordformat/structure/registry.py` | `Registry` class (per-domain instance, `get_registry(domain)`) + `@register` decorator + `export_defaults()`; `default_registry` is the thesis instance, module-level `_registry`/`_level_registry` are compat shims into it |
 | `src/wordformat/structure/settings.py` | `CATEGORY_TO_CLASS` and `LEVEL_MAP` (auto-built from registry) |
 | `src/wordformat/numbering.py` | Heading auto-numbering (clear manual + apply Word numbering) |
 | `src/wordformat/tree.py` | `Tree`, `TreeNode`, `Stack` data structures |
@@ -155,7 +157,7 @@ wordf gj (generate JSON)          wordf cf / wordf af (check/apply format)
 
 Each `FormatNode` subclass declares class-level attributes and optionally implements `_base(doc, p, r)`:
 
-- `NODE_TYPE` — dot-separated YAML path (e.g. `"abstract.chinese.chinese_title"`)
+- `NODE_TYPE` — dot-separated YAML path (e.g. `"abstract.chinese.title"`, `"references.entry"`, `"body.text"`)
 - `NODE_LABEL` — Chinese label for comment annotations
 - `DEFAULTS` — dict of default formatting values, merged with YAML overrides at load time
 - `RULES` — optional dict of `rule_name → handler_method` for config-gated business rules

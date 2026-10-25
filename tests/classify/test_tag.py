@@ -4,38 +4,13 @@ Core 模块综合测试
 覆盖 tree.py, utils.py, rules/node.py, numbering.py, settings.py
 """
 
-import os
-import pytest
-from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from docx import Document
 from docx.oxml.ns import qn
 
-from wordformat.tree import Tree, Stack, print_tree
-from wordformat.rules.node import TreeNode, FormatNode
-from wordformat.numbering import (
-    _auto_strip_numbering,
-    _strip_reference_numbering,
-    apply_auto_numbering,
-    create_numbering_definition,
-    process_heading_numbering,
-)
-from wordformat.utils import (
-    get_file_name,
-    ensure_is_directory,
-    ensure_directory_exists,
-    _to_roman,
-    _to_chinese_num,
-    load_yaml_with_merge,
-    get_paragraph_numbering_text,
-    remove_all_numbering,
-    _format_number,
-    _get_level_fmt,
-    _count_numbering_levels,
-)
-from wordformat.base import (
-    DocxBase,
+from wordformat.base import DocxBase
+from wordformat.domains.thesis.postprocess import (
     _apply_footer,
     _apply_section_state,
     _apply_threshold,
@@ -43,15 +18,16 @@ from wordformat.base import (
     _fix_abstract_titles,
     _fix_document_title,
     _fix_heading_levels,
+    _fix_keyword_categories,
     _fix_known_categories,
     _fix_references_content,
     _fix_sequence,
+    _fix_title_categories,
     _fix_toc,
     _gate_abstract_content,
+    _looks_like_keyword_list,
     _neutralize_appendix,
 )
-from wordformat import settings
-
 
 # ============================================================
 # tree.py — Tree
@@ -202,9 +178,9 @@ class TestDocxBase:
 
     def test_parse_includes_numbering_text(self, tmp_path):
         """测试解析时包含自动编号文字"""
-        from docx.oxml import OxmlElement
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from docx.opc.packuri import PackURI
+        from docx.oxml import OxmlElement
         from docx.parts.numbering import NumberingPart
 
         doc = Document()
@@ -303,7 +279,7 @@ def _mk_item(category, paragraph="", score=1.0):
 
 
 class TestPostProcessing:
-    """直接测试 base.py 中的后处理函数。"""
+    """直接测试论文域后处理函数（domains/thesis/postprocess.py）。"""
 
     def test_apply_threshold_low_conf_keeps_label_and_flags(self):
         item = _mk_item("heading_level_2", "研究背景", score=0.3)
@@ -311,6 +287,57 @@ class TestPostProcessing:
         assert item["category"] == "heading_level_2"  # 不再硬砍为 body_text
         assert item["needs_review"] is True
         assert "建议人工复核" in item["comment"]
+
+    def test_get_thresholds_follows_model_metadata(self):
+        """阈值是模型属性：模型未加载返回 None，元数据含 thresholds 时返回之。"""
+        from wordformat.agent.onnx_infer import get_thresholds
+
+        with patch("wordformat.agent.onnx_infer._model_info", None):
+            assert get_thresholds() is None
+        with patch(
+            "wordformat.agent.onnx_infer._model_info",
+            {"thresholds": {"body_text": 0.99, "default": 0.5}},
+        ):
+            assert get_thresholds() == {"body_text": 0.99, "default": 0.5}
+
+    def test_get_thresholds_prefers_domain_package_metadata(self, tmp_path):
+        """新领域在 domains/<name>/model/model_info.json 写阈值即被优先采用。"""
+        import json
+
+        from wordformat.agent.onnx_infer import get_thresholds
+
+        (tmp_path / "model_info.json").write_text(
+            json.dumps({"thresholds": {"body_text": 0.88}}), encoding="utf-8"
+        )
+        with patch(
+            "wordformat.agent.onnx_infer._domain_model_dir", return_value=tmp_path
+        ):
+            assert get_thresholds("gongwen") == {"body_text": 0.88}
+
+    def test_get_postprocess_unregistered_domain_returns_none(self):
+        """框架侧分派：领域未装配（未注册后处理）返回 None，parse 跳过。"""
+        from wordformat.domains.postprocess import get_postprocess
+
+        assert get_postprocess("no_such_domain") is None
+
+    def test_get_postprocess_thesis_registered_on_import(self):
+        """论文域模块导入即注册整链（领域包自动发现加载）。"""
+        from wordformat.domains.postprocess import get_postprocess
+        from wordformat.domains.thesis.postprocess import _thesis_postprocess
+
+        assert get_postprocess("thesis") is _thesis_postprocess
+
+    def test_apply_threshold_prefers_model_metadata(self):
+        """模型元数据提供阈值时优先采用，内置 CONF_THRESHOLDS 仅兑底。"""
+        with patch(
+            "wordformat.domains.thesis.postprocess.get_thresholds",
+            return_value={"body_text": 0.99, "default": 0.5},
+        ):
+            item = _mk_item("body_text", "一段正文", score=0.95)
+            _apply_threshold(item)
+            # 内置 body_text 阈值 0.6 不触发；模型阈值 0.99 触发 → 采用模型阈值
+            assert item["needs_review"] is True
+            assert "0.99" in item["comment"]
 
     def test_apply_threshold_relaxed_for_abstract_en_title(self):
         # abstract_english_title 阈值 0.3，0.41 应通过（对应文档 Abstract 0.41 误伤）
@@ -695,6 +722,120 @@ class TestPostProcessing:
         _fix_sequence(result)
         assert result[2]["category"] == "body_text"  # 门控生效，代码不被扫成致谢正文
         assert result[3]["category"] == "body_text"
+
+
+class TestKeywordGuards:
+    """关键词类必须是词表；按键说明/源码行不得占用 keywords_* 标签。"""
+
+    def test_labeled_list_is_keywords(self):
+        assert _looks_like_keyword_list("关键词：人脸识别；门禁系统；STM32单片机")
+        assert _looks_like_keyword_list("Keywords: Smart home; Cloud platform")
+
+    def test_unlabeled_continuation_is_keywords(self):
+        assert _looks_like_keyword_list("混合动力汽车；电子无级变速器；行星齿轮")
+        assert _looks_like_keyword_list("Hybrid Electric Vehicle; ECVT; Planetary Gear")
+
+    def test_button_description_is_not_keywords(self):
+        assert not _looks_like_keyword_list("K1（菜单键）：进入设置菜单，OLED显示菜单选项；")
+        assert not _looks_like_keyword_list("K4（返回键）：无操作。")
+
+    def test_code_lines_are_not_keywords(self):
+        assert not _looks_like_keyword_list("GPIO_InitTypeDef  GPIO_InitStructure;")
+        assert not _looks_like_keyword_list(
+            "/* PB0, PB1 LED; PB4 风扇; PB5 蜂鸣 */"
+        )
+
+    def test_single_labeled_keyword_kept_for_count_rule(self):
+        # 只有一个词但带标签 → 保留，交给关键词数量规则报“数量过少”
+        assert _looks_like_keyword_list("关键词：物联网")
+
+    def test_fix_keyword_categories_demotes_non_list(self):
+        result = [
+            _mk_item("keywords_chinese", "K2（确认键）：无操作；"),
+            _mk_item("keywords_english", "t=DS18B20_DQ_IN;"),
+        ]
+        _fix_keyword_categories(result)
+        assert result[0]["category"] == "body_text"
+        assert result[1]["category"] == "body_text"
+
+    def test_fix_keyword_categories_keeps_real_keywords(self):
+        result = [
+            _mk_item("keywords_english", "Keywords: Smart home; Cloud platform"),
+            _mk_item("keywords_chinese", "混合动力汽车；电子无级变速器；行星齿轮"),
+        ]
+        _fix_keyword_categories(result)
+        assert result[0]["category"] == "keywords_english"
+        assert result[1]["category"] == "keywords_chinese"
+
+
+class TestChapterNumberingGuards:
+    """真章节编号必须递增，且与本章题注章号自洽。"""
+
+    def test_demotes_non_increasing_chapter_number(self):
+        result = [
+            _mk_item("heading_level_1", "2 系统总体方案设计", score=0.95),
+            _mk_item("heading_level_2", "2.1 需求分析", score=0.95),
+            _mk_item("heading_level_1", "1 加速度传感器模块", score=0.95),
+        ]
+        _fix_known_categories(result)
+        assert result[2]["category"] == "body_text"
+
+    def test_demotes_chapter_with_conflicting_caption(self):
+        result = [
+            _mk_item("heading_level_1", "2 系统总体方案设计", score=0.95),
+            _mk_item("heading_level_2", "2.1 需求分析", score=0.95),
+            _mk_item("heading_level_1", "5 显示模块设计", score=0.95),
+            _mk_item("caption_figure", "图2.5 显示屏接口电路", score=0.95),
+        ]
+        _fix_known_categories(result)
+        assert result[2]["category"] == "body_text"
+        assert result[3]["category"] == "caption_figure"
+
+    def test_keeps_increasing_chapter(self):
+        result = [
+            _mk_item("heading_level_1", "2 系统总体方案设计", score=0.95),
+            _mk_item("heading_level_2", "2.1 需求分析", score=0.95),
+            _mk_item("heading_level_1", "3 硬件电路设计", score=0.95),
+            _mk_item("heading_level_2", "3.1 主控模块", score=0.95),
+        ]
+        _fix_known_categories(result)
+        assert result[2]["category"] == "heading_level_1"
+
+
+class TestCaptionNarrativeGuards:
+    def test_demotes_narrative_caption(self):
+        result = [
+            _mk_item("caption_figure", "如图5.1所示，系统由主控模块和显示模块组成。"),
+        ]
+        _fix_known_categories(result)
+        assert result[0]["category"] == "body_text"
+
+    def test_keeps_short_noun_caption_with_period(self):
+        result = [_mk_item("caption_figure", "图3.3 系统流程图。")]
+        _fix_known_categories(result)
+        assert result[0]["category"] == "caption_figure"
+
+
+class TestAbstractTitleGuards:
+    def test_english_thesis_title_keeps_trailing_period(self):
+        result = [
+            _mk_item(
+                "abstract_english_title",
+                "Design of Intelligent Vehicle Collision Avoidance System.",
+                score=0.9,
+            )
+        ]
+        _fix_title_categories(result)
+        assert result[0]["category"] == "abstract_english_title"
+
+    def test_repeated_cover_title_becomes_document_title(self):
+        result = [
+            _mk_item("document_title", "基于单片机的智能小车设计"),
+            _mk_item("body_text", "基于单片机的智能小车设计"),
+            _mk_item("abstract_chinese_title_content", "摘要：本文设计……"),
+        ]
+        _fix_abstract_titles(result)
+        assert result[1]["category"] == "document_title"
 
 
 # ============================================================

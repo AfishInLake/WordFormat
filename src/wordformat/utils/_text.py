@@ -6,6 +6,21 @@ from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
 
+def resolve_item_text(value: dict) -> str:
+    """返回 JSON 条目的目标文本。
+
+    ``replace`` 键一旦存在且为字符串，就以它为准（空字符串表示清空段落）；
+    只有不存在或值不是字符串时才回退到 ``paragraph``。不能用 ``or`` 判断，
+    否则 ``replace: ""`` 会被当作未提供。
+    """
+    if not isinstance(value, dict):
+        return ""
+    if "replace" in value and isinstance(value["replace"], str):
+        return value["replace"]
+    paragraph = value.get("paragraph", "")
+    return paragraph if isinstance(paragraph, str) else ""
+
+
 def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
     """
     提取段落的自动编号文字（如"第一章"、"1.1"、"1."等）。
@@ -366,12 +381,13 @@ def parse_caption_text(text: str) -> dict | None:
     ROMAN = r"[IVXLCDMivxlcdm]+"
 
     # 按优先级依次尝试各模式: (pattern, ch_parser, num_parser)
+    # 分隔符两侧可能有多余空格（WPS 自动编号偶见“表2. 1”）
     patterns = [
-        (rf"^{LABEL}(\d+)({SEP})(\d+)[\s　]+(.+)$", int, int),
-        (rf"^{LABEL}({CN})({SEP})(\d+)[\s　]+(.+)$", _from_chinese_num, int),
-        (rf"^{LABEL}({ROMAN})({SEP})(\d+)[\s　]+(.+)$", _from_roman, int),
+        (rf"^{LABEL}(\d+)\s*({SEP})\s*(\d+)[\s　]*(.+)$", int, int),
+        (rf"^{LABEL}({CN})\s*({SEP})\s*(\d+)[\s　]*(.+)$", _from_chinese_num, int),
+        (rf"^{LABEL}({ROMAN})\s*({SEP})\s*(\d+)[\s　]*(.+)$", _from_roman, int),
         (
-            rf"^{LABEL}(\d+)({SEP})({CN}|{ROMAN})[\s　]+(.+)$",
+            rf"^{LABEL}(\d+)\s*({SEP})\s*({CN}|{ROMAN})[\s　]*(.+)$",
             int,
             lambda n: _from_chinese_num(n)
             if any(c in _digit_map for c in n)

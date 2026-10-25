@@ -224,6 +224,8 @@ class FontSize(UnitLabelEnum):
         run.font.size = Pt(size)
     """
 
+    CHU_HAO = "初号"
+    XIAO_CHU = "小初"
     YI_HAO = "一号"
     XIAO_YI = "小一"
     ER_HAO = "二号"
@@ -235,9 +237,13 @@ class FontSize(UnitLabelEnum):
     WU_HAO = "五号"
     XIAO_WU = "小五"
     LIU_HAO = "六号"
+    XIAO_LIU = "小六"
     QI_HAO = "七号"
+    BA_HAO = "八号"
 
     _LABEL_MAP = {
+        "初号": 42,
+        "小初": 36,
         "一号": 26,
         "小一": 24,
         "二号": 22,
@@ -249,7 +255,9 @@ class FontSize(UnitLabelEnum):
         "五号": 10.5,
         "小五": 9,
         "六号": 7.5,
+        "小六": 6.5,
         "七号": 5.5,
+        "八号": 5,
     }
     _LABEL_MAP_REVERSE = {v: k for k, v in _LABEL_MAP.items()}
 
@@ -429,6 +437,19 @@ class Alignment(UnitLabelEnum):
         alignment = paragraph_get_alignment(paragraph)
         return alignment if alignment else WD_ALIGN_PARAGRAPH.LEFT
 
+    def __eq__(self, other):
+        # 左对齐与两端对齐在中文正文里常被混用（两端对齐是 Word 默认），
+        # 不把二者差异当作格式错误，避免整篇正文逐段误报。
+        expected = self.rel_value
+        actual = other.rel_value if isinstance(other, Alignment) else other
+        left_justify = {WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.JUSTIFY}
+        if expected in left_justify and actual in left_justify:
+            return True
+        return super().__eq__(other)
+
+    def __hash__(self):
+        return hash(self.rel_value)
+
 
 class Spacing(UnitLabelEnum):
     """
@@ -565,6 +586,17 @@ class Indent(UnitLabelEnum):
         cm = SetIndent.set_cm
         inch = SetIndent.set_inch
 
+    def __eq__(self, other):
+        # WPS 常用 0.25/0.26 字符的微调量补偿标点，视觉上等同 0
+        if isinstance(other, Indent) and isinstance(self.rel_value, (int, float)):
+            return abs(self.rel_value - other.rel_value) <= 0.5
+        if isinstance(other, (int, float)) and isinstance(self.rel_value, (int, float)):
+            return abs(self.rel_value - other) <= 0.5
+        return super().__eq__(other)
+
+    def __hash__(self):
+        return hash(self.value)
+
 
 class LeftIndent(Indent):
     def get_from_paragraph(self, paragraph: Paragraph) -> float | None:
@@ -612,6 +644,52 @@ class FirstLineIndent(UnitLabelEnum):
                 return getattr(indent, unit if unit != "inch" else "inches")
         return None
 
+    def __eq__(self, other):
+        # 字符单位换算受字号影响（2字符在五号/小四下得到 1.8~2.2），容差 0.3 字符
+        if isinstance(other, FirstLineIndent):
+            return abs(self.rel_value - other.rel_value) <= 0.3
+        if isinstance(other, (int, float)):
+            return abs(self.rel_value - other) <= 0.3
+        return super().__eq__(other)
+
+    def __hash__(self):
+        return hash(round(self.rel_value, 1))
+
+
+_BODY_STYLE_ALIASES = {
+    "normal",
+    "body text",
+    "body text indent",
+    "normal (web)",
+    "正文",
+    "正文文本",
+    "普通",
+    "普通(网站)",
+}
+_HEADING_STYLE_RE = re.compile(r"^heading\s*\d+$", re.IGNORECASE)
+_NAMED_STYLE_RE = re.compile(
+    r"^(?:heading\s*\d+|title|subtitle|caption)$", re.IGNORECASE
+)
+
+
+def _canonical_style_name(name) -> str:
+    """把中英文样式名归一为 Word 内置样式名（小写）。"""
+    raw = re.sub(r"\s+", " ", str(name or "")).strip().lower()
+    if raw in _BODY_STYLE_ALIASES:
+        return "normal"
+    mapping = {
+        "题注": "caption",
+        "标题": "title",
+        "副标题": "subtitle",
+        "列表项": "list paragraph",
+    }
+    if raw in mapping:
+        return mapping[raw]
+    m = re.match(r"^标题\s*(\d+)$", raw)
+    if m:
+        return f"heading {m.group(1)}"
+    return raw
+
 
 class BuiltInStyle(UnitLabelEnum):
     """
@@ -657,6 +735,27 @@ class BuiltInStyle(UnitLabelEnum):
 
     def get_from_paragraph(self, paragraph: Paragraph):
         return paragraph_get_builtin_style_name(paragraph)
+
+    def __eq__(self, other):
+        expected = _canonical_style_name(self.value)
+        if isinstance(other, BuiltInStyle):
+            actual = _canonical_style_name(other.value)
+        elif other is None:
+            actual = ""
+        else:
+            actual = _canonical_style_name(other)
+        if expected == actual:
+            return True
+        # 正文/题注没有跨文档统一的内置样式名：模板常用 Body Text、自定义
+        # “摘要正文”“图片标题”等。只要不是显式标题/题注样式，就视为同类。
+        if expected == "normal":
+            return not _NAMED_STYLE_RE.match(actual)
+        if expected == "caption":
+            return not _HEADING_STYLE_RE.match(actual)
+        return False
+
+    def __hash__(self):
+        return hash(_canonical_style_name(self.value))
 
 
 # 内置样式名称到基础样式的映射，用于创建新样式时指定基础样式

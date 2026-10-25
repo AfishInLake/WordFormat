@@ -4,48 +4,38 @@
 覆盖模块：cli.py, config, agent, set_style.py, set_tag.py, word_structure
 """
 
-import argparse
-import io
-import os
-import shutil
-import tempfile
 import threading
 from unittest import mock
 
-import pytest
 import numpy as np
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
-from fastapi.testclient import TestClient
 
-from wordformat.cli import validate_file, main
-from wordformat.config.loader import (
-    LazyConfig,
-    ConfigNotLoadedError,
-    init_config,
-    get_config,
-    clear_config,
-    load_config,
-)
-from wordformat.config.models import NodeConfigRoot
 from wordformat.agent.message import MessageManager
 from wordformat.agent.onnx_infer import (
     _get_best_onnx_providers,
     _load_model,
-    onnx_single_infer,
     onnx_batch_infer,
+    onnx_single_infer,
     safe_batch_infer,
 )
-from wordformat.pipeline.stages import FormattingExecutionStage, ParagraphAlignmentStage
 from wordformat.classify.tag import set_tag_main
+from wordformat.config.loader import (
+    LazyConfig,
+    clear_config,
+    get_config,
+    init_config,
+    load_config,
+)
+from wordformat.pipeline.stages import FormattingExecutionStage, ParagraphAlignmentStage
+from wordformat.rules.body import BodyText
+from wordformat.rules.node import FormatNode
+from wordformat.structure.document_builder import DocumentBuilder
 from wordformat.structure.node_factory import create_node
 from wordformat.structure.tree_builder import DocumentTreeBuilder
-from wordformat.structure.document_builder import DocumentBuilder
 from wordformat.structure.utils import promote_bodytext_in_subtrees_of_type
-from wordformat.rules.node import FormatNode
-from wordformat.rules.body import BodyText
-from wordformat.api import save_upload_file, TEMP_DIR
 
 apply_format_check_to_all_nodes = (
     FormattingExecutionStage().apply_format_check_to_all_nodes
@@ -296,7 +286,7 @@ class TestNodeFactoryIntegration:
     """create_node 创建/拒绝 + 真实 CATEGORY_TO_CLASS"""
 
     def test_create_known_category(self, sample_yaml_config):
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -310,7 +300,7 @@ class TestNodeFactoryIntegration:
         assert hasattr(node, "check_format")
 
     def test_create_unknown_category_returns_none(self, sample_yaml_config):
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -319,12 +309,28 @@ class TestNodeFactoryIntegration:
             assert create_node(item, level=1, config=config) is None
 
     def test_create_missing_category_raises(self, sample_yaml_config):
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
         with pytest.raises(ValueError, match="missing 'category'"):
             create_node({"paragraph": "x"}, level=1, config=config)
+
+    def test_create_node_with_domain_registry(self, sample_yaml_config):
+        """领域注册表实例优先：新领域注册自己的类别即可建节点，不污染默认表。"""
+        from wordformat.config.loader import get_config, init_config
+        from wordformat.rules.body import BodyText
+        from wordformat.structure.registry import Registry
+
+        init_config(sample_yaml_config)
+        config = get_config()
+        reg = Registry()
+        reg.register("gov_heading", level=1)(BodyText)
+        item = {"category": "gov_heading", "paragraph": "x", "fingerprint": "fp_x"}
+        node = create_node(item, level=1, config=config, registry=reg)
+        assert isinstance(node, BodyText)
+        # 默认论文注册表不含该类别 → 拒绝
+        assert create_node(item, level=1, config=config) is None
 
 
 class TestTreeBuilderIntegration:
@@ -349,7 +355,7 @@ class TestDocumentBuilderIntegration:
     """DocumentBuilder 加载 JSON 并构建树"""
 
     def test_build_from_json_list(self, sample_yaml_config):
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -398,7 +404,15 @@ class TestSetTagMainIntegration:
         mock_docx_cls.return_value.parse.return_value = []
         set_tag_main("path/to/doc.docx", "path/to/cfg.yaml")
         mock_docx_cls.assert_called_once_with(
-            "path/to/doc.docx", configpath="path/to/cfg.yaml"
+            "path/to/doc.docx", configpath="path/to/cfg.yaml", domain="thesis"
+        )
+
+    @mock.patch("wordformat.classify.tag.DocxBase")
+    def test_set_tag_main_passes_domain(self, mock_docx_cls):
+        mock_docx_cls.return_value.parse.return_value = []
+        set_tag_main("path/to/doc.docx", domain="gongwen")
+        mock_docx_cls.assert_called_once_with(
+            "path/to/doc.docx", configpath=None, domain="gongwen"
         )
 
 
@@ -585,7 +599,7 @@ class TestAutoFormatThesisDocument:
         "wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes"
     )
     @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
-    @mock.patch("wordformat.pipeline.stages.promote_bodytext_in_subtrees_of_type")
+    @mock.patch("wordformat.structure.utils.promote_bodytext_in_subtrees_of_type")
     def test_promote_called_for_subtrees(
         self, mock_promote, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
@@ -833,6 +847,7 @@ class TestLogConfig:
             "sys.modules", {"uvicorn": mock_uvicorn_mod, "logging": mock_logging_mod}
         ):
             import importlib
+
             import wordformat.log_config as log_mod
 
             importlib.reload(log_mod)
@@ -1107,8 +1122,8 @@ class TestKeywordsBaseGetLangConfig:
 
     def test_get_lang_config_unknown_lang_fallback(self, sample_yaml_config):
         """Unknown LANG falls back to chinese config (line 55)"""
-        from wordformat.config.loader import init_config, get_config
-        from wordformat.rules.keywords import BaseKeywordsNode
+        from wordformat.config.loader import get_config, init_config
+        from wordformat.domains.thesis.rules.keywords import BaseKeywordsNode
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1130,7 +1145,7 @@ class TestKeywordsENCheckKeywordLabel:
 
     def test_check_keyword_label_matches(self):
         """_check_keyword_label returns True for 'Keywords' (line 83)"""
-        from wordformat.rules.keywords import KeywordsEN
+        from wordformat.domains.thesis.rules.keywords import KeywordsEN
 
         node = KeywordsEN(
             value={"category": "abstract.keywords.english", "fingerprint": "fp"},
@@ -1142,7 +1157,7 @@ class TestKeywordsENCheckKeywordLabel:
 
     def test_check_keyword_label_key_words(self):
         """_check_keyword_label matches 'KEY WORDS'"""
-        from wordformat.rules.keywords import KeywordsEN
+        from wordformat.domains.thesis.rules.keywords import KeywordsEN
 
         node = KeywordsEN(
             value={"category": "abstract.keywords.english", "fingerprint": "fp"},
@@ -1154,7 +1169,7 @@ class TestKeywordsENCheckKeywordLabel:
 
     def test_check_keyword_label_no_match(self):
         """_check_keyword_label returns False for content text"""
-        from wordformat.rules.keywords import KeywordsEN
+        from wordformat.domains.thesis.rules.keywords import KeywordsEN
 
         node = KeywordsEN(
             value={"category": "abstract.keywords.english", "fingerprint": "fp"},
@@ -1170,7 +1185,7 @@ class TestKeywordsENBase:
 
     def _make_en_node(self, config_dict=None):
         """Helper to create a KeywordsEN node with config loaded"""
-        from wordformat.rules.keywords import KeywordsEN
+        from wordformat.domains.thesis.rules.keywords import KeywordsEN
 
         node = KeywordsEN(
             value={"category": "abstract.keywords.english", "fingerprint": "fp"},
@@ -1182,7 +1197,7 @@ class TestKeywordsENBase:
 
     def test_empty_run_skip(self, sample_yaml_config):
         """Empty run text is skipped (line 114)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1198,7 +1213,7 @@ class TestKeywordsENBase:
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 121)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1214,7 +1229,7 @@ class TestKeywordsENBase:
 
     def test_content_style_check(self, sample_yaml_config):
         """Content run style is checked (lines 130-135)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1231,7 +1246,7 @@ class TestKeywordsENBase:
 
     def test_keyword_count_validation_min(self, sample_yaml_config):
         """Keyword count < count_min triggers warning (via _run_rules)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1248,7 +1263,7 @@ class TestKeywordsENBase:
 
     def test_keyword_count_validation_max(self, sample_yaml_config):
         """Keyword count > count_max triggers warning (via _run_rules)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1269,7 +1284,7 @@ class TestKeywordsCNBase:
 
     def _make_cn_node(self, config_dict=None):
         """Helper to create a KeywordsCN node with config loaded"""
-        from wordformat.rules.keywords import KeywordsCN
+        from wordformat.domains.thesis.rules.keywords import KeywordsCN
 
         node = KeywordsCN(
             value={"category": "abstract.keywords.chinese", "fingerprint": "fp"},
@@ -1281,7 +1296,7 @@ class TestKeywordsCNBase:
 
     def test_paragraph_style_check(self, sample_yaml_config):
         """Paragraph style is checked (line 187)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1298,7 +1313,7 @@ class TestKeywordsCNBase:
 
     def test_label_style_check(self, sample_yaml_config):
         """Label run style is checked (line 218)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1313,7 +1328,7 @@ class TestKeywordsCNBase:
 
     def test_content_style_check(self, sample_yaml_config):
         """Content run style is checked (line 225)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1330,7 +1345,7 @@ class TestKeywordsCNBase:
 
     def test_keyword_count_and_trailing_punctuation(self, sample_yaml_config):
         """Keyword count validation + trailing punctuation check (via _run_rules)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1411,7 +1426,7 @@ class TestHeadingLevelNodes:
 
     def test_heading_base_with_config(self, sample_yaml_config):
         """_base method with loaded config"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
         from wordformat.rules.heading import HeadingLevel1Node
 
         init_config(sample_yaml_config)
@@ -1500,7 +1515,7 @@ class TestSetStyleAdditionalCoverage:
         "wordformat.pipeline.stages.FormattingExecutionStage.apply_format_check_to_all_nodes"
     )
     @mock.patch("wordformat.pipeline.stages.DocumentBuilder")
-    @mock.patch("wordformat.pipeline.stages.promote_bodytext_in_subtrees_of_type")
+    @mock.patch("wordformat.structure.utils.promote_bodytext_in_subtrees_of_type")
     def test_promote_called(
         self, mock_promote, mock_builder, mock_apply, temp_docx, config_path, tmp_path
     ):
@@ -1562,7 +1577,7 @@ class TestBodyTextAdditional:
 
     def test_body_text_apply_format(self, sample_yaml_config):
         """BodyText._base with p=False, r=False (line 27)"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
         from wordformat.rules.body import BodyText
 
         init_config(sample_yaml_config)
@@ -1582,7 +1597,7 @@ class TestBodyTextAdditional:
 
     def test_body_text_apply_to_run(self, sample_yaml_config):
         """apply_format 通过 handler 修正字符格式。"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
         from wordformat.rules.body import BodyText
 
         init_config(sample_yaml_config)
@@ -1634,8 +1649,8 @@ class TestTreeAdditional:
 
     def test_print_tree_with_paragraph_value(self, capsys):
         """print_tree with value having .paragraph dict (lines 162-164)"""
-        from wordformat.tree import print_tree
         from wordformat.rules.node import TreeNode
+        from wordformat.tree import print_tree
 
         node = TreeNode(
             value={"category": "test", "paragraph": "hello", "fingerprint": "fp"}
@@ -1662,6 +1677,7 @@ class TestSettingsFrozenPath:
             with mock.patch("sys.executable", "/fake/app/bin"):
                 # Reload settings module to pick up frozen state
                 import importlib
+
                 import wordformat.settings as settings_mod
 
                 importlib.reload(settings_mod)
@@ -1673,6 +1689,7 @@ class TestSettingsFrozenPath:
                 sys.frozen = original_frozen
             # Reload back to normal
             import importlib
+
             import wordformat.settings as settings_mod
 
             importlib.reload(settings_mod)
@@ -1733,7 +1750,7 @@ class TestTreeBuilderAdditionalCoverage:
 
     def test_build_tree_with_unknown_category_skipped(self, sample_yaml_config):
         """未知类别的节点被跳过（create_node 返回 None）"""
-        from wordformat.config.loader import init_config, get_config
+        from wordformat.config.loader import get_config, init_config
 
         init_config(sample_yaml_config)
         config = get_config()
@@ -1774,8 +1791,8 @@ class TestNumberingAdditionalCoverage:
 
     def test_process_heading_numbering_disabled(self, doc):
         """numbering config enabled=False，直接返回"""
-        from wordformat.numbering import process_heading_numbering
         from wordformat.config.models import NumberingConfig
+        from wordformat.numbering import process_heading_numbering
 
         # 创建 disabled 的 numbering config
         config = NumberingConfig(enabled=False)

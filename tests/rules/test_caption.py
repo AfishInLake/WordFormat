@@ -6,32 +6,13 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from docx.oxml.ns import qn
 from docx.shared import Pt
 
 from wordformat.config.models import NodeConfigRoot
 from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    AcknowledgementsCN,
-    BodyText,
     CaptionFigure,
     CaptionTable,
-    FormatNode,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    ReferenceEntry,
-    References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -105,7 +86,9 @@ class TestCaptionFigureBase:
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
-        """apply 模式：应修正格式。"""
+        """apply 模式：缩进/段间距按配置修正，不再产生残留批注。"""
+        from wordformat.style.diff import ParagraphStyle
+
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("图1 测试图片")
@@ -114,7 +97,14 @@ class TestCaptionFigureBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
+        residual = {
+            d.diff_type
+            for d in ParagraphStyle.from_config(node.pydantic_config).diff_from_paragraph(p)
+        }
+        # 缩进与段间距应已被修正（行距属不可自动转换项，允许残留）
+        assert "first_line_indent" not in residual
+        assert not {"space_before", "space_after"} & residual
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +128,9 @@ class TestCaptionTableBase:
         assert mock_comment.call_count >= 1
 
     def test_apply_with_wrong_format(self, root_config):
-        """apply 模式：应修正格式。"""
+        """apply 模式：缩进/段间距按配置修正，不再产生残留批注。"""
+        from wordformat.style.diff import ParagraphStyle
+
         doc = Document()
         p = doc.add_paragraph()
         r = p.add_run("表1 测试表格")
@@ -147,7 +139,13 @@ class TestCaptionTableBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
+        residual = {
+            d.diff_type
+            for d in ParagraphStyle.from_config(node.pydantic_config).diff_from_paragraph(p)
+        }
+        assert "first_line_indent" not in residual
+        assert not {"space_before", "space_after"} & residual
 
 
 # ---------------------------------------------------------------------------
@@ -158,10 +156,9 @@ class TestCaptionTableBase:
 
 """题注编号处理模块的单元测试。"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from docx import Document
 
 # CaptionNumberingConfig replaced by dict
 
@@ -269,6 +266,20 @@ class TestApplyCaptionNumbering:
 class TestCaptionNumberingIntegration:
     """测试 caption numbering 在 apply_format_check_to_all_nodes 中的集成。"""
 
+    @pytest.fixture(autouse=True)
+    def _thesis_caption_numbering(self):
+        """题注编号注入已迁入论文领域 hook（thesis.caption_numbering）。
+
+        本类直接调用 stage 方法（不经 FormattingExecutionStage.process），
+        需手动装配领域并 emit on_format_begin 重置章节/图序/表序状态。
+        """
+        from wordformat.domains import load_domain
+        from wordformat.hooks import hooks
+
+        load_domain("thesis")
+        hooks.emit("on_format_begin")
+        yield
+
     @pytest.fixture
     def caption_yaml(self, tmp_path):
         """创建带题注编号配置的临时 YAML 文件。"""
@@ -315,7 +326,9 @@ numbering:
         node = MagicMock()
         node.value = {"category": "heading_level_1"}
         node.children = children or []
-        node.paragraph = None
+        # 真实文档树中 heading 必有段落（对齐阶段保证 1:1）；
+        # 章节号递增依赖该节点触发 before_node_format 事件
+        node.paragraph = MagicMock()
         return node
 
     def _make_caption_figure(self, paragraph):
@@ -497,6 +510,7 @@ numbering:
         root.value = {"category": "top"}
         root.children = [h1, h2]
         root.paragraph = None
+        root.check_format = MagicMock()
 
         config = self._init_config(caption_yaml)
 
@@ -768,6 +782,20 @@ class TestCheckCaptionNumbering:
 
         mock_comment.assert_not_called()
 
+    def test_bare_continuation_marker_no_comment(self):
+        """独立的“续表”占位行（无编号）不报格式错误。"""
+        from wordformat.rules.caption import _check_caption_numbering
+
+        doc = Document()
+        p = self._make_paragraph("续表")
+        node = self._make_caption_figure(p, chapter=5, seq=3)
+        cfg = {"enabled": True, "separator": "."}
+
+        with patch.object(node, "add_comment") as mock_comment:
+            _check_caption_numbering(node, doc, "表", cfg)
+
+        mock_comment.assert_not_called()
+
     def test_continued_table_label_space_wrong(self):
         """续表 label_number_space=True 但无空格 → 添加批注。"""
         from wordformat.rules.caption import _check_caption_numbering
@@ -827,6 +855,7 @@ class TestCaptionEdgeCases:
     def test_replace_paragraph_text_empty_runs(self):
         """空 runs 列表不抛异常。"""
         from docx import Document
+
         from wordformat.rules.caption import _replace_paragraph_text
 
         doc = Document()
@@ -836,7 +865,7 @@ class TestCaptionEdgeCases:
 
     def test_check_caption_numbering_no_paragraph(self):
         """paragraph 为 None 时直接返回。"""
-        from wordformat.rules.caption import _check_caption_numbering, CaptionFigure
+        from wordformat.rules.caption import CaptionFigure, _check_caption_numbering
 
         node = CaptionFigure(value={"category": "test"}, level=0)
         node.paragraph = None
@@ -850,7 +879,7 @@ class TestCaptionEdgeCases:
 
     def test_apply_caption_numbering_no_paragraph(self):
         """paragraph 为 None 时直接返回。"""
-        from wordformat.rules.caption import _apply_caption_numbering, CaptionFigure
+        from wordformat.rules.caption import CaptionFigure, _apply_caption_numbering
 
         node = CaptionFigure(value={"category": "test"}, level=0)
         node.paragraph = None
@@ -863,20 +892,17 @@ class TestNodeConfigRoot:
     """覆盖 config/models.py NodeConfigRoot。"""
 
     def test_setattr(self):
-        from wordformat.config.models import NodeConfigRoot
 
         cfg = NodeConfigRoot()
         cfg.template_name = "测试"
         assert cfg["template_name"] == "测试"
 
     def test_getattr_missing_returns_none(self):
-        from wordformat.config.models import NodeConfigRoot
 
         cfg = NodeConfigRoot()
         assert cfg.nonexistent is None
 
     def test_model_dump(self):
-        from wordformat.config.models import NodeConfigRoot
 
         cfg = NodeConfigRoot(a=1, b=2)
         assert cfg.model_dump() == {"a": 1, "b": 2}

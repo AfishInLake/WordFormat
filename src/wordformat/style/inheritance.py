@@ -254,7 +254,23 @@ def x_first_line_indent(pPr):
             return -int(v) / 100.0
         except (TypeError, ValueError):
             return _MISS
+    # 部分文档只用 twips 记录缩进（没有 *Chars 属性）。按小四 1 字符 =
+    # 240 twips 折算，并取整到 0.5 字符：480/420 都还原为 2 字符。
+    v = ind.get(qn("w:firstLine"))
+    if v is not None:
+        return _twips_to_chars(v)
+    v = ind.get(qn("w:hanging"))
+    if v is not None:
+        chars = _twips_to_chars(v)
+        return None if chars is None else -chars
     return _MISS
+
+
+def _twips_to_chars(value: str) -> float | None:
+    try:
+        return round(int(value) / 240.0 * 2) / 2
+    except (TypeError, ValueError):
+        return None
 
 
 def x_left_indent(pPr):

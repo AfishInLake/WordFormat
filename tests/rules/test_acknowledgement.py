@@ -6,32 +6,12 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from wordformat.config.models import NodeConfigRoot
-from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
+from wordformat.domains.thesis.rules import (
     Acknowledgements,
     AcknowledgementsCN,
-    BodyText,
-    CaptionFigure,
-    CaptionTable,
-    FormatNode,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    ReferenceEntry,
-    References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -125,7 +105,7 @@ class TestAcknowledgementsBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
     def test_check_no_diffs_no_comment(self, root_config):
         """格式完全正确时，不应调用 add_comment。"""
@@ -181,7 +161,7 @@ class TestAcknowledgementsCNBase:
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
             node.apply_format(doc)
-        assert mock_comment.call_count >= 1  # apply 后 diff 仍有残留差异
+        mock_comment.assert_not_called()
 
     def test_check_first_line_indent(self, root_config):
         """验证 first_line_indent 配置被正确使用。"""

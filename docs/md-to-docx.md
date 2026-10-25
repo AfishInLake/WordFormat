@@ -69,7 +69,9 @@ FormatNode 文档树
 修正内置样式定义（Normal, Heading 1, ...）
     │
     ▼ FormattingExecutionStage
-应用 YAML 配置中的格式规则
+应用 YAML 配置中的格式规则（过程触发 on_format_begin /
+before_node_format / after_node_format 等 hook 事件，
+由文档领域回调在节点格式化前注入题注章节号等上下文）
     │
     ▼ PostProcessingStage
 标题自动编号 + 引用超链接

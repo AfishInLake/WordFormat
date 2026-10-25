@@ -277,8 +277,6 @@ def _traverse_numbering(
     node, heading_map, heading_num_map, config, ref_enabled, reference_num_id, counters
 ):
     """递归遍历节点树，应用标题和参考文献编号。"""
-    from wordformat.rules.references import ReferenceEntry
-
     category = node.value.get("category", "") if isinstance(node.value, dict) else ""
     paragraph = getattr(node, "paragraph", None)
 
@@ -288,15 +286,29 @@ def _traverse_numbering(
             if category == f"heading_{level_key}":
                 level_config = getattr(config, config_key, None)
                 if level_config and level_config.enabled:
+                    # 标题编号 hook：预设可自定义编号策略（skip 完全接管 / num_id 覆盖编号）
+                    from wordformat.hooks import hooks
+
+                    result = hooks.emit(
+                        "on_heading_numbering",
+                        heading_node=node,
+                        paragraph=paragraph,
+                        numbering_config=config,
+                        level_key=level_key,
+                        num_id=heading_num_map.get(config_key),
+                    )
+                    if result.get("skip", False):
+                        counters["heading"] += 1
+                        break
                     _auto_strip_numbering(paragraph, int(ilvl_str))
-                    num_id = heading_num_map.get(config_key)
+                    num_id = result.get("num_id") or heading_num_map.get(config_key)
                     if num_id:
                         apply_auto_numbering(paragraph, num_id, ilvl_str)
                     counters["heading"] += 1
                 break
 
-        # 处理参考文献条目节点
-        if ref_enabled and isinstance(node, ReferenceEntry):
+        # 处理参考文献条目节点（references_content category，不依赖论文规则类）
+        if ref_enabled and category == "references_content":
             _strip_reference_numbering(paragraph)
             if reference_num_id:
                 apply_auto_numbering(paragraph, reference_num_id, "0")

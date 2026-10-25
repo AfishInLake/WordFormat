@@ -226,11 +226,11 @@ class TestGetSomeFirstLineIndent:
         SetFirstLineIndent.set_char(p, 2)
         assert paragraph_get_first_line_indent(p) == 2.0
 
-    def test_ignores_firstLine_twips(self, doc):
-        """Only reads firstLineChars, ignores firstLine (physical twips)."""
+    def test_reads_firstLine_twips_as_chars(self, doc):
+        """无 firstLineChars 时按 twips 折算（小四 1 字符 = 240 twips）。"""
         p = doc.add_paragraph()
-        p.paragraph_format.first_line_indent = Pt(24)
-        assert paragraph_get_first_line_indent(p) is None
+        p.paragraph_format.first_line_indent = Pt(24)  # 480 twips → 2 字符
+        assert paragraph_get_first_line_indent(p) == 2.0
 
 
 class TestGetSomeBuiltinStyle:

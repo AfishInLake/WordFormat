@@ -4,40 +4,14 @@ Core 模块综合测试
 覆盖 tree.py, utils.py, rules/node.py, numbering.py, settings.py
 """
 
-import os
-import pytest
 from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from docx import Document
-from docx.oxml.ns import qn
+import pytest
 
-from wordformat.tree import Tree, Stack, print_tree
 from wordformat.config.dotdict import DotDict
-from wordformat.rules.node import TreeNode, FormatNode
-from wordformat.numbering import (
-    _auto_strip_numbering,
-    _strip_reference_numbering,
-    apply_auto_numbering,
-    create_numbering_definition,
-    process_heading_numbering,
-)
-from wordformat.utils import (
-    get_file_name,
-    ensure_is_directory,
-    ensure_directory_exists,
-    _to_roman,
-    _to_chinese_num,
-    load_yaml_with_merge,
-    get_paragraph_numbering_text,
-    remove_all_numbering,
-    _format_number,
-    _get_level_fmt,
-    _count_numbering_levels,
-)
-from wordformat.base import DocxBase
-from wordformat import settings
-
+from wordformat.rules.node import FormatNode, TreeNode
+from wordformat.tree import Stack, Tree, print_tree
 
 # ============================================================
 # tree.py — Tree
@@ -435,8 +409,9 @@ class TestDotDict:
         assert "a" not in d
 
     def test_delattr_missing_key_raises(self):
-        from wordformat.config.dotdict import DotDict
         import pytest
+
+        from wordformat.config.dotdict import DotDict
 
         d = DotDict()
         with pytest.raises(AttributeError):
@@ -458,20 +433,76 @@ class TestDotDict:
         assert result["a"]["b"] == 99  # overridden
         assert result["a"]["c"] == 2  # kept
 
+    def test_flatten_style_config_recursively_merges_groups(self):
+        from wordformat.config.dotdict import flatten_style_config
+
+        flattened = flatten_style_config(
+            {
+                "paragraph": {"alignment": "居中", "first_line_indent": "0字符"},
+                "font": {"font_size": "四号", "bold": True},
+                "title": {
+                    "paragraph": {"alignment": "左对齐"},
+                    "font": {"font_size": "三号"},
+                    "font_size": "小二",
+                },
+            }
+        )
+
+        assert flattened["alignment"] == "居中"
+        assert flattened["font_size"] == "四号"
+        assert flattened["title"]["alignment"] == "左对齐"
+        assert flattened["title"]["font_size"] == "小二"  # 顶层覆盖分组
+        assert "paragraph" not in flattened
+        assert "font" not in flattened["title"]
+
+
+class TestConfigLoader:
+    """配置文件只接受平铺写法。"""
+
+    def test_load_config_accepts_flat_fields(self, tmp_path):
+        from wordformat.config.loader import load_config
+
+        path = tmp_path / "flat.yaml"
+        path.write_text(
+            "headings:\n  level_1:\n    alignment: '居中对齐'\n    font_size: '三号'\n",
+            encoding="utf-8",
+        )
+
+        cfg = load_config(str(path))
+
+        assert cfg.headings.level_1.alignment == "居中对齐"
+        assert cfg.headings.level_1.font_size == "三号"
+
+    def test_load_config_rejects_nested_style_fields(self, tmp_path):
+        import pytest
+
+        from wordformat.config.loader import load_config
+
+        path = tmp_path / "nested.yaml"
+        path.write_text(
+            "abstract:\n"
+            "  chinese:\n"
+            "    title:\n"
+            "      font:\n"
+            "        font_size: '小二'\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError, match="abstract.chinese.title.font"):
+            load_config(str(path))
+
 
 class TestExportDefaults:
     """覆盖 structure/registry.py export_defaults()。"""
 
     def test_export_returns_dict_with_key_sections(self):
-        from wordformat.structure.registry import export_defaults
-
         # 需要先触发 @register（已通过 test 导入完成）
-        from wordformat.rules import (  # noqa: F401
+        from wordformat.domains.thesis.rules import (  # noqa: F401
             AbstractContentCN,
             AbstractTitleCN,
-            BodyText,
-            HeadingLevel1Node,
         )
+        from wordformat.rules import BodyText, HeadingLevel1Node  # noqa: F401
+        from wordformat.structure.registry import export_defaults
 
         data = export_defaults()
         assert isinstance(data, dict)
@@ -480,3 +511,12 @@ class TestExportDefaults:
         assert "abstract" in data
         assert "headings" in data
         assert "body" in data
+
+    def test_export_uses_flat_style_fields(self):
+        from wordformat.structure.registry import export_defaults
+
+        data = export_defaults()
+        title = data["abstract"]["chinese"]["title"]
+        assert "font_size" in title
+        assert "paragraph" not in title
+        assert "font" not in title

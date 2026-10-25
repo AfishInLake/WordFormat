@@ -2,36 +2,16 @@
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
 
-from unittest.mock import patch
-
 import pytest
 from docx import Document
+from docx.oxml import parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from wordformat.config.models import NodeConfigRoot
 from wordformat.rules import (
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    AcknowledgementsCN,
     BodyText,
-    CaptionFigure,
-    CaptionTable,
-    FormatNode,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
-    KeywordsCN,
-    KeywordsEN,
-    ReferenceEntry,
-    References,
 )
-from wordformat.rules.node import FormatNode as FormatNodeBase
+from wordformat.rules.body import _looks_like_code
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -201,3 +181,159 @@ class TestBodyTextCitationSuperscript:
 # ---------------------------------------------------------------------------
 # 8. AbstractTitleCN._base 完整 diff/apply 覆盖
 # ---------------------------------------------------------------------------
+
+
+class TestBodyTextEdges:
+    """字数规则与引用上标的空段落/特殊 run 分支。"""
+
+    def test_length_skips_missing_paragraph(self):
+        node = BodyText(value={}, level=0, paragraph=None)
+        node._check_paragraph_length(Document(), {"min_chars": 1})
+
+    def test_superscript_skips_missing_paragraph(self):
+        node = BodyText(value={}, level=0, paragraph=None)
+        node._apply_citation_superscript()
+
+    def test_apply_format_sets_superscript_in_chapter_one(self):
+        doc = Document()
+        p = doc.add_paragraph("这是一篇论文[1]的引用。")
+        node = BodyText(
+            value={"category": "body_text", "chapter_number": 1},
+            level=0,
+            paragraph=p,
+        )
+        node.load_config({})
+        node.apply_format(doc)
+        superscript_texts = [r.text for r in p.runs if r.font.superscript]
+        assert "[1]" in superscript_texts
+
+    def test_apply_format_skips_superscript_outside_chapter_one(self):
+        doc = Document()
+        p = doc.add_paragraph("这是一篇论文[1]的引用。")
+        node = BodyText(
+            value={"category": "body_text", "chapter_number": 2},
+            level=0,
+            paragraph=p,
+        )
+        node.load_config({})
+        node.apply_format(doc)
+        assert all(r.font.superscript is None for r in p.runs)
+
+    def test_superscript_skips_run_without_text_element(self):
+        doc = Document()
+        p = doc.add_paragraph()
+        p.add_run("文献[1]")
+        p.add_run().add_break()
+        node = BodyText(value={}, level=0, paragraph=p)
+        node._apply_citation_superscript()
+        assert p.text.strip() == "文献[1]"
+
+    def test_superscript_keeps_spaces_around_citation(self):
+        doc = Document()
+        p = doc.add_paragraph("文字 [1] 文字")
+        node = BodyText(value={}, level=0, paragraph=p)
+        node._apply_citation_superscript()
+        assert p.text == "文字 [1] 文字"
+        superscript = [
+            run.text
+            for run in p.runs
+            if TestBodyTextCitationSuperscript._get_vertAlign(run) == "superscript"
+        ]
+        assert superscript == ["[1]"]
+
+    def test_superscript_preserves_run_formatting(self):
+        doc = Document()
+        p = doc.add_paragraph()
+        p.add_run("文献[1]").bold = True
+        node = BodyText(value={}, level=0, paragraph=p)
+        node._apply_citation_superscript()
+        citation = next(run for run in p.runs if run.text == "[1]")
+        assert citation.bold is True
+        assert TestBodyTextCitationSuperscript._get_vertAlign(citation) == "superscript"
+
+
+# ---------------------------------------------------------------------------
+# 源码粘贴行识别（含中文行尾注释）
+# ---------------------------------------------------------------------------
+
+
+M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+
+
+class TestLooksLikeCode:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Usart2_Init(115200);//串口2，ESP8266用",
+            "    bh_data_send(BHReset);     //重置数据寄存器值在PowerOn模式下有效",
+            "GPIO_InitStructure.GPIO_Mode=GPIO_Mode_IPD;//设置GPIO口为下拉输入模式",
+            "Delay_us(15);//延时15微秒",
+            "while(1) //循环等待",
+            'printf("ok"); /* 注释 */',
+            "#include <stdio.h>",
+            "int main(void)",
+            "t=DS18B20_DQ_IN;",
+            "// 只有注释的一行",
+            "import random",
+            "from os import path",
+            "def main():",
+        ],
+    )
+    def test_detects_code_line(self, text):
+        assert _looks_like_code(text) is True
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "本文研究了单片机控制系统的设计方法。",
+            "图2.1 系统总体框图",
+            "",
+            "该模块采用串口通信完成数据交换",
+            "血压传感器的选择",
+        ],
+    )
+    def test_rejects_natural_language(self, text):
+        assert _looks_like_code(text) is False
+
+
+class TestBodyTextParaSkips:
+    def _node(self, text):
+        doc = Document()
+        p = doc.add_paragraph(text)
+        node = BodyText(value={"category": "body_text"}, level=0, paragraph=p)
+        node.load_config({})
+        return node
+
+    def test_code_line_skips_indent_and_alignment(self):
+        node = self._node("Delay_us(15);//延时15微秒")
+        assert {
+            "first_line_indent",
+            "alignment",
+            "space_before",
+            "space_after",
+        } <= node._para_checks_to_skip()
+
+    def test_short_label_line_skips_spacing(self):
+        node = self._node("血压传感器的选择")
+        assert node._is_short_label_line()
+        assert {
+            "first_line_indent",
+            "alignment",
+            "space_before",
+            "space_after",
+        } <= node._para_checks_to_skip()
+
+    def test_normal_paragraph_skips_nothing(self):
+        node = self._node("本文设计了一套基于单片机的控制系统，实现了数据采集与显示功能。")
+        assert node._para_checks_to_skip() == set()
+
+    def test_formula_explanation_skips_indent(self):
+        doc = Document()
+        p = doc.add_paragraph("式中，u为输入电压。")
+        p._p.append(
+            parse_xml(f'<m:oMath xmlns:m="{M}"><m:r><m:t>u</m:t></m:r></m:oMath>')
+        )
+        node = BodyText(value={"category": "body_text"}, level=0, paragraph=p)
+        node.load_config({})
+        assert node._is_formula_explanation()
+        assert "first_line_indent" in node._para_checks_to_skip()

@@ -10,7 +10,10 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
-from wordformat.config.dotdict import DotDict, deep_merge
+from wordformat.config.dotdict import DotDict, deep_merge, flatten_style_config
+
+# 字符格式化中可被内容级强调保护的属性
+_EMPHASIS_DIFF_TYPES = ("bold", "italic", "underline")
 
 
 class TreeNode:
@@ -21,6 +24,9 @@ class TreeNode:
     def __init__(self, value: Any):
         self.value = value
         self._config = DotDict()
+        # 完整 YAML 配置与当前节点命中的 YAML 子配置（用于查全局段/区分默认值）
+        self._full_config: dict = {}
+        self._yaml_config: dict = {}
         self.children: list[TreeNode] = []
         self.fingerprint = None
 
@@ -30,6 +36,7 @@ class TreeNode:
 
     def load_config(self, full_config: dict) -> None:
         """根据 NODE_TYPE 从 full_config 中提取子配置，与 DEFAULTS 合并。"""
+        self._full_config = full_config if isinstance(full_config, dict) else {}
         # 沿 NODE_TYPE 路径逐级查找 YAML 配置
         path_parts = self.NODE_TYPE.split(".")
         yaml_node: dict = {}
@@ -42,9 +49,10 @@ class TreeNode:
             yaml_node = current if isinstance(current, dict) else {}
         except (KeyError, TypeError):
             yaml_node = {}
+        self._yaml_config = yaml_node
 
-        # 合并：DEFAULTS 为底，YAML 覆盖
-        defaults = getattr(type(self), "DEFAULTS", {})
+        # 合并：DEFAULTS 为底，YAML 覆盖；DEFAULTS 的 paragraph/font 分组摊平
+        defaults = flatten_style_config(getattr(type(self), "DEFAULTS", {}))
         merged = deep_merge(defaults, yaml_node) if defaults else yaml_node
         self._config = DotDict(merged)
 
@@ -95,6 +103,9 @@ class FormatNode(TreeNode):
         self.paragraph: Paragraph = paragraph
         self.expected_rule = expected_rule
         self._comment_texts: list[tuple] = []
+        # 行内强调（粗体/斜体/代码/链接）保护：由 DocumentCreationStage 标记，
+        # 字符格式化时保留内容级强调，不被样式统一拉平（除非 YAML 显式声明）
+        self.protected_inline: bool = False
 
     @property
     def pydantic_config(self) -> "DotDict":
@@ -167,38 +178,61 @@ class FormatNode(TreeNode):
 
     def _handle_paragraph_style(self, doc, rule_cfg, p: bool):
         """默认段落样式检查/应用。配置需包含 alignment 等格式字段。"""
-        if self.paragraph is None or not self.paragraph.runs:
+        if self.paragraph is None:
             return
+        # 批注只能挂在 run 上；纯 OMML 公式段没有 w:r，check 模式无处锚定。
+        # 空段（含只有格式标记、没有可见文字的段落）跳过：它们没有可供阅读的
+        # 格式问题，报错只会淹没真正的段落问题。
+        from wordformat.utils import para_contains_math
+
+        has_text = bool(self.paragraph.text.strip())
+        if not has_text and not para_contains_math(self.paragraph):
+            return
+        has_runs = bool(self.paragraph.runs)
         from wordformat.style.diff import ParagraphStyle
 
         cfg = self.pydantic_config
         if cfg.alignment is None:
             return
         ps = ParagraphStyle.from_config(cfg)
+        skip = self._para_checks_to_skip()
         if p:
-            issues = ps.diff_from_paragraph(self.paragraph)
-            if issues:
+            issues = [
+                d
+                for d in ps.diff_from_paragraph(self.paragraph)
+                if d.diff_type not in skip
+            ]
+            if issues and has_runs:
                 self.add_comment(
                     doc=doc,
                     runs=self.paragraph.runs,
                     text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
                 )
         else:
-            ps.apply_to_paragraph(self.paragraph)
+            ps.apply_to_paragraph(self.paragraph, skip=skip)
             # apply 后再次 diff，只报告修正失败的残留差异
-            remaining = ps.diff_from_paragraph(self.paragraph)
-            if remaining:
+            remaining = [
+                d
+                for d in ps.diff_from_paragraph(self.paragraph)
+                if d.diff_type not in skip
+            ]
+            if remaining and has_runs:
                 self.add_comment(
                     doc=doc,
                     runs=self.paragraph.runs,
                     text=ParagraphStyle.to_string(remaining, target=self.NODE_LABEL),
                 )
 
-    def _handle_character_style(self, doc, rule_cfg, p: bool):
+    def _para_checks_to_skip(self) -> set[str]:
+        """子类可声明对当前段落不适用的段落检查项（如短行标题的首行缩进）。"""
+        return set()
+
+    def _handle_character_style(self, doc, rule_cfg, p: bool):  # noqa C901
         """默认字符样式检查/应用。配置需包含 chinese_font_name 等格式字段。"""
         if not self.paragraph.runs:
             return
         from wordformat.style.diff import CharacterStyle
+        from wordformat.style.reader import run_get_font_size_pt
 
         cfg = self.pydantic_config
         if cfg.chinese_font_name is None:
@@ -212,11 +246,24 @@ class FormatNode(TreeNode):
             italic=cfg.italic,
             underline=cfg.underline,
         )
+        # 段内字号以占据最多字符的 run 为准：夹在正文中的短 run（参考文献
+        # 角标、少量手工粘贴的字符）字号不同是常见现象，不应逐 run 报错。
+        lengths: dict[float, int] = {}
+        for run in self.paragraph.runs:
+            if run.text.strip():
+                size = run_get_font_size_pt(run)
+                lengths[size] = lengths.get(size, 0) + len(run.text.strip())
+        dominant_size = max(lengths, key=lengths.get) if len(lengths) > 1 else None
         for run in self.paragraph.runs:
             if not run.text.strip():
                 continue
+            minor_font = (
+                dominant_size is not None and run_get_font_size_pt(run) != dominant_size
+            )
             if p:
-                diff = cstyle.diff_from_run(run)
+                diff = self._diff_run_style(cstyle, run)
+                if minor_font:
+                    diff = [d for d in diff if d.diff_type != "font_size"]
                 if diff:
                     self.add_comment(
                         doc=doc,
@@ -224,9 +271,9 @@ class FormatNode(TreeNode):
                         text=CharacterStyle.to_string(diff, target=self.NODE_LABEL),
                     )
             else:
-                cstyle.apply_to_run(run)
+                self._apply_run_style(cstyle, run)
                 # apply 后再次 diff，只报告修正失败的残留差异
-                remaining = cstyle.diff_from_run(run)
+                remaining = self._diff_run_style(cstyle, run)
                 if remaining:
                     self.add_comment(
                         doc=doc,
@@ -235,6 +282,40 @@ class FormatNode(TreeNode):
                             remaining, target=self.NODE_LABEL
                         ),
                     )
+
+    def _diff_run_style(self, cstyle, run) -> list:
+        """字符样式差异；内容级强调受保护时过滤 bold/italic/underline。"""
+        return self._filter_emphasis(
+            cstyle.diff_from_run(run), self._keep_inline_emphasis()
+        )
+
+    def _apply_run_style(self, cstyle, run) -> list:
+        """应用字符样式；受保护的强调在 apply 后恢复原值。
+
+        自定义 ``_base`` 也应通过本方法应用字符样式，否则 protected_inline
+        不生效（例如摘要正文的加粗会被样式拉平）。
+        """
+        keep = self._keep_inline_emphasis()
+        saved = {k: getattr(run, k) for k in _EMPHASIS_DIFF_TYPES} if keep else None
+        diffs = cstyle.apply_to_run(run)
+        if saved is not None:
+            for key, value in saved.items():
+                setattr(run, key, value)
+            diffs = self._filter_emphasis(diffs, keep)
+        return diffs
+
+    def _keep_inline_emphasis(self) -> bool:
+        """内容级强调是否受保护（YAML 显式声明 bold/italic/underline 时不保护）。"""
+        if not self.protected_inline:
+            return False
+        yaml_config = self._yaml_config or {}
+        return not any(key in yaml_config for key in _EMPHASIS_DIFF_TYPES)
+
+    @staticmethod
+    def _filter_emphasis(diffs: list, keep: bool) -> list:
+        if not keep:
+            return diffs
+        return [d for d in diffs if d.diff_type not in _EMPHASIS_DIFF_TYPES]
 
     def _collect_comment(self, runs, text: str) -> None:
         """将批注文本加入缓冲区，(runs, text) 成对存储。"""
@@ -324,7 +405,8 @@ class FormatNode(TreeNode):
     def apply_replace(self, doc: Document = None) -> bool:
         """替换段落文本内容（由 JSON 的 replace 字段驱动）。
 
-        仅当 self.value 为 dict 且包含非空 "replace" 字段时执行替换。
+        仅当 self.value 为 dict 且包含 "replace" 字段时执行替换；
+        ``replace: ""`` 表示清空段落（不能当作未提供）。
         基类默认策略：多 run 时按原字符数分配，保持 run 边界语义。
         子类可覆写此方法实现特定类型的替换逻辑（如保留关键词标签 run、引用标记 run 等）。
 
@@ -332,18 +414,21 @@ class FormatNode(TreeNode):
             True 表示执行了替换，False 表示无需替换
         """
         value = self.value
-        if not isinstance(value, dict):
+        if not isinstance(value, dict) or "replace" not in value:
             return False
         replace_text = value.get("replace")
-        if not replace_text or not isinstance(replace_text, str):
+        if not isinstance(replace_text, str):
             return False
         replace_text = replace_text.strip().replace(" ", "")
-        if not replace_text:
-            return False
         if self.paragraph is None:
             return False
 
         runs = self.paragraph.runs
+        if not replace_text:
+            for run in runs:
+                run.text = ""
+            logger.debug("已清空段落文本（replace 为空）")
+            return True
         if not runs:
             return False
 
@@ -404,4 +489,12 @@ class FormatNode(TreeNode):
 
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         """追加批注到缓冲区，按锚点 run 分组，flush 时同组合并为一条。"""
+        # 批注 hook：预设可修改批注文案/级别（返回 {"text": ...} 覆盖）
+        from wordformat.hooks import hooks
+
+        if hooks.is_registered("on_comment"):
+            result = hooks.emit(
+                "on_comment", paragraph=self.paragraph, text=text, doc=doc
+            )
+            text = result.get("text", text)
         self._collect_comment(runs, text)

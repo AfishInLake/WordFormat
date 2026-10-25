@@ -19,10 +19,22 @@ class AbstractTitleCN(FormatNode):
     DEFAULTS = deep_merge(
         BASE_FORMAT,
         {
-            "paragraph": {"alignment": "居中对齐", "first_line_indent": "0字符"},
-            "font": {"chinese_font_name": "黑体", "font_size": "小二", "bold": True},
+            "paragraph": {
+                "alignment": ["居中对齐", "两端对齐", "左对齐"],
+                "space_before": ["0行", "0.5行"],
+                "space_after": ["0行", "0.5行"],
+                "first_line_indent": "0字符",
+            },
+            "font": {
+                "chinese_font_name": "黑体",
+                "font_size": ["四号", "小四", "小三", "三号"],
+                "bold": None,
+            },
         },
     )
+
+    def _para_checks_to_skip(self) -> set[str]:
+        return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
 @register("abstract_chinese_title_content", level=1)
@@ -34,21 +46,22 @@ class AbstractTitleContentCN(FormatNode):
     DEFAULTS = {
         "title": {
             **BASE_FORMAT,
-            "alignment": "居中对齐",
+            "alignment": ["居中对齐", "两端对齐", "左对齐"],
             "first_line_indent": "0字符",
             "chinese_font_name": "黑体",
-            "font_size": "小二",
-            "bold": True,
+            "font_size": ["四号", "小四", "小三", "三号"],
+            # “摘要”二字加粗与否因校而异
+            "bold": None,
         },
         "body": {**BASE_FORMAT, "alignment": "两端对齐"},
     }
 
-    def check_title(self, run) -> bool:
-        """检查标题是否包含在正文中"""
-        pattern = r"摘[^a-zA-Z0-9\u4e00-\u9fff]*要"
-        if re.search(pattern, run.text):
-            return True
-        return False
+    def _check_title_end_in_full_text(self, runs) -> int:
+        """返回 "摘要" 及其后分隔标号在 clean 全文中的结束位置。"""
+        full_text = "".join(run.text for run in runs)
+        full_text = full_text.replace("\r", "").replace("\n", "")
+        m = re.search(r"摘[^a-zA-Z0-9\u4e00-\u9fff]*要[：:\s]*", full_text)
+        return m.end() if m else 0
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -61,9 +74,18 @@ class AbstractTitleContentCN(FormatNode):
         else:
             issues = ps.apply_to_paragraph(self.paragraph)
 
-        for run in self.paragraph.runs:  # 检查标题是否包含在正文中
+        runs = self.paragraph.runs
+        title_end = self._check_title_end_in_full_text(runs)
+        cum = 0
+        for run in runs:  # 检查标题是否包含在正文中
             run.text = run.text.replace("\r", "").replace("\n", "")
-            if self.check_title(run):
+            text_clean = run.text
+            if not text_clean.strip():
+                continue
+            run_start = cum
+            cum += len(text_clean)
+            in_title = run_start < title_end
+            if in_title:
                 # 对run对象设置样式
                 C = CharacterStyle(
                     font_name_cn=cfg.title.chinese_font_name,
@@ -74,10 +96,6 @@ class AbstractTitleContentCN(FormatNode):
                     italic=cfg.title.italic,
                     underline=cfg.title.underline,
                 )
-                if r:
-                    diff_result = C.diff_from_run(run)
-                else:
-                    diff_result = C.apply_to_run(run)
             else:
                 # 对剩余部分的run设置样式
                 C = CharacterStyle(
@@ -89,10 +107,10 @@ class AbstractTitleContentCN(FormatNode):
                     italic=cfg.body.italic,
                     underline=cfg.body.underline,
                 )
-                if r:
-                    diff_result = C.diff_from_run(run)
-                else:
-                    diff_result = C.apply_to_run(run)
+            if r:
+                diff_result = self._diff_run_style(C, run)
+            else:
+                diff_result = self._apply_run_style(C, run)
             self.add_comment(
                 doc=doc,
                 runs=run,
@@ -129,11 +147,13 @@ class AbstractContentCN(FormatNode):
             italic=cfg.italic,
             underline=cfg.underline,
         )
-        for _, run in enumerate(self.paragraph.runs):
+        for run in self.paragraph.runs:
+            if not run.text.strip():
+                continue
             if r:
-                diff_result = cstyle.diff_from_run(run)
+                diff_result = self._diff_run_style(cstyle, run)
             else:
-                diff_result = cstyle.apply_to_run(run)
+                diff_result = self._apply_run_style(cstyle, run)
             self.add_comment(
                 doc=doc,
                 runs=run,
@@ -155,10 +175,19 @@ class AbstractTitleEN(FormatNode):
     DEFAULTS = deep_merge(
         BASE_FORMAT,
         {
-            "paragraph": {"alignment": "居中对齐", "first_line_indent": "0字符"},
-            "font": {"font_size": "四号", "bold": True},
+            "paragraph": {
+                "alignment": ["居中对齐", "两端对齐", "左对齐"],
+                "space_before": ["0行", "0.5行"],
+                "space_after": ["0行", "0.5行"],
+                "first_line_indent": "0字符",
+            },
+            # 该节点也承担英文论文题名（常加粗），加粗与否因校而异，不做校验
+            "font": {"font_size": ["小四", "四号", "小三"], "bold": None},
         },
     )
+
+    def _para_checks_to_skip(self) -> set[str]:
+        return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
 @register("abstract_english_title_content", level=1)
@@ -170,16 +199,16 @@ class AbstractTitleContentEN(FormatNode):
     DEFAULTS = {
         "title": {
             **BASE_FORMAT,
-            "alignment": "居中对齐",
+            "alignment": ["居中对齐", "两端对齐", "左对齐"],
             "first_line_indent": "0字符",
-            "font_size": "四号",
-            "bold": True,
+            "font_size": ["小四", "四号", "小三"],
+            "bold": None,
         },
         "body": {**BASE_FORMAT, "alignment": "两端对齐"},
     }
 
     def _check_title_in_full_text(self, runs) -> int:
-        """拼接全部 run 文本，返回 "Abstract" 前缀在 clean 文本中的结束位置。
+        """返回 "Abstract" 及其后分隔标号在 clean 文本中的结束位置。
 
         若全文不以 "abstract"（大小写不敏感）开头，返回 0。
         """
@@ -205,14 +234,20 @@ class AbstractTitleContentEN(FormatNode):
         runs = self.paragraph.runs
         # 段落级别判断：即使 "Abstract" 被拆分到多个 run 也能正确识别
         title_end = self._check_title_in_full_text(runs)
+        full_text = "".join(r.text for r in runs).replace("\r", "").replace("\n", "")
+        sep = re.match(r"[：:\s]*", full_text[title_end:])
+        # 紧随其后的冒号/空白同样按标题样式处理
+        style_end = title_end + (sep.end() if sep else 0)
 
         cum = 0  # 在 clean 全文中的累积位置
         for run in runs:
             text_clean = run.text.replace("\r", "").replace("\n", "")
+            if not text_clean:
+                continue
             run_len = len(text_clean)
             run_start = cum
             run_end = cum + run_len
-            in_title = run_start < title_end
+            in_title = run_start < style_end
 
             if in_title:
                 if run_start == 0:
@@ -252,9 +287,9 @@ class AbstractTitleContentEN(FormatNode):
                     underline=cfg.body.underline,
                 )
             if r:
-                diff_result = c.diff_from_run(run)
+                diff_result = self._diff_run_style(c, run)
             else:
-                diff_result = c.apply_to_run(run)
+                diff_result = self._apply_run_style(c, run)
             self.add_comment(
                 doc=doc,
                 runs=run,
@@ -274,7 +309,16 @@ class AbstractContentEN(FormatNode):
 
     NODE_TYPE = "abstract.english.body"
     NODE_LABEL = "英文摘要正文"
-    DEFAULTS = deep_merge(BASE_FORMAT, {"paragraph": {"alignment": "两端对齐"}})
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {
+                "alignment": "两端对齐",
+                # 英文摘要段首不缩进是通行写法，部分学校要求 2 字符
+                "first_line_indent": ["0字符", "2字符"],
+            }
+        },
+    )
 
     def _base(self, doc, p: bool, r: bool):
         cfg = self.pydantic_config
@@ -293,10 +337,12 @@ class AbstractContentEN(FormatNode):
             underline=cfg.underline,
         )
         for run in self.paragraph.runs:
+            if not run.text.strip():
+                continue
             if r:
-                diff_result = cstyle.diff_from_run(run)
+                diff_result = self._diff_run_style(cstyle, run)
             else:
-                diff_result = cstyle.apply_to_run(run)
+                diff_result = self._apply_run_style(cstyle, run)
             if diff_result:  # 可选：仅当有差异时才添加批注
                 self.add_comment(
                     doc=doc,
@@ -307,5 +353,5 @@ class AbstractContentEN(FormatNode):
             self.add_comment(
                 doc=doc,
                 runs=self.paragraph.runs,
-                text="".join(str(dr) for dr in issues),
+                text=ParagraphStyle.to_string(issues, target=self.NODE_LABEL),
             )

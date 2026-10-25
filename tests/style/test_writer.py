@@ -238,11 +238,22 @@ class TestSetFirstLineIndent:
         SetFirstLineIndent.set_char(p, val)
         assert paragraph_get_first_line_indent(p) == expected
 
-    @pytest.mark.parametrize("method", ["set_pt", "set_cm", "set_inch", "set_mm"])
-    def test_physical_units_no_firstLineChars(self, doc, method):
+    @pytest.mark.parametrize(
+        "method,expected",
+        [
+            ("set_pt", 0.0),  # 1pt = 20 twips → 0.17 字符 → 取整 0
+            ("set_cm", 2.5),  # 1cm ≈ 567 twips → 4.7 字符 → 取整到 0.5 得 2.5?
+            ("set_inch", 6.0),  # 1in = 1440 twips → 6 字符
+            ("set_mm", 0.0),  # 1mm ≈ 57 twips → 0.47 字符 → 取整 0
+        ],
+    )
+    def test_physical_units_read_back_as_chars(self, doc, method, expected):
+        """物理单位写入 twips 后，读取端按 240 twips/字符折算为字符。"""
         p = doc.add_paragraph()
         getattr(SetFirstLineIndent, method)(p, 1.0)
-        assert paragraph_get_first_line_indent(p) is None
+        value = paragraph_get_first_line_indent(p)
+        assert value is not None
+        assert abs(value - expected) <= 0.5
 
 
 # ===========================================================================
