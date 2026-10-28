@@ -1,4 +1,4 @@
-"""段落身份：`w14:paraId` 的读取与补齐。
+"""段落/表格身份：`w14:paraId` 的读取与补齐。
 
 编辑 JSON 要能可靠地折射成文档结构编辑，前提是每个段落有一个**跨进程稳定**的身份：
 
@@ -69,4 +69,42 @@ def ensure_para_ids(document) -> int:
         minted += 1
     if minted:
         logger.debug(f"补齐段落身份：新写入 {minted} 个 w14:paraId")
+    return minted
+
+
+def _table_anchor_p(tbl_el):
+    """表格身份锚点：``w:tbl`` 首行首单元格的首个 ``w:p``（取不到时返回 None）。"""
+    anchors = tbl_el.xpath("./w:tr[1]/w:tc[1]/w:p[1]")
+    return anchors[0] if anchors else None
+
+
+def get_table_id(tbl_el) -> str | None:
+    """表格身份 = 首单元格段落的 ``w14:paraId``。
+
+    OOXML 没给 ``w:tbl`` 定义 id，但单元格段落照样带 ``w14:paraId``；借它当身份可以
+    复用 Word 的维护（用户在 Word 里编辑表格不会丢 id），不必另造私有属性。
+    """
+    anchor = _table_anchor_p(tbl_el)
+    return get_para_id(anchor) if anchor is not None else None
+
+
+def ensure_table_ids(document) -> int:
+    """给 body 层每个表格的首单元格段落补齐身份，返回新写入的数量。
+
+    只处理 body 直接子级的 ``w:tbl``，与 gj 导出表格条目的范围一致（嵌套表格不单独
+    寻址，它会与其宿主表格共用取值域）。
+    """
+    body = document.element.body
+    used = _existing_ids(body)
+    minted = 0
+    for tbl in body.iterchildren():
+        if tbl.tag != qn("w:tbl"):
+            continue
+        anchor = _table_anchor_p(tbl)
+        if anchor is None or get_para_id(anchor):
+            continue
+        anchor.set(W14_PARA_ID, _mint_id(used))
+        minted += 1
+    if minted:
+        logger.debug(f"补齐表格身份：新写入 {minted} 个 w14:paraId")
     return minted
