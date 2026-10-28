@@ -28,6 +28,8 @@ def _reject_nested_style_config(obj, path: tuple[str, ...] = ()) -> None:
 def load_config(path: str) -> NodeConfigRoot:
     global _config
     raw = load_yaml_with_merge(path)
+    if not isinstance(raw, dict):
+        raise ValueError(f"配置文件 {path} 为空或格式无效：需要 YAML 映射")
     _reject_nested_style_config(raw)
     _config = NodeConfigRoot(**raw)
     return _config

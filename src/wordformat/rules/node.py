@@ -15,6 +15,13 @@ from wordformat.config.dotdict import DotDict, deep_merge, flatten_style_config
 # 字符格式化中可被内容级强调保护的属性
 _EMPHASIS_DIFF_TYPES = ("bold", "italic", "underline")
 
+# 承载图片/对象的 run：改写文字时不能碰，否则 run.text 赋值会清掉 w:drawing 等子元素
+_MEDIA_RUN_XPATH = ".//w:drawing | .//w:pict | .//w:object"
+
+
+def _run_has_media(run: Run) -> bool:
+    return bool(run._r.xpath(_MEDIA_RUN_XPATH))
+
 
 class TreeNode:
     """树的节点类"""
@@ -423,14 +430,17 @@ class FormatNode(TreeNode):
         if self.paragraph is None:
             return False
 
-        runs = self.paragraph.runs
+        # 图片/对象 run 不参与文字分配：run.text 赋值会清掉其子元素
+        runs = [run for run in self.paragraph.runs if not _run_has_media(run)]
         if not replace_text:
             for run in runs:
                 run.text = ""
             logger.debug("已清空段落文本（replace 为空）")
             return True
         if not runs:
-            return False
+            self.paragraph.add_run(replace_text)
+            logger.debug(f"已替换段落文本 → {replace_text[:50]}...")
+            return True
 
         if len(runs) == 1:
             runs[0].text = replace_text
@@ -471,21 +481,25 @@ class FormatNode(TreeNode):
         # 移除段落内的手动换行符（Shift+Enter → <w:br/>）
         self._remove_manual_line_breaks()
 
-        # 清理第一个非空 run 的开头空格
+        # 清理第一个有内容 run 的开头空格；纯空白 run 清空后继续往后找
         for run in runs:
-            if run.text:
-                stripped = run.text.lstrip(" \u00a0")  # 普通空格 + 不间断空格
-                if stripped != run.text:
-                    run.text = stripped
+            if not run.text:
+                continue
+            stripped = run.text.lstrip(" \u00a0")  # 普通空格 + 不间断空格
+            if stripped:
+                run.text = stripped
                 break
+            run.text = ""
 
-        # 清理最后一个非空 run 的结尾空格
+        # 清理最后一个有内容 run 的结尾空格；纯空白 run 清空后继续往前找
         for run in reversed(runs):
-            if run.text:
-                stripped = run.text.rstrip(" \u00a0")
-                if stripped != run.text:
-                    run.text = stripped
+            if not run.text:
+                continue
+            stripped = run.text.rstrip(" \u00a0")
+            if stripped:
+                run.text = stripped
                 break
+            run.text = ""
 
     def add_comment(self, doc: Document, runs: Run | Sequence[Run], text: str):
         """追加批注到缓冲区，按锚点 run 分组，flush 时同组合并为一条。"""

@@ -360,6 +360,14 @@ def _try_parse_num(text: str, parser):
         return None
 
 
+def _parse_numeral(text: str) -> int:
+    """题注编号：中文数字或罗马数字（两类字符集不重叠，依次尝试即可）。"""
+    try:
+        return _from_chinese_num(text)
+    except ValueError:
+        return _from_roman(text)
+
+
 def parse_caption_text(text: str) -> dict | None:
     """解析题注文本为结构化组件。
 
@@ -385,13 +393,16 @@ def parse_caption_text(text: str) -> dict | None:
     patterns = [
         (rf"^{LABEL}(\d+)\s*({SEP})\s*(\d+)[\s　]*(.+)$", int, int),
         (rf"^{LABEL}({CN})\s*({SEP})\s*(\d+)[\s　]*(.+)$", _from_chinese_num, int),
+        (
+            rf"^{LABEL}({CN})\s*({SEP})\s*({CN}|{ROMAN})[\s　]*(.+)$",
+            _from_chinese_num,
+            _parse_numeral,
+        ),
         (rf"^{LABEL}({ROMAN})\s*({SEP})\s*(\d+)[\s　]*(.+)$", _from_roman, int),
         (
             rf"^{LABEL}(\d+)\s*({SEP})\s*({CN}|{ROMAN})[\s　]*(.+)$",
             int,
-            lambda n: _from_chinese_num(n)
-            if any(c in _digit_map for c in n)
-            else _from_roman(n),
+            _parse_numeral,
         ),
     ]
 
@@ -411,30 +422,6 @@ def parse_caption_text(text: str) -> dict | None:
             )
 
     return None
-
-
-# 供 parse_caption_text 内部使用的 digit_map
-_digit_map = {
-    "零": 0,
-    "一": 1,
-    "二": 2,
-    "三": 3,
-    "四": 4,
-    "五": 5,
-    "六": 6,
-    "七": 7,
-    "八": 8,
-    "九": 9,
-    "壹": 1,
-    "贰": 2,
-    "叁": 3,
-    "肆": 4,
-    "伍": 5,
-    "陆": 6,
-    "柒": 7,
-    "捌": 8,
-    "玖": 9,
-}
 
 
 # ---------------------------------------------------------------------------

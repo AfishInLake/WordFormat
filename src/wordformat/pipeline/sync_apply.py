@@ -88,6 +88,8 @@ def expand_multi_paragraph_items(items: list[dict]) -> list[dict]:
                 f"第 {idx} 条 paragraphs 必须是至少 2 段的字符串列表，"
                 "单段请直接用 paragraph"
             )
+        if not all(isinstance(text, str) for text in texts):
+            raise ValueError(f"第 {idx} 条 paragraphs 的元素必须全是字符串")
         category = item.get("category", "")
         if category in _MULTI_PARAGRAPH_UNSUPPORTED:
             raise ValueError(

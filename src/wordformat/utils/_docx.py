@@ -57,13 +57,8 @@ def ensure_directory_exists(path):
 
 
 def para_contains_image(para) -> bool:
-    """检查段落是否包含内联图片（w:drawing）。"""
-    from docx.oxml.ns import qn
-
-    for r in para._element.findall(qn("w:r")):
-        if r.find(qn("w:drawing")) is not None:
-            return True
-    return False
+    """检查段落是否包含内联图片（w:drawing），含超链接等容器内的 run。"""
+    return bool(para._p.xpath(".//w:drawing"))
 
 
 def para_contains_math(para) -> bool:

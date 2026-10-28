@@ -202,22 +202,34 @@ class CharacterStyle:
 
     def __init__(
         self,
-        font_name_cn: str = "宋体",
-        font_name_en: str = "Times New Roman",
-        font_size: str | float = "小四",
-        font_color: str | tuple = "BLACK",
+        font_name_cn: str | None = "宋体",
+        font_name_en: str | None = "Times New Roman",
+        font_size: str | float | None = "小四",
+        font_color: str | tuple | None = "BLACK",
         bold: bool = False,
         italic: bool = False,
         underline: bool = False,
     ):
-        self.font_name_cn: FontName = FontName(font_name_cn)
-        self.font_name_en: FontName = FontName(font_name_en)
-        size_values = _as_option_values(font_size)
-        self.font_size: FontSize = FontSize(size_values[0])
+        # None 表示该属性不做校验（部分字段缺省的配置不应在构造时报错）
+        self.font_name_cn: FontName | None = (
+            FontName(font_name_cn) if font_name_cn is not None else None
+        )
+        self.font_name_en: FontName | None = (
+            FontName(font_name_en) if font_name_en is not None else None
+        )
         # YAML 可用列表声明等价字号（如 references.entry 的 [五号, 小四]），
         # 校验时任一命中即通过，修正时统一落到第一个值。
-        self.font_size_options: list[FontSize] = [FontSize(v) for v in size_values]
-        self.font_color: FontColor = FontColor(font_color)
+        self.font_size_options: list[FontSize] = (
+            [FontSize(v) for v in _as_option_values(font_size)]
+            if font_size is not None
+            else []
+        )
+        self.font_size: FontSize | None = (
+            self.font_size_options[0] if self.font_size_options else None
+        )
+        self.font_color: FontColor | None = (
+            FontColor(font_color) if font_color is not None else None
+        )
         # None 表示该属性不做校验（如英文摘要标题兼作论文题名，加粗与否因校而异）
         self.bold: bool | None = bold
         self.italic: bool = italic
@@ -270,7 +282,7 @@ class CharacterStyle:
 
         # 4. 字号（列表表示等价规范，任一命中即可；半磅级偏差视为排版取整）
         current_size = run_get_font_size_pt(run)
-        if not any(
+        if self.font_size_options and not any(
             abs(current_size - float(opt.rel_value)) <= _FONT_SIZE_TOL_PT
             for opt in self.font_size_options
         ):
@@ -286,7 +298,7 @@ class CharacterStyle:
 
         # 5. 字体颜色
         current_color = run_get_font_color(run)
-        if self.font_color != current_color:
+        if self.font_color is not None and self.font_color != current_color:
             # current_color 为 None 表示使用了主题色（themeColor），rgb 只是猜测值
             color_display = (
                 "主题色(不确定)" if current_color is None else str(current_color)
@@ -304,7 +316,11 @@ class CharacterStyle:
         # 6. 东亚字体（仅当 run 含中文字符时才检查）
         font_name = run_get_font_name(run) or ""
         has_cjk = has_chinese(run.text)
-        if has_cjk and str(font_name).lower() != str(self.font_name_cn).lower():
+        if (
+            has_cjk
+            and self.font_name_cn is not None
+            and str(font_name).lower() != str(self.font_name_cn).lower()
+        ):
             diffs.append(
                 DIFFResult(
                     "font_name_cn",
@@ -316,7 +332,10 @@ class CharacterStyle:
             )
         # 7. 非东亚字体（沿继承链，含主题字体；未设置视为空）
         ascii_font = run_get_font_name_en(run) or ""
-        if str(ascii_font).lower() != str(self.font_name_en).lower():
+        if (
+            self.font_name_en is not None
+            and str(ascii_font).lower() != str(self.font_name_en).lower()
+        ):
             diffs.append(
                 DIFFResult(
                     "font_name_en",
@@ -347,6 +366,7 @@ class CharacterStyle:
                 DIFFResult(field, getattr(self, _FORCE_FIELD_MAP[field]), None, "")
                 for field in wanted
                 if field in _FORCE_FIELD_MAP
+                and getattr(self, _FORCE_FIELD_MAP[field]) is not None
             ]
         else:
             diffs = self.diff_from_run(run)

@@ -72,7 +72,9 @@ class DocumentTreeBuilder:
         from wordformat.structure.node_factory import create_node
 
         level = self._determine_level(item["category"])
-        return create_node(item=item, level=level, config=self._config)
+        return create_node(
+            item=item, level=level, config=self._config, registry=self._registry
+        )
 
     def _determine_level(self, category: str) -> int:
         """根据 category 映射到逻辑层级"""
