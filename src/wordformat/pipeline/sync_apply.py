@@ -1,29 +1,43 @@
 #! /usr/bin/env python
-# @Time    : 2026/10/22
+# @Time    : 2026-10-22
 # @Author  : afish
 # @File    : sync_apply.py
 """af --sync：以编辑后的 JSON 为准，在原 docx 上做结构同步（增/删/改/重排段落）。
 
 现有 af 依赖「树节点 ↔ document.paragraphs 1:1 zip」，JSON 与原文档段落数必须
-相等，因此无法表达增删。本模块在建树之前先做一次**结构对齐**：把编辑后的 JSON
-扁平列表 A 与文档段落列表 B 按文本归一化 key（图片段用哨兵 ``"<image>"``
-统一，防空文本区漂移及图片段误删）喂给 difflib。
+相等，因此无法表达增删。本模块在建树之前先做一次**结构对齐**，有两条路径：
 
-注意 difflib 的 opcode 以「A 变换为 B」为方向，与本功能（把 B 同步为 A）相反：
+**按身份对齐（``para_id`` 存在时）** —— gj 已把每段的 ``w14:paraId`` 写进文档和
+JSON，两侧按该 id 精确配对：
+
+- JSON 条目带 id 且文档中存在 → 同一段落，文本有变化就按 run 级字符改写；
+- JSON 条目不带 id（agent/人新增的条目）→ 新插入一段，落点由它在 JSON 里紧邻的
+  条目决定（整体按 JSON 顺序重排 body），不再依赖文本相似度；
+- 文档段落未被任何条目引用 → JSON 删掉了它 → 真删该段；
+- 表格条目按 ``exists`` 顺序对应原有 ``w:tbl``，位置同样以 JSON 为准。
+
+**按文本对齐（旧 JSON 或文档无身份时）** —— 把 JSON 扁平列表 A 与文档段落列表 B 按
+文本归一化 key（图片段用哨兵 ``"<image>"`` 统一，防空文本区漂移及图片段误删）喂给
+difflib。注意 difflib 的 opcode 以「A 变换为 B」为方向，与本功能（把 B 同步为 A）
+相反：
+
 - ``insert``（B 有而 A 无的区段）→ JSON 删了这些条目 → 真删原段落；
 - ``delete``（A 有而 B 无的区段）→ JSON 新增条目 → 在锚点 ``insert_paragraph_before``
   插段；尾部无锚点的按序 ``document.add_paragraph``；
-- ``replace`` → 两区段配对逐段 ``_set_paragraph_text``（图片段跳过），多出
-  条目插在区尾锚点之前（保持 JSON 顺序）、多出段落删除；
+- ``replace`` → 两区段配对逐段改写文本，多出条目插在区尾锚点之前（保持 JSON 顺序）、
+  多出段落删除；
 - ``equal`` 不动。
 
-同步后段落数与条目数恢复 1:1，后续建树/zip/格式化流程不变。
+文本对齐靠文本找锚点，重复文本（同一篇里出现 4 次的「本章小结」）无法区分指代哪一段；
+身份对齐没有这个限制。两条路径同步后都恢复「段落数 == 条目数」，后续建树/zip/格式化
+流程不变。
 
 边界（见 SKILL.md）：
 - 表格内容不在 paragraphs 流中：原表格无法经 JSON 删改；JSON 新增的
   ``table_object`` 条目会被标记 ``sync_skip`` 并忽略（建表请用 jd 重建）；
-- difflib 把「移动」拆成删+插，含图片/域代码的段落不可移动；
-- replace 段仅清 run 重写文本，段内超链接（如目录条目）文本不参与同步。
+- 文本对齐把「移动」拆成删+插，含图片/域代码的段落不可移动；
+- 段落文本改写只动文字 run：加粗/斜体/超链接按字符对齐保留，含图片、域代码、公式的
+  run 不改写（``Run.text`` 赋值会清空 run 内容，写进去等于删图、毁页码域）。
 """
 
 from __future__ import annotations
@@ -31,7 +45,11 @@ from __future__ import annotations
 import difflib
 from typing import List
 
-from wordformat.log_config import logger
+from docx.oxml.ns import qn
+from loguru import logger
+
+from wordformat.para_ids import ensure_para_ids, get_para_id
+from wordformat.text_edit import set_paragraph_text
 from wordformat.utils import para_contains_image
 
 # 图片段哨兵：JSON 的 figure_image 条目与 docx 含图段落共用，保证对齐稳定
@@ -63,12 +81,9 @@ def _para_key(para) -> str:
     return _normalize(para.text)
 
 
-def _set_paragraph_text(para, text: str) -> None:
-    """清 run 后单 run 写入文本（保留段落 pPr；超链接/域代码不在 runs 中，不处理）。"""
-    for run in list(para.runs):
-        run._element.getparent().remove(run._element)
-    if text:
-        para.add_run(text)
+def _set_paragraph_text(para, text: str) -> bool:
+    """按字符对齐改写段落文本，保留 run 边界上的既有格式；返回是否改写。"""
+    return set_paragraph_text(para, text)
 
 
 def _remove_paragraphs(paras: List) -> None:
@@ -116,8 +131,6 @@ def _apply_opcode(
         a_slice, b_slice = items[i1:i2], paras[j1:j2]
         n_edit = 0
         for item, para in zip(a_slice, b_slice, strict=False):
-            if para_contains_image(para):
-                continue  # 哨兵区不覆写图片段文本，保留原图
             _set_paragraph_text(para, _item_text(item))
             n_edit += 1
         # 配对的区段已逐段覆写文本；多出的条目按 JSON 顺序插在区尾 B[j2]
@@ -134,13 +147,8 @@ def _apply_opcode(
     return 0, 0, 0
 
 
-def sync_document_structure(document, items: list[dict]) -> None:
-    """以 JSON 条目列表为准，原地对 document 段落做增/删/改，使两者一一对应。
-
-    Args:
-        document: python-docx Document（会被就地修改）
-        items: 编辑后的 JSON 扁平条目列表（category/paragraph/replace 字段）
-    """
+def _align_by_text(document, items: list[dict]) -> tuple[int, int, int]:
+    """旧路径：按归一化文本做 difflib 对齐（无段落身份时）。"""
     paras = list(document.paragraphs)
     # 表格条目不对应段落（原表格由 exists 标记保留，sync 不支持新增表格），
     # 不参与对齐，避免把相邻段落误配为表格而清空文本。
@@ -157,6 +165,99 @@ def sync_document_structure(document, items: list[dict]) -> None:
         n_del += d
         n_ins += ins
         n_edit += e
+    return n_edit, n_ins, n_del
+
+
+# ---------------------------------------------------------------------------
+# 按段落身份对齐（gj 写入 w14:paraId 后可用）
+# ---------------------------------------------------------------------------
+
+
+def _identity_ready(document, items: list[dict]) -> bool:
+    """两侧都能给出唯一段落身份时，才允许按身份对齐。
+
+    只要文档里有一个 body 段落缺 id 或 id 重复，就退回文本对齐：身份不完整时按身份
+    删段等于凭不存在的键误删，宁可退回旧行为。
+    """
+    if not any(isinstance(it, dict) and it.get("para_id") for it in items):
+        return False
+    body_ids = [get_para_id(p._p) for p in document.paragraphs]
+    return all(body_ids) and len(set(body_ids)) == len(body_ids)
+
+
+def _take_existing(para_by_id: dict, item: dict):
+    """取出条目指向的既有段落；无 id 或 id 在文档中已不存在时返回 None（按新增处理）。"""
+    para_id = item.get("para_id")
+    if not para_id:
+        return None
+    return para_by_id.pop(para_id, None)
+
+
+def _reorder_body(document, ordered: List) -> None:
+    """按 JSON 顺序重排 body：lxml 插入即移动，增删改与「移动段落」一次解决。"""
+    body = document.element.body
+    structural = (qn("w:p"), qn("w:tbl"))
+    tail = next((el for el in body.iterchildren() if el.tag not in structural), None)
+    for el in ordered:
+        if tail is None:
+            body.append(el)
+        else:
+            tail.addprevious(el)
+
+
+def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int]:
+    """按 ``para_id`` 对齐：JSON 为准，段落可增、删、改、移位。"""
+    para_by_id = {get_para_id(p._p): p for p in document.paragraphs}
+    table_elements = [
+        el for el in document.element.body.iterchildren() if el.tag == qn("w:tbl")
+    ]
+    ordered: List = []
+    n_edit = n_ins = n_del = 0
+    table_cursor = 0
+
+    for item in items:
+        if item.get("category") == "table_object":
+            # 原表格按 exists 顺序归位；新增表格（sync_skip）仍由 jd 负责
+            if item.get("exists") and table_cursor < len(table_elements):
+                ordered.append(table_elements[table_cursor])
+                table_cursor += 1
+            continue
+        para = _take_existing(para_by_id, item)
+        if para is None:
+            para = document.add_paragraph(_item_text(item))
+            n_ins += 1
+        elif _set_paragraph_text(para, _item_text(item)):
+            n_edit += 1
+        ordered.append(para._p)
+
+    n_del = len(para_by_id)
+    _remove_paragraphs(list(para_by_id.values()))
+    if table_cursor != len(table_elements):
+        logger.warning(
+            f"文档中有 {len(table_elements)} 个表格，JSON 只描述到 {table_cursor} 个，"
+            "未被引用的表格保持原位不动"
+        )
+    _reorder_body(document, ordered)
+    ensure_para_ids(document)  # 新插入的段落也要有身份，否则下一轮同步断链
+    return n_edit, n_ins, n_del
+
+
+def sync_document_structure(document, items: list[dict]) -> None:
+    """以 JSON 条目列表为准，原地对 document 段落做增/删/改/重排，使两者一一对应。
+
+    Args:
+        document: python-docx Document（会被就地修改）
+        items: 编辑后的 JSON 扁平条目列表（category/paragraph/para_id/replace 字段）
+    """
+    if _identity_ready(document, items):
+        n_edit, n_ins, n_del = _align_by_identity(document, items)
+    else:
+        if any(isinstance(it, dict) and it.get("para_id") for it in items):
+            logger.warning(
+                "JSON 带段落身份但文档侧不完整（未重新 gj 或在 Word 里被重建），"
+                "已退回按文本对齐"
+            )
+        n_edit, n_ins, n_del = _align_by_text(document, items)
 
     if not document.paragraphs:
         # Word 要求正文至少保留一个段落

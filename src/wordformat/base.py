@@ -10,6 +10,7 @@ from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
 from wordformat.domains.postprocess import get_postprocess
+from wordformat.para_ids import ensure_para_ids, get_para_id
 from wordformat.settings import BATCH_SIZE
 from wordformat.utils import (
     get_paragraph_numbering_text,
@@ -88,6 +89,7 @@ class DocxBase:
         # 收集所有段落（含空段）：空段按结构判定（图片/公式/空段），
         # 独立公式行短路，其余走 AI 推理
         all_paras = list(self.document.paragraphs)
+        self._annotate_paragraph_ids()
         result: list = [None] * len(all_paras)
         text_indices = []
         texts_for_ai = []
@@ -148,7 +150,34 @@ class DocxBase:
         postprocessor = get_postprocess(self.domain)
         if postprocessor is not None:
             postprocessor(result)
+        self._attach_para_ids(result, all_paras)
         return self._interleave_tables(result)
+
+    def _annotate_paragraph_ids(self) -> None:
+        """补齐段落身份并写回文档。
+
+        gj 因此从「只读」变成「可能就地补一次 XML 属性」：身份只有落进 XML 才能穿过
+        gj → af 两次进程，也才能在用户用 Word 改过文档后仍然对得上。写不回去（文件被
+        Word 占用、只读）时不中断流程：af 侧检测到文档无身份会自动退回按文本对齐，
+        功能降级但必须显式告警，不能让人以为精确增删已经生效。
+        """
+        if not ensure_para_ids(self.document):
+            return
+        try:
+            self.document.save(self.docx_file)
+        except OSError as exc:
+            logger.warning(
+                f"段落身份无法写回 {self.docx_file}（{exc}）；"
+                "af --sync 将退回按文本对齐，无法按段落精确增删"
+            )
+
+    @staticmethod
+    def _attach_para_ids(result: list[dict], paragraphs) -> None:
+        """把每段的 ``w14:paraId`` 导出为 JSON 的 ``para_id`` 字段。"""
+        for item, para in zip(result, paragraphs, strict=True):
+            para_id = get_para_id(para._p)
+            if para_id:
+                item["para_id"] = para_id
 
     def _interleave_tables(self, result: list[dict]) -> list[dict]:
         """把文档中的表格按文档序导出为 table_object 条目。

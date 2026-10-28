@@ -40,7 +40,7 @@ pip install wordformat
 | 只检查格式（加批注） | `gj`（如无 JSON）→ `cf` | — | 不跑 `af` |
 | 修正格式（应用到文档） | `gj`（如无 JSON）→ `af` | `tree` 先复核分类 | `cf` 非必需，用户想看批注才插入 |
 | 按 JSON 重建整篇文档（内容全由 JSON 承载） | `gj` → 编辑 JSON → `jd` | — | 不跑 `af`（与 `jd` 互斥）；重建不保留原图片二进制，原表格只以只读文本（`exists`）导出、不重建 |
-| 在原 docx 上增删改段落（保留图片/表格/页眉页脚） | `gj` → 编辑 JSON → `af -d 原文档 -f 编辑后JSON --sync` | — | 图片段不可移动；原表格内容只读（不检查不改写），表格增删走 `jd` 或手动 |
+| 在原 docx 上增删改段落（保留图片/表格/页眉页脚） | `gj` → 编辑 JSON → `af -d 原文档 -f 编辑后JSON --sync` | — | 已有条目的 `para_id` 不要改也不要清空（新增条目则不写该字段）；原表格内容只读（不检查不改写），表格增删走 `jd` 或手动 |
 | 查看结构树 | `tree -f xxx.json` | `--confidence` / `--index` / `--filter` | 需已有 JSON；不跑 `gj`（除非没有 JSON） |
 | Markdown 转 Word | `md` | — | 与 docx 流程互不相关 |
 | 生成配置模板 | `config` | — | — |
@@ -133,7 +133,7 @@ wordf af -d 论文.docx -c config.yaml -f output/xxx.json --sync
 模式选择与边界：
 - 需保留原文档对象（图片二进制、表格内容、页眉页脚）→ `af --sync`；内容全由 JSON 承载或新建文档 → `jd`。
 - `jd`：新增图片用 `figure_image` 条目（`paragraph`=图片文件路径）；新增表格用 `table_object` 条目（`table_rows`=二维字符串列表，可选 `table_style` 指定样式档案）；gj 导出的 JSON 不携带原图片二进制，原表格以只读文本条目（`exists: true`）保留，重建时不会重复建表。
-- `af --sync`：原表格判定为只读（不检查、不改写、不重插）；JSON 中新增的表格条目会被忽略（需先 `jd`）；含图片段落不可移动；大段重复空文本对齐可能漂，漂了逐段人工确认。
+- `af --sync`：原表格判定为只读（不检查、不改写、不重插）；JSON 中新增的表格条目会被忽略（需先 `jd`）。段落按 `para_id` 精确定位（`gj` 会把 `w14:paraId` 写回 docx）：删条目＝删那一段；不带 `para_id` 的新条目＝在它在 JSON 中的位置插段；条目顺序变了＝移动该段（含图片的段落也能移动）。文本改写按字符落到原有 run 上，加粗/斜体/超链接保留，图片 run 与域代码 run 不被改写。JSON 没有 `para_id`（旧 JSON）或文档侧身份不全时退回按文本对齐——重复文本（如出现多次的「本章小结」）在这种情况下仍可能漂，逐段人工确认。
 - 删文献条目时需同步改正文条目里的引文编号；删标题/题注条目则编号按新树序自动重算（两种模式都是）。
 
 ## 预设（`presets/`）
@@ -152,6 +152,7 @@ wordf af -d 论文.docx -c config.yaml -f output/xxx.json --sync
 |------|------|
 | `category` | 段落类型，改这里修正分类 |
 | `paragraph` | 段落文本（`jd`/`af --sync` 模式下直接编辑此字段即可改/增/删内容） |
+| `para_id` | 段落身份（对应 docx 里的 `w14:paraId`，由 `gj` 同时写入文档与 JSON）。改已有段落时**原样保留**；新增段落**不要**填这个字段（缺了就是新段，落点看它在数组里的位置）；删掉条目就是删那一段。手改后直接 `af --sync`，不必重新 `gj` |
 | `replace` | 替换段落内容；空字符串表示清空。若同时残留 `inline_marks` 且文本不一致，以 `replace` 为准 |
 | `score` | AI 置信度 |
 | `table_rows` | 表格内容（二维字符串列表，`table_object` 条目；gj 导出为只读） |

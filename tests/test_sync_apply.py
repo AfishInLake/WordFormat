@@ -10,6 +10,7 @@ import json
 import pytest
 from docx import Document
 
+from wordformat.para_ids import ensure_para_ids, get_para_id
 from wordformat.pipeline.orchestrate import auto_format_thesis_document
 from wordformat.pipeline.sync_apply import (
     IMAGE_SENTINEL,
@@ -272,3 +273,151 @@ class TestAfSyncIntegration:
         doc = Document(out)
         assert [p.text for p in doc.paragraphs] == ["A"]
         assert doc.tables == []
+
+
+class TestIdentityAlignment:
+    """gj 写入段落身份后，增/删/改/移位按 para_id 精确定位。"""
+
+    def _id_doc(self, texts):
+        doc = Document()
+        for t in texts:
+            doc.add_paragraph(t)
+        ensure_para_ids(doc)
+        return doc, [get_para_id(p._p) for p in doc.paragraphs]
+
+    def _items(self, texts, ids):
+        return [
+            _item("body_text", t, para_id=pid)
+            for t, pid in zip(texts, ids, strict=True)
+        ]
+
+    def test_insert_between_identical_paragraphs_lands_exactly(self):
+        # 文本对齐无法区分两个「本章小结」；身份对齐指哪插哪
+        doc, ids = self._id_doc(["本章小结", "A", "本章小结", "B"])
+        doc.paragraphs[2].runs[0].italic = True  # 标记第二个「本章小结」
+
+        items = self._items(["本章小结", "A"], ids[:2])
+        items.append(_item("body_text", "新增一段"))
+        items += self._items(["本章小结", "B"], ids[2:])
+        sync_document_structure(doc, items)
+
+        assert [p.text for p in doc.paragraphs] == [
+            "本章小结",
+            "A",
+            "新增一段",
+            "本章小结",
+            "B",
+        ]
+        # 新段插在带斜体的那一段之前
+        assert doc.paragraphs[2].runs[0].text == "新增一段"
+        assert doc.paragraphs[3].runs[0].italic is True
+
+    def test_delete_removes_the_referenced_paragraph_only(self):
+        doc, ids = self._id_doc(["本章小结", "本章小结", "结尾"])
+        doc.paragraphs[0].runs[0].italic = True
+
+        # 只保留第二个「本章小结」：第一个必须是被删掉的那个
+        items = self._items(["本章小结"], ids[1:2]) + self._items(["结尾"], ids[2:])
+        sync_document_structure(doc, items)
+
+        assert [p.text for p in doc.paragraphs] == ["本章小结", "结尾"]
+        assert doc.paragraphs[0].runs[0].italic is None
+
+    def test_paragraphs_without_id_are_inserted_at_json_position(self):
+        doc, ids = self._id_doc(["A", "B"])
+        items = self._items(["A"], ids[:1])
+        items.append(_item("body_text", "agent 新段"))
+        items += self._items(["B"], ids[1:])
+        sync_document_structure(doc, items)
+        assert [p.text for p in doc.paragraphs] == ["A", "agent 新段", "B"]
+
+    def test_reordered_items_move_paragraphs_preserving_identity(self):
+        doc, ids = self._id_doc(["A", "B", "C"])
+        doc.paragraphs[1].runs[0].italic = True
+
+        sync_document_structure(
+            doc, self._items(["C", "B", "A"], [ids[2], ids[1], ids[0]])
+        )
+
+        assert [p.text for p in doc.paragraphs] == ["C", "B", "A"]
+        assert doc.paragraphs[1].runs[0].italic is True
+        assert [get_para_id(p._p) for p in doc.paragraphs] == [ids[2], ids[1], ids[0]]
+
+    def test_text_edit_goes_through_run_level_alignment(self):
+        doc, ids = self._id_doc(["本文提出多智能体方法"])
+        doc.paragraphs[0].runs[0].bold = True
+
+        items = [_item("body_text", "本文提出一种多智能体方法")]
+        items[0]["para_id"] = ids[0]
+        # 整段只有一个 run，改写后仍是加粗 run
+        sync_document_structure(doc, items)
+
+        assert doc.paragraphs[0].text == "本文提出一种多智能体方法"
+        assert doc.paragraphs[0].runs[0].bold is True
+
+    def test_new_paragraphs_get_ids_for_the_next_round(self):
+        doc, ids = self._id_doc(["A"])
+        items = self._items(["A"], ids[:1]) + [_item("body_text", "新")]
+        sync_document_structure(doc, items)
+        assert all(get_para_id(p._p) for p in doc.paragraphs)
+
+    def test_existing_table_keeps_its_slot_after_insert(self):
+        doc = Document()
+        doc.add_paragraph("表前")
+        p_after = doc.add_paragraph("表后")
+        table = doc.add_table(rows=1, cols=1)
+        table.cell(0, 0).text = "x"
+        p_after._p.addprevious(table._tbl)  # 表格排在两段之间
+        ensure_para_ids(doc)
+        ids = [get_para_id(p._p) for p in doc.paragraphs]
+
+        items = [
+            _item("body_text", "表前", para_id=ids[0]),
+            _item("body_text", "插入段"),
+            _item("table_object", "", exists=True),
+            _item("body_text", "表后", para_id=ids[1]),
+        ]
+        sync_document_structure(doc, items)
+
+        tags = [el.tag.split("}")[1] for el in doc.element.body.iterchildren()]
+        assert tags == ["p", "p", "tbl", "p", "sectPr"]
+        assert [p.text for p in doc.paragraphs] == ["表前", "插入段", "表后"]
+
+    def test_falls_back_to_text_alignment_when_doc_has_no_ids(self):
+        # 旧文档（未重新 gj）配带 id 的 JSON：退回文本路径，行为与从前一致
+        doc = Document()
+        for t in ["A", "B"]:
+            doc.add_paragraph(t)
+        items = [
+            _item("body_text", "A", para_id="00000001"),
+            _item("body_text", "新"),
+            _item("body_text", "B", para_id="00000002"),
+        ]
+        sync_document_structure(doc, items)
+        assert [p.text for p in doc.paragraphs if p.text] == ["A", "新", "B"]
+
+    def test_identity_path_restores_one_to_one_parity(self, tmp_path):
+        # 建树/zip 依赖段落数 == 条目数：身份路径同样必须给出该不变式
+        dp = tmp_path / "id.docx"
+        doc, ids = self._id_doc(["绪论", "正文A", "正文B"])
+        doc.save(dp)
+        items = [
+            _item("heading_level_1", "绪论", para_id=ids[0]),
+            _item("body_text", "正文A改", para_id=ids[1]),
+            _item("body_text", "新插入段"),
+        ]
+        jp = tmp_path / "id.json"
+        jp.write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+
+        out = auto_format_thesis_document(
+            jsonpath=str(jp),
+            docxpath=str(dp),
+            check=False,
+            savepath=str(tmp_path / "out"),
+            sync=True,
+        )
+        assert [p.text for p in Document(out).paragraphs] == [
+            "绪论",
+            "正文A改",
+            "新插入段",
+        ]
