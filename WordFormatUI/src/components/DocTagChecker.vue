@@ -26,7 +26,10 @@
           <!-- 格式操作面板（仅在加载后显示） -->
           <FormatActionPanel
               v-if="isFileLoaded"
+              v-model:sync-mode="syncMode"
               :is-loading="isLoading"
+              :structure-dirty="structureDirty"
+              :dirty-hint="dirtyHint"
               @check-format="callCheckFormatApi"
               @apply-format="callApplyFormatApi"
           />
@@ -139,6 +142,17 @@ const loadingText = ref('')
 const selectedNodeIndex = ref(-1)
 const searchTerm = ref('')
 const jsonFileInput = ref(null)
+const syncMode = ref(false)
+// 结构快照：每行一个身份（para_id / table_id，无身份记空串），顺序即行序。
+// 快照变了＝用户增删/移动了行，这些改动只有 --sync 才能落到文档上。
+const baselineShape = ref([])
+
+const shapeOfNodes = () => nodeData.value.map(n => n.para_id || n.table_id || '')
+
+// gj 之后取快照：它是「文档结构」的对照基准，行操作脏检测全靠它
+const takeBaseline = () => {
+  baselineShape.value = shapeOfNodes()
+}
 
 // ====== 计算属性 ======
 const currentNode = computed(() => {
@@ -161,6 +175,37 @@ const errorCount = computed(() =>
 const otherCount = computed(() =>
     visibleNodeData.value.filter(node => node.category === 'other').length
 )
+
+// 少一项＝删行，多一项（无身份行）＝插行，同项换序＝移行。
+// 快照只在 gj 时更新——它是「文档长什么样」的唯一证据，导入 JSON 不该改它，
+// 否则「JSON 删了一行」这种最需要提示的情况反而看不见了。
+const structureStats = computed(() => {
+  const current = shapeOfNodes()
+  const baseline = baselineShape.value
+  // 完全没有身份的 JSON（旧文件或降级 gj）无从判断新增，别把它当成结构改动
+  const hasIdentity = current.some(Boolean) || baseline.some(Boolean)
+  const inserted = hasIdentity ? current.filter(id => !id).length : 0
+  const stillThere = new Set(current)
+  const deleted = baseline.filter(id => id && !stillThere.has(id)).length
+  const moved = baseline.length > 0 && inserted === 0 && !deleted &&
+      current.filter(Boolean).join('|') !== baseline.filter(Boolean).join('|')
+  return { inserted, deleted, moved }
+})
+
+// 三种改动都只有 --sync 能落到文档上，因此都算「脏」
+const structureDirty = computed(
+    () => isFileLoaded.value &&
+        (structureStats.value.inserted > 0 || structureStats.value.deleted > 0 || structureStats.value.moved)
+)
+
+const dirtyHint = computed(() => {
+  const { inserted, deleted, moved } = structureStats.value
+  const parts = []
+  if (inserted) parts.push(`新增 ${inserted} 行`)
+  if (deleted) parts.push(`删除 ${deleted} 行`)
+  if (moved) parts.push('移动了行')
+  return parts.join('，')
+})
 
 const filteredNodeData = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
@@ -238,6 +283,7 @@ const callGenerateJsonApi = async () => {
           ...node,
           id: idx
         }))
+      takeBaseline()
       isFileLoaded.value = true
       selectedNodeIndex.value = -1
     } else {
@@ -339,6 +385,21 @@ const callApplyFormatApi = async () => {
   }
 
   formData.append('json_data', JSON.stringify(nodeData.value))
+
+  // 行数与文档结构已经不一致：不勾「结构同步」的话这些增删会被后端按位置对齐吃掉
+  if (structureDirty.value && !syncMode.value) {
+    const ok = window.confirm(
+        `已检测到结构改动（${dirtyHint.value}）。\n` +
+        '点「确定」按结构同步（等价 af --sync）把增删真正落到文档；\n' +
+        '点「取消」返回，不改动文档。'
+    )
+    if (!ok) {
+      isLoading.value = false
+      return
+    }
+    syncMode.value = true
+  }
+  if (syncMode.value) formData.append('sync', 'true')
 
   try {
     const res = await request.post(
@@ -466,6 +527,11 @@ const handleJsonImport = async (e) => {
 // 清除选中当数据重置
 watch(isFileLoaded, (loaded) => {
   if (!loaded) selectedNodeIndex.value = -1
+})
+
+// 换了 docx 就等于换了一份文档，旧快照不再代表它
+watch(docxFile, () => {
+  baselineShape.value = []
 })
 </script>
 
