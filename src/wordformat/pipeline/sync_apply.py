@@ -63,6 +63,56 @@ def _normalize(text) -> str:
     return (text or "").strip()
 
 
+_MULTI_PARAGRAPH_UNSUPPORTED = ("table_object", "figure_image")
+
+
+def expand_multi_paragraph_items(items: list[dict]) -> list[dict]:
+    """把带 ``paragraphs`` 的条目拆成多条同类条目（首条继承 ``para_id``）。
+
+    agent 写「一节的多个自然段」时很自然地想用一个条目装一个文本块，但建树/zip
+    全程假定「一条 ↔ 一段」；在同步前展开一次即可复用全部既有机制，不必引入
+    「节点持有多段」这条新概念。拆分出的兄弟条目不带 ``para_id``，于是
+    ``_align_by_identity`` 按 JSON 位置把它们当新段落插入——正是需要的效果。
+    """
+    out: list[dict] = []
+    for idx, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            out.append(item)
+            continue
+        texts = item.get("paragraphs")
+        if texts is None:
+            out.append(item)
+            continue
+        if not isinstance(texts, list) or len(texts) < 2:
+            raise ValueError(
+                f"第 {idx} 条 paragraphs 必须是至少 2 段的字符串列表，"
+                "单段请直接用 paragraph"
+            )
+        category = item.get("category", "")
+        if category in _MULTI_PARAGRAPH_UNSUPPORTED:
+            raise ValueError(
+                f"第 {idx} 条 {category} 不支持 paragraphs"
+                f"（{category} 的 paragraph 另有含义），请拆成多条条目"
+            )
+        if "replace" in item:
+            raise ValueError(
+                f"第 {idx} 条同时给了 paragraphs 与 replace，两种改写方式只能选一"
+            )
+        first = {k: v for k, v in item.items() if k != "paragraphs"}
+        first["paragraph"] = texts[0]
+        out.append(first)
+        for text in texts[1:]:
+            sibling = {
+                k: v
+                for k, v in item.items()
+                if k not in ("paragraphs", "paragraph", "para_id", "replace")
+            }
+            sibling["paragraph"] = text
+            sibling["comment"] = "由多段落条目拆分"
+            out.append(sibling)
+    return out
+
+
 def _item_text(item: dict) -> str:
     """JSON 条目的目标文本；figure_image/table_object 不含可写入文档的文本。"""
     if item.get("category") in ("figure_image", "table_object"):
