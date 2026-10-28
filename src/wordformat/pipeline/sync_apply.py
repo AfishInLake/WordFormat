@@ -14,7 +14,10 @@ JSON，两侧按该 id 精确配对：
 - JSON 条目不带 id（agent/人新增的条目）→ 新插入一段，落点由它在 JSON 里紧邻的
   条目决定（整体按 JSON 顺序重排 body），不再依赖文本相似度；
 - 文档段落未被任何条目引用 → JSON 删掉了它 → 真删该段；
-- 表格条目按 ``exists`` 顺序对应原有 ``w:tbl``，位置同样以 JSON 为准。
+- 表格条目按 ``table_id``（表格首单元格段落的 ``w14:paraId``）认领原有 ``w:tbl``：
+  删条目＝删那个表格，不带 ``table_id`` 的新条目＝在该位置新建表格，条目顺序变了＝
+  移动表格；``exists=True`` 却缺 ``table_id``（表格身份上线前的旧 JSON）时退回按
+  ``exists`` 顺序归位且不删表。
 
 **按文本对齐（旧 JSON 或文档无身份时）** —— 把 JSON 扁平列表 A 与文档段落列表 B 按
 文本归一化 key（图片段用哨兵 ``"<image>"`` 统一，防空文本区漂移及图片段误删）喂给
@@ -33,8 +36,8 @@ difflib。注意 difflib 的 opcode 以「A 变换为 B」为方向，与本功�
 流程不变。
 
 边界（见 SKILL.md）：
-- 表格内容不在 paragraphs 流中：原表格无法经 JSON 删改；JSON 新增的
-  ``table_object`` 条目会被标记 ``sync_skip`` 并忽略（建表请用 jd 重建）；
+- 表格内容不在 paragraphs 流中：表格整体可按 ``table_id`` 删除、移动、新增，但单元格
+  文本仍不能经 JSON 改写（``table_rows`` 只读）；
 - 文本对齐把「移动」拆成删+插，含图片/域代码的段落不可移动；
 - 段落文本改写只动文字 run：加粗/斜体/超链接按字符对齐保留，含图片、域代码、公式的
   run 不改写（``Run.text`` 赋值会清空 run 内容，写进去等于删图、毁页码域）。
@@ -48,7 +51,7 @@ from typing import List
 from docx.oxml.ns import qn
 from loguru import logger
 
-from wordformat.para_ids import ensure_para_ids, get_para_id
+from wordformat.para_ids import ensure_para_ids, get_para_id, get_table_id
 from wordformat.text_edit import set_paragraph_text
 from wordformat.utils import para_contains_image
 
@@ -147,8 +150,8 @@ def _apply_opcode(
     return 0, 0, 0
 
 
-def _align_by_text(document, items: list[dict]) -> tuple[int, int, int]:
-    """旧路径：按归一化文本做 difflib 对齐（无段落身份时）。"""
+def _align_by_text(document, items: list[dict]) -> tuple[int, int, int, int, int]:
+    """旧路径：按归一化文本做 difflib 对齐（无段落身份时）。表格一律不动。"""
     paras = list(document.paragraphs)
     # 表格条目不对应段落（原表格由 exists 标记保留，sync 不支持新增表格），
     # 不参与对齐，避免把相邻段落误配为表格而清空文本。
@@ -165,7 +168,7 @@ def _align_by_text(document, items: list[dict]) -> tuple[int, int, int]:
         n_del += d
         n_ins += ins
         n_edit += e
-    return n_edit, n_ins, n_del
+    return n_edit, n_ins, n_del, 0, 0
 
 
 # ---------------------------------------------------------------------------
@@ -205,22 +208,85 @@ def _reorder_body(document, ordered: List) -> None:
             tail.addprevious(el)
 
 
-def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int]:
-    """按 ``para_id`` 对齐：JSON 为准，段落可增、删、改、移位。"""
-    para_by_id = {get_para_id(p._p): p for p in document.paragraphs}
-    table_elements = [
-        el for el in document.element.body.iterchildren() if el.tag == qn("w:tbl")
+def _body_tables(body) -> List:
+    """body 直接子级的 ``w:tbl`` 元素，顺序即文档序（与 gj 的表格导出范围一致）。"""
+    return [el for el in body.iterchildren() if el.tag == qn("w:tbl")]
+
+
+def _table_identity_ready(items: list[dict], table_elements: List) -> bool:
+    """表格能否按身份归位/删除/新增。
+
+    删表格是破坏性动作，身份证据不足时宁可维持旧的「原地不动 + 告警」。判据是
+    ``exists``：gj 给每个原有表格条目写 ``exists=True``，所以「带 exists 却没有
+    ``table_id``」只可能是表格身份上线之前导出的 JSON——它指向的是既有表格，此时
+    按身份删除等于凭不存在的键误删。不带 ``exists`` 的条目本身就是新建意图，
+    没有 ``table_id`` 是正常的，不妨碍身份模式生效。
+
+    JSON 完全没有表格条目时，只有段落条目普遍带 ``para_id``（说明这份 JSON 出自
+    同一文档的 gj，见过全部表格）才认定「表格被删了」——手写 JSON 忽略表格
+    不等于要删表格。
+    """
+    if not all(get_table_id(el) for el in table_elements):
+        return False
+    table_items = [
+        it
+        for it in items
+        if isinstance(it, dict) and it.get("category") == "table_object"
     ]
+    if any(it.get("exists") and not it.get("table_id") for it in table_items):
+        return False
+    if not table_items and table_elements:
+        return any(isinstance(it, dict) and it.get("para_id") for it in items)
+    return True
+
+
+def _claim_table_by_id(item: dict, tbl_by_id: dict, document, ordered: List) -> bool:
+    """按 ``table_id`` 认领既有表格元素，认领不到则放占位段（返回 True 表示新增）。
+
+    新建表格不在这里做：先放一个空段落占住 JSON 里的位置，真正的建表由
+    ``TableObject._try_insert_table`` 在该段落后插入表格并删掉占位段，
+    这样建表逻辑只有一份，jd/md 与 af --sync 共用。
+    """
+    table_id = item.get("table_id")
+    el = tbl_by_id.pop(table_id, None) if table_id else None
+    if el is None:
+        ordered.append(document.add_paragraph("")._p)
+        return True
+    ordered.append(el)
+    return False
+
+
+def _place_table_item(
+    item: dict, tbl_by_id, table_elements: List, cursor: int, document, ordered
+) -> tuple[bool, int]:
+    """把一个表格条目落到 ``ordered`` 上，返回 ``(是否新增, 归位后的游标)``。"""
+    if tbl_by_id is None:
+        # 旧 JSON（无表格身份）：按 exists 顺序归位既有表格，既不新增也不删除
+        if item.get("exists") and cursor < len(table_elements):
+            ordered.append(table_elements[cursor])
+            return False, cursor + 1
+        return False, cursor
+    return _claim_table_by_id(item, tbl_by_id, document, ordered), cursor
+
+
+def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int, int, int]:
+    """按 ``para_id`` 对齐：JSON 为准，段落可增、删、改、移位；表格按 ``table_id`` 同理。"""
+    para_by_id = {get_para_id(p._p): p for p in document.paragraphs}
+    table_elements = _body_tables(document.element.body)
+    if _table_identity_ready(items, table_elements):
+        tbl_by_id: dict | None = {get_table_id(el): el for el in table_elements}
+    else:
+        tbl_by_id = None
     ordered: List = []
-    n_edit = n_ins = n_del = 0
+    n_edit = n_ins = n_del = n_tbl_ins = n_tbl_del = 0
     table_cursor = 0
 
     for item in items:
         if item.get("category") == "table_object":
-            # 原表格按 exists 顺序归位；新增表格（sync_skip）仍由 jd 负责
-            if item.get("exists") and table_cursor < len(table_elements):
-                ordered.append(table_elements[table_cursor])
-                table_cursor += 1
+            added, table_cursor = _place_table_item(
+                item, tbl_by_id, table_elements, table_cursor, document, ordered
+            )
+            n_tbl_ins += added
             continue
         para = _take_existing(para_by_id, item)
         if para is None:
@@ -232,38 +298,79 @@ def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int]:
 
     n_del = len(para_by_id)
     _remove_paragraphs(list(para_by_id.values()))
-    if table_cursor != len(table_elements):
-        logger.warning(
-            f"文档中有 {len(table_elements)} 个表格，JSON 只描述到 {table_cursor} 个，"
-            "未被引用的表格保持原位不动"
-        )
+    n_tbl_del = _drop_unclaimed_tables(tbl_by_id, table_elements, table_cursor)
     _reorder_body(document, ordered)
     ensure_para_ids(document)  # 新插入的段落也要有身份，否则下一轮同步断链
-    return n_edit, n_ins, n_del
+    return n_edit, n_ins, n_del, n_tbl_ins, n_tbl_del
+
+
+def _drop_unclaimed_tables(tbl_by_id, table_elements: List, table_cursor: int) -> int:
+    """处理 JSON 没认领的表格，返回删除数。
+
+    身份模式没被认领的就是被删掉的条目（``_table_identity_ready`` 已确认身份证据
+    充分）；无身份时（旧 JSON）一个都不删，只告警未归位的表格原地不动。
+    """
+    if tbl_by_id is None:
+        if table_cursor != len(table_elements):
+            logger.warning(
+                f"文档中有 {len(table_elements)} 个表格，JSON 只描述到 {table_cursor} 个，"
+                "未被引用的表格保持原位不动"
+            )
+        return 0
+    for el in tbl_by_id.values():
+        el.getparent().remove(el)
+    return len(tbl_by_id)
+
+
+def _mark_unsupported_new_tables(document, items: list[dict]) -> None:
+    """身份证据不足时，JSON 新增的表格条目仍按老行为忽略（建表走 jd）。
+
+    标记必须发生在 ``_align_by_identity`` 之前且与它的表格分支保持一致：一旦身份
+    可用，新表格条目就要落一个占位段落，此时若仍标 ``sync_skip``，占位段就没有任何
+    节点绑定，「段落数 == 条目数」被打破，建树后的 zip 对齐检查直接报错。
+    """
+    table_elements = _body_tables(document.element.body)
+    if _identity_ready(document, items) and _table_identity_ready(
+        items, table_elements
+    ):
+        return
+    for item in items:
+        if (
+            isinstance(item, dict)
+            and item.get("category") == "table_object"
+            and not item.get("exists")
+        ):
+            item["sync_skip"] = True
+            logger.warning(
+                "本次同步无法按身份新增表格（缺 para_id/table_id 或在按文本对齐），"
+                "该条目已忽略；如需增删表格请用 jd 重建或补齐身份后重试"
+            )
 
 
 def sync_document_structure(document, items: list[dict]) -> None:
-    """以 JSON 条目列表为准，原地对 document 段落做增/删/改/重排，使两者一一对应。
+    """以 JSON 条目列表为准，原地对 document 的段落/表格做增/删/改/重排，使两者一一对应。
 
     Args:
         document: python-docx Document（会被就地修改）
-        items: 编辑后的 JSON 扁平条目列表（category/paragraph/para_id/replace 字段）
+        items: 编辑后的 JSON 扁平条目列表（category/paragraph/para_id/table_id/replace）
     """
+    _mark_unsupported_new_tables(document, items)
     if _identity_ready(document, items):
-        n_edit, n_ins, n_del = _align_by_identity(document, items)
+        n_edit, n_ins, n_del, n_tbl_ins, n_tbl_del = _align_by_identity(document, items)
     else:
         if any(isinstance(it, dict) and it.get("para_id") for it in items):
             logger.warning(
                 "JSON 带段落身份但文档侧不完整（未重新 gj 或在 Word 里被重建），"
                 "已退回按文本对齐"
             )
-        n_edit, n_ins, n_del = _align_by_text(document, items)
+        n_edit, n_ins, n_del, n_tbl_ins, n_tbl_del = _align_by_text(document, items)
 
     if not document.paragraphs:
         # Word 要求正文至少保留一个段落
         document.add_paragraph("")
 
-    logger.info(f"结构同步完成：改 {n_edit} 段，插 {n_ins} 段，删 {n_del} 段")
+    tables = f"，表格 +{n_tbl_ins} −{n_tbl_del}" if (n_tbl_ins or n_tbl_del) else ""
+    logger.info(f"结构同步完成：改 {n_edit} 段，插 {n_ins} 段，删 {n_del} 段{tables}")
 
 
 class StructureSyncStage:
@@ -274,22 +381,9 @@ class StructureSyncStage:
     """
 
     def process(self, ctx):
-        from wordformat.log_config import logger
         from wordformat.structure.document_builder import DocumentBuilder
 
         items = ctx.paragraphs or DocumentBuilder.load_paragraphs(ctx.json_path)
-        # af --sync 不支持新增表格（建表走 jd）；标 sync_skip 让 zip/建表阶段跳过，
-        # 原文档已有表格（exists）同样不重复插入。
-        for item in items:
-            if (
-                isinstance(item, dict)
-                and item.get("category") == "table_object"
-                and not item.get("exists")
-            ):
-                item["sync_skip"] = True
-                logger.warning(
-                    "af --sync 不支持新增表格条目，已忽略；如需增删表格请用 jd 重建"
-                )
         sync_document_structure(ctx.document, items)
         if (
             not any(

@@ -7,6 +7,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches
 
+from wordformat.para_ids import ensure_table_ids
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.comments import format_comment
@@ -323,6 +324,8 @@ class TableObject(FormatNode):
                 ".//w:drawing"
             ):
                 anchor.getparent().remove(anchor)
+        # 新表格当场可被 table_id 寻址，否则要等下一轮 gj 才能删改它
+        ensure_table_ids(doc)
 
 
 # ---------------------------------------------------------------------------
