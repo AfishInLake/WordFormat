@@ -37,9 +37,11 @@
               <div class="property-label">节点内容</div>
               <div class="property-value content-value">{{ currentNode.paragraph }}</div>
             </div>
-            <div class="property-item" v-if="currentNode.replace">
-              <div class="property-label replace-label">替换内容</div>
-              <div class="property-value content-value replace-value">{{ currentNode.replace }}</div>
+            <div class="property-item">
+              <div class="property-label">段落身份</div>
+              <div class="property-value id-value">
+                <code>{{ currentNode.para_id || currentNode.table_id || '（新增，结构同步时插入）' }}</code>
+              </div>
             </div>
             <div class="property-item">
               <div class="property-label">置信度得分</div>
@@ -54,7 +56,7 @@
 
         <!-- 可变信息 -->
         <div class="property-card mt-4">
-          <div class="property-card-header">可变信息（仅标签可修改）</div>
+          <div class="property-card-header">可变信息（标签与文本可修改）</div>
           <div class="property-card-body">
             <div class="property-item">
               <div class="property-label">
@@ -76,6 +78,23 @@
                 </option>
               </select>
               <div class="category-desc">{{ categoryConfig[localCategory] || '' }}</div>
+            </div>
+            <div class="property-item" v-if="currentNode.category === 'table_object'">
+              <div class="property-label">段落文本</div>
+              <div class="readonly-tip">表格条目的单元格内容只读：要改表格用 jd 重建或在 Word 里编辑</div>
+            </div>
+            <div class="property-item" v-else>
+              <div class="property-label">
+                段落文本
+                <span v-if="isEdited" class="edited-tag">已改</span>
+                <span class="label-tip">（写入 replace，上方节点内容保留原文供对照）</span>
+              </div>
+              <textarea
+                  class="text-edit"
+                  rows="6"
+                  v-model="localText"
+                  @change="onTextChange"
+              ></textarea>
             </div>
             <div class="check-result" :class="resultClass">
               {{ resultText }}
@@ -99,17 +118,27 @@ const props = defineProps({
   nodeIndex: Number
 })
 
-const emit = defineEmits(['update-category'])
+const emit = defineEmits(['update-category', 'update-replace'])
 
 const localCategory = ref(props.currentNode?.category || '')
+const localText = ref('')
 
 watch(() => props.currentNode, (newNode) => {
-  if (newNode) localCategory.value = newNode.category
-})
+  if (!newNode) return
+  localCategory.value = newNode.category
+  localText.value = newNode.replace ?? newNode.paragraph ?? ''
+}, { immediate: true })
 
 const onCategoryChange = () => {
   emit('update-category', localCategory.value)
 }
+
+const onTextChange = () => {
+  emit('update-replace', localText.value)
+}
+
+const isEdited = computed(() => props.currentNode?.replace !== undefined
+    && props.currentNode.replace !== props.currentNode.paragraph)
 
 const isError = computed(() => checkTagError(props.currentNode, props.scoreThreshold))
 const isOther = computed(() => props.currentNode?.category === 'other')
@@ -191,8 +220,19 @@ const resultText = computed(() => {
   line-height: 1.4; word-break: break-all;
 }
 .content-value { max-height: 8rem; overflow-y: auto; }
-.replace-label { color: var(--green); font-weight: 600; }
-.replace-value { border-color: var(--green-dim); background-color: var(--green-dim); color: var(--text); }
+.id-value code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-secondary); }
+.text-edit {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  font-size: 13px; line-height: 1.5; padding: 6px 8px;
+  border-radius: 6px; border: 1px solid var(--border-hover);
+  background: var(--ink); color: var(--text); font-family: inherit;
+}
+.text-edit:focus { outline: 1px solid var(--brass); border-color: var(--brass); }
+.edited-tag {
+  margin-left: 4px; padding: 1px 6px; border-radius: 999px;
+  font-size: 11px; background: var(--green-dim); color: var(--green);
+}
+.readonly-tip { font-size: 12px; color: var(--text-muted); padding: 6px 8px; border: 1px dashed var(--border); border-radius: 6px; }
 .status-value { border: none; padding: 6px 8px; }
 .status-normal { background-color: var(--green-dim); color: var(--green); }
 .status-error { background-color: var(--red-dim); color: var(--red); }

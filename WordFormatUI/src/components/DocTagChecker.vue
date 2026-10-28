@@ -95,6 +95,7 @@
           :total-nodes="visibleNodeData.length"
           :node-index="selectedDisplayIndex + 1"
           @update-category="handleCategoryChange"
+          @update-replace="handleReplaceChange"
       />
     </div>
   </div>
@@ -289,6 +290,15 @@ const handleCategoryChange = (newCategory) => {
     // 自动重新计算置信度？这里保留原始 score（因无模型），仅改标签
     // 若需重新打分，需调用后端接口
   }
+}
+
+// 只写 replace：paragraph 保留 gj 的原文供对照，后端 resolve_item_text 优先取 replace
+const handleReplaceChange = (text) => {
+  if (!currentNode.value) return
+  const node = nodeData.value[selectedNodeIndex.value]
+  // 改回原文就撤掉 replace，否则列表里的「R」标记会误导
+  if (text === node.paragraph) delete node.replace
+  else node.replace = text
 }
 
 // 生成节点 JSON（上传文件）
