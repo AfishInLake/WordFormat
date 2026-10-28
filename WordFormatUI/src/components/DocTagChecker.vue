@@ -82,6 +82,9 @@
           :loading-text="loadingText"
           :global-search-term="searchTerm"
           @select-node="selectNode"
+          @insert-above="handleInsertAbove"
+          @delete-node="handleDeleteNode"
+          @move-node="handleMoveNode"
       />
 
       <!-- 节点详情 -->
@@ -230,6 +233,53 @@ const selectedDisplayIndex = computed(() => {
 const selectNode = (index) => {
   const node = filteredNodeData.value[index]
   selectedNodeIndex.value = node ? nodeData.value.indexOf(node) : -1
+}
+
+// 行操作收到的是显示层索引（受搜索过滤、figure_image 隐藏影响），
+// 必须先用节点对象换算回 nodeData 下标，否则会改错行
+const rawIndexOf = (displayIndex) => {
+  const node = filteredNodeData.value[displayIndex]
+  return node ? nodeData.value.indexOf(node) : -1
+}
+
+// 新行刻意不带 para_id / table_id：后端据此判定为「新增」，--sync 时插进文档
+const handleInsertAbove = (displayIndex) => {
+  const raw = rawIndexOf(displayIndex)
+  if (raw < 0) return
+  nodeData.value.splice(raw, 0, {
+    category: 'body_text',
+    paragraph: '（新段落，点击右侧编辑文本）',
+    score: 1.0,
+    comment: '手动插入',
+    needs_review: false,
+    id: Date.now()
+  })
+  selectedNodeIndex.value = raw
+}
+
+const handleDeleteNode = (displayIndex) => {
+  const raw = rawIndexOf(displayIndex)
+  if (raw < 0) return
+  const node = nodeData.value[raw]
+  const what = node.category === 'table_object'
+      ? (node.exists ? '这个表格（结构同步时会真的删除文档中的表格）' : '这条新表格')
+      : `这一段「${(node.replace ?? node.paragraph ?? '').slice(0, 40)}」`
+  if (!window.confirm(`确认删除${what}？`)) return
+  nodeData.value.splice(raw, 1)
+  if (selectedNodeIndex.value === raw) selectedNodeIndex.value = -1
+  else if (selectedNodeIndex.value > raw) selectedNodeIndex.value -= 1
+}
+
+// 与「显示层的邻居」交换：若按 nodeData 邻居交换，被隐藏的 figure_image 行
+// 会让移动看起来毫无反应
+const handleMoveNode = ({ index, delta }) => {
+  const from = rawIndexOf(index)
+  const neighbor = filteredNodeData.value[index + delta]
+  if (from < 0 || !neighbor) return
+  const to = nodeData.value.indexOf(neighbor)
+  const [moved] = nodeData.value.splice(from, 1)
+  nodeData.value.splice(to, 0, moved)
+  selectedNodeIndex.value = to
 }
 
 // 修改当前节点的分类标签

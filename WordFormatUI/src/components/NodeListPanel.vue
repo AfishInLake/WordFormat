@@ -37,6 +37,14 @@
           <div class="node-score">{{ node.score.toFixed(4) }}</div>
           <div class="node-content" v-html="highlightSearchText(node.paragraph, globalSearchTerm)"></div>
           <span v-if="node.replace" class="replace-badge" title="有替换内容">R</span>
+          <div class="row-actions" @click.stop>
+            <button type="button" title="在上方插入段落" @click="$emit('insert-above', index)">＋</button>
+            <button type="button" title="上移" :disabled="index === 0" @click="$emit('move-node', { index, delta: -1 })">↑</button>
+            <button type="button" title="下移" :disabled="index === nodeData.length - 1"
+                    @click="$emit('move-node', { index, delta: 1 })">↓</button>
+            <button type="button" class="danger" title="删除（结构同步时会删掉对应的段落/表格）"
+                    @click="$emit('delete-node', index)">✕</button>
+          </div>
           <div v-if="node.comment" class="node-meta" :title="node.comment">
             <span class="node-comment">{{ node.comment }}</span>
           </div>
@@ -58,7 +66,7 @@ defineProps({
   globalSearchTerm: String
 })
 
-defineEmits(['select-node'])
+defineEmits(['select-node', 'insert-above', 'delete-node', 'move-node'])
 </script>
 
 <style scoped>
@@ -184,4 +192,24 @@ defineEmits(['select-node'])
   background: var(--brass); color: var(--ink); font-size: 11px; font-weight: 700;
   flex-shrink: 0;
 }
+/* 行操作只在悬停/选中时出现：列表常有几百行，常驻按钮太吵 */
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+}
+.node-item:hover .row-actions, .node-item.selected .row-actions { opacity: 1; }
+.row-actions button {
+  width: 20px; height: 20px; padding: 0;
+  font-size: 11px; line-height: 1; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); color: var(--text-secondary);
+  cursor: pointer; transition: all .15s;
+}
+.row-actions button:hover:not(:disabled) { background: var(--raised); color: var(--text); border-color: var(--border-hover); }
+.row-actions button:disabled { opacity: .35; cursor: not-allowed; }
+.row-actions button.danger:hover:not(:disabled) { background: var(--red-dim); color: #fca5a5; border-color: var(--red); }
 </style>
