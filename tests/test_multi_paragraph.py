@@ -4,8 +4,12 @@
 # @File    : test_multi_paragraph.py
 """多段落条目（paragraphs）在 af --sync 前展开为多条同身份条目。"""
 
-import pytest
+import json
 
+import pytest
+from docx import Document
+
+from wordformat.para_ids import ensure_para_ids, get_para_id
 from wordformat.pipeline.sync_apply import expand_multi_paragraph_items
 
 
@@ -70,3 +74,62 @@ class TestExpand:
 
     def test_non_dict_items_pass_through(self):
         assert expand_multi_paragraph_items(["裸字符串"]) == ["裸字符串"]
+
+
+def _make_doc(texts):
+    doc = Document()
+    for t in texts:
+        doc.add_paragraph(t)
+    return doc
+
+
+def _item(category, text, **extra):
+    d = {"category": category, "paragraph": text, "score": 1.0}
+    d.update(extra)
+    return d
+
+
+class TestSyncEndToEnd:
+    def _run(self, tmp_path, doc, items):
+        """把已备好身份的 doc 落盘，再跑 af --sync，返回输出文档。"""
+        dp = tmp_path / "s.docx"
+        doc.save(dp)
+        jp = tmp_path / "s.json"
+        jp.write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+        from wordformat.pipeline.orchestrate import auto_format_thesis_document
+
+        return auto_format_thesis_document(
+            jsonpath=str(jp),
+            docxpath=str(dp),
+            check=False,
+            savepath=str(tmp_path / "out"),
+            sync=True,
+        )
+
+    def test_one_entry_becomes_two_paragraphs_at_right_place(self, tmp_path):
+        doc = _make_doc(["甲", "乙"])
+        ensure_para_ids(doc)
+        ids = [get_para_id(p._p) for p in doc.paragraphs]
+        items = [
+            _item("body_text", "甲", para_id=ids[0], paragraphs=["甲改写", "插入的新段"]),
+            _item("body_text", "乙", para_id=ids[1]),
+        ]
+
+        out = Document(self._run(tmp_path, doc, items))
+
+        assert [p.text for p in out.paragraphs] == ["甲改写", "插入的新段", "乙"]
+        assert get_para_id(out.paragraphs[0]._p) == ids[0]
+
+    def test_jd_rejects_paragraphs_instead_of_dropping_them(self, tmp_path):
+        from wordformat.pipeline.orchestrate import json_to_docx
+
+        jp = tmp_path / "nodes.json"
+        jp.write_text(
+            json.dumps(
+                [_item("body_text", "甲", paragraphs=["一", "二"])], ensure_ascii=False
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError, match="af --sync"):
+            json_to_docx(str(jp), save_dir=str(tmp_path / "out"))

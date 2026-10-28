@@ -236,6 +236,16 @@ def _validate_jd_categories(json_path) -> None:
             f"jd JSON 含未知 category：{detail}{suffix}。"
             f"可用类别：{', '.join(sorted(CATEGORY_TO_CLASS))}"
         )
+    multi = [
+        idx
+        for idx, item in enumerate(items, start=1)
+        if isinstance(item, dict) and item.get("paragraphs")
+    ]
+    if multi:
+        raise ValueError(
+            f"jd 不支持 paragraphs 多段落条目（第 {', '.join(map(str, multi[:5]))} 条），"
+            "一个节点只建一段会静默丢段；请拆成多条条目，或改用 af --sync"
+        )
 
 
 def json_to_docx(

@@ -434,6 +434,9 @@ class StructureSyncStage:
         from wordformat.structure.document_builder import DocumentBuilder
 
         items = ctx.paragraphs or DocumentBuilder.load_paragraphs(ctx.json_path)
+        # 「一条 ↔ 一段」是建树/zip 的地基，多段落写法在此展开一次，
+        # 后续阶段看到的仍是扁平单段条目。
+        items = expand_multi_paragraph_items(items)
         sync_document_structure(ctx.document, items)
         if (
             not any(
