@@ -10,7 +10,12 @@ from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
 from wordformat.domains.postprocess import get_postprocess
-from wordformat.para_ids import ensure_para_ids, get_para_id
+from wordformat.para_ids import (
+    ensure_para_ids,
+    ensure_table_ids,
+    get_para_id,
+    get_table_id,
+)
 from wordformat.settings import BATCH_SIZE
 from wordformat.utils import (
     get_paragraph_numbering_text,
@@ -154,14 +159,14 @@ class DocxBase:
         return self._interleave_tables(result)
 
     def _annotate_paragraph_ids(self) -> None:
-        """补齐段落身份并写回文档。
+        """补齐段落与表格身份并写回文档。
 
         gj 因此从「只读」变成「可能就地补一次 XML 属性」：身份只有落进 XML 才能穿过
         gj → af 两次进程，也才能在用户用 Word 改过文档后仍然对得上。写不回去（文件被
         Word 占用、只读）时不中断流程：af 侧检测到文档无身份会自动退回按文本对齐，
         功能降级但必须显式告警，不能让人以为精确增删已经生效。
         """
-        if not ensure_para_ids(self.document):
+        if not ensure_para_ids(self.document) + ensure_table_ids(self.document):
             return
         try:
             self.document.save(self.docx_file)
@@ -188,7 +193,8 @@ class DocxBase:
 
         表格条目为**独立项**：不占用段落槽位，带 ``exists=True`` 供 zip 侧
         跳过段落绑定（建树阶段不绑定原表格）；``table_rows`` 为全部单元格
-        文本（行优先，合并单元格按 python-docx 语义拍平）。
+        文本（行优先，合并单元格按 python-docx 语义拍平）；``table_id`` 为表格
+        身份（首单元格段落的 ``w14:paraId``），供 af --sync 按身份归位与删除。
         """
         from docx.oxml.ns import qn
 
@@ -205,18 +211,19 @@ class DocxBase:
 
         out = list(result)
         for k, (pos, tbl_el) in enumerate(tables):
-            out.insert(
-                min(pos + k, len(out)),
-                {
-                    "category": "table_object",
-                    "paragraph": "",
-                    "score": 1.0,
-                    "comment": "原文档表格（内容只读，不参与格式检查）",
-                    "table_rows": self._extract_table_rows(tbl_el),
-                    "exists": True,
-                    "needs_review": False,
-                },
-            )
+            entry = {
+                "category": "table_object",
+                "paragraph": "",
+                "score": 1.0,
+                "comment": "原文档表格（内容只读，不参与格式检查）",
+                "table_rows": self._extract_table_rows(tbl_el),
+                "exists": True,
+                "needs_review": False,
+            }
+            table_id = get_table_id(tbl_el)
+            if table_id:
+                entry["table_id"] = table_id
+            out.insert(min(pos + k, len(out)), entry)
         return out
 
     def _extract_table_rows(self, tbl_el) -> list[list[str]]:

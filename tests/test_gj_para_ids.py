@@ -78,6 +78,24 @@ class TestGjParaIdExport:
         assert "para_id" not in tables[0]
         assert all("para_id" in it for it in items if it is not tables[0])
 
+    def test_table_entries_carry_a_table_id(self, tmp_path):
+        from wordformat.para_ids import get_table_id
+
+        path = _make_docx(tmp_path, ["甲段", ("table", [["a", "b"]]), "乙段"])
+        items = _parse(path, 2)
+        table_item = next(it for it in items if it["category"] == "table_object")
+
+        assert table_item["table_id"] == get_table_id(Document(path).tables[0]._tbl)
+        assert table_item["exists"] is True
+
+    def test_table_ids_are_persisted_to_disk(self, tmp_path):
+        from wordformat.para_ids import get_table_id
+
+        path = _make_docx(tmp_path, ["甲段", ("table", [["a"]])])
+        _parse(path, 1)
+
+        assert get_table_id(Document(path).tables[0]._tbl)
+
     def test_export_still_works_when_docx_cannot_be_written(self, tmp_path):
         # 文件被 Word 占用/只读：身份写不回，但流程不得中断（af 侧退回文本对齐）
         path = _make_docx(tmp_path, ["甲段", "乙段"])
