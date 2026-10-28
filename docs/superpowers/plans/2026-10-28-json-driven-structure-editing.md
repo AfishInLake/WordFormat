@@ -1484,3 +1484,30 @@ git commit -m "docs:记录 UI 结构编辑入口"
 **2. 占位符扫描**：Task 3 Step 1 的 `_items()` 里 `if False else` 与两处「先跑一次拿真实值再写死」的断言是**已知待明确项**，执行时必须先跑再定稿，不许留成 `TODO`；其余步骤均带可运行代码。
 
 **3. 类型一致性**：`_align_by_identity`/`_align_by_text` 统一返回 5 元组 `(n_edit, n_ins, n_del, n_tbl_ins, n_tbl_del)`，只有 `sync_document_structure` 解包；`get_table_id(tbl_el)` 收 XML 元素（不是 `Table` 对象），调用处一律传 `._tbl` 或 `body.iterchildren()` 的元素；`ensure_table_ids(document)` 收 Document（与 `ensure_para_ids` 同形）；`expand_multi_paragraph_items(items) -> list[dict]` 返回新列表，不改原列表。
+
+---
+
+## 执行记录（Task 1–4，2026-10-28）
+
+**Task 3 与 Task 4 合并成一个提交**：占位段落与 `sync_skip` 判定必须同时落地。只合入 Task 3 时
+（`StructureSyncStage` 仍把新表格条目一律标 `sync_skip`），`_align_by_identity` 已经给它落了一
+个占位段，而占位段没有节点绑定，「段落数 == 条目数」被打破——2 段落 + 2 表格的小文档上直接抛
+`ValueError: 当前文档(3 段)与节点 JSON(2 节点)不一致`。
+
+**Task 3 Step 3 的 `_table_identity_ready` 判据改了**：计划里的 `all(it.get("table_id"))` 与
+Task 4 自相矛盾（新建的表格条目按定义不带 `table_id`，会让身份模式整表退回按位置归位，
+`test_new_table_item_creates_a_table_at_its_position` 必失败）。实现改以 `exists` 区分两种
+「没有 table_id」：带 `exists` 却缺 id 只可能是表格身份上线前的旧 JSON，它指向既有表格，
+删表不安全 → 退回保守模式；不带 `exists` 就是新建意图，没有 id 是正常的 → 身份模式照常生效。
+
+**Task 4 的「建表」部分没有新增代码**：`_try_insert_table` 本就用 `table_rows` 建表并删占位段，
+sync 路径接上占位段后端到端即通；只补了建表后的 `ensure_table_ids(doc)`，让新表格当场可寻址。
+
+**真机验证结果**（temp 下已清理，数字记在这里）：原 1 个 body 表格 → 删该条目 + 在正文插一条
+新表格条目 → 输出 1 个表格（内容 `A B / C D`）、被删 id `0A473B6C` 不再出现、段落数 384 不变、
+空段 84→84、段落身份完整且唯一；对输出再跑 `gj`（新表格带 id `64843449`）→ 删该条目 →
+日志「表格 +0 −1」、输出 0 个表格。`cf` 检查模式不受影响。
+
+**新发现的边界（未修，需在 Task 5 的契约里写明）**：表格条目落在封面/声明等 `other` 类别子树时
+不会建表——`DEFAULT_SKIP_CHILDREN_CATEGORIES`/`VOIDNODELIST` 让这些子树整体跳过格式化，占位段
+原地留成一个空段。表格条目要放在正文类别的段落之间。
