@@ -46,9 +46,11 @@ difflib。注意 difflib 的 opcode 以「A 变换为 B」为方向，与本功�
 from __future__ import annotations
 
 import difflib
+from copy import deepcopy
 from typing import List
 
 from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
 from loguru import logger
 
 from wordformat.categories import Category
@@ -147,6 +149,68 @@ def _remove_paragraphs(paras: List) -> None:
         para._element.getparent().remove(para._element)
 
 
+# 参照段的这些属性属于具体段落位置，不能带给新段落
+_UNCOPYABLE_PPR_TAGS = (qn("w:numPr"), qn("w:sectPr"))
+
+# 标题/题注类样式：新正文段不应继承它们的段落属性
+_NON_BODY_STYLE_PREFIXES = ("Heading", "Title", "Subtitle", "Caption", "标题", "题注")
+
+
+def _as_p_element(para):
+    """Paragraph 或 ``w:p`` 元素 → ``w:p`` 元素；其余返回 None。"""
+    if para is None:
+        return None
+    el = getattr(para, "_p", para)
+    return el if el.tag == qn("w:p") else None
+
+
+def _is_body_reference(p_el, document) -> bool:
+    """参照段是否为可继承的正文类段落（非标题/非题注）。"""
+    p_el = _as_p_element(p_el)
+    if p_el is None:
+        return False
+    try:
+        style_name = Paragraph(p_el, document._body).style.name or ""
+    except (AttributeError, KeyError):
+        return False
+    return not style_name.startswith(_NON_BODY_STYLE_PREFIXES)
+
+
+def _inherit_paragraph_props(document, new_p, ref_p) -> None:
+    """新建段落沿用参照段落的段落属性（相当于在 Word 中回车另起一段）。
+
+    ``add_paragraph`` / ``insert_paragraph_before`` 造出的是裸段落：没有 pStyle，
+    也没有行距、对齐等直接格式。格式检查只比对「已显式设置」的属性，缺省值一律
+    视为继承样式，因此这些缺失项不会被补齐——新段落的样式、行距、对齐会与上下文
+    不一致（最直观的是行距从 1.5 倍掉回单倍、两端对齐变成左对齐）。
+    """
+    if not _is_body_reference(ref_p, document):
+        return
+    new_p = _as_p_element(new_p)
+    ref_p = _as_p_element(ref_p)
+    if new_p is None or ref_p is None:
+        return
+    ref_pPr = ref_p.find(qn("w:pPr"))
+    if ref_pPr is None:
+        return
+    new_pPr = deepcopy(ref_pPr)
+    for tag in _UNCOPYABLE_PPR_TAGS:
+        for el in new_pPr.findall(tag):
+            new_pPr.remove(el)
+    existing = new_p.find(qn("w:pPr"))
+    if existing is not None:
+        new_p.remove(existing)
+    new_p.insert(0, new_pPr)
+
+
+def _pick_reference(document, *candidates):
+    """按优先级选第一个可继承的正文类参照段；全不合适则返回 None。"""
+    return next(
+        (c for c in candidates if _is_body_reference(c, document)),
+        None,
+    )
+
+
 def _insert_item(document, paras: List, anchor_idx: int, item: dict) -> None:
     """在 B 侧 anchor_idx 段落前插入条目；anchor 越界（文档尾部）则追加。
 
@@ -155,9 +219,14 @@ def _insert_item(document, paras: List, anchor_idx: int, item: dict) -> None:
     """
     text = _item_text(item)
     if anchor_idx < len(paras):
-        paras[anchor_idx].insert_paragraph_before(text)
+        new_para = paras[anchor_idx].insert_paragraph_before(text)
+        prev = paras[anchor_idx - 1] if anchor_idx > 0 else None
+        ref = _pick_reference(document, paras[anchor_idx], prev)
     else:
-        document.add_paragraph(text)
+        new_para = document.add_paragraph(text)
+        ref = _pick_reference(document, paras[-1] if paras else None)
+    if ref is not None:
+        _inherit_paragraph_props(document, new_para._p, ref._p)
 
 
 def _apply_opcode(
@@ -331,10 +400,22 @@ def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int, int,
     else:
         tbl_by_id = None
     ordered: List = []
+    # 同类别最近一段：新段落优先继承同类段落的属性（如正文段不继承标题段）
+    last_p_by_category: dict = {}
+    # 每条目之后（含自身）最近的既有段落：插入点的参照段首选
+    next_existing: list = [None] * len(items)
+    upcoming = None
+    for i in range(len(items) - 1, -1, -1):
+        it = items[i]
+        if isinstance(it, dict) and it.get("category") != Category.TABLE_OBJECT:
+            pid = it.get("para_id")
+            if pid and pid in para_by_id:
+                upcoming = para_by_id[pid]._p
+        next_existing[i] = upcoming
     n_edit = n_ins = n_del = n_tbl_ins = n_tbl_del = 0
     table_cursor = 0
 
-    for item in items:
+    for i, item in enumerate(items):
         if item.get("category") == Category.TABLE_OBJECT:
             added, table_cursor = _place_table_item(
                 item, tbl_by_id, table_elements, table_cursor, document, ordered
@@ -342,11 +423,17 @@ def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int, int,
             n_tbl_ins += added
             continue
         para = _take_existing(para_by_id, item)
+        category = item.get("category")
         if para is None:
             para = document.add_paragraph(_item_text(item))
+            ref_p = _pick_reference(
+                document, next_existing[i], last_p_by_category.get(category)
+            )
+            _inherit_paragraph_props(document, para._p, ref_p)
             n_ins += 1
         elif _set_paragraph_text(para, _item_text(item)):
             n_edit += 1
+        last_p_by_category[category] = para._p
         ordered.append(para._p)
 
     n_del = len(para_by_id)

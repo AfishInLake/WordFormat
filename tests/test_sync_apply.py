@@ -9,6 +9,8 @@ import json
 
 import pytest
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 from wordformat.para_ids import ensure_para_ids, get_para_id
 from wordformat.pipeline.orchestrate import auto_format_thesis_document
@@ -88,6 +90,99 @@ class TestSyncDocumentStructure:
             doc, [_item("body_text", "A"), _item("body_text", "尾部新段")]
         )
         assert [p.text for p in doc.paragraphs] == ["A", "尾部新段"]
+
+    def test_inserted_paragraph_inherits_neighbor_format(self):
+        """新增段落沿用相邻正文段的段落属性，避免掉回 Normal（单倍行距/左对齐）。"""
+        doc = Document()
+        doc.add_paragraph("前段")
+        doc.add_paragraph("后段")
+        for p in doc.paragraphs:
+            p.style = doc.styles["Body Text"]
+            p.paragraph_format.line_spacing = 1.5
+
+        sync_document_structure(
+            doc,
+            [
+                _item("body_text", "前段"),
+                _item("body_text", "新段"),
+                _item("body_text", "后段"),
+            ],
+        )
+
+        new = doc.paragraphs[1]
+        assert new.text == "新段"
+        assert new.style.name == "Body Text"
+        assert new.paragraph_format.line_spacing == 1.5
+
+    def test_inserted_paragraph_skips_heading_format(self):
+        """标题后的新正文段不继承标题属性。"""
+        doc = Document()
+        doc.add_paragraph("一级标题").style = doc.styles["Heading 1"]
+        doc.add_paragraph("正文段")
+
+        sync_document_structure(
+            doc,
+            [
+                _item("heading_level_1", "一级标题"),
+                _item("body_text", "新正文段"),
+                _item("body_text", "正文段"),
+            ],
+        )
+
+        new = doc.paragraphs[1]
+        assert new.text == "新正文段"
+        assert new.style.name == "Normal"
+
+    def test_inserted_paragraph_does_not_inherit_numbering(self):
+        """编号属于原段落位置，不能复制给新段落。"""
+        doc = Document()
+        doc.add_paragraph("前段")
+        numbered = doc.add_paragraph("带编号")
+        num_pr = OxmlElement("w:numPr")
+        ilvl = OxmlElement("w:ilvl")
+        ilvl.set(qn("w:val"), "0")
+        num_id = OxmlElement("w:numId")
+        num_id.set(qn("w:val"), "1")
+        num_pr.append(ilvl)
+        num_pr.append(num_id)
+        numbered._p.get_or_add_pPr().append(num_pr)
+
+        sync_document_structure(
+            doc,
+            [
+                _item("body_text", "前段"),
+                _item("body_text", "新段"),
+                _item("body_text", "带编号"),
+            ],
+        )
+
+        new = doc.paragraphs[1]
+        assert new.text == "新段"
+        assert new._p.pPr.find(qn("w:numPr")) is None
+
+    def test_inserted_paragraph_inherits_in_identity_mode(self):
+        """按 para_id 对齐（主路径）时新段落同样继承同类段落属性。"""
+        doc = Document()
+        doc.add_paragraph("前段")
+        doc.add_paragraph("后段")
+        for p in doc.paragraphs:
+            p.style = doc.styles["Body Text"]
+            p.paragraph_format.line_spacing = 1.5
+        ensure_para_ids(doc)
+
+        sync_document_structure(
+            doc,
+            [
+                _item("body_text", "前段", para_id=get_para_id(doc.paragraphs[0]._p)),
+                _item("body_text", "新段"),
+                _item("body_text", "后段", para_id=get_para_id(doc.paragraphs[1]._p)),
+            ],
+        )
+
+        new = doc.paragraphs[1]
+        assert new.text == "新段"
+        assert new.style.name == "Body Text"
+        assert new.paragraph_format.line_spacing == 1.5
 
     def test_text_edit_applied(self):
         doc = _make_doc(["原文", "保持"])
