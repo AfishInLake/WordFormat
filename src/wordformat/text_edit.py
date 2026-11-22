@@ -109,7 +109,14 @@ def set_paragraph_text(para, text: str) -> bool:
     """
     elements = _textual_runs(para._p)
     segments = [Run(el, para).text for el in elements]
-    if "".join(segments) == text:
+    visible = "".join(segments)
+    if visible == text:
+        return False
+    # gj 导出的 paragraph 会去掉首尾空白；sync 以 JSON 为准时不应因此抹掉
+    # 封面字段、签名行、公式编号用于定位的缩进空格——仅首尾空白差异视为无变化。
+    # 例外：原段落无实际内容（纯空白）时仍允许清空。
+    # 需要真实增删首尾空格时用显式 replace 字段。
+    if visible.strip() and visible.strip() == text.strip():
         return False
 
     distributed = _distribute(segments, text)

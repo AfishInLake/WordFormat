@@ -93,6 +93,14 @@ class TestCharAlignment:
         assert set_paragraph_text(para, "甲乙") is False
         assert para._p.xml == xml_before
 
+    def test_leading_trailing_whitespace_only_is_no_change(self):
+        """gj 导出的 paragraph 已 strip：sync 不应抹掉原段落的定位空格。"""
+        para = _para(["\u3000\u3000作者签名：      日期： "])
+        xml_before = para._p.xml
+
+        assert set_paragraph_text(para, "作者签名：      日期：") is False
+        assert para._p.xml == xml_before
+
     def test_clear_text_empties_runs_without_removing_them(self):
         para = _para(["要删掉的文字"])
 
