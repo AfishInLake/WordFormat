@@ -16,6 +16,6 @@ def set_tag_main(
     :param configpath: yaml配置文件路径（可选，当前未使用）
     :param domain: 文档领域（默认 thesis），决定分类后处理规则
     """
-    dox = DocxBase(docx_path, configpath=configpath, domain=domain)
-    a = dox.parse()
-    return a
+    document_base = DocxBase(docx_path, configpath=configpath, domain=domain)
+    paragraphs = document_base.parse()
+    return paragraphs

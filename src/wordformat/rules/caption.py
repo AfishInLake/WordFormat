@@ -5,6 +5,7 @@
 
 import re
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
@@ -162,7 +163,7 @@ def _apply_caption_numbering(
     _replace_paragraph_text(paragraph, new_text)
 
 
-@register("caption_figure")
+@register(Category.CAPTION_FIGURE)
 class CaptionFigure(FormatNode):
     """题注-图片"""
 
@@ -211,7 +212,7 @@ class CaptionFigure(FormatNode):
             _apply_caption_numbering(self, prefix, rule_cfg)
 
 
-@register("caption_table")
+@register(Category.CAPTION_TABLE)
 class CaptionTable(FormatNode):
     """题注-表格"""
 

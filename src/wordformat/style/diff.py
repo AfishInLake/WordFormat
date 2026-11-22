@@ -750,9 +750,9 @@ class ParagraphStyle:
     def to_string(
         value: list[DIFFResult], target: str = "", warnings: WarningConfig | None = None
     ) -> str:
+        """将 DIFFResult 列表转为标准格式批注文本。"""
         if warnings is None:
             warnings = _load_warnings()
-        """将 DIFFResult 列表转为标准格式批注文本。"""
         from .comments import format_comment
 
         t = []

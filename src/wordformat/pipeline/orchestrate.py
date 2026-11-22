@@ -145,6 +145,33 @@ def _load_presets_into_context(ctx, presets) -> None:
     logger.info(f"已加载预设: {', '.join(presets)}")
 
 
+def _finalize_and_save(ctx: FormatContext, source_path: str, save_dir: str) -> str:
+    """保存前 hook + 兜底输出到「<源文件名>--生成版.docx」，返回输出路径。
+
+    md_to_docx / json_to_docx 共用，保证对外文件命名约定只有一处定义。
+    """
+    from pathlib import Path
+
+    from wordformat.hooks import hooks
+    from wordformat.utils import ensure_directory_exists, get_file_name
+
+    # 保存前 hook：编号/超链接/页眉页脚/页边距与预设统一在此执行
+    hooks.emit(
+        "before_document_save",
+        document=ctx.document,
+        config=ctx.config_model,
+        ctx=ctx,
+        check=False,
+    )
+
+    ensure_directory_exists(save_dir)
+    filename = get_file_name(source_path)
+    out_path = Path(save_dir) / f"{filename}--生成版.docx"
+    ctx.document.save(str(out_path))
+    logger.info(f"保存文件到 {out_path}")
+    return str(out_path)
+
+
 def md_to_docx(
     md_path: str,
     config_path: str | None = None,
@@ -172,10 +199,6 @@ def md_to_docx(
     Returns:
         生成的 .docx 文件路径。
     """
-    from pathlib import Path
-
-    from wordformat.utils import ensure_directory_exists, get_file_name
-
     ctx = FormatContext(
         md_path=md_path,
         config_path=config_path or "",
@@ -197,24 +220,7 @@ def md_to_docx(
     for stage in pipeline:
         ctx = stage.process(ctx)
 
-    # 保存前 hook：编号/超链接等机制与预设统一在此执行（复用 before_document_save）
-    from wordformat.hooks import hooks
-
-    hooks.emit(
-        "before_document_save",
-        document=ctx.document,
-        config=ctx.config_model,
-        ctx=ctx,
-        check=False,
-    )
-
-    # 重命名输出文件
-    ensure_directory_exists(save_dir)
-    filename = get_file_name(md_path)
-    out_path = Path(save_dir) / f"{filename}--生成版.docx"
-    ctx.document.save(str(out_path))
-    logger.info(f"保存文件到 {out_path}")
-    return str(out_path)
+    return _finalize_and_save(ctx, md_path, save_dir)
 
 
 def _validate_jd_categories(json_path) -> None:
@@ -283,10 +289,6 @@ def json_to_docx(
     Returns:
         生成的 .docx 文件路径。
     """
-    from pathlib import Path
-
-    from wordformat.utils import ensure_directory_exists, get_file_name
-
     ctx = FormatContext(
         json_path=json_path,
         config_path=config_path or "",
@@ -309,20 +311,4 @@ def json_to_docx(
     for stage in pipeline:
         ctx = stage.process(ctx)
 
-    # 保存前 hook：编号/超链接/页眉页脚/页边距与预设统一在此执行
-    from wordformat.hooks import hooks
-
-    hooks.emit(
-        "before_document_save",
-        document=ctx.document,
-        config=ctx.config_model,
-        ctx=ctx,
-        check=False,
-    )
-
-    ensure_directory_exists(save_dir)
-    filename = get_file_name(json_path)
-    out_path = Path(save_dir) / f"{filename}--生成版.docx"
-    ctx.document.save(str(out_path))
-    logger.info(f"保存文件到 {out_path}")
-    return str(out_path)
+    return _finalize_and_save(ctx, json_path, save_dir)

@@ -14,6 +14,9 @@
 import dataclasses
 from typing import Dict, Optional, Type
 
+# 未登记层级的哨兵值：必须大于任何真实层级，供建树/展示树的栈比较使用
+NO_LEVEL = 999
+
 
 class Registry:
     """领域级 FormatNode 注册表（每领域一份实例，互不覆盖）。"""
@@ -60,8 +63,8 @@ class Registry:
             self._level_registry.setdefault(category, level)
 
     def level_of(self, category: str) -> int:
-        """类别逻辑层级；未登记返回 999（非标题）。"""
-        return self._level_registry.get(category, 999)
+        """类别逻辑层级；未登记返回 NO_LEVEL（非标题）。"""
+        return self._level_registry.get(category, NO_LEVEL)
 
     def reverse_category(self, cls: Type) -> Optional[str]:
         """节点类 → 注册类别名（树提升时同步 value 身份字段用）。"""

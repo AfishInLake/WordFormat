@@ -20,6 +20,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_UNDERLINE
 from docx.oxml.ns import qn
 from loguru import logger
 
+from wordformat.style.defaults import TWIPS_PER_CHAR
+
 # 链上「本源未设置该属性」的哨兵，区别于合法的 None（如主题色/主题字体不确定）
 _MISS = object()
 
@@ -268,7 +270,7 @@ def x_first_line_indent(pPr):
 
 def _twips_to_chars(value: str) -> float | None:
     try:
-        return round(int(value) / 240.0 * 2) / 2
+        return round(int(value) / TWIPS_PER_CHAR * 2) / 2
     except (TypeError, ValueError):
         return None
 

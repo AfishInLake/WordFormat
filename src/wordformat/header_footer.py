@@ -78,6 +78,7 @@ from wordformat.style.reader import (
     run_get_font_name_en,
     run_get_font_size_pt_or_none,
 )
+from wordformat.style.units import CM_PER_UNIT, extract_unit_from_string
 from wordformat.utils import has_chinese
 
 # 页眉/页脚缺省规范（本科论文常见：小五号宋体、Times New Roman、居中）
@@ -281,26 +282,27 @@ def _resolve_font_size_pt(label) -> Optional[float]:
         return None
 
 
-_CM_PER = {"cm": 1.0, "毫米": 0.1, "mm": 0.1, "英寸": 2.54, "in": 2.54, "pt": 0.035278}
-_UNIT_ALIAS = {"厘米": "cm", "毫米": "mm", "inch": "in", "英寸": "in", "磅": "pt"}
-
-
 def _resolve_length_cm(label) -> Optional[float]:
     """长度标签 → cm 浮点；支持 '2.54cm' / '31.8mm' / '1.5' (缺省 cm) / 数字。
 
-    无法解析返回 None（调用方跳过该项，避免误报）。
+    单位解析复用 style.units（全库唯一定义），无法解析返回 None
+    （调用方跳过该项，避免误报）。
     """
     if label is None:
         return None
     if isinstance(label, (int, float)):
         return float(label)
-    pattern = r"^\s*([0-9]+(?:\.[0-9]+)?)\s*(cm|厘米|毫米|mm|英寸|in|inch|pt|磅)?\s*$"
-    m = re.match(pattern, str(label).lower())
-    if not m:
+    text = str(label).strip()
+    result = extract_unit_from_string(text)
+    if result.is_valid and result.value is not None:
+        factor = CM_PER_UNIT.get(result.standard_unit)
+        if factor is not None:
+            return result.value * factor
+    # 无单位纯数字：约定按 cm
+    try:
+        return float(text)
+    except ValueError:
         return None
-    unit = m.group(2) or "cm"
-    unit = _UNIT_ALIAS.get(unit, unit)
-    return float(m.group(1)) * _CM_PER.get(unit, 1.0)
 
 
 def _resolve_page_format(label) -> Optional[str]:

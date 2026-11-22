@@ -13,6 +13,12 @@ from docx.shared import Cm, Inches, Mm, Pt
 from docx.text.paragraph import Paragraph
 from loguru import logger
 
+from wordformat.style.defaults import (
+    MAX_LINE_SPACING,
+    IndentSide,
+    resolve_indent_side,
+)
+
 
 def run_set_font_name(run, font_name: str):
     """设置 Run 对象的东亚字体名称（python-docx Font 不支持 eastAsia）。"""
@@ -107,9 +113,9 @@ class SetSpacing:
     def _set_hang_on_pPr(pPr, spacing_type: str, value: float):
         """在任意 pPr 元素上设置「行」单位间距（段落或样式定义通用）。"""
         value = max(float(value), 0.0)
-        if value > 10.0:
-            logger.warning(f"间距{value}行过大，自动兜底为10行")
-            value = 10.0
+        if value > MAX_LINE_SPACING:
+            logger.warning(f"间距{value}行过大，自动兜底为{MAX_LINE_SPACING}行")
+            value = MAX_LINE_SPACING
         lines_100unit = int(round(value * 100))
 
         spacing = pPr.find(qn("w:spacing"))
@@ -266,24 +272,24 @@ class SetLineSpacing:
 
 class SetIndent:
     """
-    缩进 文本之前(R)/ 文本之后(X):
+    缩进 文本之前（LEFT）/ 文本之后（RIGHT）。
+
+    接受 IndentSide 枚举或历史写法 "R"/"X"（见 style.defaults）。
     """
 
     @staticmethod
-    def _set_char_on_pPr(pPr, indent_type: str, value: float):
+    def _set_char_on_pPr(pPr, indent_type, value: float):
         """在任意 pPr 元素上设置「字符」单位缩进（段落或样式定义通用）。"""
-        if indent_type not in ("R", "X"):
-            raise ValueError(
-                f"无效的缩进类型: {indent_type}. 仅支持 'R'（左）或 'X'（右）"
-            )
+        side = resolve_indent_side(indent_type)
 
         ind = pPr.find(qn("w:ind"))
         if ind is None:
             ind = OxmlElement("w:ind")
             pPr.append(ind)
 
-        char_attr = qn("w:leftChars") if indent_type == "R" else qn("w:rightChars")
-        physical_attr = qn("w:left") if indent_type == "R" else qn("w:right")
+        is_left = side is IndentSide.LEFT
+        char_attr = qn("w:leftChars") if is_left else qn("w:rightChars")
+        physical_attr = qn("w:left") if is_left else qn("w:right")
 
         if value == 0:
             if char_attr in ind.attrib:
@@ -359,18 +365,13 @@ class SetIndent:
         SetIndent._apply_indent(paragraph, indent_type, value)
 
     @staticmethod
-    def _apply_indent(paragraph: Paragraph, indent_type: str, value):
+    def _apply_indent(paragraph: Paragraph, indent_type, value):
         """内部方法：应用缩进值"""
-        if indent_type == "R":
-            # "R" 对应左缩进（文本之前）
+        side = resolve_indent_side(indent_type)
+        if side is IndentSide.LEFT:
             paragraph.paragraph_format.left_indent = value
-        elif indent_type == "X":
-            # "X" 对应右缩进（文本之后）
-            paragraph.paragraph_format.right_indent = value
         else:
-            raise ValueError(
-                f"无效的缩进类型: {indent_type}. 请使用 'R'（左缩进）或 'X'（右缩进）"
-            )
+            paragraph.paragraph_format.right_indent = value
 
 
 class SetFirstLineIndent:

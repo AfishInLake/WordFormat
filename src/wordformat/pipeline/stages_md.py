@@ -13,11 +13,13 @@ from pathlib import Path
 
 from docx import Document
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import deep_merge, first_option
 from wordformat.log_config import logger
 from wordformat.markdown.parser import parse_markdown
 from wordformat.math.omml import latex_to_omath, latex_to_omath_para
 from wordformat.rules.node import FormatNode
+from wordformat.style.defaults import DEFAULT_CN_FONT, DEFAULT_CODE_FONT
 from wordformat.utils import resolve_item_text
 
 from .context import FormatContext
@@ -25,8 +27,8 @@ from .context import FormatContext
 # 行内富文本默认配置（可由 YAML `inline` 段覆盖）
 _DEFAULT_INLINE_CONFIG = {
     "code_font": {
-        "chinese_font_name": "宋体",
-        "english_font_name": "Consolas",
+        "chinese_font_name": DEFAULT_CN_FONT,
+        "english_font_name": DEFAULT_CODE_FONT,
         "font_size": "五号",
     },
     "link": {"style": "Hyperlink", "color": "theme", "underline": True},
@@ -76,7 +78,7 @@ class DocumentCreationStage:
             # 原文档已有表格（exists）或 sync 忽略的表格不占段落槽位；
             # 若仍建占位段，jd 会在正文中留下一个空段。
             if (
-                category == "table_object"
+                category == Category.TABLE_OBJECT
                 and isinstance(value, dict)
                 and (value.get("exists") or value.get("sync_skip"))
             ):
@@ -106,9 +108,9 @@ class DocumentCreationStage:
                     inline_marks = []
             para = ctx.document.add_paragraph()
             # figure_image: 路径留给 FigureImage._try_insert_image 处理，这里只建空段落
-            if category == "figure_image":
+            if category == Category.FIGURE_IMAGE:
                 para.add_run("")
-            elif category == "math_block":
+            elif category == Category.MATH_BLOCK:
                 self._add_math_paragraph(para, text)
             elif self._has_math(inline_marks):
                 self._add_math_runs(para, inline_marks)
@@ -210,8 +212,8 @@ class DocumentCreationStage:
         from docx.shared import Pt
 
         cfg = inline_cfg.get("code_font") or {}
-        en_font = cfg.get("english_font_name", "Consolas")
-        cn_font = cfg.get("chinese_font_name", "宋体")
+        en_font = cfg.get("english_font_name", DEFAULT_CODE_FONT)
+        cn_font = cfg.get("chinese_font_name", DEFAULT_CN_FONT)
         run.font.name = en_font
         rpr = run._element.get_or_add_rPr()
         rfonts = rpr.find(qn("w:rFonts"))
@@ -225,8 +227,8 @@ class DocumentCreationStage:
 
             try:
                 run.font.size = Pt(float(FontSize(size).rel_value))
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as e:
+                logger.warning(f"行内代码字号解析失败，保留默认值: {size!r} ({e})")
 
     @staticmethod
     def _add_hyperlink(para, text: str, url: str, inline_cfg: dict) -> None:

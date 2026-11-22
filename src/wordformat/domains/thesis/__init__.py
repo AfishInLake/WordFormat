@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import re
 
+from loguru import logger
+
+from wordformat.categories import Category
 from wordformat.domains import register_domain
 from wordformat.hooks import HookRegistry, hooks
 
@@ -183,11 +186,11 @@ def _reset_caption_state(data: dict):
         value = node.value if isinstance(node.value, dict) else {}
         category = value.get("category", "")
         text = _node_text(node)
-        if category == "heading_level_1":
+        if category == Category.HEADING_LEVEL_1:
             parsed_chapter = _parse_chapter_number(text)
             if parsed_chapter is not None and parsed_chapter > 0:
                 _state["heading_chapters"].add(parsed_chapter)
-        elif category in ("caption_figure", "caption_table") and text:
+        elif category in (Category.CAPTION_FIGURE, Category.CAPTION_TABLE) and text:
             parsed = parse_caption_text(text)
             if parsed and parsed.get("chapter_num") is not None:
                 caption_chapters.append(parsed["chapter_num"])
@@ -196,7 +199,10 @@ def _reset_caption_state(data: dict):
 
     try:
         walk(root)
-    except Exception:
+    except Exception as e:
+        # 题注编号依赖章节遍历的完整性：中断时必须留痕，
+        # 否则 caption_chapters 缺失会让题注编号整体错位且无从追查。
+        logger.warning(f"题注章节遍历失败，题注编号可能不准确: {e}")
         return
     if len(caption_chapters) >= 3 and len(set(caption_chapters)) == 1:
         _state["caption_global"] = True
@@ -226,7 +232,7 @@ def _inject_caption_numbering(data: dict):
     # 一级标题：优先采用标题文本中的章节号（第3章 / 3 系统设计），
     # 避免正文里被误判为一级标题的短行把章节计数推高；无编号时顺序递增。
     # 目录条目（带制表符/点线页码）不属于正文章节，不参与计数。
-    if category == "heading_level_1":
+    if category == Category.HEADING_LEVEL_1:
         text = _node_text(node)
         if not _TOC_ENTRY_RE.match(text):
             parsed_chapter = _parse_chapter_number(text)
@@ -237,7 +243,7 @@ def _inject_caption_numbering(data: dict):
     chapter = _state["chapter"]
 
     # 题注节点：注入章节号 + 顺序号（续表/续图保留原标题注编号）
-    if category in ("caption_figure", "caption_table"):
+    if category in (Category.CAPTION_FIGURE, Category.CAPTION_TABLE):
         from wordformat.utils import parse_caption_text
 
         text = _node_text(node)
@@ -251,8 +257,10 @@ def _inject_caption_numbering(data: dict):
             chapter = parsed["chapter_num"]
             seq = parsed["number_num"]
         else:
-            counter_key = "fig" if category == "caption_figure" else "tab"
-            global_key = "fig_global" if category == "caption_figure" else "tab_global"
+            counter_key = "fig" if category == Category.CAPTION_FIGURE else "tab"
+            global_key = (
+                "fig_global" if category == Category.CAPTION_FIGURE else "tab_global"
+            )
             actual_chapter = parsed.get("chapter_num") if parsed else None
             if _state["caption_global"]:
                 # 统一编号文档：章节号沿用题注自身，序号按全文连续
@@ -312,17 +320,24 @@ def _build_summary(data: dict):
 
 def _compose_summary(root_node, document, config_model) -> str:
     """遍历树和错误统计，生成论文检测报告摘要文本（字数/关键词/参考文献规范校验）。"""
+    from wordformat.domains.thesis.rules.abstract import (
+        AbstractContentCN,
+        AbstractContentEN,
+        AbstractTitleContentCN,
+        AbstractTitleContentEN,
+    )
     from wordformat.domains.thesis.rules.keywords import KeywordsCN, KeywordsEN
+    from wordformat.domains.thesis.rules.references import ReferenceEntry
     from wordformat.rules.node import FormatNode
+    from wordformat.rules.object import TableObject
     from wordformat.utils import count_chinese_chars, has_chinese
 
     stats = FormatNode._error_stats
     total = stats["total"]
 
     def _collect_section(node, sections):
-        cls_name = type(node).__name__
         para = node.paragraph
-        if cls_name == "TableObject":
+        if isinstance(node, TableObject):
             # 表格为只读导出（无绑定段落），仅统计数量；
             # sync 忽略的新增表格未真正写入文档，不计入统计
             value = node.value if isinstance(node.value, dict) else {}
@@ -330,31 +345,31 @@ def _compose_summary(root_node, document, config_model) -> str:
                 sections["table_count"] = sections.get("table_count", 0) + 1
         if para and para.text.strip():
             text = para.text.strip()
-            if cls_name == "AbstractContentCN":
+            if isinstance(node, AbstractContentCN):
                 cn_chars = count_chinese_chars(text)
                 if cn_chars:
                     sections["abstract_cn_chars"] = (
                         sections.get("abstract_cn_chars", 0) + cn_chars
                     )
-            elif cls_name == "AbstractContentEN":
+            elif isinstance(node, AbstractContentEN):
                 sections["abstract_en_words"] = sections.get(
                     "abstract_en_words", 0
                 ) + len(text.split())
-            elif cls_name == "KeywordsCN":
+            elif isinstance(node, KeywordsCN):
                 kws = KeywordsCN.extract_keywords(text)
                 if kws:
                     sections["keyword_cn_count"] = len(kws)
-            elif cls_name == "KeywordsEN":
+            elif isinstance(node, KeywordsEN):
                 kws = KeywordsEN.extract_keywords(text)
                 if kws:
                     sections["keyword_en_count"] = len(kws)
-            elif cls_name == "ReferenceEntry":
+            elif isinstance(node, ReferenceEntry):
                 if has_chinese(text):
                     sections["ref_cn"] = sections.get("ref_cn", 0) + 1
                 else:
                     sections["ref_en"] = sections.get("ref_en", 0) + 1
         # 处理混合节点：AbstractTitleContentCN/EN 的子 BodyText 是摘要正文
-        if cls_name == "AbstractTitleContentCN":
+        if isinstance(node, AbstractTitleContentCN):
             for child in node.children:
                 cp = child.paragraph
                 if cp and cp.text.strip():
@@ -362,7 +377,7 @@ def _compose_summary(root_node, document, config_model) -> str:
                     sections["abstract_cn_chars"] = (
                         sections.get("abstract_cn_chars", 0) + cnt
                     )
-        elif cls_name == "AbstractTitleContentEN":
+        elif isinstance(node, AbstractTitleContentEN):
             for child in node.children:
                 cp = child.paragraph
                 if cp and cp.text.strip():

@@ -206,8 +206,8 @@ def onnx_single_infer(text: str, prev_label: Optional[str] = None) -> dict:
     """单条推理。prev_label 为上一段预测标签（跨调用维护可串成状态链）。"""
     if _ort_sess is None:
         _load_model()
-    assert _ort_sess is not None
-    assert _id2label is not None
+    if _ort_sess is None or _id2label is None:
+        raise RuntimeError("ONNX 模型未加载：请确认模型文件存在后重试")
 
     input_ids, attention_mask = _encode_batch([_prompt(prev_label, text)])
     onnx_input = {"input_ids": input_ids, "attention_mask": attention_mask}
@@ -240,8 +240,8 @@ def onnx_batch_infer(
         return [], prev_label
     if _ort_sess is None:
         _load_model()
-    assert _ort_sess is not None
-    assert _id2label is not None
+    if _ort_sess is None or _id2label is None:
+        raise RuntimeError("ONNX 模型未加载：请确认模型文件存在后重试")
 
     batch_size = len(texts)
     prompts = [_prompt(prev_label, t) for t in texts]

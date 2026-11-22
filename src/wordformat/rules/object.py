@@ -7,14 +7,27 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches
 
+from wordformat.categories import Category
+from wordformat.log_config import logger
 from wordformat.para_ids import ensure_table_ids
-from wordformat.rules.node import FormatNode
+from wordformat.rules.node import FormatNode, run_has_media
 from wordformat.structure.registry import register
 from wordformat.style.comments import format_comment
-from wordformat.style.units import extract_unit_from_string
+from wordformat.style.defaults import (
+    DEFAULT_CN_FONT,
+    DEFAULT_EN_FONT,
+    DEFAULT_FONT_COLOR,
+    DEFAULT_FONT_SIZE,
+)
+from wordformat.style.units import (
+    EMU_PER_CM,
+    TWIPS_PER_CM,
+    extract_unit_from_string,
+)
 
-_EMU_PER_CM = 360_000
 _WIDTH_TOLERANCE_CM = 0.01
+# 图片默认插入宽度：5.5 英寸≈14cm，适配 A4 正文区
+_DEFAULT_IMAGE_WIDTH = Inches(5.5)
 
 # 环绕方式：中文标签与 OOXML 档位双向接受
 _WRAP_LABELS = {
@@ -131,7 +144,7 @@ def _resolve_max_width_emu(value) -> int | None:
     return emu
 
 
-@register("figure_image")
+@register(Category.FIGURE_IMAGE)
 class FigureImage(FormatNode):
     """图片段落节点（包含内联图片的段落，非题注）。
 
@@ -198,16 +211,18 @@ class FigureImage(FormatNode):
         if not img_path.exists():
             return
         try:
-            # 清空占位 run，插入图片
-            for run in self.paragraph.runs:
+            # 先插入图片再清空占位文字：add_picture 失败时保留原文本，
+            # 避免“文本已清空 + 图片未插入”的双输局面。
+            picture_run = self.paragraph.add_run()
+            picture_run.add_picture(str(img_path), width=_DEFAULT_IMAGE_WIDTH)
+        except Exception as e:
+            logger.warning(f"图片插入失败，保留占位文本: {img_path} ({e})")
+            return
+        # 插图成功后再清空占位 run；承载 drawing 的 run 不能改写 text，
+        # 否则 run.text 赋值会连带清掉 w:drawing 子元素。
+        for run in self.paragraph.runs:
+            if run is not picture_run and not run_has_media(run):
                 run.text = ""
-            if self.paragraph.runs:
-                self.paragraph.runs[0].add_picture(str(img_path), width=Inches(5.5))
-            else:
-                run = self.paragraph.add_run()
-                run.add_picture(str(img_path), width=Inches(5.5))
-        except Exception:
-            pass  # 图片格式不支持等，保留占位文本
 
     def _check_figure_layout(self, doc, rule_cfg, p: bool = False):
         """环绕方式与宽度检查：只报批注，不改版式（check/apply 都报）。"""
@@ -220,7 +235,7 @@ class FigureImage(FormatNode):
         limit_emu = _resolve_max_width_emu(rule_cfg.get("max_width"))
         if limit_emu is None:
             limit_emu = _body_width_emu(self.paragraph, doc)
-        limit_cm = limit_emu / _EMU_PER_CM if limit_emu else None
+        limit_cm = limit_emu / EMU_PER_CM if limit_emu else None
 
         for drawing in drawings:
             if expected_wrap is not None:
@@ -241,7 +256,7 @@ class FigureImage(FormatNode):
             width_emu = _drawing_extent_emu(drawing)
             if width_emu is None:
                 continue
-            width_cm = width_emu / _EMU_PER_CM
+            width_cm = width_emu / EMU_PER_CM
             if width_cm > limit_cm + _WIDTH_TOLERANCE_CM:
                 self.add_comment(
                     doc=doc,
@@ -255,7 +270,7 @@ class FigureImage(FormatNode):
                 )
 
 
-@register("table_object")
+@register(Category.TABLE_OBJECT)
 class TableObject(FormatNode):
     """表格对象节点（表格整体格式，非题注）。
 
@@ -401,7 +416,8 @@ _ALIGN_MAP = {
 
 
 def _cm_to_dxa(value) -> int:
-    return int(round(float(value) * 567))
+    """厘米 → twips（1/1440 英寸），与 Word UI 惯例保持一致。"""
+    return int(round(float(value) * TWIPS_PER_CM))
 
 
 def _ordered_insert(parent, tag: str, elem, order: tuple[str, ...]) -> None:
@@ -617,10 +633,10 @@ def _apply_cell_run(table, cell_run) -> None:
     if not only:
         return
     cstyle = CharacterStyle(
-        font_name_cn=cell_run.get("chinese_font_name", "宋体"),
-        font_name_en=cell_run.get("english_font_name", "Times New Roman"),
-        font_size=cell_run.get("font_size", "小四"),
-        font_color=cell_run.get("font_color", "BLACK"),
+        font_name_cn=cell_run.get("chinese_font_name", DEFAULT_CN_FONT),
+        font_name_en=cell_run.get("english_font_name", DEFAULT_EN_FONT),
+        font_size=cell_run.get("font_size", DEFAULT_FONT_SIZE),
+        font_color=cell_run.get("font_color", DEFAULT_FONT_COLOR),
         bold=bool(cell_run.get("bold", False)),
         italic=bool(cell_run.get("italic", False)),
         underline=bool(cell_run.get("underline", False)),

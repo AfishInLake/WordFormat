@@ -6,6 +6,7 @@
 import re
 from typing import Callable, List, Tuple
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
@@ -262,7 +263,7 @@ def _type_specific_issues(
     return issues
 
 
-@register("references_title", level=1)
+@register(Category.REFERENCES_TITLE, level=1)
 class References(FormatNode):
     """参考文献节点"""
 
@@ -291,7 +292,7 @@ class References(FormatNode):
         return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
-@register("references_content")
+@register(Category.REFERENCES_CONTENT)
 class ReferenceEntry(FormatNode):
     """参考文献条目节点"""
 

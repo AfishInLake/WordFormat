@@ -12,6 +12,8 @@ from typing import Any
 import mistune
 from loguru import logger
 
+from wordformat.categories import Category
+
 # Markdown 没有题注语法，作者通常手写「表1-1 名称」「图1-1 名称」紧贴对象。
 # 该正则要求「标签 + 编号 + 分隔符（空格/冒号）+ 文字」，避免把
 # 「表1所示的数据……」这类正文句误判成题注。
@@ -25,8 +27,8 @@ _CAPTION_FORBIDDEN_CHARS = "。；;！？!?"
 
 # 题注与对象的相邻方向：表题在表上方，图题在图下方
 _CAPTION_NEIGHBOR_ORDER = {
-    "table_object": (("caption_table", "表"), (-1, 1)),
-    "figure_image": (("caption_figure", "图"), (1, -1)),
+    Category.TABLE_OBJECT: ((Category.CAPTION_TABLE, "表"), (-1, 1)),
+    Category.FIGURE_IMAGE: ((Category.CAPTION_FIGURE, "图"), (1, -1)),
 }
 
 
@@ -73,20 +75,22 @@ def _promote_adjacent_captions(items: list[dict[str, Any]]) -> None:
         if mapping is None:
             continue
         (caption_category, label), neighbors = mapping
-        if caption_category == "caption_figure" and _image_has_caption(items, idx):
+        if caption_category == Category.CAPTION_FIGURE and _image_has_caption(
+            items, idx
+        ):
             continue
         for offset in neighbors:
             pos = idx + offset
             if not 0 <= pos < len(items):
                 continue
             candidate = items[pos]
-            if candidate.get("category") != "body_text":
+            if candidate.get("category") != Category.BODY_TEXT:
                 continue
             if (
-                category == "table_object"
+                category == Category.TABLE_OBJECT
                 and offset == 1
                 and pos + 1 < len(items)
-                and items[pos + 1].get("category") == "table_object"
+                and items[pos + 1].get("category") == Category.TABLE_OBJECT
             ):
                 # 两表之间的「表X-Y」行属于下一张表（表题在上），不被上一张认领
                 continue
@@ -99,14 +103,17 @@ def _promote_adjacent_captions(items: list[dict[str, Any]]) -> None:
 def _image_has_caption(items: list[dict[str, Any]], idx: int) -> bool:
     """图片是否已有题注：alt 生成的题注紧随其后，上一张图的题注不算本图的。"""
     nxt = idx + 1
-    if nxt < len(items) and items[nxt].get("category") == "caption_figure":
+    if nxt < len(items) and items[nxt].get("category") == Category.CAPTION_FIGURE:
         return True
     prev = idx - 1
-    if 0 <= prev < len(items) and items[prev].get("category") == "caption_figure":
+    if (
+        0 <= prev < len(items)
+        and items[prev].get("category") == Category.CAPTION_FIGURE
+    ):
         before_caption = prev - 1
         owns_previous_image = (
             0 <= before_caption < len(items)
-            and items[before_caption].get("category") == "figure_image"
+            and items[before_caption].get("category") == Category.FIGURE_IMAGE
         )
         return not owns_previous_image
     return False
@@ -125,7 +132,7 @@ def _looks_like_caption(text: str, label: str) -> bool:
 def _warn_uncaptioned_images(items: list[dict[str, Any]]) -> None:
     """图片既无 alt 题注、也无相邻手写题注时告警（论文图无题注是硬伤）。"""
     for idx, item in enumerate(items):
-        if item.get("category") != "figure_image":
+        if item.get("category") != Category.FIGURE_IMAGE:
             continue
         if _image_has_caption(items, idx):
             continue
@@ -168,14 +175,16 @@ def _walk_blocks(blocks: list[dict], result: list[dict]) -> None:
             raw = re.sub(r"<[^>]+>", " ", block.get("raw", "")).strip()
             if raw:
                 logger.warning(f"Markdown 含块级 HTML，已降级为纯文本：{raw[:50]}")
-                result.append({"category": "body_text", "paragraph": raw, "score": 1.0})
+                result.append(
+                    {"category": Category.BODY_TEXT, "paragraph": raw, "score": 1.0}
+                )
         else:
             logger.warning(f"未处理的 Markdown 块类型，已跳过：{btype}")
 
 
 def _make_block_math(block: dict) -> dict:
     return {
-        "category": "math_block",
+        "category": Category.MATH_BLOCK,
         "paragraph": block.get("raw", ""),
         "score": 1.0,
         "inline_marks": [
@@ -186,7 +195,8 @@ def _make_block_math(block: dict) -> dict:
 
 def _make_heading(block: dict) -> dict:
     level = block["attrs"]["level"]
-    category = f"heading_level_{min(level, 3)}"
+    # 未知级别立即 ValueError，避免拼出永不命中的类别名
+    category = Category(f"heading_level_{min(level, 3)}")
     text = _extract_text(block.get("children", []))
     segments = _extract_segments(block.get("children", []))
     return {
@@ -211,7 +221,7 @@ def _make_paragraph(block: dict) -> dict | list[dict] | None:
         # 图片在前，题注在后（图题在下）
         result: list[dict] = [
             {
-                "category": "figure_image",
+                "category": Category.FIGURE_IMAGE,
                 "paragraph": url,
                 "score": 1.0,
                 "inline_marks": [],
@@ -220,7 +230,7 @@ def _make_paragraph(block: dict) -> dict | list[dict] | None:
         if alt_text:
             result.append(
                 {
-                    "category": "caption_figure",
+                    "category": Category.CAPTION_FIGURE,
                     "paragraph": alt_text,
                     "score": 1.0,
                     "inline_marks": [],
@@ -234,7 +244,7 @@ def _make_paragraph(block: dict) -> dict | list[dict] | None:
         return None
     segments = _extract_segments(children)
     return {
-        "category": "body_text",
+        "category": Category.BODY_TEXT,
         "paragraph": text,
         "score": 1.0,
         "inline_marks": segments,
@@ -260,7 +270,7 @@ def _make_table(block: dict) -> dict:
                 ]
                 rows.append(cells)
     return {
-        "category": "table_object",
+        "category": Category.TABLE_OBJECT,
         "paragraph": "",
         "score": 1.0,
         "inline_marks": [],
@@ -279,7 +289,7 @@ def _make_code_block(block: dict) -> list[dict]:
             continue
         result.append(
             {
-                "category": "body_text",
+                "category": Category.BODY_TEXT,
                 "paragraph": line,
                 "score": 1.0,
                 "inline_marks": [{"text": line, "code": True}],

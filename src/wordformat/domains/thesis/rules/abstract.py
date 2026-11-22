@@ -4,13 +4,14 @@
 # @File    : abstract.py
 import re
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 from wordformat.style.diff import CharacterStyle, ParagraphStyle
 
 
-@register("abstract_chinese_title", level=1)
+@register(Category.ABSTRACT_CHINESE_TITLE, level=1)
 class AbstractTitleCN(FormatNode):
     """摘要标题中文节点"""
 
@@ -37,7 +38,7 @@ class AbstractTitleCN(FormatNode):
         return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
-@register("abstract_chinese_title_content", level=1)
+@register(Category.ABSTRACT_CHINESE_TITLE_CONTENT, level=1)
 class AbstractTitleContentCN(FormatNode):
     """摘要标题正文混合中文节点"""
 
@@ -126,7 +127,7 @@ class AbstractTitleContentCN(FormatNode):
         )
 
 
-@register("abstract_chinese_content")
+@register(Category.ABSTRACT_CHINESE_CONTENT)
 class AbstractContentCN(FormatNode):
     """摘要内容中文节点"""
 
@@ -169,7 +170,7 @@ class AbstractContentCN(FormatNode):
         )
 
 
-@register("abstract_english_title", level=1)
+@register(Category.ABSTRACT_ENGLISH_TITLE, level=1)
 class AbstractTitleEN(FormatNode):
     """摘要标题英文节点"""
 
@@ -193,7 +194,7 @@ class AbstractTitleEN(FormatNode):
         return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
-@register("abstract_english_title_content", level=1)
+@register(Category.ABSTRACT_ENGLISH_TITLE_CONTENT, level=1)
 class AbstractTitleContentEN(FormatNode):
     """摘要标题正文混合英文节点"""
 
@@ -306,7 +307,7 @@ class AbstractTitleContentEN(FormatNode):
         )
 
 
-@register("abstract_english_content")
+@register(Category.ABSTRACT_ENGLISH_CONTENT)
 class AbstractContentEN(FormatNode):
     """摘要内容英文节点"""
 

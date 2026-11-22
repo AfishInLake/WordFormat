@@ -2,45 +2,15 @@
 # @Time    : 2026/1/11 22:25
 # @Author  : afish
 # @File    : settings.py
+"""结构层配置视图。
 
-from wordformat.domains.thesis.rules import (  # noqa: F401 — 论文域节点，触发 @register
-    AbstractContentCN,
-    AbstractContentEN,
-    AbstractTitleCN,
-    AbstractTitleContentCN,
-    AbstractTitleContentEN,
-    AbstractTitleEN,
-    Acknowledgements,
-    KeywordsCN,
-    KeywordsEN,
-    References,
-)
-from wordformat.rules import (  # noqa: F401 — 通用结构节点，触发 @register
-    BodyText,
-    CaptionFigure,
-    CaptionTable,
-    FigureImage,
-    HeadingLevel1Node,
-    HeadingLevel2Node,
-    HeadingLevel3Node,
-    TableObject,
-)
+只暴露注册表的别名，**不 import 任何具体节点或领域模块**：
+装配由 ``wordformat.assembly.register_nodes()`` 在包初始化时完成
+（``wordformat/__init__.py``），因此这里读到的一定是完整注册表。
+这样 structure 层不再反向依赖 rules/domains，可独立复用。
+"""
+
 from wordformat.structure.registry import _level_registry, _registry
 
 CATEGORY_TO_CLASS = _registry
-# 无需格式化的类别统一映射到 BodyText（再配合 settings.VOIDNODELIST 跳过格式化），
-# 避免 create_node 因未知类别返回 None 丢弃节点，导致段落与树节点错位。
-CATEGORY_TO_CLASS.setdefault("other", BodyText)  # 封面/声明等无需格式化的内容
-CATEGORY_TO_CLASS.setdefault("document_title", BodyText)  # 文档标题（后处理扩展）
-CATEGORY_TO_CLASS.setdefault("footer", BodyText)  # 页脚/AI 生成声明（后处理扩展）
-# 目录/附录标题：作为 terminal 标题节点挂载以隔离子树，但不参与格式化。
-# 必须在此注册，否则 create_node 会因未知类别返回 None 丢弃节点，导致段落与树节点错位
-# （heading_fulu 是模型真实标签，附录段落必然触发；heading_mulu 为结构性 terminal 类别）。
-CATEGORY_TO_CLASS.setdefault("heading_mulu", BodyText)  # 目录标题
-CATEGORY_TO_CLASS.setdefault("heading_fulu", BodyText)  # 附录标题
-CATEGORY_TO_CLASS.setdefault("toc_entry", BodyText)  # 目录条目（跳过格式化）
-
 LEVEL_MAP = _level_registry
-# 无对应 FormatNode 的特殊 terminal 类别
-LEVEL_MAP.setdefault("heading_mulu", 1)
-LEVEL_MAP.setdefault("heading_fulu", 1)

@@ -220,34 +220,25 @@ def _load_tree_from_json(json_path: str) -> tuple[TreeNode, list[dict]]:
 
 def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
     """从扁平段落列表构建简单树（不依赖 config，仅用于展示）"""
+    from wordformat.categories import DISPLAY_NON_HEADING_CATEGORIES, Category
+    from wordformat.structure.registry import NO_LEVEL
     from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
-    from wordformat.tree import Stack
 
     # 展示用标题类别/层级从注册表派生（与树构建共享同一权威来源，
     # 消除硬编码副本——多领域标签集不同时展示树仍正确）。
     # 排除非标题/非挂载节点：正文、图表、公式与后处理扩展的占位类别。
-    _NON_HEADING = {
-        "body_text",
-        "math_block",
-        "figure_image",
-        "table_object",
-        "toc_entry",
-        "other",
-        "document_title",
-        "footer",
-        "keywords_chinese",
-        "keywords_english",
+    HEADING_CATEGORIES = {
+        k for k in CATEGORY_TO_CLASS if k not in DISPLAY_NON_HEADING_CATEGORIES
     }
-    HEADING_CATEGORIES = {k for k in CATEGORY_TO_CLASS if k not in _NON_HEADING}
     LEVEL_MAP = {k: v for k, v in LEVEL_MAP.items() if k in HEADING_CATEGORIES}
 
     stack = Stack()
     stack.push(root)
 
     for item in items:
-        category = item.get("category", "body_text")
+        category = item.get("category", Category.BODY_TEXT)
         node = TreeNode(item)
-        level = LEVEL_MAP.get(category, 999)
+        level = LEVEL_MAP.get(category, NO_LEVEL)
 
         if category in HEADING_CATEGORIES:
             # 标题节点：维护栈层级
@@ -257,7 +248,7 @@ def _build_simple_tree(root: TreeNode, items: list[dict]) -> None:
                     top.value.get("category", "")
                     if isinstance(top.value, dict)
                     else "",
-                    999,
+                    NO_LEVEL,
                 )
                 if top_level >= level:
                     stack.pop()

@@ -6,21 +6,14 @@
 
 from typing import Optional
 
+from wordformat.categories import NON_HEADING_CATEGORIES
 from wordformat.rules.node import FormatNode
-from wordformat.structure.registry import Registry
+from wordformat.structure.registry import NO_LEVEL, Registry
 from wordformat.structure.settings import CATEGORY_TO_CLASS, LEVEL_MAP
 from wordformat.tree import Stack
 
-_NON_HEADING = {
-    "body_text",
-    "math_block",
-    "figure_image",
-    "table_object",
-    "toc_entry",
-}
-
 _HEADING_CATEGORIES = {
-    k: v for k, v in CATEGORY_TO_CLASS.items() if k not in _NON_HEADING
+    k: v for k, v in CATEGORY_TO_CLASS.items() if k not in NON_HEADING_CATEGORIES
 }
 
 
@@ -40,7 +33,11 @@ class DocumentTreeBuilder:
         """标题类别表：领域注册表优先（多领域标签集不同时树构建仍正确），
         默认实例回退类级静态表（导入时快照，兼容既有引用）。"""
         if self._registry is not None:
-            return {k: v for k, v in self._registry.items() if k not in _NON_HEADING}
+            return {
+                k: v
+                for k, v in self._registry.items()
+                if k not in NON_HEADING_CATEGORIES
+            }
         return self.HEADING_CATEGORIES
 
     def build_tree(self, items: list[dict]) -> FormatNode:
@@ -80,7 +77,7 @@ class DocumentTreeBuilder:
         """根据 category 映射到逻辑层级"""
         if self._registry is not None:
             return self._registry.level_of(category)
-        return LEVEL_MAP.get(category, 999)
+        return LEVEL_MAP.get(category, NO_LEVEL)
 
     # 标题类类别：目录/附录已注册进 CATEGORY_TO_CLASS，自动落在 HEADING_CATEGORIES 中，
     # 其子树隔离依赖 LEVEL_MAP 给定的层级（heading_mulu/heading_fulu = 1）

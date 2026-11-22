@@ -51,6 +51,7 @@ app.add_middleware(
 # ---------------------- 全局配置 ----------------------
 TEMP_DIR = BASE_DIR / "temp"
 OUTPUT_DIR = BASE_DIR / "output"
+CONFIGS_DIR = BASE_DIR / "configs"
 
 # 上传体积上限：接口全部是小体量文档/配置，超过即拒绝，防单请求打爆内存
 MAX_UPLOAD_SIZE = 100 * 1024 * 1024
@@ -59,8 +60,8 @@ ALLOWED_UPLOAD_SUFFIXES = (".docx", ".yaml", ".yml", ".md", ".json")
 
 
 def _ensure_dirs() -> None:
-    """按需创建临时/输出目录（避免 import 时产生副作用）。"""
-    for d in (TEMP_DIR, OUTPUT_DIR):
+    """按需创建临时/输出/配置目录（避免 import 时产生副作用）。"""
+    for d in (TEMP_DIR, OUTPUT_DIR, CONFIGS_DIR):
         if not d.exists():
             d.mkdir(parents=True, exist_ok=True)
 
@@ -531,8 +532,6 @@ def download_file(filename: str):
 
 
 # ---------------------- 配置文件管理 ----------------------
-CONFIGS_DIR = BASE_DIR / "configs"
-CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.get("/configs", summary="获取可用配置文件列表")

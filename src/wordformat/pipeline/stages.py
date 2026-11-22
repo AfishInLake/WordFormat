@@ -9,6 +9,7 @@ from docx import Document
 from docx.document import Document as DocumentObject
 from docx.shared import Pt, RGBColor
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import first_option
 from wordformat.config.loader import load_config
 from wordformat.config.models import NodeConfigRoot
@@ -16,6 +17,7 @@ from wordformat.log_config import logger
 from wordformat.rules.node import FormatNode
 from wordformat.settings import VOIDNODELIST
 from wordformat.structure.document_builder import DocumentBuilder
+from wordformat.style.defaults import IndentSide
 from wordformat.style.defs import (
     Alignment,
     FirstLineIndent,
@@ -126,7 +128,10 @@ class ParagraphAlignmentStage:
     def _is_detached_table(node) -> bool:
         """原文档已有表格（exists）或 sync 忽略的表格不占用段落槽位。"""
         value = getattr(node, "value", None)
-        if not isinstance(value, dict) or value.get("category") != "table_object":
+        if (
+            not isinstance(value, dict)
+            or value.get("category") != Category.TABLE_OBJECT
+        ):
             return False
         return bool(value.get("exists") or value.get("sync_skip"))
 
@@ -309,8 +314,8 @@ class StyleDefinitionFixStage:
                 )
 
         for attr_name, cls, indent_type in [
-            ("left_indent", LeftIndent, "R"),
-            ("right_indent", RightIndent, "X"),
+            ("left_indent", LeftIndent, IndentSide.LEFT),
+            ("right_indent", RightIndent, IndentSide.RIGHT),
         ]:
             val = first_option(getattr(cfg, attr_name, None))
             if val is None:
@@ -425,7 +430,8 @@ class FormattingExecutionStage:
                     # top 节点直接关联的 body_text 不参与格式化（如封面页、原创性声明等）
                     # 但间接关联的 body_text（作为 heading 子节点）正常格式化
                     is_top_direct_body_text = (
-                        parent_category == "top" and category == "body_text"
+                        parent_category == Category.TOP
+                        and category == Category.BODY_TEXT
                     )
                     if category not in void_set and not is_top_direct_body_text:
                         node.load_config(config)
@@ -454,9 +460,10 @@ class FormattingExecutionStage:
                                 config=config,
                                 check=check,
                             )
-                except Exception as e:
-                    logger.warning(f"Node {node} not format, because: {str(e)}")
-                    raise e
+                except Exception:
+                    # 裸 raise 保留原始 traceback；opt(exception=True) 让日志带栈
+                    logger.opt(exception=True).warning(f"节点格式化失败: {node!r}")
+                    raise
 
             # 目录、附录、封面/声明等 skip_children 类别的子节点跳过格式化
             if category not in skip_children_set:

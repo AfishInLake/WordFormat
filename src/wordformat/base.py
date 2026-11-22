@@ -9,6 +9,7 @@ from docx import Document
 from loguru import logger
 
 from wordformat.agent.onnx_infer import onnx_batch_infer, onnx_single_infer
+from wordformat.categories import Category
 from wordformat.domains.postprocess import get_postprocess
 from wordformat.para_ids import (
     ensure_para_ids,
@@ -58,11 +59,11 @@ def _is_display_formula(para, text: str) -> bool:
 def _structural_item(para, text: str) -> dict:
     """按 XML 结构短路判定的段落条目（图片 / 公式 / 空段）。"""
     if para_contains_image(para):
-        category, note = "figure_image", "图片段落"
+        category, note = Category.FIGURE_IMAGE, "图片段落"
     elif para_contains_math(para):
-        category, note = "math_block", "公式段落"
+        category, note = Category.MATH_BLOCK, "公式段落"
     else:
-        category, note = "body_text", "空段落"
+        category, note = Category.BODY_TEXT, "空段落"
     return {
         "category": category,
         "score": 1.0,
@@ -143,7 +144,11 @@ class DocxBase:
                 }
                 result[idx] = response
 
-        assert all(r is not None for r in result), "存在未处理的段落"
+        if any(r is None for r in result):
+            missing = [i for i, r in enumerate(result) if r is None]
+            raise RuntimeError(
+                f"存在未处理的段落（索引 {missing[:10]}，共 {len(missing)} 段）"
+            )
 
         # 目录条目是结构信息（既非正文也非标题），先按样式/文本排除，
         # 避免后续领域规则把它们当成标题参与编号与状态传播。
@@ -212,7 +217,7 @@ class DocxBase:
         out = list(result)
         for k, (pos, tbl_el) in enumerate(tables):
             entry = {
-                "category": "table_object",
+                "category": Category.TABLE_OBJECT,
                 "paragraph": "",
                 "score": 1.0,
                 "comment": "原文档表格（内容只读，不参与格式检查）",
@@ -241,7 +246,7 @@ def _paragraph_style_name(para) -> str:
 
 def _toc_entry_item(text: str) -> dict:
     return {
-        "category": "toc_entry",
+        "category": Category.TOC_ENTRY,
         "score": 1.0,
         "comment": "目录条目（规则识别，跳过格式化）",
         "paragraph": text,

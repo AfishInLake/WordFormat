@@ -3,6 +3,7 @@ from copy import deepcopy
 
 from docx.oxml.ns import qn
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
@@ -14,6 +15,11 @@ class BaseKeywordsNode(FormatNode):
     """关键词节点基类（复用中英文通用逻辑）"""
 
     NODE_TYPE: str = ""
+    # 子类必须提供：标签/分隔符/头部识别/单 run 兑底正则
+    _LABEL_RE: re.Pattern
+    _SEPARATOR_RE: re.Pattern
+    _LABEL_HEAD_RE: re.Pattern
+    _LABEL_ANY_RE: re.Pattern
 
     def _check_paragraph_style(self, cfg, p: bool) -> str:
         """通用段落样式检查（复用）"""
@@ -73,60 +79,23 @@ class BaseKeywordsNode(FormatNode):
             r_elem.addnext(new_r_elem)
 
     def _get_label_split_pattern(self) -> re.Pattern | None:
-        """返回用于拆分标签的正则表达式，由子类重写。"""
-        return None
+        """标签拆分正则：默认与头部识别正则一致。"""
+        return self._LABEL_HEAD_RE
 
-    # 第二步：英文关键词节点（专属逻辑）
-
-
-@register("keywords_english", level=3)
-class KeywordsEN(BaseKeywordsNode):
-    """关键词节点-英文"""
-
-    NODE_TYPE = "abstract.english.keywords"
-    NODE_LABEL = "英文关键词"
-    DEFAULTS = deep_merge(
-        BASE_FORMAT,
-        {
-            "paragraph": {
-                "alignment": "两端对齐",
-                "first_line_indent": "2字符",
-            },
-            "font": {"chinese_font_name": "宋体", "font_size": "小四"},
-            "label": {
-                "chinese_font_name": "黑体",
-                "english_font_name": "Times New Roman",
-                "font_size": ["四号", "小四"],
-                "font_color": "黑色",
-                # 关键词标签常用黑体加粗，也有不加粗的模板，不做硬性要求
-                "bold": None,
-                "italic": False,
-                "underline": False,
-            },
-            "rules": {
-                "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5}
-            },
-        },
-    )
-    RULES = {"keyword_count": "_check_keyword_count"}
-
-    _LABEL_RE = re.compile(r"Keywords?:?\s*", re.IGNORECASE)
-    _SEPARATOR_RE = re.compile(r"[,;]")
-
-    @staticmethod
-    def extract_keywords(text: str) -> list[str]:
-        """从文本中提取英文关键词列表（去除标签前缀）。"""
-        kw_text = KeywordsEN._LABEL_RE.sub("", text)
-        return [k.strip() for k in KeywordsEN._SEPARATOR_RE.split(kw_text) if k.strip()]
+    @classmethod
+    def extract_keywords(cls, text: str) -> list[str]:
+        """从文本中提取关键词列表（去除标签前缀）。"""
+        kw_text = cls._LABEL_RE.sub("", text)
+        return [k.strip() for k in cls._SEPARATOR_RE.split(kw_text) if k.strip()]
 
     def _check_keyword_label(self, run) -> bool:
-        """判断 run 是否属于英文关键词标签部分。"""
+        """判断 run 是否属于关键词标签部分（防拆分）。"""
         if not run.text.strip():
             return False
         if self.paragraph is None:
-            return bool(re.search(r"Keywords?|KEY\s*WORDS", run.text, re.IGNORECASE))
+            return bool(self._LABEL_ANY_RE.search(run.text))
         full = "".join(r.text for r in self.paragraph.runs)
-        m = re.match(r"Keywords?\s*[:：]?\s*|KEY\s*WORDS\s*", full, re.IGNORECASE)
+        m = self._LABEL_HEAD_RE.search(full)
         if not m:
             return False
         label_end = m.end()
@@ -139,23 +108,20 @@ class KeywordsEN(BaseKeywordsNode):
             pos += rl
         return False
 
-    def _get_label_split_pattern(self) -> re.Pattern | None:
-        """英文标签拆分模式：匹配 'Keywords:' 或 'Keywords ' 及其变体"""
-        return re.compile(r"Keywords?\s*[:：]?\s*", re.IGNORECASE)
-
     def _check_keyword_count(self, doc, rule_cfg, p: bool = False):
-        """校验英文关键词数量"""
-        keyword_text = "".join([run.text for run in self.paragraph.runs])
-        keyword_list = KeywordsEN.extract_keywords(keyword_text)
+        """校验关键词数量（中英文共用）。"""
         from wordformat.style.comments import format_comment
 
+        keyword_text = "".join(run.text for run in self.paragraph.runs)
+        keyword_list = self.extract_keywords(keyword_text)
         target = self.NODE_LABEL
+        count_range = f"{rule_cfg.count_min}-{rule_cfg.count_max}个"
         if len(keyword_list) < rule_cfg.count_min:
             issue = format_comment(
                 target,
                 "数量过少",
                 f"当前{len(keyword_list)}个",
-                f"{rule_cfg.count_min}-{rule_cfg.count_max}个",
+                count_range,
             )
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
         if len(keyword_list) > rule_cfg.count_max:
@@ -163,12 +129,12 @@ class KeywordsEN(BaseKeywordsNode):
                 target,
                 "数量过多",
                 f"当前{len(keyword_list)}个",
-                f"{rule_cfg.count_min}-{rule_cfg.count_max}个",
+                count_range,
             )
             self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
 
-    # 覆盖默认 handler：区分标签与内容的字符样式
     def _handle_character_style(self, doc, rule_cfg, p: bool):
+        """区分标签与内容的字符样式（中英文共用）。"""
         cfg = self.pydantic_config
         label_style = CharacterStyle(
             font_name_cn=cfg.label.chinese_font_name,
@@ -206,13 +172,59 @@ class KeywordsEN(BaseKeywordsNode):
                 )
 
     def _base(self, doc, p: bool, r: bool):
-        """拆分标签和内容混合的 run（仅在应用模式下执行）"""
+        """拆分标签和内容混合的 run（仅在应用模式下执行）。"""
         if not p:
             self._split_mixed_runs()
 
 
+# 第二步：英文关键词节点（专属逻辑）
+
+
+@register(Category.KEYWORDS_ENGLISH, level=3)
+class KeywordsEN(BaseKeywordsNode):
+    """关键词节点-英文"""
+
+    NODE_TYPE = "abstract.english.keywords"
+    NODE_LABEL = "英文关键词"
+    DEFAULTS = deep_merge(
+        BASE_FORMAT,
+        {
+            "paragraph": {
+                "alignment": "两端对齐",
+                "first_line_indent": "2字符",
+            },
+            "font": {"chinese_font_name": "宋体", "font_size": "小四"},
+            "label": {
+                "chinese_font_name": "黑体",
+                "english_font_name": "Times New Roman",
+                "font_size": ["四号", "小四"],
+                "font_color": "黑色",
+                # 关键词标签常用黑体加粗，也有不加粗的模板，不做硬性要求
+                "bold": None,
+                "italic": False,
+                "underline": False,
+            },
+            "rules": {
+                "keyword_count": {"enabled": True, "count_min": 3, "count_max": 5}
+            },
+        },
+    )
+    RULES = {"keyword_count": "_check_keyword_count"}
+
+    _LABEL_RE = re.compile(r"Keywords?:?\s*", re.IGNORECASE)
+    _SEPARATOR_RE = re.compile(r"[,;]")
+    _LABEL_HEAD_RE = re.compile(
+        r"^(?:Keywords?\s*[:：]?\s*|KEY\s*WORDS\s*)", re.IGNORECASE
+    )
+    _LABEL_ANY_RE = re.compile(r"Keywords?|KEY\s*WORDS", re.IGNORECASE)
+
+    def _get_label_split_pattern(self) -> re.Pattern | None:
+        """英文标签拆分模式（与头部识别正则一致）。"""
+        return KeywordsEN._LABEL_HEAD_RE
+
+
 # 第三步：中文关键词节点（专属逻辑）
-@register("keywords_chinese", level=3)
+@register(Category.KEYWORDS_CHINESE, level=3)
 class KeywordsCN(BaseKeywordsNode):
     """关键词节点-中文"""
 
@@ -252,65 +264,12 @@ class KeywordsCN(BaseKeywordsNode):
 
     _LABEL_RE = re.compile(r"关键词[:：]?\s*")
     _SEPARATOR_RE = re.compile(r"[；;]")
-
-    @staticmethod
-    def extract_keywords(text: str) -> list[str]:
-        """从文本中提取中文关键词列表（去除标签前缀）。"""
-        kw_text = KeywordsCN._LABEL_RE.sub("", text)
-        return [k.strip() for k in KeywordsCN._SEPARATOR_RE.split(kw_text) if k.strip()]
-
-    def _check_keyword_label(self, run) -> bool:
-        """判断 run 是否属于中文关键词标签部分（防拆分）。"""
-        if not run.text.strip():
-            return False
-        if self.paragraph is None:
-            p = r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词"
-            return bool(re.search(p, run.text))
-        full = "".join(r.text for r in self.paragraph.runs)
-        m = re.search(
-            r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*",
-            full,
-        )
-        if not m:
-            return False
-        label_end = m.end()
-        pos = 0
-        for r in self.paragraph.runs:
-            rl = len(r.text)
-            if r._element is run._element:
-                return pos < label_end
-            pos += rl
-        return False
-
-    def _get_label_split_pattern(self) -> re.Pattern | None:
-        """中文标签拆分模式：匹配 '关键词：' 或 '关键词:' 及其变体"""
-        return re.compile(
-            r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*"
-        )
-
-    def _check_keyword_count(self, doc, rule_cfg, p: bool = False):
-        """校验中文关键词数量"""
-        keyword_text = "".join([run.text for run in self.paragraph.runs])
-        keyword_list = KeywordsCN.extract_keywords(keyword_text)
-        from wordformat.style.comments import format_comment
-
-        target = self.NODE_LABEL
-        if len(keyword_list) < rule_cfg.count_min:
-            issue = format_comment(
-                target,
-                "数量过少",
-                f"当前{len(keyword_list)}个",
-                f"{rule_cfg.count_min}-{rule_cfg.count_max}个",
-            )
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
-        if len(keyword_list) > rule_cfg.count_max:
-            issue = format_comment(
-                target,
-                "数量过多",
-                f"当前{len(keyword_list)}个",
-                f"{rule_cfg.count_min}-{rule_cfg.count_max}个",
-            )
-            self.add_comment(doc=doc, runs=self.paragraph.runs, text=issue)
+    _LABEL_HEAD_RE = re.compile(
+        r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词\s*[:：]?\s*"
+    )
+    _LABEL_ANY_RE = re.compile(
+        r"关[^a-zA-Z0-9\u4e00-\u9fff]*键[^a-zA-Z0-9\u4e00-\u9fff]*词"
+    )
 
     def _check_trailing_punctuation(self, doc, rule_cfg, p: bool = False):
         """校验中文关键词末尾标点"""
@@ -332,46 +291,3 @@ class KeywordsCN(BaseKeywordsNode):
                     "末尾无标点",
                 ),
             )
-
-    # 覆盖默认 handler：区分标签与内容的字符样式
-    def _handle_character_style(self, doc, rule_cfg, p: bool):
-        cfg = self.pydantic_config
-        label_style = CharacterStyle(
-            font_name_cn=cfg.label.chinese_font_name,
-            font_name_en=cfg.label.english_font_name,
-            font_size=cfg.label.font_size,
-            font_color=cfg.label.font_color,
-            bold=cfg.label.bold,
-            italic=cfg.label.italic,
-            underline=cfg.label.underline,
-        )
-        content_style = CharacterStyle(
-            font_name_cn=cfg.chinese_font_name,
-            font_name_en=cfg.english_font_name,
-            font_size=cfg.font_size,
-            font_color=cfg.font_color,
-            bold=cfg.bold,
-            italic=cfg.italic,
-            underline=cfg.underline,
-        )
-        for run in self.paragraph.runs:
-            if not run.text.strip():
-                continue
-            is_label = self._check_keyword_label(run)
-            cstyle = label_style if is_label else content_style
-            target = f"{self.NODE_LABEL}标签" if is_label else f"{self.NODE_LABEL}内容"
-            if p:
-                diff = self._diff_run_style(cstyle, run)
-            else:
-                diff = self._apply_run_style(cstyle, run)
-            if diff:
-                self.add_comment(
-                    doc=doc,
-                    runs=run,
-                    text=CharacterStyle.to_string(diff, target=target),
-                )
-
-    def _base(self, doc, p: bool, r: bool):
-        """拆分标签和内容混合的 run（仅在应用模式下执行）"""
-        if not p:
-            self._split_mixed_runs()

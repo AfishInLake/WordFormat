@@ -3,12 +3,13 @@
 # @Author  : afish
 # @File    : acknowledgement.py
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
 
 
-@register("acknowledgements_title", level=1)
+@register(Category.ACKNOWLEDGEMENTS_TITLE, level=1)
 class Acknowledgements(FormatNode):
     """致谢节点"""
 
@@ -35,7 +36,7 @@ class Acknowledgements(FormatNode):
         return {"first_line_indent", "line_spacing_rule", "line_spacing"}
 
 
-@register("acknowledgements_content")
+@register(Category.ACKNOWLEDGEMENTS_CONTENT)
 class AcknowledgementsCN(FormatNode):
     """致谢内容"""
 

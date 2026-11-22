@@ -97,21 +97,10 @@ def get_paragraph_numbering_text(paragraph: Paragraph) -> str:
         return ""
 
     lvl_text = lvl_text_elem.get(qn("w:val"), "")
-    num_fmt_elem = lvl.find(qn("w:numFmt"))
-    num_fmt = (
-        num_fmt_elem.get(qn("w:val"), "decimal")
-        if num_fmt_elem is not None
-        else "decimal"
-    )
 
     # 计算当前级别的编号值
     # 需要遍历文档中所有使用同一 abstractNum 的段落来计数
     level_counters = _count_numbering_levels(numbering_elm, abstract_num_id, paragraph)
-
-    current_num = level_counters.get(ilvl, 1)
-
-    # 根据格式化类型转换数字
-    _format_number(current_num, num_fmt)
 
     # 替换 lvlText 中的占位符
     # %1 -> 当前级别, %2 -> 下一级别, etc.
@@ -159,7 +148,7 @@ def _count_numbering_levels(
         """检查该级别是否在每个上级编号重启"""
         if lvl_element is None:
             return True
-        restart = lvl_element.find(qn("w:isLgl") if False else qn("w:lvlRestart"))
+        restart = lvl_element.find(qn("w:lvlRestart"))
         # lvlRestart 不存在时默认行为：下级在上级重启
         return restart is None
 

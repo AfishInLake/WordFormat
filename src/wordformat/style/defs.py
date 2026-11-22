@@ -8,12 +8,17 @@ from enum import Enum
 from typing import Callable, Optional, Tuple
 
 import webcolors
+from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
+from wordformat.style.defaults import (
+    FIRST_LINE_INDENT_TOLERANCE_CHARS,
+    INDENT_TOLERANCE_CHARS,
+)
 from wordformat.style.reader import (
     GetIndent,
     paragraph_get_alignment,
@@ -589,9 +594,9 @@ class Indent(UnitLabelEnum):
     def __eq__(self, other):
         # WPS 常用 0.25/0.26 字符的微调量补偿标点，视觉上等同 0
         if isinstance(other, Indent) and isinstance(self.rel_value, (int, float)):
-            return abs(self.rel_value - other.rel_value) <= 0.5
+            return abs(self.rel_value - other.rel_value) <= INDENT_TOLERANCE_CHARS
         if isinstance(other, (int, float)) and isinstance(self.rel_value, (int, float)):
-            return abs(self.rel_value - other) <= 0.5
+            return abs(self.rel_value - other) <= INDENT_TOLERANCE_CHARS
         return super().__eq__(other)
 
     def __hash__(self):
@@ -645,11 +650,14 @@ class FirstLineIndent(UnitLabelEnum):
         return None
 
     def __eq__(self, other):
-        # 字符单位换算受字号影响（2字符在五号/小四下得到 1.8~2.2），容差 0.3 字符
+        # 字符单位换算受字号影响（2字符在五号/小四下得到 1.8~2.2），带容差
         if isinstance(other, FirstLineIndent):
-            return abs(self.rel_value - other.rel_value) <= 0.3
+            return (
+                abs(self.rel_value - other.rel_value)
+                <= FIRST_LINE_INDENT_TOLERANCE_CHARS
+            )
         if isinstance(other, (int, float)):
-            return abs(self.rel_value - other) <= 0.3
+            return abs(self.rel_value - other) <= FIRST_LINE_INDENT_TOLERANCE_CHARS
         return super().__eq__(other)
 
     def __hash__(self):
@@ -758,25 +766,22 @@ class BuiltInStyle(UnitLabelEnum):
         return hash(_canonical_style_name(self.value))
 
 
-# 内置样式名称到基础样式的映射，用于创建新样式时指定基础样式
-_BUILTIN_STYLE_BASE_MAP = {
-    "Heading 1": "Normal",
-    "Heading 2": "Normal",
-    "Heading 3": "Normal",
-    "Heading 4": "Normal",
-    "Normal": None,
-    "Title": "Normal",
-    "Subtitle": "Normal",
-    "Caption": "Normal",
-    "List Paragraph": "Normal",
+# 内置样式元数据：样式名 → (基础样式, outlineLvl)；单一数据源，
+# 基础样式表与大纲级别表均由本表派生，避免两份映射漏改。
+_BUILTIN_STYLE_META: dict[str, tuple[str | None, int | None]] = {
+    "Heading 1": ("Normal", 0),
+    "Heading 2": ("Normal", 1),
+    "Heading 3": ("Normal", 2),
+    "Heading 4": ("Normal", 3),
+    "Normal": (None, None),
+    "Title": ("Normal", None),
+    "Subtitle": ("Normal", None),
+    "Caption": ("Normal", None),
+    "List Paragraph": ("Normal", None),
 }
-
-# 内置样式名称到 outlineLvl 的映射（标题样式需要设置大纲级别）
+_BUILTIN_STYLE_BASE_MAP = {name: meta[0] for name, meta in _BUILTIN_STYLE_META.items()}
 _BUILTIN_STYLE_OUTLINE_LVL = {
-    "Heading 1": 0,
-    "Heading 2": 1,
-    "Heading 3": 2,
-    "Heading 4": 3,
+    name: meta[1] for name, meta in _BUILTIN_STYLE_META.items() if meta[1] is not None
 }
 
 
@@ -799,7 +804,7 @@ def ensure_style_exists(doc, style_name: str):
             base_style = doc.styles[base_style_name]
         else:
             base_style = None
-        new_style = doc.styles.add_style(style_name, 1)  # WD_STYLE_TYPE.PARAGRAPH = 1
+        new_style = doc.styles.add_style(style_name, WD_STYLE_TYPE.PARAGRAPH)
         if base_style:
             new_style.base_style = base_style
 

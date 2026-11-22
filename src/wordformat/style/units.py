@@ -2,6 +2,33 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Optional
 
+# ===== 单位换算基准（全库唯一权威定义）=====
+# 1 英寸 = 914400 EMU = 1440 twips；1 cm = 360000 EMU；1 twip = 635 EMU
+EMU_PER_INCH = 914_400
+EMU_PER_CM = 360_000
+EMU_PER_TWIP = 635
+# Word UI 惯例：1 cm = 567 twips（由 1440 twips/inch ÷ 2.54 四舍五入而来，
+# 与 Word 对话框显示的缩进值一致）
+TWIPS_PER_CM = 567
+# 1 磅 = 1/72 英寸；1 英寸 = 2.54 cm
+CM_PER_UNIT = {
+    "cm": 1.0,
+    "mm": 0.1,
+    "inch": 2.54,
+    "pt": 2.54 / 72,
+}
+# 中文/别名单位 → 标准单位
+UNIT_ALIASES = {
+    "厘米": "cm",
+    "毫米": "mm",
+    "英寸": "inch",
+    "in": "inch",
+    "inch": "inch",
+    "inches": "inch",
+    "磅": "pt",
+    "pt": "pt",
+}
+
 
 # 用dataclass简化类定义（Python 3.7+支持）
 @dataclass
@@ -91,6 +118,7 @@ def extract_unit_from_string(text: str) -> UnitResult:
         "英寸": "inch",
         "inch": "inch",
         "inches": "inch",
+        "in": "inch",
         "Inch": "inch",
         "INCHES": "inch",
         "毫米": "mm",
@@ -112,7 +140,7 @@ def extract_unit_from_string(text: str) -> UnitResult:
     unit_patterns = [
         r"pt|磅",
         r"厘米|cm",
-        r"英寸|inches|inch",
+        r"英寸|inches|inch|in",
         r"毫米|mm",
         r"emu",
         r"行",

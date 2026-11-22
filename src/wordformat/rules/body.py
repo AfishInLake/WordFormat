@@ -9,6 +9,7 @@ from copy import deepcopy
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
@@ -141,7 +142,7 @@ def _split_run_at(paragraph, start: int, end: int):
     return None
 
 
-@register("body_text")
+@register(Category.BODY_TEXT)
 class BodyText(FormatNode):
     """正文节点"""
 

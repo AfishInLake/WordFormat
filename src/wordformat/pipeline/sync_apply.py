@@ -51,6 +51,7 @@ from typing import List
 from docx.oxml.ns import qn
 from loguru import logger
 
+from wordformat.categories import Category
 from wordformat.para_ids import ensure_para_ids, get_para_id, get_table_id
 from wordformat.text_edit import set_paragraph_text
 from wordformat.utils import para_contains_image
@@ -63,7 +64,7 @@ def _normalize(text) -> str:
     return (text or "").strip()
 
 
-_MULTI_PARAGRAPH_UNSUPPORTED = ("table_object", "figure_image")
+_MULTI_PARAGRAPH_UNSUPPORTED = (Category.TABLE_OBJECT, Category.FIGURE_IMAGE)
 
 
 def expand_multi_paragraph_items(items: list[dict]) -> list[dict]:
@@ -117,7 +118,7 @@ def expand_multi_paragraph_items(items: list[dict]) -> list[dict]:
 
 def _item_text(item: dict) -> str:
     """JSON 条目的目标文本；figure_image/table_object 不含可写入文档的文本。"""
-    if item.get("category") in ("figure_image", "table_object"):
+    if item.get("category") in (Category.FIGURE_IMAGE, Category.TABLE_OBJECT):
         return ""
     from wordformat.utils import resolve_item_text
 
@@ -125,7 +126,7 @@ def _item_text(item: dict) -> str:
 
 
 def _item_key(item: dict) -> str:
-    if item.get("category") == "figure_image":
+    if item.get("category") == Category.FIGURE_IMAGE:
         return IMAGE_SENTINEL
     return _item_text(item)
 
@@ -207,7 +208,7 @@ def _align_by_text(document, items: list[dict]) -> tuple[int, int, int, int, int
     paras = list(document.paragraphs)
     # 表格条目不对应段落（原表格由 exists 标记保留，sync 不支持新增表格），
     # 不参与对齐，避免把相邻段落误配为表格而清空文本。
-    text_items = [it for it in items if it.get("category") != "table_object"]
+    text_items = [it for it in items if it.get("category") != Category.TABLE_OBJECT]
     keys_a = [_item_key(it) for it in text_items]
     keys_b = [_para_key(p) for p in paras]
     matcher = difflib.SequenceMatcher(None, keys_a, keys_b, autojunk=False)
@@ -283,7 +284,7 @@ def _table_identity_ready(items: list[dict], table_elements: List) -> bool:
     table_items = [
         it
         for it in items
-        if isinstance(it, dict) and it.get("category") == "table_object"
+        if isinstance(it, dict) and it.get("category") == Category.TABLE_OBJECT
     ]
     if any(it.get("exists") and not it.get("table_id") for it in table_items):
         return False
@@ -334,7 +335,7 @@ def _align_by_identity(document, items: list[dict]) -> tuple[int, int, int, int,
     table_cursor = 0
 
     for item in items:
-        if item.get("category") == "table_object":
+        if item.get("category") == Category.TABLE_OBJECT:
             added, table_cursor = _place_table_item(
                 item, tbl_by_id, table_elements, table_cursor, document, ordered
             )
@@ -389,7 +390,7 @@ def _mark_unsupported_new_tables(document, items: list[dict]) -> None:
     for item in items:
         if (
             isinstance(item, dict)
-            and item.get("category") == "table_object"
+            and item.get("category") == Category.TABLE_OBJECT
             and not item.get("exists")
         ):
             item["sync_skip"] = True
@@ -442,13 +443,15 @@ class StructureSyncStage:
         sync_document_structure(ctx.document, items)
         if (
             not any(
-                isinstance(it, dict) and it.get("category") != "table_object"
+                isinstance(it, dict) and it.get("category") != Category.TABLE_OBJECT
                 for it in items
             )
             and ctx.document.paragraphs
         ):
             # 内容被删空时 sync 会补一个空段落（Word 要求），这里补占位条目，
             # 避免后续「节点数 ≠ 段落数」对齐检查失败。
-            items.append({"category": "body_text", "paragraph": "", "score": 1.0})
+            items.append(
+                {"category": Category.BODY_TEXT, "paragraph": "", "score": 1.0}
+            )
         ctx.paragraphs = items
         return ctx

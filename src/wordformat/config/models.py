@@ -8,6 +8,8 @@ Pydantic 配置模型已被 DEFAULTS + DotDict 替代。
 NodeConfigRoot 保留为 dict 子类，提供向后兼容的点号访问和 collect_style_configs()。
 """
 
+from loguru import logger
+
 
 class NodeConfigRoot(dict):
     """配置根节点 —— dict 子类，支持点号访问和 collect_style_configs()。
@@ -71,7 +73,9 @@ def _resolve_builtin_style_name(cfg) -> str | None:
         return None
     try:
         return BuiltInStyle(raw).rel_value
-    except Exception:
+    except ValueError:
+        # 非内置样式名（如学校自定义样式）：原样返回，但必须留痕便于定位配置错误
+        logger.warning(f"未知内置样式名 {raw!r}，按自定义样式名使用")
         return raw
 
 

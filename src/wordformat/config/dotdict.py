@@ -4,6 +4,13 @@ import difflib
 
 from loguru import logger
 
+from wordformat.style.defaults import (
+    DEFAULT_CN_FONT,
+    DEFAULT_EN_FONT,
+    DEFAULT_FONT_COLOR,
+    DEFAULT_FONT_SIZE,
+)
+
 
 def _missing_key_hint(obj: dict, key: str) -> None:
     """点号访问缺失键的分级告警：保留“返回 None”的既有语义，
@@ -65,10 +72,10 @@ BASE_FORMAT: dict[str, object] = {
         "builtin_style_name": "正文",
     },
     "font": {
-        "chinese_font_name": "宋体",
-        "english_font_name": "Times New Roman",
-        "font_size": "小四",
-        "font_color": "黑色",
+        "chinese_font_name": DEFAULT_CN_FONT,
+        "english_font_name": DEFAULT_EN_FONT,
+        "font_size": DEFAULT_FONT_SIZE,
+        "font_color": DEFAULT_FONT_COLOR,
         "bold": False,
         "italic": False,
         "underline": False,

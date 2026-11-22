@@ -15,6 +15,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from loguru import logger
 
+from wordformat.style.defaults import IndentSide, resolve_indent_side
 from wordformat.style.inheritance import (
     StyleResolver,
     x_alignment,
@@ -178,11 +179,11 @@ class GetIndent:
     """段落左/右缩进（单位：字符），沿继承链解析。"""
 
     @staticmethod
-    def line_indent(paragraph: Paragraph, indent_type: str = "left") -> float | None:
-        if indent_type not in ("left", "right"):
-            logger.error("indent_type 必须是 'left' 或 'right'")
-            raise ValueError("indent_type 必须是 'left' 或 'right'")
-        extractor = x_left_indent if indent_type == "left" else x_right_indent
+    def line_indent(
+        paragraph: Paragraph, indent_type: str | IndentSide = IndentSide.LEFT
+    ) -> float | None:
+        side = resolve_indent_side(indent_type)
+        extractor = x_left_indent if side is IndentSide.LEFT else x_right_indent
         val = _para(paragraph, extractor, None)
         if val is None:
             return None
@@ -190,8 +191,8 @@ class GetIndent:
 
     @staticmethod
     def left_indent(paragraph: Paragraph) -> float | None:
-        return GetIndent.line_indent(paragraph, "left")
+        return GetIndent.line_indent(paragraph, IndentSide.LEFT)
 
     @staticmethod
     def right_indent(paragraph: Paragraph) -> float | None:
-        return GetIndent.line_indent(paragraph, "right")
+        return GetIndent.line_indent(paragraph, IndentSide.RIGHT)

@@ -19,11 +19,10 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Mm, Pt
 from loguru import logger
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import first_option
-from wordformat.style.units import extract_unit_from_string
-
-# EMU 到 twips 的换算系数
-_EMU_PER_TWIP = 635
+from wordformat.style.defaults import HANGING_TWIPS_PER_LEVEL
+from wordformat.style.units import EMU_PER_TWIP, extract_unit_from_string
 
 
 def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
@@ -197,7 +196,7 @@ def _convert_to_twips(value_str: str) -> int:
         return 0
 
     # EMU → twips（使用 round 避免整数除法精度损失）
-    return round(emu / _EMU_PER_TWIP)
+    return round(emu / EMU_PER_TWIP)
 
 
 def _set_indent_value(ind_element, indent_type: str, value_str: str):
@@ -272,14 +271,14 @@ def _build_numbering_rPr(headings_config, level_key: str):
                 # 非中文标签（如 "15.5" 或 14），直接作为磅值使用
                 pt_val = float(font_size)
             rPr_set_font_size(rPr, pt_val)
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as e:
+            logger.warning(f"编号字号解析失败，跳过该项: {font_size!r} ({e})")
 
     if font_color:
         try:
             rPr_set_font_color(rPr, FontColor(font_color).rel_value)
-        except Exception:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.warning(f"编号字体颜色解析失败，跳过该项: {font_color!r} ({e})")
 
     if bold is not None:
         rPr_set_bold(rPr, bold)
@@ -297,7 +296,7 @@ def _traverse_numbering(
     if paragraph:
         # 处理标题节点
         for level_key, (ilvl_str, config_key) in heading_map.items():
-            if category == f"heading_{level_key}":
+            if category == Category(f"heading_{level_key}"):
                 level_config = getattr(config, config_key, None)
                 if level_config and level_config.enabled:
                     # 标题编号 hook：预设可自定义编号策略（skip 完全接管 / num_id 覆盖编号）
@@ -322,7 +321,7 @@ def _traverse_numbering(
                 break
 
         # 处理参考文献条目节点（references_content category，不依赖论文规则类）
-        if ref_enabled and category == "references_content":
+        if ref_enabled and category == Category.REFERENCES_CONTENT:
             _strip_reference_numbering(paragraph)
             if reference_num_id:
                 apply_auto_numbering(paragraph, reference_num_id, "0")
@@ -588,7 +587,7 @@ def _build_numbering_level(
     if level_config.text_indent:
         _set_indent_value(ind, "hanging", level_config.text_indent)
     else:
-        ind.set(qn("w:hanging"), str((ilvl + 1) * 210))
+        ind.set(qn("w:hanging"), str((ilvl + 1) * HANGING_TWIPS_PER_LEVEL))
 
     pPr.append(ind)
     lvl.append(pPr)

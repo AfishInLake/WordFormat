@@ -19,8 +19,13 @@ _EMPHASIS_DIFF_TYPES = ("bold", "italic", "underline")
 _MEDIA_RUN_XPATH = ".//w:drawing | .//w:pict | .//w:object"
 
 
-def _run_has_media(run: Run) -> bool:
+def run_has_media(run: Run) -> bool:
+    """run 是否承载图片/对象（改写 text 会连带清掉这些子元素）。"""
     return bool(run._r.xpath(_MEDIA_RUN_XPATH))
+
+
+# 兼容内部旧名
+_run_has_media = run_has_media
 
 
 class TreeNode:

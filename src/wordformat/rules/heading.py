@@ -3,6 +3,7 @@
 # @Author  : afish
 # @File    : heading.py
 
+from wordformat.categories import Category
 from wordformat.config.dotdict import BASE_FORMAT, deep_merge
 from wordformat.rules.node import FormatNode
 from wordformat.structure.registry import register
@@ -15,7 +16,7 @@ class _HeadingChecks:
         return {"first_line_indent"}
 
 
-@register("heading_level_1", level=1)
+@register(Category.HEADING_LEVEL_1, level=1)
 class HeadingLevel1Node(_HeadingChecks, FormatNode):
     """一级标题节点"""
 
@@ -43,7 +44,7 @@ class HeadingLevel1Node(_HeadingChecks, FormatNode):
     )
 
 
-@register("heading_level_2", level=2)
+@register(Category.HEADING_LEVEL_2, level=2)
 class HeadingLevel2Node(_HeadingChecks, FormatNode):
     """二级标题节点"""
 
@@ -70,7 +71,7 @@ class HeadingLevel2Node(_HeadingChecks, FormatNode):
     )
 
 
-@register("heading_level_3", level=3)
+@register(Category.HEADING_LEVEL_3, level=3)
 class HeadingLevel3Node(_HeadingChecks, FormatNode):
     """三级标题节点"""
 
