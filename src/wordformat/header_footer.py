@@ -70,6 +70,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from loguru import logger
 
+from wordformat.config.dotdict import first_option
 from wordformat.style.defs import Alignment, FontSize
 from wordformat.style.reader import (
     paragraph_get_alignment,
@@ -254,15 +255,22 @@ def _part_label(kind: str, sec_idx: int, variant: str = "") -> str:
 
 
 def _resolve_alignment_value(label):
-    """对齐标签 → WD_ALIGN_PARAGRAPH 枚举值；解析失败返回 None。"""
+    """对齐标签 → WD_ALIGN_PARAGRAPH 枚举值；解析失败返回 None。
+
+    列表值（任一满足即可）取首项——页眉页脚只能落一个对齐方式。
+    """
     try:
-        return Alignment(label).rel_value
+        return Alignment(first_option(label)).rel_value
     except (ValueError, TypeError):
         return None
 
 
 def _resolve_font_size_pt(label) -> Optional[float]:
-    """字号标签 → pt；支持 '小五' / 12 / '12pt' 等。"""
+    """字号标签 → pt；支持 '小五' / 12 / '12pt' 等。
+
+    列表值（任一满足即可）取首项。
+    """
+    label = first_option(label)
     if label is None:
         return None
     try:

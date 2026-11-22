@@ -23,6 +23,13 @@ from wordformat.tree import print_tree
 
 console = Console()
 
+# 配置模板头部说明：列表字段是「任一满足即可」的等价规范，校验时全部合法，
+# 应用格式到文档时只能落一个值，统一取首项。
+_CONFIG_TEMPLATE_HEADER = (
+    "# 列表值表示「任一满足即可」（校验时命中任一项即通过，应用时取首项落盘）。\n"
+    "# 单值表示唯一规范。\n"
+)
+
 
 def validate_file(
     path: str, name: str, allowed_extensions: list[str] | None = None
@@ -73,10 +80,10 @@ def _show_config():
     from wordformat.structure.registry import export_defaults
 
     data = export_defaults()
-    yaml_str = yaml.dump(
+    yaml_str = _CONFIG_TEMPLATE_HEADER + yaml.dump(
         data, default_flow_style=False, allow_unicode=True, sort_keys=False
     )
-    console.print(yaml_str)
+    console.print(yaml_str, markup=False)
 
 
 def main():
@@ -417,7 +424,7 @@ wordf startapi -H 127.0.0.1 -p 8000
             from wordformat.structure.registry import export_defaults
 
             data = export_defaults()
-            yaml_str = yaml.dump(
+            yaml_str = _CONFIG_TEMPLATE_HEADER + yaml.dump(
                 data, default_flow_style=False, allow_unicode=True, sort_keys=False
             )
             with open(args.o, "w", encoding="utf-8") as f:

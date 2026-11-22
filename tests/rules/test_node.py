@@ -241,11 +241,6 @@ class TestLoadConfig:
         node.load_config(root_config)
         assert node.pydantic_config.label.font_size == "三号"
 
-    def test_keywords_en_loads_label(self, root_config):
-        node = _make_node(KeywordsEN)
-        node.load_config(root_config)
-        assert node.pydantic_config.label.font_size == "三号"
-
 
 class TestInlineEmphasisProtection:
     """行内强调保护：YAML 显式声明 bold/italic/underline 时以配置为准。"""

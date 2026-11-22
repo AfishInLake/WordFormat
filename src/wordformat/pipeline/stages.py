@@ -9,6 +9,7 @@ from docx import Document
 from docx.document import Document as DocumentObject
 from docx.shared import Pt, RGBColor
 
+from wordformat.config.dotdict import first_option
 from wordformat.config.loader import load_config
 from wordformat.config.models import NodeConfigRoot
 from wordformat.log_config import logger
@@ -196,20 +197,25 @@ class StyleDefinitionFixStage:
             rPr = ensure_rPr(style.element)
             rPr_set_font(rPr, cn_name=cn_name, en_name=en_name)
 
-        font_size = getattr(cfg, "font_size", None)
+        # 列表值表示“任一满足即可”，样式定义只能落一个值 → 取首项
+        font_size = first_option(getattr(cfg, "font_size", None))
         if font_size is not None:
             try:
                 style.font.size = Pt(FontSize(font_size).rel_value)
             except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' 字号失败: {e}")
+                logger.warning(
+                    f"设置样式 '{style_name}' 字号失败: {e}（配置值: {font_size!r}）"
+                )
 
-        font_color = getattr(cfg, "font_color", None)
+        font_color = first_option(getattr(cfg, "font_color", None))
         if font_color is not None:
             try:
                 rgb = FontColor(font_color).rel_value
                 style.font.color.rgb = RGBColor(*rgb)
             except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' 颜色失败: {e}")
+                logger.warning(
+                    f"设置样式 '{style_name}' 颜色失败: {e}（配置值: {font_color!r}）"
+                )
 
         bold = getattr(cfg, "bold", None)
         if bold is not None:
@@ -231,20 +237,22 @@ class StyleDefinitionFixStage:
         回退到 XML 操作。
         """
         # --- 对齐方式（python-docx API） ---
-        alignment = getattr(cfg, "alignment", None)
+        alignment = first_option(getattr(cfg, "alignment", None))
         if alignment is not None:
             try:
                 style.paragraph_format.alignment = Alignment(alignment).rel_value
             except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' 对齐方式失败: {e}")
+                logger.warning(
+                    f"设置样式 '{style_name}' 对齐方式失败: {e}（配置值: {alignment!r}）"
+                )
 
         # --- 行距（python-docx API） ---
-        line_spacingrule = getattr(cfg, "line_spacingrule", None)
+        line_spacingrule = first_option(getattr(cfg, "line_spacingrule", None))
         if line_spacingrule is not None:
             try:
                 lsr = LineSpacingRule(line_spacingrule)
                 style.paragraph_format.line_spacing_rule = lsr.rel_value
-                line_spacing = getattr(cfg, "line_spacing", None)
+                line_spacing = first_option(getattr(cfg, "line_spacing", None))
                 if line_spacing is not None:
                     ls = LineSpacing(line_spacing)
                     if ls.rel_unit == "pt":
@@ -264,7 +272,7 @@ class StyleDefinitionFixStage:
             ("space_before", SpaceBefore, "before"),
             ("space_after", SpaceAfter, "after"),
         ]:
-            val = getattr(cfg, attr_name, None)
+            val = first_option(getattr(cfg, attr_name, None))
             if val is None:
                 continue
             try:
@@ -277,10 +285,12 @@ class StyleDefinitionFixStage:
                         f"样式定义仅支持'行'单位，已跳过"
                     )
             except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
+                logger.warning(
+                    f"设置样式 '{style_name}' {attr_name} 失败: {e}（配置值: {val!r}）"
+                )
 
         # --- 缩进（仅支持字符单位，需 XML） ---
-        first_line_indent = getattr(cfg, "first_line_indent", None)
+        first_line_indent = first_option(getattr(cfg, "first_line_indent", None))
         if first_line_indent is not None:
             try:
                 inst = FirstLineIndent(first_line_indent)
@@ -293,13 +303,16 @@ class StyleDefinitionFixStage:
                         f"样式定义仅支持'字符'单位，已跳过"
                     )
             except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' first_line_indent 失败: {e}")
+                logger.warning(
+                    f"设置样式 '{style_name}' first_line_indent 失败: {e}"
+                    f"（配置值: {first_line_indent!r}）"
+                )
 
         for attr_name, cls, indent_type in [
             ("left_indent", LeftIndent, "R"),
             ("right_indent", RightIndent, "X"),
         ]:
-            val = getattr(cfg, attr_name, None)
+            val = first_option(getattr(cfg, attr_name, None))
             if val is None:
                 continue
             try:
@@ -312,7 +325,9 @@ class StyleDefinitionFixStage:
                         f"样式定义仅支持'字符'单位，已跳过"
                     )
             except Exception as e:
-                logger.warning(f"设置样式 '{style_name}' {attr_name} 失败: {e}")
+                logger.warning(
+                    f"设置样式 '{style_name}' {attr_name} 失败: {e}（配置值: {val!r}）"
+                )
 
     def _fix_all_style_definitions(self, document: DocumentObject, config_model):
         """在格式化开始前，统一修正文档中所有使用的样式定义。
@@ -451,8 +466,9 @@ class FormattingExecutionStage:
         traverse(root_node)
 
     def process(self, ctx: FormatContext) -> FormatContext:
-        if ctx.check:
-            FormatNode.reset_stats()
+        # 两种模式都重置：apply 路径的页眉页脚锚定批注也会累加全局统计，
+        # 若仅 check 重置，长驻服务中计数会跨请求单调增长
+        FormatNode.reset_stats()
         # 格式化开始 hook：领域 handler 在此重置自己的遍历状态（如论文题注编号）
         from wordformat.hooks import hooks
 

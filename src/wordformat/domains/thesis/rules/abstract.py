@@ -80,7 +80,10 @@ class AbstractTitleContentCN(FormatNode):
         for run in runs:  # 检查标题是否包含在正文中
             run.text = run.text.replace("\r", "").replace("\n", "")
             text_clean = run.text
-            if not text_clean.strip():
+            if not text_clean:
+                # 只跳过空 run；纯空白 run 必须参与 cum 累加，否则与
+                # title_end（在含空白的 clean 全文上计算）坐标系错位，
+                # 标题/正文样式分界会判错（与英文版处理一致）
                 continue
             run_start = cum
             cum += len(text_clean)

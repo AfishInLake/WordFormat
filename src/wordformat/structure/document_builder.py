@@ -23,7 +23,8 @@ class DocumentBuilder:
             else:
                 return json.loads(json_path)
         except Exception:
-            logger.warning("加载json文件...")
+            # 非 JSON 文本（典型是文件路径）：转为读文件，这里是正常分支不是告警
+            logger.debug(f"按路径加载 json 文件: {json_path}")
             with open(json_path, encoding="utf-8") as f:
                 return json.load(f)
 

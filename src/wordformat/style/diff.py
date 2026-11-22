@@ -92,6 +92,13 @@ def _load_warnings() -> WarningConfig:
     return _warnings
 
 
+def reset_warnings_cache() -> None:
+    """失效告警配置缓存：长驻服务每次运行开头调用，
+    避免首个请求的配置永久决定后续所有请求的告警阈值。"""
+    global _warnings
+    _warnings = None
+
+
 def _pt_to_label(pt: float) -> str:
     """磅值 → 中文标签。精确匹配显示字号，否则直接显示 Xpt。"""
     return FontSize._LABEL_MAP_REVERSE.get(pt, f"{pt}pt")
@@ -235,9 +242,11 @@ class CharacterStyle:
         self.italic: bool = italic
         self.underline: bool = underline
 
-    def diff_from_run(self, run: Run) -> list[DIFFResult]:  # noqa c901
-        """
-        检查段落样式和指定样式是否一致
+    def diff_from_run(self, run: Run, canonical: bool = False) -> list[DIFFResult]:
+        """检查 run 与目标字符样式的差异。
+
+        canonical=False（检查）：字号列表表示等价规范，任一命中即通过。
+        canonical=True（应用）：只认首项，run 必须收敛到列表第一个字号。
         """
 
         diffs = []
@@ -282,9 +291,12 @@ class CharacterStyle:
 
         # 4. 字号（列表表示等价规范，任一命中即可；半磅级偏差视为排版取整）
         current_size = run_get_font_size_pt(run)
-        if self.font_size_options and not any(
+        size_options = (
+            self.font_size_options[:1] if canonical else self.font_size_options
+        )
+        if size_options and not any(
             abs(current_size - float(opt.rel_value)) <= _FONT_SIZE_TOL_PT
-            for opt in self.font_size_options
+            for opt in size_options
         ):
             diffs.append(
                 DIFFResult(
@@ -349,7 +361,11 @@ class CharacterStyle:
         return sorted(diffs, key=lambda x: x.level)
 
     def apply_to_run(  # noqa C901
-        self, run: Run, only: set[str] | None = None, force: bool = False
+        self,
+        run: Run,
+        only: set[str] | None = None,
+        force: bool = False,
+        canonical: bool = False,
     ):
         """将字符样式应用到 docx.Run 对象。
 
@@ -359,6 +375,7 @@ class CharacterStyle:
             force: 跳过差异判定，直接写入 only 指定的字段。用于“显式配置必须
                 落到 run 上”的场景（如表格 cell_run），此时当前值恰好落在容差
                 内也不应省略写入。
+            canonical: 字号列表只认首项（应用模式），默认按等价规范判定。
         """
         if force:
             wanted = only if only is not None else set(_FORCE_FIELD_MAP)
@@ -369,7 +386,7 @@ class CharacterStyle:
                 and getattr(self, _FORCE_FIELD_MAP[field]) is not None
             ]
         else:
-            diffs = self.diff_from_run(run)
+            diffs = self.diff_from_run(run, canonical=canonical)
             if only is not None:
                 diffs = [d for d in diffs if d.diff_type in only]
         result = []
@@ -499,10 +516,13 @@ class ParagraphStyle:
         """将段落样式应用到 docx.Paragraph 对象，返回样式修正结果。
 
         skip: 本次不适用的 diff_type 集合（如短行标题的 first_line_indent）。
+
+        配置里的列表是「任一满足即可」的等价规范：检查时全部合法，应用时
+        文档只能落一个值，统一取首项（canonical 模式）。
         """
         skip = skip or set()
         # 先检测当前段落与目标样式的差异
-        diffs = self.diff_from_paragraph(paragraph)
+        diffs = self.diff_from_paragraph(paragraph, canonical=True)
         result = []
 
         # 第一步：先应用 builtin_style_name（样式赋值会重置对齐、缩进等，
@@ -560,15 +580,50 @@ class ParagraphStyle:
         # 返回所有修正结果，便于外部查看/记录
         return result
 
-    def diff_from_paragraph(self, paragraph: Paragraph) -> list[DIFFResult]:  # noqa C901
-        """检查当前段落样式与给定段落样式的差异"""
+    def _option_values(self, canonical: bool) -> tuple[list, list, list, list, list]:
+        """各段落属性的候选值。
+
+        检查模式返回全部等价规范（任一命中即通过）；应用模式只返回首项，
+        保证文档收敛到配置里的第一个值。
+        """
+        if canonical:
+            return (
+                [self.alignment],
+                [self.space_before],
+                [self.space_after],
+                [self.line_spacingrule],
+                [self.first_line_indent],
+            )
+        return (
+            self.alignment_options,
+            self.space_before_options,
+            self.space_after_options,
+            self.line_spacingrule_options,
+            self.first_line_indent_options,
+        )
+
+    def diff_from_paragraph(  # noqa: C901
+        self, paragraph: Paragraph, canonical: bool = False
+    ) -> list[DIFFResult]:
+        """检查当前段落样式与给定段落样式的差异。
+
+        canonical=False（检查）：列表值表示「任一满足即可」，命中任一项即通过。
+        canonical=True（应用）：只认首项，文档必须收敛到列表的第一个值。
+        """
         if not paragraph:
             return []
+        (
+            alignment_options,
+            before_options,
+            after_options,
+            rule_options,
+            indent_options,
+        ) = self._option_values(canonical)
         diffs = []
         # 对齐方式（未设置 → 继承自样式/文档默认，不报告）
         alignment = self.alignment.get_from_paragraph(paragraph)
         if alignment is not None and not any(
-            opt == alignment for opt in self.alignment_options
+            opt == alignment for opt in alignment_options
         ):
             diffs.append(
                 DIFFResult(
@@ -582,7 +637,7 @@ class ParagraphStyle:
         # 段前间距（未显式设置/继承链无值 → 视为未规定，不报告）
         space_before = self.space_before.get_from_paragraph(paragraph)
         if space_before is not None and not any(
-            opt == space_before for opt in self.space_before_options
+            opt == space_before for opt in before_options
         ):
             diffs.append(
                 DIFFResult(
@@ -596,7 +651,7 @@ class ParagraphStyle:
         # 段后间距（未设置 → 不报告）
         space_after = self.space_after.get_from_paragraph(paragraph)
         if space_after is not None and not any(
-            opt == space_after for opt in self.space_after_options
+            opt == space_after for opt in after_options
         ):
             diffs.append(
                 DIFFResult(
@@ -614,7 +669,7 @@ class ParagraphStyle:
             linespacingrule == WD_LINE_SPACING.MULTIPLE and line_spacing_value is None
         )
         if not line_spacing_unset and not any(
-            opt == linespacingrule for opt in self.line_spacingrule_options
+            opt == linespacingrule for opt in rule_options
         ):
             diffs.append(
                 DIFFResult(
@@ -643,9 +698,7 @@ class ParagraphStyle:
             or self.alignment.rel_value == WD_ALIGN_PARAGRAPH.CENTER
         )
         first_line_indent = self.first_line_indent.get_from_paragraph(paragraph)
-        if not centered and not any(
-            opt == first_line_indent for opt in self.first_line_indent_options
-        ):
+        if not centered and not any(opt == first_line_indent for opt in indent_options):
             diffs.append(
                 DIFFResult(
                     "first_line_indent",

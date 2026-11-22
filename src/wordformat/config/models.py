@@ -23,6 +23,9 @@ class NodeConfigRoot(dict):
         try:
             val = self[key]
         except KeyError:
+            from wordformat.config.dotdict import _missing_key_hint
+
+            _missing_key_hint(self, key)
             return None
         if isinstance(val, dict) and not isinstance(val, NodeConfigRoot):
             return NodeConfigRoot(**val)
@@ -54,6 +57,7 @@ class NodeConfigRoot(dict):
 
 
 def _resolve_builtin_style_name(cfg) -> str | None:
+    from wordformat.config.dotdict import first_option
     from wordformat.style.defs import BuiltInStyle
 
     raw = (
@@ -61,6 +65,8 @@ def _resolve_builtin_style_name(cfg) -> str | None:
         if isinstance(cfg, dict)
         else getattr(cfg, "builtin_style_name", None)
     )
+    # 列表值（任一满足即可）取首项：样式定义只能落到一个 Word 样式名
+    raw = first_option(raw)
     if not raw:
         return None
     try:

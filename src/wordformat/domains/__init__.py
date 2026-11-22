@@ -76,15 +76,19 @@ def load_domain(name: str, registry: HookRegistry = hooks, force: bool = False) 
 
 
 def reset_domains() -> None:
-    """清空领域装配记录（测试用，不会清空已注册回调本身）。"""
+    """清空领域装配记录（测试与每次运行重新装配用，不会清空已注册回调本身）。"""
     _LOADED_DOMAINS.clear()
 
 
 # 自动发现 domains/ 下所有领域模块（thesis.py、gongwen.py……），
-# 导入后 @register_domain 装饰器会把注册函数写入 _DOMAIN_REGISTRY
+# 导入后 @register_domain 装饰器会把注册函数写入 _DOMAIN_REGISTRY。
+# 单个领域导入失败只跳过该领域：否则包导入连锁失败，API/编排入口整个起不来
 def _discover_domain_modules() -> None:
     for module_info in pkgutil.iter_modules(__path__):
-        importlib.import_module(f"{__name__}.{module_info.name}")
+        try:
+            importlib.import_module(f"{__name__}.{module_info.name}")
+        except Exception as e:
+            logger.error(f"领域模块 {module_info.name} 导入失败，已跳过：{e}")
 
 
 _discover_domain_modules()

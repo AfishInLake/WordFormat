@@ -19,6 +19,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Mm, Pt
 from loguru import logger
 
+from wordformat.config.dotdict import first_option
 from wordformat.style.units import extract_unit_from_string
 
 # EMU 到 twips 的换算系数
@@ -41,6 +42,7 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
         return False
 
     text = paragraph.text.lstrip("\u3000 ")  # 全角/半角空格
+    lead_ws = len(paragraph.text) - len(text)  # 被 lstrip 掉的前导空白，删除时需计入
     if not text:
         return False
 
@@ -55,6 +57,9 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
     # 中文数字/阿拉伯数字 混合组
     _CHD = f"(?:{_CHN}|[0-9])"
     _CHDM = f"(?:{_CHN}|[0-9])+"
+    # 纯中文数字（可多位，如“十一”“二十”），用于裸编号图案：
+    # 一级/二级标题的裸数字编号只认中文数字，避免“1 测试”被一级误剔
+    _CHDM_CN = f"(?:{_CHN})+"
 
     # 按 ilvl 构建模式列表（优先级从高到低）
     patterns: list[str] = []
@@ -68,7 +73,10 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
             rf"^\({_CHDM}\)\s*",  # (一)、(1)
             rf"^{_CHDM}\)\s*",  # 一)、1)
             rf"^{_ROMAN}\.\s+",  # I.  / V.
-            rf"^{_CH}\s*[、，,\.]?\s*",  # 一、 / 一 / 一.
+            # 裸中文数字后必须跟标点或空白，否则“十分类分析”这类
+            # 首字为中文数字的正常标题会被误删首字
+            rf"^{_CHDM_CN}[、，,\.](?:\s+|(?=[^\s\d]))",  # 一、 / 一.
+            rf"^{_CHDM_CN}\s+",  # 一 绪论（数字后必须有空白分隔）
         ]
     elif ilvl == 1:  # 二级标题
         patterns = [
@@ -76,14 +84,16 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
             rf"^{_NUM}\.{_NUM}\s+",  # 1.1   (带空格)
             rf"^{_NUM}\.{_NUM}\s*",  # 1.1
             rf"^{_CH}\.{_NUM}\s*",  # 一.1
-            rf"^{_CH}\s*[、，,\.]?\s*",  # 一、/ 一.
+            rf"^{_CHDM_CN}[、，,\.](?:\s+|(?=[^\s\d]))",  # 一、/ 一.
+            rf"^{_CHDM_CN}\s+",  # 一 节标题（数字后必须有空白分隔）
         ]
     else:  # 三级及以上
         patterns = [
             rf"^{_NUM}\.{_NUM}\.{_NUM}\s*",  # 1.1.1
             rf"^{_NUM}\.{_NUM}\.{_NUM}\s+",  # 1.1.1
             rf"^{_NUM}\.{_NUM}\s*",  # 1.1
-            rf"^{_NUM}\s*[、，,\.]?\s*",  # 1. / 1、
+            rf"^{_NUM}\s*[、，,\.]",  # 1. / 1、/ 1，
+            rf"^{_NUM}\s+",  # 1 标题（裸数字后必须有空白，避免"3D打印"误剥）
         ]
 
     # 去除所有尾部空格和零宽断言
@@ -91,7 +101,9 @@ def _auto_strip_numbering(paragraph, ilvl: int) -> bool:
         match = re.match(pattern, text)
         if not match:
             continue
-        stripped_len = len(match.group())
+        # 匹配长度在 lstrip 后的文本上计算，删除从原始头部开始，
+        # 前导空白必须一并计入，否则会错删编号尾部的正文字符
+        stripped_len = lead_ws + len(match.group())
         _remove_chars(paragraph, stripped_len)
         return True
 
@@ -109,6 +121,7 @@ def _strip_reference_numbering(paragraph) -> bool:
         return False
 
     text = paragraph.text.lstrip("　 ")
+    lead_ws = len(paragraph.text) - len(text)  # 前导空白宽度，同 _auto_strip_numbering
     if not text:
         return False
 
@@ -125,7 +138,7 @@ def _strip_reference_numbering(paragraph) -> bool:
     for pattern in patterns:
         match = re.match(pattern, text)
         if match:
-            _remove_chars(paragraph, len(match.group()))
+            _remove_chars(paragraph, lead_ws + len(match.group()))
             return True
 
     return False
@@ -239,8 +252,9 @@ def _build_numbering_rPr(headings_config, level_key: str):
 
     chinese_font = getattr(level_cfg, "chinese_font_name", None)
     english_font = getattr(level_cfg, "english_font_name", None)
-    font_size = getattr(level_cfg, "font_size", None)
-    font_color = getattr(level_cfg, "font_color", None)
+    # 选项列表（任意一项即合法）在编号定义里只能落一个值 → 取首项
+    font_size = first_option(getattr(level_cfg, "font_size", None))
+    font_color = first_option(getattr(level_cfg, "font_color", None))
     bold = getattr(level_cfg, "bold", None)
 
     if not any([chinese_font, english_font, font_size, font_color, bold is not None]):

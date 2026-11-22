@@ -13,7 +13,7 @@ from pathlib import Path
 
 from docx import Document
 
-from wordformat.config.dotdict import deep_merge
+from wordformat.config.dotdict import deep_merge, first_option
 from wordformat.log_config import logger
 from wordformat.markdown.parser import parse_markdown
 from wordformat.math.omml import latex_to_omath, latex_to_omath_para
@@ -219,7 +219,7 @@ class DocumentCreationStage:
             rfonts = OxmlElement("w:rFonts")
             rpr.insert(0, rfonts)
         rfonts.set(qn("w:eastAsia"), cn_font)
-        size = cfg.get("font_size")
+        size = first_option(cfg.get("font_size"))
         if size:
             from wordformat.style.defs import FontSize
 

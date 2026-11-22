@@ -4,59 +4,37 @@ comprehensive tests for style modules:
   check_format, get_some, set_some, style_enum, utils
 """
 
-import pytest
-from types import SimpleNamespace
-from unittest.mock import MagicMock, PropertyMock, patch as mock_patch
+from unittest.mock import MagicMock
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Pt, RGBColor
-from docx.oxml.ns import qn
 
-from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
-from wordformat.style.reader import (
-    paragraph_get_alignment,
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
-    paragraph_get_builtin_style_name,
-    run_get_font_name,
-    run_get_font_size_pt,
-    run_get_font_color,
-    run_get_font_bold,
-    run_get_font_italic,
-    run_get_font_underline,
-    GetIndent,
-)
-from wordformat.style.writer import (
-    run_set_font_name,
-    set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines,
-    _paragraph_space_by_lines,
-    SetSpacing,
-    SetLineSpacing,
-    SetIndent,
-    SetFirstLineIndent,
-)
 from wordformat.style.defs import (
+    Alignment,
+    BuiltInStyle,
+    FirstLineIndent,
+    FontColor,
     FontName,
     FontSize,
-    FontColor,
-    Alignment,
-    LineSpacingRule,
-    LineSpacing,
-    FirstLineIndent,
     LeftIndent,
+    LineSpacing,
+    LineSpacingRule,
     RightIndent,
-    BuiltInStyle,
-    SpaceBefore,
     SpaceAfter,
+    SpaceBefore,
     Spacing,
     UnitLabelEnum,
 )
-from wordformat.style.units import extract_unit_from_string, UnitResult
-
+from wordformat.style.reader import (
+    run_get_font_name,
+)
+from wordformat.style.units import UnitResult, extract_unit_from_string
+from wordformat.style.writer import (
+    set_paragraph_space_after_by_lines,
+    set_paragraph_space_before_by_lines,
+)
 
 # ---------------------------------------------------------------------------
 # fixtures & helpers
@@ -217,11 +195,11 @@ class TestFontColor:
 
     def test_invalid_raises(self):
         with pytest.raises(ValueError):
-            FontColor("not_a_color").rel_value
+            _ = FontColor("not_a_color").rel_value
 
     def test_non_string_raises(self):
         with pytest.raises(TypeError):
-            FontColor(123).rel_value
+            _ = FontColor(123).rel_value
 
     @pytest.mark.parametrize(
         "h,ok", [("#f00", True), ("#FF0000", True), ("FF0000", True), ("#GGG", False)]
@@ -464,7 +442,7 @@ class TestUnitResult:
 
     def test_unit_ch_invalid_raises(self):
         with pytest.raises(ValueError, match="Invalid unit"):
-            UnitResult(standard_unit="xyz").unit_ch
+            _ = UnitResult(standard_unit="xyz").unit_ch
 
 
 # ===========================================================================
@@ -553,7 +531,7 @@ class TestFontColorParseColorValueError:
         webcolors.hex_to_rgb = MagicMock(side_effect=ValueError("mock error"))
         try:
             with pytest.raises(ValueError, match="非法十六进制色值"):
-                FontColor("#FF0000").rel_value
+                _ = FontColor("#FF0000").rel_value
         finally:
             webcolors.hex_to_rgb = original
 
@@ -583,7 +561,7 @@ class TestFontColorEqEdgeCases:
         fc = FontColor("red")
         assert fc == "red"  # 字符串颜色名现在被正确比较
         assert fc != 42  # 非颜色应返回 False
-        assert fc != None  # None 应返回 False
+        assert fc is not None  # None 应返回 False
 
     def test_eq_wrong_length_tuple_returns_false(self):
         """__eq__ with tuple of wrong length returns False (line 339-340)"""

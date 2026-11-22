@@ -8,6 +8,7 @@ from wordformat.config.dotdict import (
     BASE_FORMAT,
     DotDict,
     deep_merge,
+    first_option,
     flatten_style_config,
 )
 from wordformat.config.loader import LazyConfig, clear_config, get_config, load_config
@@ -100,6 +101,22 @@ class TestDeepMergeBoundary:
         assert deep_merge({}, {}) == {}
         assert deep_merge({"a": 1}, {}) == {"a": 1}
         assert deep_merge({}, {"a": 1}) == {"a": 1}
+
+
+class TestFirstOptionBoundary:
+    def test_list_takes_first_item(self):
+        assert first_option(["四号", "小四"]) == "四号"
+
+    def test_single_value_passthrough(self):
+        assert first_option("小四") == "小四"
+        assert first_option(None) is None
+
+    def test_empty_list_becomes_none(self):
+        assert first_option([]) is None
+
+    def test_tuple_is_not_treated_as_options(self):
+        # tuple 可能是 RGB 等真实值（font_color），不能取首项
+        assert first_option((0, 0, 0)) == (0, 0, 0)
 
 
 class TestFlattenStyleConfigBoundary:

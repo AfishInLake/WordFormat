@@ -22,7 +22,7 @@ from wordformat.pipeline.orchestrate import (
     json_to_docx,
     md_to_docx,
 )
-from wordformat.settings import BASE_DIR, SERVER_HOST, VERSION
+from wordformat.settings import BASE_DIR, VERSION
 from wordformat.tree import render_tree
 
 # ---------------------- 初始化FastAPI应用 ----------------------
@@ -41,7 +41,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 允许上述域名的跨域请求
-    allow_credentials=True,  # 允许携带cookie（可选，建议开）
+    # 通配来源下必须关闭凭证：否则部分实现会退化为反射任意 Origin，
+    # 且本服务不依赖 cookie 会话，携带凭证没有任何收益
+    allow_credentials=False,
     allow_methods=["*"],  # 允许所有请求方法（GET/POST/PUT等）
     allow_headers=["*"],  # 允许所有请求头（包括文件上传的头）
 )
@@ -49,6 +51,11 @@ app.add_middleware(
 # ---------------------- 全局配置 ----------------------
 TEMP_DIR = BASE_DIR / "temp"
 OUTPUT_DIR = BASE_DIR / "output"
+
+# 上传体积上限：接口全部是小体量文档/配置，超过即拒绝，防单请求打爆内存
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024
+# 保存上传文件时允许的扩展名白名单（config_file 等所有落盘共用）
+ALLOWED_UPLOAD_SUFFIXES = (".docx", ".yaml", ".yml", ".md", ".json")
 
 
 def _ensure_dirs() -> None:
@@ -68,16 +75,33 @@ class OperationResult(BaseModel):
 
 
 # ---------------------- 核心工具函数 ----------------------
+def _safe_upload_name(filename: Optional[str]) -> str:
+    """归一化客户端可控的文件名：剥离路径、拒绝穿越与隐藏文件。
+
+    Windows 客户端可能上传带反斜杠的全路径名，这里两种分隔符都要剥。
+    """
+    name = os.path.basename((filename or "").replace("\\", "/"))
+    if not name or name in (".", "..") or name.startswith("."):
+        raise HTTPException(status_code=400, detail=f"上传文件名不合法：{filename!r}")
+    return name
+
+
 def save_upload_file(upload_file: UploadFile, save_dir: Path) -> str:
     """
     保存上传的文件到指定目录，仅返回【文件绝对路径】（重名自动加_1/_2后缀，避免覆盖）
+    - 文件名经 basename 归一化，拒绝路径穿越；扩展名限白名单；落盘点限 save_dir 内
     :param upload_file: FastAPI上传的文件对象
     :param save_dir: 保存目录
     :return: 文件绝对路径
     """
     try:
-        original_filename = upload_file.filename
-        file_suffix = os.path.splitext(original_filename)[-1]
+        original_filename = _safe_upload_name(upload_file.filename)
+        file_suffix = os.path.splitext(original_filename)[-1].lower()
+        if file_suffix not in ALLOWED_UPLOAD_SUFFIXES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"上传失败：仅支持 {'/'.join(ALLOWED_UPLOAD_SUFFIXES)} 扩展名",
+            )
         original_name_no_suffix = os.path.splitext(original_filename)[0]
 
         # 重名处理：自动追加数字后缀，防止文件覆盖
@@ -89,14 +113,41 @@ def save_upload_file(upload_file: UploadFile, save_dir: Path) -> str:
             )
             counter += 1
 
-        # 保存文件流
-        with open(save_path, "wb") as f:
-            f.write(upload_file.file.read())
-        abs_path = os.path.abspath(save_path)
+        # 最终防线：解析真实路径，确保落在 save_dir 内
+        save_dir_resolved = os.path.realpath(save_dir)
+        abs_path = os.path.realpath(save_path)
+        if os.path.dirname(abs_path) != save_dir_resolved:
+            raise HTTPException(status_code=400, detail="上传文件保存路径不合法")
+
+        # 体积上限：优先用 starlette 的 size 元数据快速拒绝，再按读入量兜底。
+        # 不用 while-read 分块循环——它要求 file 对象在 EOF 后返回 b""，
+        # 对返回固定内容的 file-like/mock 会无限循环。
+        declared_size = getattr(upload_file, "size", None)
+        if isinstance(declared_size, int) and declared_size > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"上传失败：文件超过大小上限（{MAX_UPLOAD_SIZE // 1024 // 1024}MB）",
+            )
+        data = upload_file.file.read(MAX_UPLOAD_SIZE + 1)
+        if not isinstance(data, (bytes, bytearray)):
+            raise HTTPException(status_code=400, detail="上传内容读取失败")
+        if len(data) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"上传失败：文件超过大小上限（{MAX_UPLOAD_SIZE // 1024 // 1024}MB）",
+            )
+
+        with open(abs_path, "wb") as f:
+            f.write(data)
         logger.info(f"上传文件已保存：{abs_path}")
         return abs_path
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文件保存失败：{str(e)}") from e
+        logger.error(f"文件保存失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="文件保存失败，请检查输入后重试"
+        ) from e
 
 
 def _parse_presets(value: Optional[str]) -> Optional[list[str]]:
@@ -174,8 +225,10 @@ async def api_generate_json(
             },
         )
     except Exception as e:
-        logger.error(f"生成JSON失败：{str(e)}")
-        raise HTTPException(status_code=500, detail=f"生成JSON失败：{str(e)}") from e
+        logger.exception(f"生成JSON失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="生成JSON失败，请检查输入文档后重试"
+        ) from e
 
 
 @app.post(
@@ -218,9 +271,9 @@ async def api_check_format(
 
         # 3. 从真实路径中提取最终文件名（如：1 (1)_2--标注版.docx）
         final_filename = os.path.basename(actual_save_path)
-        # 4. 拼接正确的下载链接（仅编码文件名，无多余路径）
+        # 4. 拼接下载链接：统一相对路径（绝对 SERVER_HOST 在反代/远程下会失效）
         encoded_filename = quote(final_filename)
-        download_url = f"{SERVER_HOST}/download/{encoded_filename}"
+        download_url = f"/download/{encoded_filename}"
 
         # 5. 记录真实的保存路径日志（与函数内部日志一致）
         logger.info(f"格式校验完成，结果保存：{actual_save_path}")
@@ -237,8 +290,10 @@ async def api_check_format(
             },
         )
     except Exception as e:
-        logger.error(f"格式校验失败：{str(e)}")
-        raise HTTPException(status_code=500, detail=f"格式校验失败：{str(e)}") from e
+        logger.exception(f"格式校验失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="格式校验失败，请检查输入后重试"
+        ) from e
 
 
 @app.post(
@@ -305,8 +360,10 @@ async def api_apply_format(
             },
         )
     except Exception as e:
-        logger.error(f"文档格式化失败：{str(e)}")
-        raise HTTPException(status_code=500, detail=f"文档格式化失败：{str(e)}") from e
+        logger.exception(f"文档格式化失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="文档格式化失败，请检查输入后重试"
+        ) from e
 
 
 @app.post(
@@ -344,9 +401,9 @@ async def api_markdown_to_docx(
             data=_saved_file_data(md_file.filename, out_path),
         )
     except Exception as e:
-        logger.error(f"Markdown 转换失败：{str(e)}")
+        logger.exception(f"Markdown 转换失败：{str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Markdown 转换失败：{str(e)}"
+            status_code=500, detail="Markdown 转换失败，请检查输入后重试"
         ) from e
 
 
@@ -387,8 +444,10 @@ async def api_json_to_docx(
             data=_saved_file_data(json_file.filename, out_path),
         )
     except Exception as e:
-        logger.error(f"JSON 重建失败：{str(e)}")
-        raise HTTPException(status_code=500, detail=f"JSON 重建失败：{str(e)}") from e
+        logger.exception(f"JSON 重建失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="JSON 重建失败，请检查输入后重试"
+        ) from e
 
 
 @app.post(
@@ -428,8 +487,10 @@ async def api_tree(
             code=200, msg="文档结构树生成成功", data={"tree": tree_text}
         )
     except Exception as e:
-        logger.error(f"结构树生成失败：{str(e)}")
-        raise HTTPException(status_code=500, detail=f"结构树生成失败：{str(e)}") from e
+        logger.exception(f"结构树生成失败：{str(e)}")
+        raise HTTPException(
+            status_code=500, detail="结构树生成失败，请检查输入后重试"
+        ) from e
 
 
 @app.get("/download/{filename}", summary="下载格式化/校验后的Word文档")
@@ -466,7 +527,7 @@ def download_file(filename: str):
         raise
     except Exception as e:
         logger.error(f"文件下载失败：{filename} -> {str(e)}")
-        raise HTTPException(status_code=500, detail=f"文件下载失败：{str(e)}") from e
+        raise HTTPException(status_code=500, detail="文件下载失败，请稍后重试") from e
 
 
 # ---------------------- 配置文件管理 ----------------------
@@ -483,7 +544,8 @@ def list_configs():
         ]
         return {"code": 200, "data": sorted(set(files))}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"配置列表读取失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="配置列表读取失败") from e
 
 
 @app.get("/configs/{filename}", summary="读取指定配置文件内容")
@@ -498,7 +560,8 @@ def read_config(filename: str):
         with open(file_path, encoding="utf-8") as f:
             return {"code": 200, "data": f.read()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"配置文件读取失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="配置文件读取失败") from e
 
 
 class SaveConfigRequest(BaseModel):
@@ -520,7 +583,8 @@ def save_config(req: SaveConfigRequest):
             f.write(req.content)
         return {"code": 200, "msg": f"配置已保存到 configs/{filename}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"配置保存失败：{str(e)}")
+        raise HTTPException(status_code=500, detail="配置保存失败") from e
 
 
 # ---------------------- 前端静态文件（Vue SPA）---------------------

@@ -4,59 +4,18 @@ comprehensive tests for style modules:
   check_format, get_some, set_some, style_enum, utils
 """
 
-import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, PropertyMock, patch as mock_patch
+from unittest.mock import MagicMock
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.shared import Pt, RGBColor
-from docx.oxml.ns import qn
+from docx.shared import Pt
 
-from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
-from wordformat.style.reader import (
-    paragraph_get_alignment,
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
-    paragraph_get_builtin_style_name,
-    run_get_font_name,
-    run_get_font_size_pt,
-    run_get_font_color,
-    run_get_font_bold,
-    run_get_font_italic,
-    run_get_font_underline,
-    GetIndent,
-)
+from wordformat.style.diff import CharacterStyle, DIFFResult, ParagraphStyle
 from wordformat.style.writer import (
     run_set_font_name,
-    set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines,
-    _paragraph_space_by_lines,
-    SetSpacing,
-    SetLineSpacing,
-    SetIndent,
-    SetFirstLineIndent,
 )
-from wordformat.style.defs import (
-    FontName,
-    FontSize,
-    FontColor,
-    Alignment,
-    LineSpacingRule,
-    LineSpacing,
-    FirstLineIndent,
-    LeftIndent,
-    RightIndent,
-    BuiltInStyle,
-    SpaceBefore,
-    SpaceAfter,
-    Spacing,
-    UnitLabelEnum,
-)
-from wordformat.style.units import extract_unit_from_string, UnitResult
-
 
 # ---------------------------------------------------------------------------
 # fixtures & helpers
@@ -219,6 +178,19 @@ class TestCharacterStyle:
         assert any(d.diff_type == "bold" for d in result)
         _clear_warning()
 
+    def test_font_size_list_is_lenient_in_check_strict_in_apply(self, doc):
+        """字号列表：检查任一命中即通过，应用只落首项。"""
+        cs = CharacterStyle(font_size=["五号", "小四"])
+        run = doc.add_paragraph().add_run("文字")
+        run.font.size = Pt(12)  # 小四
+
+        assert not [d for d in cs.diff_from_run(run) if d.diff_type == "font_size"]
+
+        applied = cs.apply_to_run(run, canonical=True)
+
+        assert any(d.diff_type == "font_size" for d in applied)
+        assert run.font.size == Pt(10.5)  # 五号（首项）
+
     def test_to_string_filters_by_warning(self, mock_warning, mock_warning_off):
         diffs = [DIFFResult(diff_type="bold", current_value=True, expected_value=False)]
         _set_warning(mock_warning)
@@ -304,6 +276,31 @@ class TestDIFFResultWarningLevel:
 class TestParagraphStyleApplyToParagraph:
     """Cover lines 315-358: ParagraphStyle.apply_to_paragraph with various indent types"""
 
+    def test_check_accepts_any_option_of_list(self, doc, mock_warning):
+        """检查模式：列表值任一命中即通过。"""
+        _set_warning(mock_warning)
+        p = doc.add_paragraph("正文")
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        ps = ParagraphStyle(alignment=["居中对齐", "左对齐"])
+
+        diffs = ps.diff_from_paragraph(p)
+
+        assert not [d for d in diffs if d.diff_type == "alignment"]
+        _clear_warning()
+
+    def test_apply_takes_first_option_of_list(self, doc, mock_warning):
+        """应用模式：列表只落首项（检查认左对齐，应用仍收敛到居中）。"""
+        _set_warning(mock_warning)
+        p = doc.add_paragraph("正文")
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        ps = ParagraphStyle(alignment=["居中对齐", "左对齐"])
+
+        diffs = ps.apply_to_paragraph(p)
+
+        assert [d.diff_type for d in diffs].count("alignment") == 1
+        assert p.alignment == WD_ALIGN_PARAGRAPH.CENTER
+        _clear_warning()
+
     def test_apply_left_indent(self, doc, mock_warning):
         """apply_to_paragraph with left_indent diff (line 337-338)"""
         _set_warning(mock_warning)
@@ -354,7 +351,7 @@ class TestParagraphStyleApplyToParagraph:
 
         original_diff = ps.diff_from_paragraph
 
-        def fake_diff(paragraph):
+        def fake_diff(paragraph, canonical=False):
             return [DIFFResult(diff_type="unknown_type", comment="test")]
 
         ps.diff_from_paragraph = fake_diff
@@ -424,8 +421,8 @@ class TestCharacterStyleInitFromConfig:
 
     def test_init_loads_warning_from_config(self, config_path):
         """从配置加载警告设置。"""
-        from wordformat.config.loader import init_config, clear_config
         import wordformat.style.diff as m
+        from wordformat.config.loader import clear_config, init_config
 
         init_config(config_path)
         try:
@@ -523,6 +520,7 @@ class TestCharacterStyleToStringNone:
     def test_to_string_all_warnings_enabled(self):
         """warnings 全开时返回所有 diff 的标准格式文本。"""
         import dataclasses
+
         import wordformat.style.diff as m
 
         m._warnings = m.WarningConfig(
@@ -551,7 +549,7 @@ class TestCharacterStyleToStringBoldFilter:
 
 
 class TestCharacterStyleToStringVariousFilters:
-    """Cover lines 252, 254, 256: CharacterStyle.to_string with italic/underline/font_size/font_color/font_name filters"""
+    """CharacterStyle.to_string 各类告警开关过滤路径。"""
 
     def test_to_string_italic_filtered(self, mock_warning):
         """warning.italic=True 时 italic diff 被包含。"""
@@ -604,6 +602,7 @@ class TestParagraphStyleToStringAllEnabled:
     def test_to_string_all_warnings_enabled(self):
         """warnings 全开时返回所有 diff 的标准格式文本。"""
         import dataclasses
+
         import wordformat.style.diff as m
 
         m._warnings = m.WarningConfig(

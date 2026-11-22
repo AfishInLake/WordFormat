@@ -278,9 +278,22 @@ class FormatNode(TreeNode):
                         text=CharacterStyle.to_string(diff, target=self.NODE_LABEL),
                     )
             else:
-                self._apply_run_style(cstyle, run)
+                apply_style = cstyle
+                if minor_font:
+                    # 与 check 分支同源豁免：次要 run（上标角标等）的字号
+                    # 不强制拉平到正文字号，只补齐字体/颜色等其他样式
+                    apply_style = CharacterStyle(
+                        font_name_cn=cfg.chinese_font_name,
+                        font_name_en=cfg.english_font_name,
+                        font_size=None,
+                        font_color=cfg.font_color,
+                        bold=cfg.bold,
+                        italic=cfg.italic,
+                        underline=cfg.underline,
+                    )
+                self._apply_run_style(apply_style, run)
                 # apply 后再次 diff，只报告修正失败的残留差异
-                remaining = self._diff_run_style(cstyle, run)
+                remaining = self._diff_run_style(apply_style, run)
                 if remaining:
                     self.add_comment(
                         doc=doc,
@@ -304,7 +317,8 @@ class FormatNode(TreeNode):
         """
         keep = self._keep_inline_emphasis()
         saved = {k: getattr(run, k) for k in _EMPHASIS_DIFF_TYPES} if keep else None
-        diffs = cstyle.apply_to_run(run)
+        # 应用模式：字号等列表值统一落首项，文档收敛到唯一规范
+        diffs = cstyle.apply_to_run(run, canonical=True)
         if saved is not None:
             for key, value in saved.items():
                 setattr(run, key, value)

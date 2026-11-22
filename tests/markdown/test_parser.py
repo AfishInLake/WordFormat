@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 """Markdown 解析器单元测试。"""
 
-import pytest
+from unittest.mock import patch
 
 from wordformat.markdown.parser import parse_markdown
 
@@ -147,7 +147,7 @@ class TestSpecialBlocks:
         assert "引用文字" in result[0]["paragraph"]
 
     def test_code_block_empty_lines_skipped(self):
-        result = parse_markdown('```\n\na = 1\n\nb = 2\n\n```')
+        result = parse_markdown("```\n\na = 1\n\nb = 2\n\n```")
         assert len(result) == 2
         assert result[0]["paragraph"] == "a = 1"
         assert result[1]["paragraph"] == "b = 2"
@@ -171,6 +171,104 @@ class TestSpecialBlocks:
         assert len(result) == 1
         assert result[0]["category"] == "figure_image"
         assert result[0]["paragraph"] == "noalt.png"
+
+    def test_image_no_alt_warns_about_missing_caption(self):
+        """无 alt 时不会生成题注段，必须留下 WARNING（论文图无题注是硬伤）。"""
+        with patch("wordformat.markdown.parser.logger") as log:
+            result = parse_markdown("![](noalt.png)")
+
+        assert [r["category"] for r in result] == ["figure_image"]
+        warnings = " ".join(str(c) for c in log.warning.call_args_list)
+        assert "题注" in warnings and "noalt.png" in warnings
+
+    def test_image_with_alt_does_not_warn(self):
+        with patch("wordformat.markdown.parser.logger") as log:
+            parse_markdown("![图1 系统架构](arch.png)")
+
+        assert not [c for c in log.warning.call_args_list if "题注" in str(c)]
+
+    # -- 手写题注识别（Markdown 无题注语法，作者常写「表X-Y 名称」） --------
+
+    def test_table_caption_above_table_promoted(self):
+        text = "表1-1 功能需求与指标\n\n| 功能 | 指标 |\n|---|---|\n| 登录 | 3 秒 |"
+        result = parse_markdown(text)
+        assert result[0]["category"] == "caption_table"
+        assert result[0]["paragraph"] == "表1-1 功能需求与指标"
+        assert result[1]["category"] == "table_object"
+
+    def test_table_caption_below_table_promoted(self):
+        text = "| 功能 | 指标 |\n|---|---|\n| 登录 | 3 秒 |\n\n表1-1 功能需求与指标"
+        result = parse_markdown(text)
+        assert result[0]["category"] == "table_object"
+        assert result[1]["category"] == "caption_table"
+
+    def test_caption_between_two_tables_belongs_to_the_next_one(self):
+        """两表之间的「表X-Y」行归属下一张表（表题在上）。"""
+        text = (
+            "| A | B |\n|---|---|\n| 1 | 2 |\n\n"
+            "表1-2 第二张表\n\n"
+            "| C | D |\n|---|---|\n| 3 | 4 |"
+        )
+        result = parse_markdown(text)
+        categories = [r["category"] for r in result]
+        assert categories == ["table_object", "caption_table", "table_object"]
+        assert result[1]["paragraph"] == "表1-2 第二张表"
+
+    def test_body_sentence_starting_with_table_ref_not_promoted(self):
+        """正文句「表1-1 的数据表明……」不能被当成题注。"""
+        text = (
+            "表1-1 的数据表明，该方法有效。\n\n"
+            "| 功能 | 指标 |\n|---|---|\n| 登录 | 3 秒 |"
+        )
+        result = parse_markdown(text)
+        assert result[0]["category"] == "body_text"
+        assert result[1]["category"] == "table_object"
+
+    def test_manual_figure_caption_promoted_without_alt(self):
+        """图片无 alt 但旁边写了「图X-Y 名称」时，识别为图题注且不告警。"""
+        text = "![](arch.png)\n\n图1-1 系统总体框图"
+        with patch("wordformat.markdown.parser.logger") as log:
+            result = parse_markdown(text)
+
+        assert [r["category"] for r in result] == ["figure_image", "caption_figure"]
+        assert result[1]["paragraph"] == "图1-1 系统总体框图"
+        assert not [c for c in log.warning.call_args_list if "题注" in str(c)]
+
+    def test_alt_caption_not_duplicated_by_manual_line(self):
+        """alt 已生成题注时，相邻手写「图X-Y」行不再认领，避免两条题注。"""
+        text = "图1-1 系统总体框图\n\n![图1-1 系统总体框图](arch.png)"
+        result = parse_markdown(text)
+
+        categories = [r["category"] for r in result]
+        assert categories.count("caption_figure") == 1
+        assert categories[0] == "body_text"
+
+    def test_previous_figure_caption_not_counted_for_next_figure(self):
+        """上一张图的题注不能当成下一张图的题注，缺题注的图仍要告警。"""
+        text = "![图1-1 第一张](a.png)\n\n![](b.png)"
+        with patch("wordformat.markdown.parser.logger") as log:
+            result = parse_markdown(text)
+
+        assert [r["category"] for r in result] == [
+            "figure_image",
+            "caption_figure",
+            "figure_image",
+        ]
+        warnings = [str(c) for c in log.warning.call_args_list]
+        assert len([w for w in warnings if "b.png" in w]) == 1
+
+    def test_next_figure_manual_caption_still_promoted(self):
+        """两张图连排时，第二张图下方的手写题注仍应认领。"""
+        text = "![图1-1 第一张](a.png)\n\n![](b.png)\n\n图1-2 第二张"
+        result = parse_markdown(text)
+
+        assert [r["category"] for r in result] == [
+            "figure_image",
+            "caption_figure",
+            "figure_image",
+            "caption_figure",
+        ]
+        assert result[3]["paragraph"] == "图1-2 第二张"
 
     def test_strikethrough_text(self):
         result = parse_markdown("这是~~删除~~文字")

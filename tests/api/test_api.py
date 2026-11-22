@@ -9,44 +9,15 @@ import io
 import os
 import shutil
 import tempfile
-import threading
 from unittest import mock
 
 import pytest
-import numpy as np
-from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt
-from pydantic import ValidationError
 from fastapi.testclient import TestClient
 
-from wordformat.cli import validate_file, main
-from wordformat.config.loader import (
-    LazyConfig,
-    ConfigNotLoadedError,
-    init_config,
-    get_config,
-    clear_config,
-)
-from wordformat.config.models import NodeConfigRoot
-from wordformat.agent.message import MessageManager
-from wordformat.agent.onnx_infer import (
-    _get_best_onnx_providers,
-    _load_model,
-    onnx_single_infer,
-    onnx_batch_infer,
-    safe_batch_infer,
-)
-from wordformat.pipeline.stages import FormattingExecutionStage, ParagraphAlignmentStage
-from wordformat.classify.tag import set_tag_main
-from wordformat.structure.node_factory import create_node
-from wordformat.structure.tree_builder import DocumentTreeBuilder
-from wordformat.structure.document_builder import DocumentBuilder
-from wordformat.structure.utils import promote_bodytext_in_subtrees_of_type
-from wordformat.rules.node import FormatNode
 import wordformat.api
-from wordformat.rules.body import BodyText
 from wordformat.api import save_upload_file
+from wordformat.cli import main, validate_file
+from wordformat.pipeline.stages import FormattingExecutionStage
 
 apply_format_check_to_all_nodes = (
     FormattingExecutionStage().apply_format_check_to_all_nodes
@@ -424,7 +395,7 @@ class TestAPIEndpoints:
         test_file = output_dir / "result.docx"
         test_file.write_bytes(b"docx content here")
 
-        response = client.get(f"/download/result.docx")
+        response = client.get("/download/result.docx")
         assert response.status_code == 200
         assert response.content == b"docx content here"
 

@@ -116,9 +116,19 @@ def _prepare_hooks(ctx, presets) -> None:
 
     顺序：内置机制 → 文档领域（可覆盖/补充内置逻辑） → 预设（最后注册，
     可 unregister 禁用前述任何回调）。
+
+    长驻服务中全局 hooks 单例跨请求共享：若不复位，上一请求带过的预设
+    回调会泄漏到后续不带该预设的请求。因此每次运行先清空注册表与
+    告警缓存，再按本请求参数重新装配（注册均幂等）。
     """
-    from wordformat.domains import load_domain
+    from wordformat.domains import load_domain, reset_domains
     from wordformat.handlers import register_builtin_handlers
+    from wordformat.hooks import hooks
+    from wordformat.style.diff import reset_warnings_cache
+
+    hooks.clear()
+    reset_domains()
+    reset_warnings_cache()
 
     register_builtin_handlers()
     load_domain("thesis")

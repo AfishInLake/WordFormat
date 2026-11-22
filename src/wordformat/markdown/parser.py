@@ -6,9 +6,28 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import mistune
+from loguru import logger
+
+# Markdown 没有题注语法，作者通常手写「表1-1 名称」「图1-1 名称」紧贴对象。
+# 该正则要求「标签 + 编号 + 分隔符（空格/冒号）+ 文字」，避免把
+# 「表1所示的数据……」这类正文句误判成题注。
+_CAPTION_RE = re.compile(
+    r"^\s*续?\s*(?P<label>[图表])\s*\d+(?:\s*[-－.．–—]\s*\d+)*\s*(?:[：:]|\s)\s*\S"
+)
+
+# 题注是单行短标签；过长或带句末标点的段落按正文处理，不提升
+_CAPTION_MAX_CHARS = 80
+_CAPTION_FORBIDDEN_CHARS = "。；;！？!?"
+
+# 题注与对象的相邻方向：表题在表上方，图题在图下方
+_CAPTION_NEIGHBOR_ORDER = {
+    "table_object": (("caption_table", "表"), (-1, 1)),
+    "figure_image": (("caption_figure", "图"), (1, -1)),
+}
 
 
 def parse_markdown(md_text: str) -> list[dict[str, Any]]:
@@ -17,7 +36,8 @@ def parse_markdown(md_text: str) -> list[dict[str, Any]]:
     category 映射：
       h1 → heading_level_1, h2 → heading_level_2, h3+ → heading_level_3
       普通段落 → body_text
-      仅含图片的段落 → figure_image
+      仅含图片的段落 → figure_image（alt 文本生成 caption_figure）
+      紧贴表格/图片的「表X-Y 名称」「图X-Y 名称」段落 → caption_table / caption_figure
 
     每个段落附带 inline_marks，记录行内格式片段（bold/italic/code 等），
     供 DocumentCreationStage 创建多 run 段落时使用。
@@ -28,12 +48,94 @@ def parse_markdown(md_text: str) -> list[dict[str, Any]]:
     ast = md(md_text)
     result: list[dict[str, Any]] = []
     _walk_blocks(ast, result)
+    _promote_adjacent_captions(result)
+    _warn_uncaptioned_images(result)
     return result
 
 
 # ---------------------------------------------------------------------------
 # 内部辅助
 # ---------------------------------------------------------------------------
+
+
+def _promote_adjacent_captions(items: list[dict[str, Any]]) -> None:
+    """把紧贴表格/图片、形如「表X-Y 名称」「图X-Y 名称」的正文段提升为题注。
+
+    作者手写的题注行会被当成 body_text，落到 docx 里就是普通正文，既没有
+    题注样式也没有自动编号。题注与对象相邻（中间的空行已在解析阶段跳过）
+    且文本形态匹配时，就地改 category，内容与位置保持不变。
+
+    图片已由 alt 文本生成题注时不再认领邻居，避免同一张图出现两条题注。
+    """
+    for idx, item in enumerate(items):
+        category = item.get("category")
+        mapping = _CAPTION_NEIGHBOR_ORDER.get(category)
+        if mapping is None:
+            continue
+        (caption_category, label), neighbors = mapping
+        if caption_category == "caption_figure" and _image_has_caption(items, idx):
+            continue
+        for offset in neighbors:
+            pos = idx + offset
+            if not 0 <= pos < len(items):
+                continue
+            candidate = items[pos]
+            if candidate.get("category") != "body_text":
+                continue
+            if (
+                category == "table_object"
+                and offset == 1
+                and pos + 1 < len(items)
+                and items[pos + 1].get("category") == "table_object"
+            ):
+                # 两表之间的「表X-Y」行属于下一张表（表题在上），不被上一张认领
+                continue
+            if _looks_like_caption(str(candidate.get("paragraph", "")), label):
+                candidate["category"] = caption_category
+                candidate["score"] = 1.0
+                break
+
+
+def _image_has_caption(items: list[dict[str, Any]], idx: int) -> bool:
+    """图片是否已有题注：alt 生成的题注紧随其后，上一张图的题注不算本图的。"""
+    nxt = idx + 1
+    if nxt < len(items) and items[nxt].get("category") == "caption_figure":
+        return True
+    prev = idx - 1
+    if 0 <= prev < len(items) and items[prev].get("category") == "caption_figure":
+        before_caption = prev - 1
+        owns_previous_image = (
+            0 <= before_caption < len(items)
+            and items[before_caption].get("category") == "figure_image"
+        )
+        return not owns_previous_image
+    return False
+
+
+def _looks_like_caption(text: str, label: str) -> bool:
+    text = text.strip()
+    if not text or len(text) > _CAPTION_MAX_CHARS:
+        return False
+    if any(ch in text for ch in _CAPTION_FORBIDDEN_CHARS):
+        return False
+    match = _CAPTION_RE.match(text)
+    return bool(match) and match.group("label") == label
+
+
+def _warn_uncaptioned_images(items: list[dict[str, Any]]) -> None:
+    """图片既无 alt 题注、也无相邻手写题注时告警（论文图无题注是硬伤）。"""
+    for idx, item in enumerate(items):
+        if item.get("category") != "figure_image":
+            continue
+        if _image_has_caption(items, idx):
+            continue
+        url = str(item.get("paragraph", "")) or "<空路径>"
+        logger.warning(
+            "图片缺少题注，未生成图题注："
+            f"{url}；"
+            "请在 Markdown 中写成 ![图1 题注文字](路径)，"
+            "或在图片旁一行写「图1-1 题注文字」"
+        )
 
 
 def _walk_blocks(blocks: list[dict], result: list[dict]) -> None:
@@ -61,6 +163,14 @@ def _walk_blocks(blocks: list[dict], result: list[dict]) -> None:
             _walk_list(block, result)
         elif btype == "block_quote":
             _walk_blocks(block.get("children", []), result)
+        elif btype == "block_html":
+            # 块级原始 HTML：剔标签后按正文保留，避免内容静默消失
+            raw = re.sub(r"<[^>]+>", " ", block.get("raw", "")).strip()
+            if raw:
+                logger.warning(f"Markdown 含块级 HTML，已降级为纯文本：{raw[:50]}")
+                result.append({"category": "body_text", "paragraph": raw, "score": 1.0})
+        else:
+            logger.warning(f"未处理的 Markdown 块类型，已跳过：{btype}")
 
 
 def _make_block_math(block: dict) -> dict:
@@ -116,6 +226,7 @@ def _make_paragraph(block: dict) -> dict | list[dict] | None:
                     "inline_marks": [],
                 }
             )
+        # 无 alt 时不生成题注；由 _warn_uncaptioned_images 在相邻题注识别后统一告警
         return result
 
     text = _extract_text(children)

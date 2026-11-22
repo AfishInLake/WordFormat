@@ -2,7 +2,7 @@
 rules 模块测试 —— 聚焦真实行为验证，无填充。
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from docx import Document
@@ -155,10 +155,6 @@ class TestCaptionTableBase:
 # === 题注编号集成测试 (from test_caption_numbering.py) ===
 
 """题注编号处理模块的单元测试。"""
-
-from unittest.mock import MagicMock
-
-import pytest
 
 # CaptionNumberingConfig replaced by dict
 

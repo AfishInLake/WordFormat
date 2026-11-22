@@ -83,7 +83,8 @@ class TestMarkdownToDocx:
                 files={"md_file": ("note.md", io.BytesIO(b"x"), "text/markdown")},
             )
         assert response.status_code == 500
-        assert "boom" in response.json()["detail"]
+        # 安全要求：500 不向客户端回显内部异常文本，细节只进日志
+        assert "boom" not in response.json()["detail"]
 
 
 class TestJsonToDocx:
@@ -351,8 +352,9 @@ class TestCommandErrors:
 
     def test_download_rejects_path_traversal(self, api_client):
         # 客户端/路由层会规范化 ../，直接调用接口才能命中文件名守卫
-        import wordformat.api as api_module
         from fastapi import HTTPException
+
+        import wordformat.api as api_module
 
         _client, _temp, _output = api_client
         with pytest.raises(HTTPException) as exc_info:

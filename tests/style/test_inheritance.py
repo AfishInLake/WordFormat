@@ -5,9 +5,9 @@
 → docDefaults → 主题字体，以及 Mock 降级与各提取器分支。
 """
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
@@ -102,7 +102,7 @@ class TestBasedOnChain:
         gp = _para_style(doc, "GP")
         gp.font.bold = True
         parent = _para_style(doc, "Parent", base=gp)
-        child = _para_style(doc, "Child", base=parent)
+        _para_style(doc, "Child", base=parent)
         r = doc.add_paragraph(style="Child").add_run("x")
         assert run_get_font_bold(r) is True
 

@@ -142,8 +142,17 @@ def _apply_caption_numbering(
     text = paragraph.text.strip()
     if not text:
         return
+    # 与 check 路径同源的两道守卫，避免 apply 把不认识的内容改脏：
+    # “续表：/续图”这类跨页续表引导标签本身不带编号，不参与编号修正
+    if re.fullmatch(r"续?[图表]\s*[:：]?", text):
+        return
 
     parsed = parse_caption_text(text)
+    if parsed is None:
+        # 无法识别为题注的段落（check 只报格式错误）不重写，防止被改成
+        # “表0.0 <整段原文>”这类带缺省章节号的脏文本
+        return
+
     name = parsed["name"] if parsed else text
     is_continued = parsed.get("is_continued", False) if parsed else False
     label_text = f"续{expected_label}" if is_continued else expected_label
@@ -212,8 +221,9 @@ class CaptionTable(FormatNode):
         BASE_FORMAT,
         {
             "paragraph": {
-                "alignment": ["两端对齐", "居中对齐", "左对齐"],
-                "first_line_indent": ["2字符", "0字符"],
+                # 表题与图题一致：常见居中（应用取首项），两端/左对齐仍视为合法
+                "alignment": ["居中对齐", "两端对齐", "左对齐"],
+                "first_line_indent": ["0字符", "2字符"],
                 "space_before": ["0行", "0.5行"],
                 "space_after": ["0行", "0.5行"],
                 "line_spacingrule": [

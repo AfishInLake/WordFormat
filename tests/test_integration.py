@@ -9,6 +9,7 @@ from unittest import mock
 
 import numpy as np
 import pytest
+import yaml
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
@@ -97,7 +98,7 @@ class TestConfigLifecycle:
         for t in threads:
             t.join()
         # 所有实例独立
-        assert len(set(id(r) for r in results)) == 10
+        assert len({id(r) for r in results}) == 10
 
 
 # ==================== (b) DataModel 验证测试 ====================
@@ -200,7 +201,8 @@ class TestONNXInferIntegration:
             assert result["label"] == "body_text"
             assert result["score"] > 0.5
 
-    def test_single_infer_error_returns_empty(self):
+    def test_single_infer_error_raises(self):
+        """推理失败不再吞成空标签，而是抛出由调用方统一处理。"""
         with (
             mock.patch("wordformat.agent.onnx_infer._tokenizer") as mock_tok,
             mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess,
@@ -213,11 +215,12 @@ class TestONNXInferIntegration:
             enc.type_ids = [0, 0, 0]
             mock_tok.encode.return_value = enc
             mock_sess.run.side_effect = RuntimeError("OOM")
-            result = onnx_single_infer("test")
-            assert result == {"label": "", "score": 0.0}
+            with pytest.raises(RuntimeError, match="OOM"):
+                onnx_single_infer("test")
 
     def test_batch_infer_error_format_matches_single(self):
         """batch 失败降级为逐条推理后，label/score 与 single 一致"""
+        ok_logits = [np.array([[0.9, 0.1]])]
         with (
             mock.patch("wordformat.agent.onnx_infer._tokenizer") as mock_tok,
             mock.patch("wordformat.agent.onnx_infer._ort_sess") as mock_sess,
@@ -229,7 +232,8 @@ class TestONNXInferIntegration:
             enc.attention_mask = [1, 1, 1]
             enc.type_ids = [0, 0, 0]
             mock_tok.encode.return_value = enc
-            mock_sess.run.side_effect = RuntimeError("OOM")
+            # 第一次（批量）失败，后续单条推理成功
+            mock_sess.run.side_effect = [RuntimeError("OOM"), ok_logits, ok_logits]
             batch_results, _ = onnx_batch_infer(["t1"])
             single_result = onnx_single_infer("t1")
             assert batch_results[0]["label"] == single_result["label"]
@@ -664,7 +668,7 @@ class TestAutoFormatThesisDocument:
 
         from wordformat.pipeline.orchestrate import auto_format_thesis_document
 
-        with pytest.raises(Exception):
+        with pytest.raises(FileNotFoundError):
             auto_format_thesis_document(
                 jsonpath=temp_docx,
                 docxpath=temp_docx,
@@ -921,7 +925,7 @@ class TestONNXInferExceptionHandling:
                     "wordformat.agent.onnx_infer._get_best_onnx_providers",
                     return_value=["CUDAExecutionProvider"],
                 ),
-                mock.patch("tokenizers.Tokenizer") as mock_tok_cls,
+                mock.patch("tokenizers.Tokenizer"),
                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls,
                 mock.patch("builtins.open", open_mock),
             ):
@@ -968,7 +972,7 @@ class TestONNXInferExceptionHandling:
                     "wordformat.agent.onnx_infer._get_model_dir",
                     return_value=mock_dir,
                 ),
-                mock.patch("tokenizers.Tokenizer") as mock_tok_cls,
+                mock.patch("tokenizers.Tokenizer"),
                 mock.patch("onnxruntime.InferenceSession") as mock_sess_cls,
                 mock.patch("onnxruntime.SessionOptions") as mock_opts_cls,
                 mock.patch("builtins.open", open_mock),
@@ -996,6 +1000,7 @@ class TestONNXInferExceptionHandling:
         )
         try:
             m._tokenizer = mock.MagicMock()
+            m._tokenizer.token_to_id.return_value = 3  # 模拟 [SEP] id
             m._ort_sess = mock.MagicMock()
             m._id2label = {0: "body_text", 1: "heading"}
             # Create encoded output longer than MAX_LENGTH (128)
@@ -1010,6 +1015,8 @@ class TestONNXInferExceptionHandling:
             # Verify the input_ids were truncated to MAX_LENGTH
             call_args = m._ort_sess.run.call_args[0][1]
             assert call_args["input_ids"].shape == (1, 128)
+            # 截断必须保留尾部 [SEP]，与训练侧 truncation 行为一致
+            assert call_args["input_ids"][0][-1] == 3
         finally:
             m._tokenizer = original_tok
             m._ort_sess = original_sess
@@ -1018,6 +1025,7 @@ class TestONNXInferExceptionHandling:
     def test_batch_infer_empty_texts(self):
         """Empty texts list returns [] (line 156)"""
         result = onnx_batch_infer([])
+        assert result == ([], None)
 
     def test_batch_infer_loads_model_when_session_none(self):
         """_ort_sess is None 触发 _load_model"""
@@ -1112,6 +1120,7 @@ class TestONNXInferExceptionHandling:
     def test_safe_batch_infer_empty_texts(self):
         """Empty texts returns [] (line 244)"""
         result = safe_batch_infer([])
+        assert result == []
 
 
 # ==================== (m) keywords.py 覆盖测试 ====================
@@ -1256,10 +1265,11 @@ class TestKeywordsENBase:
         p = doc.add_paragraph()
         label_run = p.add_run("Keywords: ")
         label_run.font.bold = True
-        content_run = p.add_run("AI")
+        p.add_run("AI")
         node.paragraph = p
         node.check_format(doc)
         # count_min is 3, only 1 keyword -> should trigger count warning
+        assert len(list(doc.comments)), "关键词过少应产生批注"
 
     def test_keyword_count_validation_max(self, sample_yaml_config):
         """Keyword count > count_max triggers warning (via _run_rules)"""
@@ -1273,10 +1283,11 @@ class TestKeywordsENBase:
         p = doc.add_paragraph()
         label_run = p.add_run("Keywords: ")
         label_run.font.bold = True
-        content_run = p.add_run("AI, ML, NLP, CV, DB, SE")
+        p.add_run("AI, ML, NLP, CV, DB, SE")
         node.paragraph = p
         node.check_format(doc)
         # count_max is 5, 6 keywords -> should trigger count warning
+        assert len(list(doc.comments)), "关键词过多应产生批注"
 
 
 class TestKeywordsCNBase:
@@ -1307,7 +1318,7 @@ class TestKeywordsCNBase:
         p.paragraph_format.alignment = (
             WD_ALIGN_PARAGRAPH.CENTER
         )  # Wrong - should be left
-        run = p.add_run("关键词：人工智能")
+        p.add_run("关键词：人工智能")
         node.paragraph = p
         node.check_format(doc)
 
@@ -1353,7 +1364,7 @@ class TestKeywordsCNBase:
         node = self._make_cn_node(config)
         doc = Document()
         p = doc.add_paragraph()
-        run = p.add_run("关键词：人工智能；机器学习；")
+        p.add_run("关键词：人工智能；机器学习；")
         node.paragraph = p
         node.check_format(doc)
         # trailing_punctuation.enabled should be True by default
@@ -1442,6 +1453,7 @@ class TestHeadingLevelNodes:
         run = p.add_run("第一章 绪论")
         node.paragraph = p
         node.check_format(doc)  # 通过 RULES handler 执行格式检查
+        assert run.text == "第一章 绪论"  # check 模式不改写正文
 
 
 # ==================== (o) set_style.py 额外覆盖测试 ====================
@@ -1704,7 +1716,7 @@ class TestConfigAdditional:
     def test_load_invalid_yaml_raises(self, tmp_path):
         bad_yaml = tmp_path / "bad.yaml"
         bad_yaml.write_text("global_format: {alignment: [invalid}", encoding="utf-8")
-        with pytest.raises(Exception):
+        with pytest.raises(yaml.YAMLError):
             load_config(str(bad_yaml))
 
     def test_get_without_load_raises(self):
@@ -1750,10 +1762,6 @@ class TestTreeBuilderAdditionalCoverage:
 
     def test_build_tree_with_unknown_category_skipped(self, sample_yaml_config):
         """未知类别的节点被跳过（create_node 返回 None）"""
-        from wordformat.config.loader import get_config, init_config
-
-        init_config(sample_yaml_config)
-        config = get_config()
         builder = DocumentTreeBuilder()
         items = [
             {"category": "unknown_category", "paragraph": "test", "fingerprint": "fp1"},

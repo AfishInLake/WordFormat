@@ -111,10 +111,10 @@ class TestAcknowledgementsBase:
         """格式完全正确时，不应调用 add_comment。"""
         doc = Document()
         p = doc.add_paragraph()
-        r = p.add_run("致谢")
+        p.add_run("致谢")
         node = Acknowledgements(value=p, level=0, paragraph=p)
         node.load_config(root_config)
-        with patch.object(node, "add_comment") as mock_comment:
+        with patch.object(node, "add_comment"):
             node.check_format(doc)
         # 即使格式正确，段落级别的 diff 仍可能触发 comment
         # 但如果没有差异，不应有 comment

@@ -323,6 +323,7 @@ class TestHeadingLevelNodes:
         run = p.add_run("第一章 绪论")
         node.paragraph = p
         node.check_format(doc)  # 通过 RULES handler 执行格式检查
+        assert run.text == "第一章 绪论"  # check 模式不改写正文
 
 
 # ==================== (o) set_style.py 额外覆盖测试 ====================

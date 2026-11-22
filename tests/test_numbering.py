@@ -39,7 +39,7 @@ class TestAutoStripNumbering:
     def test_level0_chinese_chapter_strips(self, doc):
         """一级标题：第一章 → 绪论"""
         p = doc.add_paragraph()
-        run = p.add_run("第一章 绪论")
+        p.add_run("第一章 绪论")
         result = _auto_strip_numbering(p, ilvl=0)
         assert result is True
         assert p.text == "绪论"
@@ -68,8 +68,8 @@ class TestAutoStripNumbering:
     def test_multi_run_level0_strips_correctly(self, doc):
         """多 run 一级标题：第一章 + 绪论 → 绪论"""
         p = doc.add_paragraph()
-        r1 = p.add_run("第一章")
-        r2 = p.add_run(" 绪论")
+        p.add_run("第一章")
+        p.add_run(" 绪论")
         result = _auto_strip_numbering(p, ilvl=0)
         assert result is True
         assert p.text == "绪论"
@@ -633,7 +633,7 @@ class TestAutoStripNumberingEmptyResult:
     def test_text_becomes_empty_after_strip(self, doc):
         """匹配整个文本后，段落文本变为空"""
         p = doc.add_paragraph()
-        run = p.add_run("1.1 ")
+        p.add_run("1.1 ")
         result = _auto_strip_numbering(p, ilvl=1)
         assert result is True
         assert p.text == ""
@@ -641,7 +641,7 @@ class TestAutoStripNumberingEmptyResult:
     def test_single_run_fully_consumed(self, doc):
         """单个 run 的文本完全被匹配清除"""
         p = doc.add_paragraph()
-        run = p.add_run("第一章")
+        p.add_run("第一章")
         result = _auto_strip_numbering(p, ilvl=0)
         assert result is True
         assert p.text == ""
@@ -1023,8 +1023,9 @@ class TestStripReferenceNumbering:
         """不应误删除年份（如 2024. 后面没有空格不会被 1. 模式匹配）"""
         p = doc.add_paragraph("2024. A great paper about X.")
         # "2024." 后面有空格，会被匹配。我们只测不以数字开头的引用
-        p2 = doc.add_paragraph("Smith, J. (2024). A paper.")
-        assert _strip_reference_numbering(p2) is False
+        doc.add_paragraph("Smith, J. (2024). A paper.")
+        assert _strip_reference_numbering(p) is True
+        assert p.text == "A great paper about X."
 
     def test_strip_across_runs(self, doc):
         """跨 run 清除编号"""
@@ -1504,7 +1505,7 @@ class TestCountNumberingLevels:
         self._setup_numbering_doc(doc)
         p1 = doc.add_paragraph("第一章")
         self._add_numPr_to_paragraph(p1, num_id="1", ilvl="0")
-        p2 = doc.add_paragraph("正文")
+        doc.add_paragraph("正文")
         doc.add_paragraph("无编号段落")
         p3 = doc.add_paragraph("第二章")
         self._add_numPr_to_paragraph(p3, num_id="1", ilvl="0")

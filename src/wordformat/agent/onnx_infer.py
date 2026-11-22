@@ -10,6 +10,7 @@
 """
 
 import json
+import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
@@ -27,6 +28,7 @@ _tokenizer: Optional["Tokenizer"] = None  # noqa: F821
 _ort_sess: Optional["ort.InferenceSession"] = None  # noqa: F821
 _id2label: Optional[Dict[int, str]] = None
 _model_info: Optional[dict] = None
+_model_lock = threading.Lock()
 MAX_LENGTH = 128
 
 
@@ -97,11 +99,22 @@ def _get_best_onnx_providers() -> List[str]:
 
 
 def _load_model() -> None:
-    """首次调用时加载模型/词表/标签表（后续调用直接复用全局缓存）。"""
+    """首次调用时加载模型/词表/标签表（后续调用直接复用全局缓存）。
+
+    加锁 + 双重检查：多线程同时首调用时只加载一次，不会拿到半初始化状态。
+    """
     global _tokenizer, _ort_sess, _id2label, _model_info, MAX_LENGTH
     if _ort_sess is not None:
         return
+    with _model_lock:
+        if _ort_sess is not None:
+            return
+        _load_model_locked()
 
+
+def _load_model_locked() -> None:
+    """实际加载逻辑，仅在持有 _model_lock 时调用。"""
+    global _tokenizer, _ort_sess, _id2label, _model_info, MAX_LENGTH
     import onnxruntime as ort
     from tokenizers import Tokenizer
 
@@ -174,9 +187,18 @@ def _encode_batch(texts: List[str]) -> Tuple[np.ndarray, np.ndarray]:
     batch_attention_mask = np.zeros((batch_size, MAX_LENGTH), dtype=np.int64)
     for idx, text in enumerate(texts):
         encoded = _tokenizer.encode(text, add_special_tokens=True)  # type: ignore[misc]
-        seq_len = min(len(encoded.ids), MAX_LENGTH)
-        batch_input_ids[idx, :seq_len] = encoded.ids[:seq_len]
-        batch_attention_mask[idx, :seq_len] = encoded.attention_mask[:seq_len]
+        ids = encoded.ids
+        mask = encoded.attention_mask
+        # 硬切片会把尾部 [SEP] 一起切掉，与训练侧 HF
+        # truncation=True（保特殊 token：[CLS]+内容+[SEP]）不一致，
+        # 超长样本输入分布漂移会静默劣化分类精度——截断时补回 [SEP]
+        if len(ids) > MAX_LENGTH:
+            sep_id = _tokenizer.token_to_id("[SEP]")  # type: ignore[union-attr]
+            ids = ids[: MAX_LENGTH - 1] + ([sep_id] if sep_id is not None else [])
+            mask = mask[: len(ids)]
+        seq_len = min(len(ids), MAX_LENGTH)
+        batch_input_ids[idx, :seq_len] = ids[:seq_len]
+        batch_attention_mask[idx, :seq_len] = mask[:seq_len]
     return batch_input_ids, batch_attention_mask
 
 
@@ -190,20 +212,21 @@ def onnx_single_infer(text: str, prev_label: Optional[str] = None) -> dict:
     input_ids, attention_mask = _encode_batch([_prompt(prev_label, text)])
     onnx_input = {"input_ids": input_ids, "attention_mask": attention_mask}
 
-    try:
-        start = time.time()
-        logits = _ort_sess.run(["logits"], onnx_input)[0]
-        logger.debug(f"单条推理耗时：{time.time() - start:.4f}s")
-    except Exception as e:
-        logger.error(f"单条推理失败：{e}")
-        return {"label": "", "score": 0.0}
+    # 失败不吞成空标签静默续跑：抛出由调用方（批量降级链/接口层）统一处理，
+    # 避免空标签漂到下游 create_node 才报错、错误点远离真实故障点
+    start = time.time()
+    logits = _ort_sess.run(["logits"], onnx_input)[0]
+    logger.debug(f"单条推理耗时：{time.time() - start:.4f}s")
 
     logits = logits[0]
     logits -= np.max(logits)
     probs = np.exp(logits) / np.sum(np.exp(logits))
     pred_id = int(np.argmax(probs))
 
-    return {"label": _id2label[pred_id], "score": round(float(probs[pred_id]), 4)}
+    label = _id2label.get(pred_id, "")
+    if not label:
+        logger.warning(f"预测 id 不在标签表：{pred_id}")
+    return {"label": label, "score": round(float(probs[pred_id]), 4)}
 
 
 def onnx_batch_infer(

@@ -4,59 +4,29 @@ comprehensive tests for style modules:
   check_format, get_some, set_some, style_enum, utils
 """
 
-import pytest
-from types import SimpleNamespace
-from unittest.mock import MagicMock, PropertyMock, patch as mock_patch
+from unittest.mock import MagicMock
 
+import pytest
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_LINE_SPACING
 from docx.oxml.ns import qn
 
-from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
 from wordformat.style.reader import (
-    paragraph_get_alignment,
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
-    paragraph_get_builtin_style_name,
-    run_get_font_name,
-    run_get_font_size_pt,
-    run_get_font_color,
-    run_get_font_bold,
-    run_get_font_italic,
-    run_get_font_underline,
     GetIndent,
+    paragraph_get_first_line_indent,
+    paragraph_get_space_after,
+    paragraph_get_space_before,
 )
 from wordformat.style.writer import (
-    run_set_font_name,
-    set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines,
-    _paragraph_space_by_lines,
-    SetSpacing,
-    SetLineSpacing,
-    SetIndent,
     SetFirstLineIndent,
+    SetIndent,
+    SetLineSpacing,
+    SetSpacing,
+    _paragraph_space_by_lines,
+    run_set_font_name,
+    set_paragraph_space_after_by_lines,
+    set_paragraph_space_before_by_lines,
 )
-from wordformat.style.defs import (
-    FontName,
-    FontSize,
-    FontColor,
-    Alignment,
-    LineSpacingRule,
-    LineSpacing,
-    FirstLineIndent,
-    LeftIndent,
-    RightIndent,
-    BuiltInStyle,
-    SpaceBefore,
-    SpaceAfter,
-    Spacing,
-    UnitLabelEnum,
-)
-from wordformat.style.units import extract_unit_from_string, UnitResult
-
 
 # ---------------------------------------------------------------------------
 # fixtures & helpers
@@ -315,8 +285,8 @@ class TestSetSpacingUnits:
     def test_set_hang_sets_twips_to_zero(self, doc):
         """set_hang 写入 w:before="0" 覆盖样式级 pt 间距"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")

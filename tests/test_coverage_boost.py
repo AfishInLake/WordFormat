@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
@@ -35,10 +36,6 @@ from wordformat.style.defs import (
     FirstLineIndent,
     ensure_style_exists,
 )
-
-_fix_stage = StyleDefinitionFixStage()
-_format_stage = FormattingExecutionStage()
-apply_format_check_to_all_nodes = _format_stage.apply_format_check_to_all_nodes
 from wordformat.style.reader import (
     GetIndent,
     paragraph_get_builtin_style_name,
@@ -57,6 +54,10 @@ from wordformat.utils import (
     ensure_directory_exists,
     get_paragraph_numbering_text,
 )
+
+_fix_stage = StyleDefinitionFixStage()
+_format_stage = FormattingExecutionStage()
+apply_format_check_to_all_nodes = _format_stage.apply_format_check_to_all_nodes
 
 # ---------------------------------------------------------------------------
 # 共享 fixtures / helpers
@@ -268,6 +269,42 @@ class TestHeadingCoverageBoost:
         doc = Document()
         _fix_stage._fix_all_style_definitions(doc, root_config)
         # 不应抛出异常
+
+    def test_fix_all_style_definitions_takes_first_option_for_list_values(self):
+        """列表值（任一满足即可）应取首项落到样式定义，而不是静默失败。
+
+        回归：`wordf config` 导出的 alignment/font_size/line_spacingrule 等是
+        选项列表，曾被直接喂给枚举/字典查找抛 unhashable type: 'list'，
+        只记 WARNING 且退出码 0，样式定义实际上没被修正。
+        """
+        cfg = NodeConfigRoot(
+            headings={
+                "level_1": {
+                    "alignment": ["居中对齐", "两端对齐"],
+                    "builtin_style_name": "Heading 1",
+                    "font_size": ["二号", "小二"],
+                    "space_before": ["0行", "0.5行"],
+                    "space_after": ["0行", "0.5行"],
+                    "line_spacingrule": ["1.5倍行距", "单倍行距"],
+                    "line_spacing": "1.5倍",
+                    "first_line_indent": ["0字符", "2字符"],
+                }
+            }
+        )
+        doc = Document()
+
+        with patch("wordformat.pipeline.stages.logger") as log:
+            _fix_stage._fix_all_style_definitions(doc, cfg)
+
+        warnings = " ".join(str(c) for c in log.warning.call_args_list)
+        assert "unhashable" not in warnings
+
+        style = doc.styles["Heading 1"]
+        assert style.font.size == Pt(22)  # 二号（首项）
+        assert style.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.CENTER
+        assert (
+            style.paragraph_format.line_spacing_rule == WD_LINE_SPACING.ONE_POINT_FIVE
+        )
 
     def test_fix_style_run_properties_clears_theme_color(self, root_config):
         """_fix_style_run_properties 应清除样式定义中的主题色。"""
@@ -493,7 +530,7 @@ class TestKeywordsCoverageBoost:
         r1 = p.add_run("关键词")
         r1.font.size = Pt(10)
         r1.font.bold = False  # 应为加粗
-        r2 = p.add_run("：A；B；C")
+        p.add_run("：A；B；C")
         node = KeywordsCN(value=p, level=0, paragraph=p)
         node.load_config(root_config)
         with patch.object(node, "add_comment") as mock_comment:
@@ -671,11 +708,28 @@ class TestNumberingCoverageBoost:
         # sz 不应被添加（half_pt 为 None）
         assert result.find(qn("w:sz")) is None
 
+    def test_build_numbering_rPr_list_font_size_takes_first_option(self):
+        """字号写选项列表时编号应取首项，而不是静默跳过。"""
+        headings_config = MagicMock()
+        level_cfg = MagicMock()
+        level_cfg.chinese_font_name = "黑体"
+        level_cfg.english_font_name = None
+        level_cfg.font_size = ["小二", "三号"]
+        level_cfg.font_color = None
+        level_cfg.bold = None
+        headings_config.level_1 = level_cfg
+
+        result = _build_numbering_rPr(headings_config, "level_1")
+
+        sz = result.find(qn("w:sz"))
+        assert sz is not None
+        assert sz.get(qn("w:val")) == "36"  # 小二 = 18pt = 36 half-points
+
     def test_auto_strip_numbering_success(self):
         """覆盖 _auto_strip_numbering 成功清除编号。"""
         doc = Document()
         p = doc.add_paragraph()
-        r = p.add_run("1.1 研究背景")
+        p.add_run("1.1 研究背景")
         result = _auto_strip_numbering(p, ilvl=1)
         assert result is True
         assert not p.text.startswith("1.1")
@@ -707,9 +761,9 @@ class TestNumberingCoverageBoost:
         """多 run 逐字符删除。"""
         doc = Document()
         p = doc.add_paragraph()
-        r1 = p.add_run("1.")
-        r2 = p.add_run("1 ")
-        r3 = p.add_run("研究背景")
+        p.add_run("1.")
+        p.add_run("1 ")
+        p.add_run("研究背景")
         result = _auto_strip_numbering(p, ilvl=1)
         assert result is True
         assert p.text.strip() == "研究背景"
@@ -1402,7 +1456,7 @@ class TestCoverageBoostRound2:
         )
         from wordformat.rules.node import FormatNode
 
-        p = doc.add_paragraph("")
+        doc.add_paragraph("")
         root = FormatNode(value={"category": "top"}, level=0)
         root.children = []
         FormatNode.reset_stats()
@@ -1469,7 +1523,7 @@ class TestCoverageBoostRound2:
         from wordformat.style.defs import FirstLineIndent
 
         indent = FirstLineIndent("0字符")
-        assert indent == None  # rel_value is 0, so equal to None
+        assert indent == None  # noqa: E711 — 故意验证自定义 __eq__ 对 None 的行为
 
     # --- numbering.py ---
 

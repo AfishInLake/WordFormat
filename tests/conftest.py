@@ -4,14 +4,13 @@
 将所有测试文件中重复定义的 fixture 集中管理。
 """
 
-import os
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 from docx import Document
-from docx.shared import Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent

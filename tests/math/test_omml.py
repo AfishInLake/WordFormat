@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 """wordformat.math 模块单元测试。"""
 
-import pytest
 
 from wordformat.math import (
     add_display_math,

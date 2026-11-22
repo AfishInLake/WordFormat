@@ -4,59 +4,35 @@ comprehensive tests for style modules:
   check_format, get_some, set_some, style_enum, utils
 """
 
-import pytest
-from types import SimpleNamespace
-from unittest.mock import MagicMock, PropertyMock, patch as mock_patch
+from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import patch as mock_patch
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.shared import Pt, RGBColor
 from docx.oxml.ns import qn
+from docx.shared import Pt, RGBColor
 
-from wordformat.style.diff import DIFFResult, CharacterStyle, ParagraphStyle
 from wordformat.style.reader import (
+    GetIndent,
     paragraph_get_alignment,
-    paragraph_get_space_before,
-    paragraph_get_space_after,
-    paragraph_get_line_spacing,
-    paragraph_get_first_line_indent,
     paragraph_get_builtin_style_name,
+    paragraph_get_first_line_indent,
+    paragraph_get_line_spacing,
+    paragraph_get_space_after,
+    paragraph_get_space_before,
+    run_get_font_bold,
+    run_get_font_color,
+    run_get_font_italic,
     run_get_font_name,
     run_get_font_size_pt,
-    run_get_font_color,
-    run_get_font_bold,
-    run_get_font_italic,
     run_get_font_underline,
-    GetIndent,
 )
 from wordformat.style.writer import (
-    run_set_font_name,
-    set_paragraph_space_before_by_lines,
-    set_paragraph_space_after_by_lines,
-    _paragraph_space_by_lines,
-    SetSpacing,
-    SetLineSpacing,
-    SetIndent,
     SetFirstLineIndent,
+    SetIndent,
+    run_set_font_name,
 )
-from wordformat.style.defs import (
-    FontName,
-    FontSize,
-    FontColor,
-    Alignment,
-    LineSpacingRule,
-    LineSpacing,
-    FirstLineIndent,
-    LeftIndent,
-    RightIndent,
-    BuiltInStyle,
-    SpaceBefore,
-    SpaceAfter,
-    Spacing,
-    UnitLabelEnum,
-)
-from wordformat.style.units import extract_unit_from_string, UnitResult
-
 
 # ---------------------------------------------------------------------------
 # fixtures & helpers
@@ -297,8 +273,8 @@ class TestGetSomeSpaceBeforeAfterInheritance:
     def test_space_before_invalid_attr_returns_none(self, doc):
         """beforeLines attr is non-numeric -> self_lines=None, fall to style (line 147-148)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
@@ -310,8 +286,8 @@ class TestGetSomeSpaceBeforeAfterInheritance:
     def test_space_after_invalid_attr_returns_none(self, doc):
         """afterLines attr is non-numeric -> self_lines=None, fall to style (line 180-181)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
@@ -400,7 +376,7 @@ class TestGetSomeRunExtended:
 
     def test_font_color_none(self, doc):
         """run.font.color is None -> returns (0,0,0)"""
-        run = doc.add_paragraph().add_run("x")
+        doc.add_paragraph().add_run("x")
         # color is a read-only property, so we mock the entire run_get_font_color
         # by directly testing the code path with a MagicMock run
         mock_run = MagicMock()
@@ -474,8 +450,8 @@ class TestParagraphGetSpaceBeforeWithValidLines:
     def test_space_before_valid_lines(self, doc):
         """Valid beforeLines in XML returns correct value (lines 157-158)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
@@ -486,8 +462,8 @@ class TestParagraphGetSpaceBeforeWithValidLines:
     def test_space_before_valid_lines_rounded(self, doc):
         """Valid beforeLines value is rounded (line 156)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
@@ -502,8 +478,8 @@ class TestParagraphGetSpaceAfterWithValidLines:
     def test_space_after_valid_lines(self, doc):
         """Valid afterLines in XML returns correct value (lines 190-191)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
@@ -514,8 +490,8 @@ class TestParagraphGetSpaceAfterWithValidLines:
     def test_space_after_valid_lines_rounded(self, doc):
         """Valid afterLines value is rounded (line 189)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         spacing = OxmlElement("w:spacing")
@@ -565,8 +541,8 @@ class TestGetIndentLineIndentWithCharsValues:
     def test_line_indent_left_chars_valid(self, doc):
         """Valid w:leftChars value returns correct float (lines 419-423)"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
@@ -577,8 +553,8 @@ class TestGetIndentLineIndentWithCharsValues:
     def test_line_indent_right_chars_valid(self, doc):
         """Valid w:rightChars value returns correct float"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
@@ -589,8 +565,8 @@ class TestGetIndentLineIndentWithCharsValues:
     def test_line_indent_left_chars_zero(self, doc):
         """w:leftChars = 0 -> returns max(0.0, 0.0) = 0.0"""
         p = doc.add_paragraph()
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         pPr = p._element.get_or_add_pPr()
         ind = OxmlElement("w:ind")
